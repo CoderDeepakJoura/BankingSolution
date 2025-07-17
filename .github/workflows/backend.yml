@@ -1,4 +1,4 @@
-name: .NET 9 CI (Windows)
+name: .NET 8 CI (Windows)
 
 on:
   push:
@@ -14,10 +14,10 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Setup .NET 9 SDK
+      - name: Setup .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 8.0.x
 
       - name: Restore dependencies
         run: dotnet restore backend/BankingPlatform.sln
