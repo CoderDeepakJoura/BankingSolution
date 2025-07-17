@@ -20,17 +20,10 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore AHDSolution/BankingPlatform.sln
 
       - name: Build the project
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build AHDSolution/BankingPlatform.sln --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test --no-build --verbosity normal
-
-      - name: Upload Test Results
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: '**/TestResults/*.trx'
+        run: dotnet test AHDSolution/BankingPlatform.sln --no-build --verbosity normal
