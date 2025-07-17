@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# Logs
+*.log
+
+# Node
+node_modules/
+
+# Env files
+.env
+
+# Docker
+**/Dockerfile
+**/docker-compose.yml
+
+# System
+.DS_Store
+Thumbs.db

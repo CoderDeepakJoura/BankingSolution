@@ -1,0 +1,47 @@
+name: Backend CI/CD
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'backend/**'
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build & Test Backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore ./backend
+
+      - name: Build
+        run: dotnet build --no-restore ./backend
+
+      - name: Test (if you have test project)
+        run: dotnet test ./backend/tests --no-build --verbosity normal
+        continue-on-error: true
+
+      - name: Publish
+        run: dotnet publish ./backend -c Release -o ./backend/publish
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-publish
+          path: ./backend/publish
+
