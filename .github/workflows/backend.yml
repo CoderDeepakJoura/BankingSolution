@@ -1,47 +1,36 @@
-name: Backend CI/CD
+name: .NET 9 CI (Windows)
 
 on:
   push:
-    paths:
-      - 'backend/**'
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    paths:
-      - 'backend/**'
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    name: Build & Test Backend
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout source code
+        uses: actions/checkout@v4
 
-      - name: Set up .NET
+      - name: Setup .NET 9 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: 9.0.x
 
       - name: Restore dependencies
-        run: dotnet restore ./backend
+        run: dotnet restore
 
-      - name: Build
-        run: dotnet build --no-restore ./backend
+      - name: Build the project
+        run: dotnet build --no-restore --configuration Release
 
-      - name: Test (if you have test project)
-        run: dotnet test ./backend/tests --no-build --verbosity normal
-        continue-on-error: true
+      - name: Run tests
+        run: dotnet test --no-build --verbosity normal
 
-      - name: Publish
-        run: dotnet publish ./backend -c Release -o ./backend/publish
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload Test Results
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
-          name: backend-publish
-          path: ./backend/publish
-
+          name: test-results
+          path: '**/TestResults/*.trx'
