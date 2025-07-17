@@ -20,10 +20,10 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Restore dependencies
-        run: dotnet restore AHDSolution/BankingPlatform/backend/BankingPlatform.sln
+        run: dotnet restore backend/BankingPlatform.sln
 
       - name: Build the project
-        run: dotnet build AHDSolution/BankingPlatform/backend/BankingPlatform.sln --no-restore --configuration Release
+        run: dotnet build backend/BankingPlatform.sln --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test AHDSolution/BankingPlatform/backend/BankingPlatform.sln --no-build --verbosity normal
+        run: dotnet test backend/BankingPlatform.sln --no-build --verbosity normal
