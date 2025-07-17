@@ -26,4 +26,4 @@ jobs:
         run: dotnet build backend/BankingPlatform.sln --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test backend/BankingPlatform.sln --no-build --verbosity normal
+        run: dotnet test backend/BankingPlatform.sln --configuration Release --verbosity normal
