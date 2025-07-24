@@ -1,24 +1,36 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-
+import ApiService from '../services/api';
 const Login = () => {
-  const [email, setEmail] = useState("");
+  const [username, setUserName] = useState("");
   const [password, setPassword] = useState("");
+  const [branchcode, setbranchcode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showBranchCode, setShowBranchCode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
+  const [error, setError] = useState("");
+  const navigate = useNavigate(); 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    console.log("Login with:", email, password);
-    setIsLoading(false);
-    // TODO: call your .NET backend API
+    try {
+      const data = await ApiService.login(username, password, branchcode);
+      if (!data.success) {
+        setError(data.message || "Login failed");
+        return;
+      }
+      navigate("/dashboard");
+    } catch (error) {
+      setError("Network error. Please try again.");
+      console.error("Login error:", error);
+      alert("An error occurred while logging in. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -68,10 +80,10 @@ const Login = () => {
               {/* Email Field */}
               <div className="space-y-2">
                 <label
-                  htmlFor="email"
+                  htmlFor="text"
                   className="block text-sm font-semibold text-gray-700"
                 >
-                  Email Address
+                  User Name
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -91,12 +103,13 @@ const Login = () => {
                   </div>
                   <input
                     id="email"
-                    type="email"
+                    type="text"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    autoFocus={true}
+                    value={username}
+                    onChange={(e) => setUserName(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                    placeholder="your.email@company.com"
+                    placeholder="Enter your username"
                   />
                 </div>
               </div>
@@ -139,7 +152,84 @@ const Login = () => {
                     onClick={() => setShowPassword((prev) => !prev)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
                   >
-                    {showPassword ? (
+                    {!showPassword ? (
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.464 8.464M9.878 9.878l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0L9.878 9.878m7.532 7.532L21 21"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+              {/* Branch Code Field */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-semibold text-gray-700"
+                >
+                  Branch Code
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg
+                      className="h-5 w-5 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      />
+                    </svg>
+                  </div>
+                  <input
+                    id="branchcode"
+                    type={showBranchCode ? "text" : "password"}
+                    required
+                    maxLength={4}
+                    value={branchcode}
+                    onChange={(e) => setbranchcode(e.target.value)}
+                    className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                    placeholder="••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowBranchCode((prev) => !prev)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {!showBranchCode ? (
                       <svg
                         className="h-5 w-5"
                         fill="none"
@@ -178,25 +268,6 @@ const Login = () => {
                 </div>
               </div>
 
-              {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                  />
-                  <span className="text-sm text-gray-600 font-medium">
-                    Remember me
-                  </span>
-                </label>
-                <a
-                  href="#"
-                  className="text-sm text-blue-600 hover:text-blue-700 font-semibold hover:underline transition-colors"
-                >
-                  Forgot password?
-                </a>
-              </div>
-
               {/* Sign In Button */}
               <button
                 type="submit"
@@ -231,46 +302,11 @@ const Login = () => {
                   </div>
                 )}
               </button>
-
-              {/* Security Notice */}
-              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                <div className="flex items-start space-x-3">
-                  <svg
-                    className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                    />
-                  </svg>
-                  <div className="text-sm text-amber-800">
-                    <p className="font-semibold mb-1">Security Notice</p>
-                    <p>
-                      Always ensure you're on the official SecureBank domain.
-                      Never share your credentials via email or phone.
-                    </p>
-                  </div>
-                </div>
-              </div>
             </form>
           </div>
 
           {/* Help Section */}
           <div className="mt-8 text-center space-y-4">
-            <p className="text-sm text-gray-600">
-              Don’t have an account?{" "}
-              <Link
-                to="/signup"
-                className="text-blue-600 hover:underline font-semibold"
-              >
-                Sign up
-              </Link>
-            </p>
             <div className="flex items-center justify-center space-x-6 text-sm text-gray-600">
               <a
                 href="#"

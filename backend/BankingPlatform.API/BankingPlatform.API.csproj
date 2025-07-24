@@ -7,14 +7,30 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildotnet tool install --global dotnet-ef
+dtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.5" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+	  <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="7.1.2" />
+	  <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.2" />
+
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BankingPlatform.Application\BankingPlatform.Application.csproj" />
     <ProjectReference Include="..\BankingPlatform.Infrastructure\BankingPlatform.Infrastructure.csproj" />
     <ProjectReference Include="..\BankingPlatform.Identity\BankingPlatform.Identity.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="CommonFiles\" />
   </ItemGroup>
 
 </Project>
