@@ -10,10 +10,10 @@ export interface ZoneFilter {
 }
 
 export interface Zone {
-  id: number;
-  zonecode: string;
-  zonename: string;
-  zonenamesl: string;
+  zoneId: number ;
+  zoneCode: string;
+  zoneName: string;
+  zoneNameSL: string;
 }
 
 export interface ZoneResponse {
@@ -37,6 +37,38 @@ class ZoneApiService extends ApiService {
       body: JSON.stringify({ zonename, zonecode, zonenamesl }),
       headers: {
         'Content-Type': 'application/json',
+        
+      },
+    });
+  }
+
+  async modify_zone(
+    zoneid : number,
+    zonename: string,
+    zonecode: string,
+    zonenamesl: string = ""
+  ): Promise<ApiResponse<AuthResponse>> {
+    return this.makeRequest<AuthResponse>('/zonemaster/modify_zone', {
+      method: 'POST',
+      body: JSON.stringify({zoneid, zonename, zonecode, zonenamesl }),
+      headers: {
+        'Content-Type': 'application/json',
+        
+      },
+    });
+  }
+
+  async delete_zone(
+    zoneid : number,
+    zonename: string,
+    zonecode: string,
+    zonenamesl: string = ""
+  ): Promise<ApiResponse<AuthResponse>> {
+    return this.makeRequest<AuthResponse>('/zonemaster/delete_zone', {
+      method: 'POST',
+      body: JSON.stringify({zoneid, zonename, zonecode, zonenamesl }),
+      headers: {
+        'Content-Type': 'application/json',
       },
     });
   }
@@ -52,6 +84,8 @@ class ZoneApiService extends ApiService {
       },
     });
   }
+  
 }
+
 
 export default new ZoneApiService(); // ✅ Singleton instance for reuse

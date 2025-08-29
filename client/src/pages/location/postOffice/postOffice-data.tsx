@@ -1,47 +1,43 @@
 import React from "react";
-import ZoneApiService, {
-  Zone,
-  ZoneFilter,
-} from "../../../services/zone/zoneapi";
+import PostOfficeApiService, {
+  PostOffice,
+  PostOfficeFilter,
+} from "../../../services/PostOffice/postOfficeapi";
 import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
-import ZoneTable from "./zone-table";
+import PostOfficeTable from "./postOffice-table";
 import { useNavigate } from "react-router-dom";
 
-// Define the async function to fetch zones and ensure the return type is correct.
-const fetchZones = async (filter: ZoneFilter) => {
-  const res = await ZoneApiService.fetchZones(filter);
-
+// Define the async function to fetch PostOffices and ensure the return type is correct.
+const fetchPostOffices = async (filter: PostOfficeFilter) => {
+  const res = await PostOfficeApiService.fetchPostOffices(filter);
   return {
     // Ensure 'success' is a boolean, defaulting to false if undefined.
-    success: res.success ?? false,
-    // Ensure 'data' is a Zone array, defaulting to an empty array.
-    data: res.zones ?? [],
-    // Ensure 'totalCount' is a number, defaulting to 0.
-    totalCount: res.totalCount ?? 0,
-    // Ensure 'message' is a string, defaulting to an empty string.
+    success: res.success ?? false, // Ensure 'data' is a PostOffice array, defaulting to an empty array.
+    data: res.postOffices ?? [], // Ensure 'totalCount' is a number, defaulting to 0.
+    totalCount: res.totalCount ?? 0, // Ensure 'message' is a string, defaulting to an empty string.
     message: res.message ?? "",
   };
 };
 
-// Define the async function for adding a zone.
-const addZone = async () => {
+// Define the async function for adding a PostOffice.
+const addPostOffice = async () => {
   const { value: formValues } = await Swal.fire({
-    title: "Add New Zone",
+    title: "Add New Post Office",
     html: `
   <div class="swal2-form-container space-y-6 p-2">
-    <!-- Zone Name Field -->
+    <!-- PostOffice Name Field -->
     <div class="swal2-input-group">
-      <label for="zonename" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+      <label for="PostOfficename" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
         <div class="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
-        Zone Name
+        Post Office Name
         <span class="text-red-500 text-xs">*</span>
       </label>
       <div class="relative">
         <input 
-          id="zonename" 
+          id="PostOfficename" 
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-          placeholder="Enter Zone Name" 
+          placeholder="Enter Post Office Name" 
           aria-required="true"
           autocomplete="off"
         >
@@ -49,18 +45,18 @@ const addZone = async () => {
       </div>
     </div>
 
-    <!-- Zone Code Field -->
+    <!-- PostOffice Code Field -->
     <div class="swal2-input-group">
-      <label for="zonecode" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+      <label for="PostOfficecode" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
         <div class="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
-        Zone Code
+        Post Office Code
         <span class="text-red-500 text-xs">*</span>
       </label>
       <div class="relative">
         <input 
-          id="zonecode" 
+          id="PostOfficecode" 
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50 font-mono" 
-          placeholder="Enter Zone Code" 
+          placeholder="Enter Post Office Code" 
           aria-required="true"
           autocomplete="off"
           maxlength="10"
@@ -70,19 +66,19 @@ const addZone = async () => {
       </div>
     </div>
 
-    <!-- Zone Name SL Field -->
+    <!-- PostOffice Name SL Field -->
     <div class="swal2-input-group">
-      <label for="zonenamesl" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+      <label for="PostOfficenamesl" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
         <div class="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
-        Zone Name SL
+        Post Office Name SL
         <span class="text-emerald-600 text-xs font-medium"></span>
         <span class="text-red-500 text-xs">*</span>
       </label>
       <div class="relative">
         <input 
-          id="zonenamesl" 
+          id="PostOfficenamesl" 
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-          placeholder="Enter Zone Name SL" 
+          placeholder="Enter Post Office Name SL" 
           aria-required="true"
           autocomplete="off"
           lang="si"
@@ -98,8 +94,8 @@ const addZone = async () => {
           <span class="text-white text-sm font-bold">+</span>
         </div>
         <div class="flex-1">
-          <p class="text-sm font-semibold text-slate-700">Creating New Zone</p>
-          <p class="text-xs text-slate-500 mt-1">Fill in all the required information to add a new zone.</p>
+          <p class="text-sm font-semibold text-slate-700">Creating New PostOffice</p>
+          <p class="text-xs text-slate-500 mt-1">Fill in all the required information to add a new PostOffice.</p>
         </div>
         <div class="text-right">
           <div class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">
@@ -119,7 +115,7 @@ const addZone = async () => {
         <div class="text-xs text-slate-600">
           <p class="font-medium text-blue-700">Creation Guidelines:</p>
           <ul class="list-disc list-inside mt-1 space-y-1 text-blue-600">
-            <li>Zone name should be descriptive and unique</li>
+            <li>PostOffice name should be descriptive and unique</li>
             <li>Fields marked with * are required for successful creation</li>
           </ul>
         </div>
@@ -171,76 +167,76 @@ const addZone = async () => {
   </style>
 `,
     showCancelButton: true,
-    confirmButtonText: "Add Zone",
+    confirmButtonText: "Add PostOffice",
     confirmButtonColor: "#3085d6",
     cancelButtonColor: "#d33",
     preConfirm: () => {
-      const zonenameInput = document.getElementById(
-        "zonename"
+      const PostOfficenameInput = document.getElementById(
+        "PostOfficename"
       ) as HTMLInputElement;
-      const zonecodeInput = document.getElementById(
-        "zonecode"
+      const PostOfficecodeInput = document.getElementById(
+        "PostOfficecode"
       ) as HTMLInputElement;
 
-      const zonename = zonenameInput.value.trim();
-      const zonecode = zonecodeInput.value.trim();
+      const PostOfficename = PostOfficenameInput.value.trim();
+      const PostOfficecode = PostOfficecodeInput.value.trim();
 
       // Keep track of the first empty element
       let firstEmptyElement: HTMLInputElement | null = null;
 
-      if (!zonename) {
-        firstEmptyElement = zonenameInput;
-      } else if (!zonecode) {
-        firstEmptyElement = zonecodeInput;
+      if (!PostOfficename) {
+        firstEmptyElement = PostOfficenameInput;
+      } else if (!PostOfficecode) {
+        firstEmptyElement = PostOfficecodeInput;
       }
 
       if (firstEmptyElement) {
         Swal.showValidationMessage("Please fill in all required fields");
-        firstEmptyElement.focus();
+        firstEmptyElement.focus(); // Set focus to the first empty element
         return null;
       }
-      return { zonename, zonecode };
+      return { PostOfficename, PostOfficecode };
     },
   });
 
   if (formValues) {
     try {
-      await ZoneApiService.add_new_zone(
-        formValues.zonename,
-        formValues.zonecode
+      await PostOfficeApiService.add_new_PostOffice(
+        formValues.PostOfficename,
+        formValues.PostOfficecode
       );
       Swal.fire({
         title: "Success!",
-        text: "New zone has been added.",
+        text: "New PostOffice has been added.",
         icon: "success",
         timer: 1500,
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire("Error!", err.message || "Failed to add zone.", "error");
+      Swal.fire("Error!", err.message || "Failed to add PostOffice.", "error");
     }
   }
 };
 
-// Define the async function for modifying a zone.
-const modifyZone = async (zone: Zone) => {
+// Define the async function for modifying a PostOffice.
+const modifyPostOffice = async (PostOffice: PostOffice) => {
   const { value: formValues } = await Swal.fire({
-    title: "Modify Zone",
+    title: "Modify Post Office",
     html: `
   <div class="swal2-form-container space-y-6 p-2">
-    <!-- Zone Name Field -->
+    <!-- PostOffice Name Field -->
     <div class="swal2-input-group">
-      <label for="zonename" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+      <label for="PostOfficename" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
         <div class="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
-        Zone Name
+        Post Office Name
         <span class="text-red-500 text-xs">*</span>
       </label>
       <div class="relative">
         <input 
-          id="zonename" 
+          id="PostOfficename" 
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-          value="${zone.zoneName}"
-          placeholder="Enter Zone Name" 
+          value="${PostOffice.postOfficeName}"
+          placeholder="Enter PostOffice Name" 
           aria-required="true"
           autocomplete="off"
         >
@@ -248,41 +244,42 @@ const modifyZone = async (zone: Zone) => {
       </div>
     </div>
 
-    <!-- Zone Code Field -->
+    <!-- PostOffice Code Field -->
     <div class="swal2-input-group">
-      <label for="zonecode" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+      <label for="PostOfficecode" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
         <div class="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
-        Zone Code
+        Post Office Code
         <span class="text-red-500 text-xs">*</span>
       </label>
       <div class="relative">
         <input 
-          id="zonecode" 
-          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50 uppercase font-mono" 
-          value="${zone.zoneCode || ""}"
-          placeholder="Enter Zone Code" 
+          id="PostOfficecode" 
+          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50 font-mono" 
+          value="${PostOffice.postOfficeCode || ""}"
+          placeholder="Enter Post Office Code" 
           aria-required="true"
           autocomplete="off"
           maxlength="10"
-          style="text-transform: uppercase;"
+          required
+          
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-purple-200"></div>
       </div>
     </div>
 
-    <!-- Zone Name SL Field -->
+    <!-- PostOffice Name SL Field -->
     <div class="swal2-input-group">
-      <label for="zonenamesl" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+      <label for="PostOfficenamesl" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
         <div class="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
-        Zone Name SL
+        Post Office Name SL
         
       </label>
       <div class="relative">
         <input 
-          id="zonenamesl" 
+          id="PostOfficenamesl" 
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-          value="${zone.zoneNameSL || ""}"
-          placeholder="Enter Zone Name SL" 
+          value="${PostOffice.postOfficeNameSL || ""}"
+          placeholder="Enter Post Office Name SL" 
           aria-required="true"
           autocomplete="off"
           lang="si"
@@ -298,8 +295,8 @@ const modifyZone = async (zone: Zone) => {
           <span class="text-white text-sm font-bold">✓</span>
         </div>
         <div class="flex-1">
-          <p class="text-sm font-semibold text-slate-700">Editing Zone Information</p>
-          <p class="text-xs text-slate-500 mt-1">Update the zone details above. Fields marked with * are required.</p>
+          <p class="text-sm font-semibold text-slate-700">Editing Post Office Information</p>
+          <p class="text-xs text-slate-500 mt-1">Update the Post Office details above. Fields marked with * are required.</p>
         </div>
        
       </div>
@@ -314,8 +311,8 @@ const modifyZone = async (zone: Zone) => {
         <div class="text-xs text-slate-600">
           <p class="font-medium text-amber-700">Important Notes:</p>
           <ul class="list-disc list-inside mt-1 space-y-1 text-amber-600">
-            <li>Zone code changes may affect existing records</li>
-            <li>Ensure Zone Name and Zone Code is unique in the system</li>
+            <li>Post Office code changes may affect existing records</li>
+            <li>Ensure Post Office Name and Post Office Code is unique in the system</li>
           </ul>
         </div>
       </div>
@@ -366,63 +363,67 @@ const modifyZone = async (zone: Zone) => {
   </style>
 `,
     showCancelButton: true,
-    confirmButtonText: "Update Zone",
+    confirmButtonText: "Update PostOffice",
     confirmButtonColor: "#3085d6",
     cancelButtonColor: "#d33",
     preConfirm: () => {
-      const zonenameInput = document.getElementById(
-        "zonename"
+      const PostOfficenameInput = document.getElementById(
+        "PostOfficename"
       ) as HTMLInputElement;
-      const zonecodeInput = document.getElementById(
-        "zonecode"
+      const PostOfficecodeInput = document.getElementById(
+        "PostOfficecode"
       ) as HTMLInputElement;
 
-      const zonename = zonenameInput.value.trim();
-      const zonecode = zonecodeInput.value.trim();
+      const PostOfficename = PostOfficenameInput.value.trim();
+      const PostOfficecode = PostOfficecodeInput.value.trim();
 
       // Keep track of the first empty element
       let firstEmptyElement: HTMLInputElement | null = null;
 
-      if (!zonename) {
-        firstEmptyElement = zonenameInput;
-      } else if (!zonecode) {
-        firstEmptyElement = zonecodeInput;
+      if (!PostOfficename) {
+        firstEmptyElement = PostOfficenameInput;
+      } else if (!PostOfficecode) {
+        firstEmptyElement = PostOfficecodeInput;
       }
 
       if (firstEmptyElement) {
         Swal.showValidationMessage("Please fill in all required fields");
-        firstEmptyElement.focus();
+        firstEmptyElement.focus(); // Set focus to the first empty element
         return null;
       }
-      return { id: zone.zoneId, zonename, zonecode };
+      return { id: PostOffice.postOfficeId, PostOfficename, PostOfficecode };
     },
   });
 
   if (formValues) {
     try {
-      await ZoneApiService.modify_zone(
+      await PostOfficeApiService.modify_PostOffice(
         formValues.id,
-        formValues.zonename,
-        formValues.zonecode
+        formValues.PostOfficename,
+        formValues.PostOfficecode
       );
       Swal.fire({
         title: "Success!",
-        text: "Zone has been updated.",
+        text: "Post Office has been updated.",
         icon: "success",
         timer: 1500,
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire("Error!", err.message || "Failed to update zone.", "error");
+      Swal.fire(
+        "Error!",
+        err.message || "Failed to update PostOffice.",
+        "error"
+      );
     }
   }
 };
 
-// Define the async function for deleting a zone.
-const deleteZone = async (zone: Zone) => {
+// Define the async function for deleting a PostOffice.
+const deletePostOffice = async (PostOffice: PostOffice) => {
   const result = await Swal.fire({
-    title: "Delete Zone",
-    text: `Are you sure you want to delete "${zone.zoneName}"? This action cannot be undone.`,
+    title: "Delete PostOffice",
+    text: `Are you sure you want to delete "${PostOffice.postOfficeName}"? This action cannot be undone.`,
     icon: "warning",
     showCancelButton: true,
     confirmButtonColor: "#3085d6",
@@ -432,50 +433,53 @@ const deleteZone = async (zone: Zone) => {
 
   if (result.isConfirmed) {
     try {
-      await ZoneApiService.delete_zone(
-        zone.zoneId,
-        zone.zoneName,
-        zone.zoneCode,
-        zone.zoneNameSL
+      await PostOfficeApiService.delete_PostOffice(
+        PostOffice.postOfficeId,
+        PostOffice.postOfficeName,
+        PostOffice.postOfficeCode,
+        PostOffice.postOfficeNameSL
       );
       Swal.fire({
         title: "Deleted!",
-        text: `Zone "${zone.zoneName}" has been deleted.`,
+        text: `Post Office "${PostOffice.postOfficeName}" has been deleted.`,
         icon: "success",
         timer: 1500,
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire("Error!", err.message || "Failed to delete zone.", "error");
+      Swal.fire(
+        "Error!",
+        err.message || "Failed to delete PostOffice.",
+        "error"
+      );
     }
   }
 };
 
-// --- ZoneMaster Component ---
+// --- PostOfficeMaster Component ---
 
-const ZoneMaster: React.FC = () => {
+const PostOfficeMaster: React.FC = () => {
   const navigate = useNavigate();
-
   return (
-    <CRUDMaster<Zone>
-      fetchData={fetchZones}
-      addEntry={addZone}
-      modifyEntry={modifyZone}
-      deleteEntry={deleteZone}
-      pageTitle="Zone Operations"
-      addLabel="Add Zone"
+    <CRUDMaster<PostOffice>
+      fetchData={fetchPostOffices}
+      addEntry={addPostOffice}
+      modifyEntry={modifyPostOffice}
+      deleteEntry={deletePostOffice}
+      pageTitle="Post Office Operations"
+      addLabel="Add Post Office"
+      onClose={() => navigate("/PostOffice")}
       searchPlaceholder="Search by name or code..."
-      onClose={() => navigate("/zone")}
-      renderTable={(zones, handleModify, handleDelete) => (
-        <ZoneTable
-          zones={zones}
+      renderTable={(PostOffices, handleModify, handleDelete) => (
+        <PostOfficeTable
+          PostOffices={PostOffices}
           handleModify={handleModify}
           handleDelete={handleDelete}
         />
       )}
-      getKey={(zone) => zone.zoneId}
+      getKey={(PostOffice) => PostOffice.postOfficeId}
     />
   );
 };
 
-export default ZoneMaster;
+export default PostOfficeMaster;

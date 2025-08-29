@@ -9,6 +9,7 @@ import Footer from '../components/Footer';
 import ApiService from '../services/api';
 import { useEffect } from 'react';
 import { debug } from 'console';
+import Swal from "sweetalert2";
 
 interface Transaction {
   id: number;
@@ -39,6 +40,7 @@ interface DashboardLayoutProps {
   mainContent: React.ReactNode;
   user?: { name: string; balance: number };
   transactions?: Transaction[];
+  enableScroll?: boolean; 
 }
 
 
@@ -49,7 +51,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   transactions = [
     { id: 1, description: "Grocery", amount: -120.5, date: "2025-07-18" },
     { id: 2, description: "Salary", amount: 3000, date: "2025-07-17" },
-  ]
+  ],
+  enableScroll = true 
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<{ [key: string]: boolean }>({});
@@ -128,9 +131,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'Location Masters',
           path: '/location/zone',
           subItems: [
+            { label: 'Category Master', path: '/category-operations' },
+            { label: 'Post Office Master', path: '/postOffice-operations' },
+            { label: 'Tehsil Master', path: '/tehsil-operations' },
+            { label: 'Thana Master', path: '/thana-operations' },
             { label: 'Zone Master', path: '/zone-operations' },
-            { label: 'Accounts Payable', path: '/modules/accounting/accounts-payable' },
-            { label: 'Accounts Receivable', path: '/modules/accounting/accounts-receivable' },
+            { label: 'Village Master', path: '/village-operations' },
           ],
         },
         { label: 'Sales', path: '/modules/sales' },
@@ -300,7 +306,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </button>
           </div>
 
-          <main className="flex-1 overflow-y-auto p-6 sm:p-8 lg:p-10">
+          <main id='mainlayoutdiv' className={`flex-1 p-6 sm:p-8 lg:p-10 ${enableScroll ? "overflow-y-auto" : ""}`}>
             {mainContent}
           </main>
         </div>

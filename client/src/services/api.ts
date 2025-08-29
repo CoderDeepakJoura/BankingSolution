@@ -34,7 +34,6 @@ export class ApiService {
 
   async makeRequest<T = any>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
-
     const config: RequestOptions = {
       headers: {
         'Content-Type': 'application/json',

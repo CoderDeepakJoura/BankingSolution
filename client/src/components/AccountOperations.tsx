@@ -7,14 +7,14 @@ interface AccountOperationsProps {
   accountType: string;
   addPath: string;
   modifyPath: string;
-  deletePath: string;
+  // deletePath: string | ""; // Made deletePath nullable
 }
 
 const AccountOperations: React.FC<AccountOperationsProps> = ({
   accountType,
   addPath,
   modifyPath,
-  deletePath,
+  // deletePath,
 }) => {
   const navigate = useNavigate();
 
@@ -34,7 +34,7 @@ const AccountOperations: React.FC<AccountOperationsProps> = ({
   return (
     <div className="bg-white p-7 rounded-xl shadow-lg border border-gray-100 transition-all duration-300 hover:shadow-xl"> {/* Enhanced container */}
       <h2 className="text-xl font-bold text-gray-800 mb-5 border-b pb-3 border-gray-200">{accountType}</h2> {/* Stronger title with separator */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
         <OperationButton
           icon={<PlusCircle size={22} />}
           label={`Add ${accountType}`}
@@ -42,14 +42,14 @@ const AccountOperations: React.FC<AccountOperationsProps> = ({
         />
         <OperationButton
           icon={<Edit size={22} />}
-          label={`Modify ${accountType}`}
+          label={`Modify/Delete ${accountType}`}
           onClick={() => navigate(modifyPath)}
         />
-        <OperationButton
+        {/* <OperationButton
           icon={<Trash2 size={22} />}
           label={`Delete ${accountType}`}
           onClick={() => navigate(deletePath)}
-        />
+        /> */}
       </div>
     </div>
   );

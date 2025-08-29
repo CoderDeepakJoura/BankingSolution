@@ -1,4 +1,4 @@
-﻿namespace BankingPlatform.API.DTO
+﻿namespace BankingPlatform.API.DTO.Zone
 {
     public class ZoneFilterDto
     {
