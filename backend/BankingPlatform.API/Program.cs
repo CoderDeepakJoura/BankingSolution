@@ -10,6 +10,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using System.Text.Json;
+using BankingPlatform.Common.Common.CommonClasses;
+using BankingPlatform.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,7 +34,11 @@ if (string.IsNullOrEmpty(jwtSettings.SecretKey) || string.IsNullOrEmpty(jwtSetti
     throw new InvalidOperationException("JWT settings (SecretKey, Issuer, or Audience) are missing or invalid.");
 }
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<CommonClass>();
+builder.Services.AddScoped<CommonFunctions>();
+builder.Services.AddScoped<MemberService>();
 
 // Configure CORS with dynamic origins
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
@@ -130,6 +136,8 @@ builder.Services.AddAuthentication(options =>
             }
 
             var cookieToken = context.Request.Cookies["AuthToken"];
+            var tempLoginToken = context.Request.Cookies["LoginToken"];
+
             if (!string.IsNullOrEmpty(cookieToken))
             {
                 if (IsValidJwtFormat(cookieToken))
@@ -138,10 +146,10 @@ builder.Services.AddAuthentication(options =>
                     try
                     {
                         var parts = cookieToken.Split('.');
-                        var headerJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[0].Replace('-', '+').Replace('_', '/').PadRight((parts[0].Length + 3) & ~3, '=')));
-                        var payloadJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[1].Replace('-', '+').Replace('_', '/').PadRight((parts[1].Length + 3) & ~3, '=')));
-                        logger.LogInformation("Token extracted from AuthToken cookie. Length: {Length}, Parts: {PartsCount}, Header: {Header}, Payload: {Payload}",
-                            cookieToken.Length, parts.Length, headerJson, payloadJson);
+                        var headerJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[0]
+                            .Replace('-', '+').Replace('_', '/').PadRight((parts[0].Length + 3) & ~3, '=')));
+                        var payloadJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[1]
+                            .Replace('-', '+').Replace('_', '/').PadRight((parts[1].Length + 3) & ~3, '=')));
                     }
                     catch (Exception ex)
                     {
@@ -152,6 +160,7 @@ builder.Services.AddAuthentication(options =>
                 {
                     logger.LogWarning("Invalid JWT format in AuthToken cookie. Length: {Length}, Parts: {PartsCount}",
                         cookieToken.Length, cookieToken.Split('.').Length);
+
                     if (context.Request.Path.Value?.EndsWith("/api/auth/logout", StringComparison.OrdinalIgnoreCase) == true)
                     {
                         context.NoResult();
@@ -159,15 +168,33 @@ builder.Services.AddAuthentication(options =>
                     }
                 }
             }
-            else
+            else if (!string.IsNullOrEmpty(tempLoginToken))
             {
-                logger.LogWarning("No JWT token found in request.");
-                if (context.Request.Path.Value?.EndsWith("/api/auth/logout", StringComparison.OrdinalIgnoreCase) == true)
+                // 🔑 Handle LoginToken
+                if (context.Request.Path.Value?.Contains("/api/auth/working-date", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    context.Token = tempLoginToken;
+                    logger.LogInformation("Using temporary LoginToken for login confirmation.");
+                }
+                else
                 {
                     context.NoResult();
-                    logger.LogInformation("No token found, bypassing for logout endpoint.");
+                    logger.LogWarning("LoginToken found but not allowed for this endpoint: {Path}", context.Request.Path);
                 }
             }
+            else
+            {
+                logger.LogWarning("No AuthToken or LoginToken found in request.");
+                if (
+                    context.Request.Path.Value?.EndsWith("/api/auth/login", StringComparison.OrdinalIgnoreCase) == true
+                    || context.Request.Path.Value?.EndsWith("/api/auth/working-date", StringComparison.OrdinalIgnoreCase) == true
+                    || context.Request.Path.Value?.EndsWith("/api/auth/logout", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    context.NoResult();
+                    logger.LogInformation("Bypassing token validation for public auth endpoint: {Path}", context.Request.Path);
+                }
+            }
+
 
             return Task.CompletedTask;
         },
@@ -288,8 +315,9 @@ else
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseCors("_myAllowSpecificOrigins");
-app.UseRateLimiter();
+//app.UseRateLimiter();
 app.UseAuthentication();
+
 app.UseAuthorization();
 app.MapControllers();
 

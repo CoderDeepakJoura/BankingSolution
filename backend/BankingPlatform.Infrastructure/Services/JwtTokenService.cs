@@ -1,4 +1,5 @@
-﻿using BankingPlatform.Infrastructure.Settings;
+﻿using BankingPlatform.Infrastructure.Common;
+using BankingPlatform.Infrastructure.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -6,19 +7,22 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using BankingPlatform.Common.Common.CommonClasses;
 
 public class JwtTokenService
 {
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<JwtTokenService> _logger;
+    private readonly CommonClass _commonClass;
 
-    public JwtTokenService(IOptions<JwtSettings> jwtOptions, ILogger<JwtTokenService> logger)
+    public JwtTokenService(IOptions<JwtSettings> jwtOptions, ILogger<JwtTokenService> logger, CommonClass commonClass)
     {
         _jwtSettings = jwtOptions?.Value ?? throw new ArgumentNullException(nameof(jwtOptions));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _commonClass = commonClass ?? throw new ArgumentNullException(nameof(_commonClass));
     }
 
-    public string GenerateToken(string userId, string username, string branchCode)
+    public string GenerateToken()
     {
         // Decode base64 secret key
         byte[] keyBytes;
@@ -39,9 +43,17 @@ public class JwtTokenService
 
         var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId),
-            new Claim(ClaimTypes.Name, username),
-            new Claim("branchCode", branchCode),
+            new Claim(JwtRegisteredClaimNames.Sub, _commonClass.userId),
+            new Claim(ClaimTypes.Name, _commonClass.userName),
+            new Claim("branchCode", _commonClass.branchCode),
+            new Claim("userId", _commonClass.userId),
+            new Claim("branchId", _commonClass.branchId.ToString()),
+            new Claim("branchName", _commonClass.branchName),
+            new Claim("societyName", _commonClass.societyName),
+            new Claim("contactNo", _commonClass.contactno),
+            new Claim("address", _commonClass.address),
+            new Claim("emailaddress", _commonClass.email),
+            new Claim("workingdate", _commonClass.workingDate),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim("JwtId", jwtId)
         };
@@ -64,7 +76,7 @@ public class JwtTokenService
                 var headerJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[0].Replace('-', '+').Replace('_', '/').PadRight((parts[0].Length + 3) & ~3, '=')));
                 var payloadJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[1].Replace('-', '+').Replace('_', '/').PadRight((parts[1].Length + 3) & ~3, '=')));
                 _logger.LogDebug("JWT generated for user: {Username}. Header: {Header}, Payload: {Payload}, Length: {TokenLength}, Parts: {PartsCount}",
-                    username, headerJson, payloadJson, tokenString.Length, parts.Length);
+                    _commonClass.userName, headerJson, payloadJson, tokenString.Length, parts.Length);
             }
         }
         catch (Exception ex)

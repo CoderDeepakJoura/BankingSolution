@@ -30,11 +30,12 @@ class tehsilApiService extends ApiService {
   async add_new_tehsil(
     tehsilname: string,
     tehsilcode: string,
-    tehsilnamesl: string = ""
+    tehsilnamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/tehsil/create_tehsil', {
       method: 'POST',
-      body: JSON.stringify({ tehsilname, tehsilcode, tehsilnamesl }),
+      body: JSON.stringify({ tehsilname, tehsilcode, tehsilnamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
         
@@ -46,11 +47,12 @@ class tehsilApiService extends ApiService {
     tehsilid : number,
     tehsilname: string,
     tehsilcode: string,
-    tehsilnamesl: string = ""
+    tehsilnamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/tehsil/modify_tehsil', {
       method: 'POST',
-      body: JSON.stringify({tehsilid, tehsilname, tehsilcode, tehsilnamesl }),
+      body: JSON.stringify({tehsilid, tehsilname, tehsilcode, tehsilnamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
         
@@ -62,11 +64,12 @@ class tehsilApiService extends ApiService {
     tehsilid : number,
     tehsilname: string,
     tehsilcode: string,
-    tehsilnamesl: string = ""
+    tehsilnamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/tehsil/delete_tehsil', {
       method: 'POST',
-      body: JSON.stringify({tehsilid, tehsilname, tehsilcode, tehsilnamesl }),
+      body: JSON.stringify({tehsilid, tehsilname, tehsilcode, tehsilnamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -74,9 +77,10 @@ class tehsilApiService extends ApiService {
   }
 
   async fetchtehsils(
-    filter: TehsilFilter
+    filter: TehsilFilter,
+    branchId: number
   ): Promise<ApiResponse<tehsilResponse>> {
-    return this.makeRequest<tehsilResponse>('/tehsil/get_all_tehsils', {
+    return this.makeRequest<tehsilResponse>(`/tehsil/get_all_tehsils/${branchId}`, {
       method: 'POST',
       body: JSON.stringify(filter),
       headers: {
@@ -84,6 +88,7 @@ class tehsilApiService extends ApiService {
       },
     });
   }
+  
   
 }
 

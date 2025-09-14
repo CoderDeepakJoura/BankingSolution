@@ -28,11 +28,12 @@ class categoryApiService extends ApiService {
 
   async add_new_category(
     categoryname: string,
-    categorynamesl: string = ""
+    categorynamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
-    return this.makeRequest<AuthResponse>('/category/create_category', {
+    return this.makeRequest<AuthResponse>('/categorymaster/create_category', {
       method: 'POST',
-      body: JSON.stringify({ categoryname, categorynamesl }),
+      body: JSON.stringify({ categoryname, categorynamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
         
@@ -43,11 +44,12 @@ class categoryApiService extends ApiService {
   async modify_category(
     categoryid : number,
     categoryname: string,
-    categorynamesl: string = ""
+    categorynamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
-    return this.makeRequest<AuthResponse>('/category/modify_category', {
+    return this.makeRequest<AuthResponse>('/categorymaster/modify_category', {
       method: 'POST',
-      body: JSON.stringify({categoryid, categoryname, categorynamesl }),
+      body: JSON.stringify({categoryid, categoryname, categorynamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
         
@@ -58,11 +60,12 @@ class categoryApiService extends ApiService {
   async delete_category(
     categoryid : number,
     categoryname: string,
-    categorynamesl: string = ""
+    categorynamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
-    return this.makeRequest<AuthResponse>('/category/delete_category', {
+    return this.makeRequest<AuthResponse>('/categorymaster/delete_category', {
       method: 'POST',
-      body: JSON.stringify({categoryid, categoryname, categorynamesl }),
+      body: JSON.stringify({categoryid, categoryname, categorynamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -70,9 +73,10 @@ class categoryApiService extends ApiService {
   }
 
   async fetchcategory(
-    filter: CategoryFilter
+    filter: CategoryFilter,
+    branchid: number
   ): Promise<ApiResponse<categoryResponse>> {
-    return this.makeRequest<categoryResponse>('/category/get_all_categorys', {
+    return this.makeRequest<categoryResponse>(`/categorymaster/get_all_category/${branchid}`, {
       method: 'POST',
       body: JSON.stringify(filter),
       headers: {

@@ -1,13 +1,15 @@
 import React from "react";
 import DashboardLayout from "../../../Common/Layout";
+import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import CategoryApiService from "../../../services/category/categoryapi";
 import Swal from "sweetalert2";
 import { FaPlus, FaTimes, FaMapMarkerAlt, FaCode, FaGlobe, FaSave, FaArrowLeft, FaInfoCircle } from "react-icons/fa";
-
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 const CategoryMaster: React.FC = () => {
   const navigate = useNavigate();
-
+  const user = useSelector((state: RootState) => state.user);
   const [CategoryName, setCategoryName] = React.useState("");
   const [CategoryNameSL, setCategoryNameSL] = React.useState("");
   const [error, setError] = React.useState("");
@@ -24,12 +26,15 @@ const CategoryMaster: React.FC = () => {
       setError("Please enter only Hindi characters (Devanagari script).");
     }
   };
-
+  const inputRef = useRef<HTMLInputElement>(null);
   const handleReset = () => {
     setCategoryName("");
     setCategoryNameSL("");
     setError("");
+    inputRef.current?.focus();
     setLoading(false);
+    const CategoryName = document.getElementById("CategoryName") as HTMLInputElement;
+    CategoryName.focus();
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -38,7 +43,7 @@ const CategoryMaster: React.FC = () => {
     setError("");
 
     try {
-      const response = await CategoryApiService.add_new_category(CategoryName, CategoryNameSL || "");
+      const response = await CategoryApiService.add_new_category(CategoryName, CategoryNameSL || "", user.branchid);
 
       if (response.success) {
         Swal.fire({
@@ -60,7 +65,7 @@ const CategoryMaster: React.FC = () => {
     } catch (err: any) {
       Swal.fire({
         icon: "error",
-        title: "An unexpected error occurred!",
+        title: "Error!",
         text: err.message || "Please check your network connection.",
       });
     } finally {
@@ -72,7 +77,7 @@ const CategoryMaster: React.FC = () => {
     <DashboardLayout
     enableScroll = {false}
       mainContent={
-        <div className="min-h-screen bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
+        <div className=" bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Header Section */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8">
@@ -129,10 +134,11 @@ const CategoryMaster: React.FC = () => {
                       <input
                         type="text"
                         id="CategoryName"
+                        ref={inputRef}
                         value={CategoryName}
                         onChange={(e) => setCategoryName(e.target.value)}
                         required
-                        pattern="[a-zA-Z0-9]{1,10}"
+                        pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
                         autoFocus={true}
                         maxLength={50}
                         className="w-full pl-10 pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50"

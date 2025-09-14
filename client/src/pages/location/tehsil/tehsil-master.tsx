@@ -3,11 +3,21 @@ import DashboardLayout from "../../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import TehsilApiService from "../../../services/tehsil/tehsilapi";
 import Swal from "sweetalert2";
-import { FaPlus, FaTimes, FaMapMarkerAlt, FaCode, FaGlobe, FaSave, FaArrowLeft, FaInfoCircle } from "react-icons/fa";
-
+import {
+  FaPlus,
+  FaTimes,
+  FaMapMarkerAlt,
+  FaCode,
+  FaGlobe,
+  FaSave,
+  FaArrowLeft,
+  FaInfoCircle,
+} from "react-icons/fa";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 const TehsilMaster: React.FC = () => {
   const navigate = useNavigate();
-
+  const user = useSelector((state: RootState) => state.user);
   const [TehsilCode, setTehsilCode] = React.useState("");
   const [TehsilName, setTehsilName] = React.useState("");
   const [TehsilNameSL, setTehsilNameSL] = React.useState("");
@@ -32,6 +42,8 @@ const TehsilMaster: React.FC = () => {
     setTehsilNameSL("");
     setError("");
     setLoading(false);
+    const tehsilname = document.getElementById("TehsilName") as HTMLInputElement
+    tehsilname.focus();
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -40,7 +52,12 @@ const TehsilMaster: React.FC = () => {
     setError("");
 
     try {
-      const response = await TehsilApiService.add_new_tehsil(TehsilName, TehsilCode, TehsilNameSL || "");
+      const response = await TehsilApiService.add_new_tehsil(
+        TehsilName,
+        TehsilCode,
+        TehsilNameSL || "",
+        user.branchid
+      );
 
       if (response.success) {
         Swal.fire({
@@ -72,9 +89,9 @@ const TehsilMaster: React.FC = () => {
 
   return (
     <DashboardLayout
-    enableScroll = {false}
+      enableScroll={false}
       mainContent={
-        <div className="min-h-screen bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
+        <div className=" bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Header Section */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8">
@@ -108,8 +125,12 @@ const TehsilMaster: React.FC = () => {
                     <FaPlus className="text-white text-sm" />
                   </div>
                   <div>
-                    <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Create New Tehsil</h2>
-                    <p className="text-sm text-gray-600">Fill in the Tehsil details below</p>
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
+                      Create New Tehsil
+                    </h2>
+                    <p className="text-sm text-gray-600">
+                      Fill in the Tehsil details below
+                    </p>
                   </div>
                 </div>
               </div>
@@ -117,9 +138,44 @@ const TehsilMaster: React.FC = () => {
               {/* Form Content */}
               <form className="p-6 sm:p-8" onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {/* Tehsil Name Field */}
+                  <div className="flex flex-col">
+                    <label
+                      htmlFor="TehsilName"
+                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"
+                    >
+                      <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
+                      Tehsil Name
+                      <span className="text-red-500 text-xs">*</span>
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                        <FaMapMarkerAlt className="text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        id="TehsilName"
+                        autoFocus={true}
+                        pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
+                        value={TehsilName}
+                        onChange={(e) => setTehsilName(e.target.value)}
+                        required
+                        maxLength={50}
+                        className="w-full pl-10 pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50"
+                        placeholder="Enter Tehsil name"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                      <FaInfoCircle />
+                      Descriptive name for the Tehsil (max 50 characters)
+                    </p>
+                  </div>
                   {/* Tehsil Code Field */}
                   <div className="flex flex-col">
-                    <label htmlFor="TehsilCode" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                    <label
+                      htmlFor="TehsilCode"
+                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"
+                    >
                       <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
                       Tehsil Code
                       <span className="text-red-500 text-xs">*</span>
@@ -132,7 +188,6 @@ const TehsilMaster: React.FC = () => {
                         type="text"
                         id="TehsilCode"
                         value={TehsilCode}
-                        autoFocus={true}
                         onChange={(e) => setTehsilCode(e.target.value)}
                         required
                         pattern="[a-zA-Z0-9]{1,10}"
@@ -147,40 +202,17 @@ const TehsilMaster: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* Tehsil Name Field */}
-                  <div className="flex flex-col">
-                    <label htmlFor="TehsilName" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
-                      Tehsil Name
-                      <span className="text-red-500 text-xs">*</span>
-                    </label>
-                    <div className="relative group">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
-                        <FaMapMarkerAlt className="text-sm" />
-                      </div>
-                      <input
-                        type="text"
-                        id="TehsilName"
-                        value={TehsilName}
-                        onChange={(e) => setTehsilName(e.target.value)}
-                        required
-                        maxLength={50}
-                        className="w-full pl-10 pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50"
-                        placeholder="Enter Tehsil name"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                      <FaInfoCircle />
-                      Descriptive name for the Tehsil (max 50 characters)
-                    </p>
-                  </div>
-
                   {/* Tehsil Name SL Field */}
                   <div className="flex flex-col">
-                    <label htmlFor="TehsilNameSL" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                    <label
+                      htmlFor="TehsilNameSL"
+                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"
+                    >
                       <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
                       Tehsil Name (In SL)
-                      <span className="text-emerald-600 text-xs font-medium">(Hindi/Devanagari)</span>
+                      <span className="text-emerald-600 text-xs font-medium">
+                        (Hindi/Devanagari)
+                      </span>
                     </label>
                     <div className="relative group">
                       <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors">
@@ -194,8 +226,8 @@ const TehsilMaster: React.FC = () => {
                         maxLength={50}
                         className={`w-full pl-10 pr-4 py-2 sm:py-3 border-2 rounded-lg focus:ring-2 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50 ${
                           error
-                            ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
-                            : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
+                            ? "border-red-300 focus:border-red-500 focus:ring-red-100"
+                            : "border-gray-200 focus:border-emerald-500 focus:ring-emerald-100"
                         }`}
                         placeholder="Enter Tehsil name in Hindi/Devanagari"
                         lang="hi"
@@ -209,7 +241,8 @@ const TehsilMaster: React.FC = () => {
                     ) : (
                       <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                         <FaInfoCircle />
-                        Optional field for Hindi/Devanagari script (max 50 characters)
+                        Optional field for Hindi/Devanagari script (max 50
+                        characters)
                       </p>
                     )}
                   </div>

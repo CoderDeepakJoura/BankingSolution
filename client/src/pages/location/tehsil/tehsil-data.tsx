@@ -7,21 +7,21 @@ import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import TehsilTable from "./tehsil-table";
 import { useNavigate } from "react-router-dom";
-
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 // Define the async function to fetch Tehsils and ensure the return type is correct.
-const fetchTehsils = async (filter: TehsilFilter) => {
-  const res = await TehsilApiService.fetchtehsils(filter);
+const fetchTehsils = async (filter: TehsilFilter, branchId: number) => {
+  const res = await TehsilApiService.fetchtehsils(filter, branchId);
   return {
-    // Ensure 'success' is a boolean, defaulting to false if undefined.
-    success: res.success ?? false, // Ensure 'data' is a Tehsil array, defaulting to an empty array.
-    data: res.tehsils ?? [], // Ensure 'totalCount' is a number, defaulting to 0.
-    totalCount: res.totalCount ?? 0, // Ensure 'message' is a string, defaulting to an empty string.
+    success: res.success ?? false, 
+    data: res.tehsils ?? [],
+    totalCount: res.totalCount ?? 0,
     message: res.message ?? "",
   };
 };
 
 // Define the async function for adding a Tehsil.
-const addTehsil = async () => {
+const addTehsil = async (branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Add New Tehsil",
     html: `
@@ -40,6 +40,10 @@ const addTehsil = async () => {
           placeholder="Enter Tehsil Name" 
           aria-required="true"
           autocomplete="off"
+          maxlength="50"
+          required
+          pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
+          autoFocus={true}
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
       </div>
@@ -60,6 +64,7 @@ const addTehsil = async () => {
           aria-required="true"
           autocomplete="off"
           maxlength="10"
+          pattern="[a-zA-Z0-9]{1,10}"
           "
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-purple-200"></div>
@@ -81,6 +86,7 @@ const addTehsil = async () => {
           placeholder="Enter Tehsil Name SL" 
           aria-required="true"
           autocomplete="off"
+          autoFocus={true}
           lang="si"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-emerald-200"></div>
@@ -177,9 +183,13 @@ const addTehsil = async () => {
       const TehsilcodeInput = document.getElementById(
         "Tehsilcode"
       ) as HTMLInputElement;
+      const TehsilnameslInput = document.getElementById(
+        "Tehsilnamesl"
+      ) as HTMLInputElement;
 
       const Tehsilname = TehsilnameInput.value.trim();
       const Tehsilcode = TehsilcodeInput.value.trim();
+      const Tehsilnamesl = TehsilnameslInput.value.trim();
 
       // Keep track of the first empty element
       let firstEmptyElement: HTMLInputElement | null = null;
@@ -192,11 +202,11 @@ const addTehsil = async () => {
 
       if (firstEmptyElement) {
         Swal.showValidationMessage("Please fill in all required fields");
-        firstEmptyElement.focus(); 
+        firstEmptyElement.focus();
         return null;
       }
 
-      return { Tehsilname, Tehsilcode };
+      return { Tehsilname, Tehsilcode, Tehsilnamesl };
     },
   });
 
@@ -204,7 +214,9 @@ const addTehsil = async () => {
     try {
       await TehsilApiService.add_new_tehsil(
         formValues.Tehsilname,
-        formValues.Tehsilcode
+        formValues.Tehsilcode,
+        formValues.Tehsilnamesl,
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -220,7 +232,7 @@ const addTehsil = async () => {
 };
 
 // Define the async function for modifying a Tehsil.
-const modifyTehsil = async (Tehsil: Tehsil) => {
+const modifyTehsil = async (Tehsil: Tehsil, branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Modify Tehsil",
     html: `
@@ -240,6 +252,10 @@ const modifyTehsil = async (Tehsil: Tehsil) => {
           placeholder="Enter Tehsil Name" 
           aria-required="true"
           autocomplete="off"
+          maxlength="50"
+          required
+          pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
+          autoFocus={true}
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
       </div>
@@ -373,9 +389,13 @@ const modifyTehsil = async (Tehsil: Tehsil) => {
       const TehsilcodeInput = document.getElementById(
         "Tehsilcode"
       ) as HTMLInputElement;
+      const TehsilnameslInput = document.getElementById(
+        "Tehsilnamesl"
+      ) as HTMLInputElement;
 
       const Tehsilname = TehsilnameInput.value.trim();
       const Tehsilcode = TehsilcodeInput.value.trim();
+      const Tehsilnamesl = TehsilnameslInput.value.trim();
 
       // Keep track of the first empty element
       let firstEmptyElement: HTMLInputElement | null = null;
@@ -388,10 +408,10 @@ const modifyTehsil = async (Tehsil: Tehsil) => {
 
       if (firstEmptyElement) {
         Swal.showValidationMessage("Please fill in all required fields");
-        firstEmptyElement.focus(); 
+        firstEmptyElement.focus();
         return null;
       }
-      return { id: Tehsil.tehsilId, Tehsilname, Tehsilcode };
+      return { id: Tehsil.tehsilId, Tehsilname, Tehsilcode, Tehsilnamesl };
     },
   });
 
@@ -400,7 +420,9 @@ const modifyTehsil = async (Tehsil: Tehsil) => {
       await TehsilApiService.modify_tehsil(
         formValues.id,
         formValues.Tehsilname,
-        formValues.Tehsilcode
+        formValues.Tehsilcode,
+        formValues.Tehsilnamesl,
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -416,7 +438,7 @@ const modifyTehsil = async (Tehsil: Tehsil) => {
 };
 
 // Define the async function for deleting a Tehsil.
-const deleteTehsil = async (Tehsil: Tehsil) => {
+const deleteTehsil = async (Tehsil: Tehsil, branchid: number) => {
   const result = await Swal.fire({
     title: "Delete Tehsil",
     text: `Are you sure you want to delete "${Tehsil.tehsilName}"? This action cannot be undone.`,
@@ -433,7 +455,8 @@ const deleteTehsil = async (Tehsil: Tehsil) => {
         Tehsil.tehsilId,
         Tehsil.tehsilName,
         Tehsil.tehsilCode,
-        Tehsil.tehsilNameSL
+        Tehsil.tehsilNameSL,
+        branchid
       );
       Swal.fire({
         title: "Deleted!",
@@ -452,12 +475,19 @@ const deleteTehsil = async (Tehsil: Tehsil) => {
 
 const TehsilMaster: React.FC = () => {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.user);
+  const fetchTehsilsWithBranch = React.useCallback(
+    async (filter: TehsilFilter) => {
+      return await fetchTehsils(filter, user.branchid);
+    },
+    [user.branchid]
+  );
   return (
     <CRUDMaster<Tehsil>
-      fetchData={fetchTehsils}
-      addEntry={addTehsil}
-      modifyEntry={modifyTehsil}
-      deleteEntry={deleteTehsil}
+      fetchData={fetchTehsilsWithBranch}
+      addEntry={() => addTehsil(user.branchid)}
+      modifyEntry={(tehsil) => modifyTehsil(tehsil, user.branchid)}
+      deleteEntry={(tehsil) => deleteTehsil(tehsil, user.branchid)}
       pageTitle="Tehsil Operations"
       addLabel="Add Tehsil"
       onClose={() => navigate("/Tehsil")}

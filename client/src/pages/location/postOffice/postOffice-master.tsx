@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import PostOfficeApiService from "../../../services/PostOffice/postOfficeapi";
 import Swal from "sweetalert2";
 import { FaPlus, FaTimes, FaMapMarkerAlt, FaCode, FaGlobe, FaSave, FaArrowLeft, FaInfoCircle } from "react-icons/fa";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 
 const PostOfficeMaster: React.FC = () => {
   const navigate = useNavigate();
@@ -13,6 +15,7 @@ const PostOfficeMaster: React.FC = () => {
   const [PostOfficeNameSL, setPostOfficeNameSL] = React.useState("");
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  const user = useSelector((state: RootState) => state.user);
 
   const hindiRegex = /^[\u0900-\u097F\s.,!?]*$/;
 
@@ -32,6 +35,8 @@ const PostOfficeMaster: React.FC = () => {
     setPostOfficeNameSL("");
     setError("");
     setLoading(false);
+    const PoName = document.getElementById("PostOfficeName") as HTMLInputElement;
+    PoName.focus();
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -40,7 +45,7 @@ const PostOfficeMaster: React.FC = () => {
     setError("");
 
     try {
-      const response = await PostOfficeApiService.add_new_PostOffice(PostOfficeName, PostOfficeCode, PostOfficeNameSL || "");
+      const response = await PostOfficeApiService.add_new_PostOffice(PostOfficeName, PostOfficeCode, PostOfficeNameSL || "", user.branchid);
 
       if (response.success) {
         Swal.fire({
@@ -56,7 +61,7 @@ const PostOfficeMaster: React.FC = () => {
         Swal.fire({
           icon: "error",
           title: "Error!",
-          text: response.message || "Failed to save PostOffice.",
+          text: response.message || "Failed to save Post Office.",
         });
       }
     } catch (err: any) {
@@ -74,7 +79,7 @@ const PostOfficeMaster: React.FC = () => {
     <DashboardLayout
     enableScroll = {false}
       mainContent={
-        <div className="min-h-screen bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
+        <div className=" bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Header Section */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8">
@@ -135,7 +140,7 @@ const PostOfficeMaster: React.FC = () => {
                         autoFocus={true}
                         onChange={(e) => setPostOfficeName(e.target.value)}
                         required
-                        pattern="[a-zA-Z0-9]{1,10}"
+                        pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
                         maxLength={50}
                         className="w-full pl-10 pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50"
                         placeholder="Enter Post Office name"

@@ -6,12 +6,13 @@ namespace BankingPlatform.API.DTO.Tehsil
     {
         public TehsilMasterDTO() { }
 
-        public TehsilMasterDTO(string tehsilName, string tehsilCode, string? tehsilNameSl, int tehsilId)
+        public TehsilMasterDTO(string tehsilName, string tehsilCode, string? tehsilNameSl, int tehsilId, int branchId)
         {
             TehsilName = tehsilName;
             TehsilCode = tehsilCode;
             TehsilNameSL = tehsilNameSl;
             TehsilId = tehsilId;
+            BranchId = branchId;
         }
 
         [Required(ErrorMessage = "Tehsil Code is required")]
@@ -26,5 +27,7 @@ namespace BankingPlatform.API.DTO.Tehsil
         public string? TehsilNameSL { get; set; } = string.Empty;
 
         public int TehsilId { get; set; } = 0;
+        [Required]
+        public int BranchId { get; set; }
     }
 }

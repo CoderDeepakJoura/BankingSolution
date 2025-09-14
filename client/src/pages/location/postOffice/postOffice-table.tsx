@@ -47,7 +47,7 @@ const PostOfficeTable: React.FC<PostOfficeTableProps> = ({
   ];
 
   // A function to get a unique key for each row from the PostOffice data.
-  const getPostOfficeKey = (PostOffice: PostOffice) => PostOffice.PostOfficeId;
+  const getPostOfficeKey = (PostOffice: PostOffice) => PostOffice.postOfficeId;
 
   return <GenericTable data={PostOffices} columns={columns} getKey={getPostOfficeKey} />;
 };

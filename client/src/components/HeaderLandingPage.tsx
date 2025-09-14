@@ -2,12 +2,18 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {createPortal } from "react-dom";
 import ApiService from '../services/api';
+import { useSelector } from "react-redux";
+import { RootState } from "../redux";
+
 
 const Header = () => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [now, setNow] = useState(new Date());
   const[error, setError] = useState("");
+  const user = useSelector((state: RootState) => state.user);
+
+
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -46,7 +52,7 @@ const Header = () => {
 
 
   return (
-    <header className="w-full bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+    <header style={{position: "sticky", top: 0}} className="w-full bg-white border-b border-gray-200 shadow-sm z-50">
       {/* SIMPLE GRID: Left (logo), Center (search, flexible), Right (controls, min width) */}
       <nav className="flex items-center h-16 w-full px-2 md:px-8 gap-4">
         {/* Left: Logo and Brand */}
@@ -106,15 +112,13 @@ const Header = () => {
               <line x1={8} y1={2} x2={8} y2={6}/>
               <line x1={3} y1={10} x2={21} y2={10}/>
             </svg>
-            {now.toLocaleDateString("en-IN", {
-              day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
-            })}
+            {user.workingdate}
           </span>
           <span className="flex items-center gap-1 text-sm text-gray-800 font-semibold whitespace-nowrap">
             <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path d="M20 21v-2a4 4 0 00-3-3.87M4 21v-2a4 4 0 013-3.87M16 7a4 4 0 11-8 0 4 4 0 018 0z"/>
             </svg>
-            John Doe
+            {user.name}
           </span>
           <button
             onClick={handleLogout}

@@ -30,11 +30,12 @@ class thanaApiService extends ApiService {
   async add_new_thana(
     thananame: string,
     thanacode: string,
-    thananamesl: string = ""
+    thananamesl: string = "",
+    branchId : number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/thana/create_thana', {
       method: 'POST',
-      body: JSON.stringify({ thananame, thanacode, thananamesl }),
+      body: JSON.stringify({ thananame, thanacode, thananamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
         
@@ -46,11 +47,12 @@ class thanaApiService extends ApiService {
     thanaid : number,
     thananame: string,
     thanacode: string,
-    thananamesl: string = ""
+    thananamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/thana/modify_thana', {
       method: 'POST',
-      body: JSON.stringify({thanaid, thananame, thanacode, thananamesl }),
+      body: JSON.stringify({thanaid, thananame, thanacode, thananamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
         
@@ -62,11 +64,12 @@ class thanaApiService extends ApiService {
     thanaid : number,
     thananame: string,
     thanacode: string,
-    thananamesl: string = ""
+    thananamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/thana/delete_thana', {
       method: 'POST',
-      body: JSON.stringify({thanaid, thananame, thanacode, thananamesl }),
+      body: JSON.stringify({thanaid, thananame, thanacode, thananamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -74,9 +77,10 @@ class thanaApiService extends ApiService {
   }
 
   async fetchthanas(
-    filter: ThanaFilter
+    filter: ThanaFilter,
+    branchId: number
   ): Promise<ApiResponse<thanaResponse>> {
-    return this.makeRequest<thanaResponse>('/thana/get_all_thanas', {
+    return this.makeRequest<thanaResponse>(`/thana/get_all_thanas/${branchId}`, {
       method: 'POST',
       body: JSON.stringify(filter),
       headers: {

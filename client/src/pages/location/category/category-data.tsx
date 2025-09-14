@@ -7,21 +7,20 @@ import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import CategoryTable from "./category-table";
 import { useNavigate } from "react-router-dom";
-
-// Define the async function to fetch Categorys and ensure the return type is correct.
-const fetchCategorys = async (filter: CategoryFilter) => {
-  const res = await CategoryApiService.fetchcategory(filter);
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
+const fetchCategorys = async (filter: CategoryFilter, branchId: number) => {
+  const res = await CategoryApiService.fetchcategory(filter, branchId);
   return {
-    // Ensure 'success' is a boolean, defaulting to false if undefined.
-    success: res.success ?? false, // Ensure 'data' is a Category array, defaulting to an empty array.
-    data: res.category ?? [], // Ensure 'totalCount' is a number, defaulting to 0.
-    totalCount: res.totalCount ?? 0, // Ensure 'message' is a string, defaulting to an empty string.
+    success: res.success ?? false,
+    data: res.category ?? [],
+    totalCount: res.totalCount ?? 0,
     message: res.message ?? "",
   };
 };
 
 // Define the async function for adding a Category.
-const addCategory = async () => {
+const addCategory = async (branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Add New Category",
     html: `
@@ -42,7 +41,7 @@ const addCategory = async () => {
           autocomplete="off"
           autoFocus={true}
           required
-          pattern="[a-zA-Z0-9]{1,10}"
+          pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
       </div>
@@ -54,14 +53,12 @@ const addCategory = async () => {
         <div class="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
         Category Name SL
         <span class="text-emerald-600 text-xs font-medium"></span>
-        <span class="text-red-500 text-xs">*</span>
       </label>
       <div class="relative">
         <input 
           id="Categorynamesl" 
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
           placeholder="Enter Category Name SL" 
-          aria-required="true"
           autocomplete="off"
           lang="si"
         >
@@ -159,7 +156,6 @@ const addCategory = async () => {
 
       const Categoryname = CategorynameInput.value.trim();
 
-
       // Keep track of the first empty element
       let firstEmptyElement: HTMLInputElement | null = null;
 
@@ -171,7 +167,12 @@ const addCategory = async () => {
         firstEmptyElement.focus(); // Set focus to the first empty element
         return null;
       }
-      return { Categoryname };
+      return {
+        Categoryname,
+        Categorynamesl: (
+          document.getElementById("Categorynamesl") as HTMLInputElement
+        ).value.trim(),
+      };
     },
   });
 
@@ -179,7 +180,8 @@ const addCategory = async () => {
     try {
       await CategoryApiService.add_new_category(
         formValues.Categoryname,
-        formValues.CategoryNameSL || ""
+        formValues.Categorynamesl || "",
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -195,7 +197,7 @@ const addCategory = async () => {
 };
 
 // Define the async function for modifying a Category.
-const modifyCategory = async (Category: Category) => {
+const modifyCategory = async (Category: Category, branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Modify Category",
     html: `
@@ -213,6 +215,8 @@ const modifyCategory = async (Category: Category) => {
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
           value="${Category.categoryName}"
           placeholder="Enter Category Name" 
+          pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
+          required
           aria-required="true"
           autocomplete="off"
         >
@@ -323,20 +327,14 @@ const modifyCategory = async (Category: Category) => {
       const CategorynameInput = document.getElementById(
         "Categoryname"
       ) as HTMLInputElement;
-      const CategorycodeInput = document.getElementById(
-        "Categorycode"
-      ) as HTMLInputElement;
 
       const Categoryname = CategorynameInput.value.trim();
-      const Categorycode = CategorycodeInput.value.trim();
 
       // Keep track of the first empty element
       let firstEmptyElement: HTMLInputElement | null = null;
 
       if (!Categoryname) {
         firstEmptyElement = CategorynameInput;
-      } else if (!Categorycode) {
-        firstEmptyElement = CategorycodeInput;
       }
 
       if (firstEmptyElement) {
@@ -344,7 +342,13 @@ const modifyCategory = async (Category: Category) => {
         firstEmptyElement.focus(); // Set focus to the first empty element
         return null;
       }
-      return { id: Category.categoryId, Categoryname, Categorycode };
+      return {
+        id: Category.categoryId,
+        Categoryname,
+        Categorynamesl: (
+          document.getElementById("Categorynamesl") as HTMLInputElement
+        ).value.trim(),
+      };
     },
   });
 
@@ -353,7 +357,8 @@ const modifyCategory = async (Category: Category) => {
       await CategoryApiService.modify_category(
         formValues.id,
         formValues.Categoryname,
-        formValues.Categorynamesl || ""
+        formValues.Categorynamesl || "",
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -363,17 +368,13 @@ const modifyCategory = async (Category: Category) => {
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire(
-        "Error!",
-        err.message || "Failed to update Category.",
-        "error"
-      );
+      Swal.fire("Error!", err.message || "Failed to update Category.", "error");
     }
   }
 };
 
 // Define the async function for deleting a Category.
-const deleteCategory = async (Category: Category) => {
+const deleteCategory = async (Category: Category, branchId: number) => {
   const result = await Swal.fire({
     title: "Delete Category",
     text: `Are you sure you want to delete "${Category.categoryName}"? This action cannot be undone.`,
@@ -389,7 +390,8 @@ const deleteCategory = async (Category: Category) => {
       await CategoryApiService.delete_category(
         Category.categoryId,
         Category.categoryName,
-        Category.categoryNameSL
+        Category.categoryNameSL,
+        branchId
       );
       Swal.fire({
         title: "Deleted!",
@@ -399,11 +401,7 @@ const deleteCategory = async (Category: Category) => {
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire(
-        "Error!",
-        err.message || "Failed to delete Category.",
-        "error"
-      );
+      Swal.fire("Error!", err.message || "Failed to delete Category.", "error");
     }
   }
 };
@@ -412,12 +410,19 @@ const deleteCategory = async (Category: Category) => {
 
 const CategoryMaster: React.FC = () => {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.user);
+  const fetchCategoryWithBranch = React.useCallback(
+    async (filter: CategoryFilter) => {
+      return await fetchCategorys(filter, user.branchid);
+    },
+    [user.branchid]
+  );
   return (
     <CRUDMaster<Category>
-      fetchData={fetchCategorys}
-      addEntry={addCategory}
-      modifyEntry={modifyCategory}
-      deleteEntry={deleteCategory}
+      fetchData={fetchCategoryWithBranch}
+      addEntry={() => addCategory(user.branchid)}
+      modifyEntry={(category) => modifyCategory(category, user.branchid)}
+      deleteEntry={(category) => deleteCategory(category, user.branchid)}
       pageTitle="Category Operations"
       addLabel="Add Category"
       onClose={() => navigate("/Category")}

@@ -4,12 +4,13 @@ public class ThanaMasterDto
 {
     public ThanaMasterDto() { }
 
-    public ThanaMasterDto(string thanaName, string thanaCode, string? thanaNameSl, int thanaId)
+    public ThanaMasterDto(string thanaName, string thanaCode, string? thanaNameSl, int thanaId,int branchId )
     {
         ThanaName = thanaName;
         ThanaCode = thanaCode;
         ThanaNameSL = thanaNameSl;
         ThanaId = thanaId;
+        BranchId = branchId;
     }
 
     [Required(ErrorMessage = "Thana Code is required")]
@@ -24,4 +25,6 @@ public class ThanaMasterDto
     public string? ThanaNameSL { get; set; } = string.Empty;
 
     public int ThanaId { get; set; } = 0;
+    [Required]
+    public int BranchId { get; set; } = 0;
 }

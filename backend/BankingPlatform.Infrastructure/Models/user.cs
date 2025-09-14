@@ -6,16 +6,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BankingPlatform.Infrastructure.Models;
 
-[PrimaryKey("id", "branchcode")]
-public partial class user
+[PrimaryKey("id", "branchid")]
+public partial class User
 {
     [Key]
     public int id { get; set; }
 
-    [Key]
-    public string branchcode { get; set; } = null!;
+    public int branchid { get; set; }
 
     public string username { get; set; } = null!;
 
-    public string? password { get; set; }
+    public string password { get; set; } = ""!;
+    public int isauthorized { get; set; }
+    public int issu { get; set; }
+    public int isbranchsu { get; set; }
+    public int usertype { get; set; }
 }

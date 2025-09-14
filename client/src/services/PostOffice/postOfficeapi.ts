@@ -30,11 +30,12 @@ class PostOfficeApiService extends ApiService {
   async add_new_PostOffice(
     PostOfficename: string,
     PostOfficecode: string,
-    PostOfficenamesl: string = ""
+    PostOfficenamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/PostOffice/create_postOffice', {
       method: 'POST',
-      body: JSON.stringify({ PostOfficename, PostOfficecode, PostOfficenamesl }),
+      body: JSON.stringify({ PostOfficename, PostOfficecode, PostOfficenamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
         
@@ -46,11 +47,12 @@ class PostOfficeApiService extends ApiService {
     PostOfficeid : number,
     PostOfficename: string,
     PostOfficecode: string,
-    PostOfficenamesl: string = ""
+    PostOfficenamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/PostOffice/modify_postOffice', {
       method: 'POST',
-      body: JSON.stringify({PostOfficeid, PostOfficename, PostOfficecode, PostOfficenamesl }),
+      body: JSON.stringify({PostOfficeid, PostOfficename, PostOfficecode, PostOfficenamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
         
@@ -62,11 +64,12 @@ class PostOfficeApiService extends ApiService {
     PostOfficeid : number,
     PostOfficename: string,
     PostOfficecode: string,
-    PostOfficenamesl: string = ""
+    PostOfficenamesl: string = "",
+    branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/PostOffice/delete_postOffice', {
       method: 'POST',
-      body: JSON.stringify({PostOfficeid, PostOfficename, PostOfficecode, PostOfficenamesl }),
+      body: JSON.stringify({PostOfficeid, PostOfficename, PostOfficecode, PostOfficenamesl, branchId }),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -74,9 +77,10 @@ class PostOfficeApiService extends ApiService {
   }
 
   async fetchPostOffices(
-    filter: PostOfficeFilter
+    filter: PostOfficeFilter,
+    branchId: number
   ): Promise<ApiResponse<PostOfficeResponse>> {
-    return this.makeRequest<PostOfficeResponse>('/PostOffice/get_all_postOffices', {
+    return this.makeRequest<PostOfficeResponse>(`/PostOffice/get_all_postOffices/${branchId}`, {
       method: 'POST',
       body: JSON.stringify(filter),
       headers: {

@@ -1,5 +1,5 @@
-﻿using BankingPlatform.API.DTO.Tehsil;
-using BankingPlatform.API.DTO.Zone;
+﻿using BankingPlatform.API.DTO;
+using BankingPlatform.API.DTO.Tehsil;
 using BankingPlatform.Infrastructure.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -39,49 +39,44 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-
+                string inputCode = tehsilMasterDTO.TehsilCode.Trim().ToLower();
+                string inputName = tehsilMasterDTO.TehsilName.Trim().ToLower();
+                string? inputNameSL = tehsilMasterDTO.TehsilNameSL?.Trim().ToLower();
 
                 var errors = new List<string>();
-                bool anyExists = await _appContext.tehsil
-                    .AnyAsync(z =>
-                        (z.tehsilcode.ToLower() == tehsilMasterDTO.TehsilCode.ToLower() ||
-                         z.tehsilname.ToLower() == tehsilMasterDTO.TehsilName.ToLower() ||
-                         (z.tehsilnamesl != null && z.tehsilnamesl.ToLower() == tehsilMasterDTO.TehsilNameSL.ToLower())));
+                var duplicateTehsils = await _appContext.tehsil
+                    .Where(z => z.branchid == tehsilMasterDTO.BranchId &&
+                                (z.tehsilcode.ToLower() == inputCode ||
+                                 z.tehsilname.ToLower() == inputName ||
+                                 (!string.IsNullOrEmpty(inputNameSL) && z.tehsilnamesl != null && z.tehsilnamesl.ToLower() == inputNameSL)))
+                    .ToListAsync();
 
-                if (anyExists)
+                if (duplicateTehsils.Any(z => z.tehsilcode.ToLower() == inputCode))
+                    errors.Add("Tehsil Code already exists.");
+
+                if (duplicateTehsils.Any(z => z.tehsilname.ToLower() == inputName))
+                    errors.Add("Tehsil Name already exists.");
+
+                if (!string.IsNullOrEmpty(inputNameSL) &&
+                    duplicateTehsils.Any(z => z.tehsilnamesl != null && z.tehsilnamesl.ToLower() == inputNameSL))
                 {
-                    if (await _appContext.tehsil.AnyAsync(z => z.id != tehsilMasterDTO.TehsilId && z.tehsilcode.ToLower() == tehsilMasterDTO.TehsilCode.ToLower()))
-                        errors.Add("Tehsil code already exists.");
-
-                    if (await _appContext.tehsil.AnyAsync(z => z.id != tehsilMasterDTO.TehsilId && z.tehsilname.ToLower() == tehsilMasterDTO.TehsilName.ToLower()))
-                        errors.Add("Tehsil Name already exists.");
-
-                    if (!string.IsNullOrWhiteSpace(tehsilMasterDTO.TehsilNameSL) &&
-                        await _appContext.tehsil.AnyAsync(z => z.id != tehsilMasterDTO.TehsilId && z.tehsilnamesl != null && z.tehsilnamesl.ToLower() == tehsilMasterDTO.TehsilNameSL.ToLower()))
-                    {
-                        errors.Add("Tehsil Name SL already exists.");
-                    }
+                    errors.Add("Tehsil Name SL already exists.");
                 }
 
                 if (errors.Any())
                 {
-                    _logger.LogWarning("Tehsil update failed due to duplicate data: {Errors}", string.Join(", ", errors));
+                    _logger.LogWarning(
+                        "Tehsil update failed for TehsilId {TehsilId}. Errors: {Errors}",
+                        tehsilMasterDTO.TehsilId,
+                        string.Join(", ", errors));
+
                     return BadRequest(new ResponseDto
                     {
                         Success = false,
-                        Message = string.Join("\n", errors)
+                        Message = string.Join(Environment.NewLine, errors)
                     });
                 }
 
-                // Return all errors if any
-                if (errors.Any())
-                {
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = string.Join("\n", errors)
-                    });
-                }
                 tehsilMasterDTO.TehsilCode = tehsilMasterDTO.TehsilCode?.Trim() ?? "";
                 tehsilMasterDTO.TehsilName = tehsilMasterDTO.TehsilName?.Trim() ?? "";
                 tehsilMasterDTO.TehsilNameSL = tehsilMasterDTO.TehsilNameSL?.Trim() ?? "";
@@ -89,7 +84,7 @@ namespace BankingPlatform.API.Controllers
 
                 await _appContext.tehsil.AddAsync(new Tehsil
                 {
-                    branchid = 1,
+                    branchid = tehsilMasterDTO.BranchId,
                     tehsilname = tehsilMasterDTO.TehsilName,
                     tehsilnamesl = tehsilMasterDTO.TehsilNameSL,
                     tehsilcode = tehsilMasterDTO.TehsilCode
@@ -114,9 +109,9 @@ namespace BankingPlatform.API.Controllers
             }
         }
 
-        [HttpPost("get_all_tehsils")]
+        [HttpPost("get_all_tehsils/{branchId}")]
         [Authorize]
-        public async Task<IActionResult> GetAllTehsils([FromBody] ZoneFilterDto filter)
+        public async Task<IActionResult> GetAllTehsils([FromRoute] int branchId, [FromBody] LocationFilterDTO filter)
         {
             try
             {
@@ -133,10 +128,11 @@ namespace BankingPlatform.API.Controllers
                 var totalCount = await query.CountAsync();
 
                 var items = await query
+                    .Where(x=> x.branchid == branchId)
                     .OrderBy(z => z.tehsilname)
                     .Skip((filter.PageNumber - 1) * filter.PageSize)
                     .Take(filter.PageSize)
-                    .Select(z => new TehsilMasterDTO(z.tehsilname, z.tehsilcode, z.tehsilnamesl, z.id))
+                    .Select(z => new TehsilMasterDTO(z.tehsilname, z.tehsilcode, z.tehsilnamesl, z.id, z.branchid))
                     .ToListAsync();
 
                 return Ok(new
@@ -175,8 +171,7 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                // Check if the tehsil to be modified exists
-                var existingTehsil = await _appContext.tehsil.FindAsync(tehsilMasterDTO.TehsilId, 1);
+                var existingTehsil = await _appContext.tehsil.FindAsync(tehsilMasterDTO.TehsilId, tehsilMasterDTO.BranchId);
                 if (existingTehsil == null)
                 {
                     return NotFound(new ResponseDto
@@ -186,40 +181,45 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                // Check for duplicates, excluding the current tehsil being modified
+                string inputCode = tehsilMasterDTO.TehsilCode.Trim().ToLower();
+                string inputName = tehsilMasterDTO.TehsilName.Trim().ToLower();
+                string? inputNameSL = tehsilMasterDTO.TehsilNameSL?.Trim().ToLower();
+
                 var errors = new List<string>();
-                bool anyExists = await _appContext.tehsil
-                    .AnyAsync(z => z.id != tehsilMasterDTO.TehsilId &&
-                        (z.tehsilcode.ToLower() == tehsilMasterDTO.TehsilCode.ToLower() ||
-                         z.tehsilname.ToLower() == tehsilMasterDTO.TehsilName.ToLower() ||
-                         (z.tehsilnamesl != null && z.tehsilnamesl.ToLower() == tehsilMasterDTO.TehsilNameSL.ToLower())));
+                var duplicateTehsils = await _appContext.tehsil
+                    .Where(z => z.id != tehsilMasterDTO.TehsilId 
+                                && z.branchid == tehsilMasterDTO.BranchId &&
+                                (z.tehsilcode.ToLower() == inputCode ||
+                                 z.tehsilname.ToLower() == inputName ||
+                                 (!string.IsNullOrEmpty(inputNameSL) && z.tehsilnamesl != null && z.tehsilnamesl.ToLower() == inputNameSL)))
+                    .ToListAsync();
 
-                if (anyExists)
+                if (duplicateTehsils.Any(z => z.tehsilcode.ToLower() == inputCode))
+                    errors.Add("Tehsil Code already exists.");
+
+                if (duplicateTehsils.Any(z => z.tehsilname.ToLower() == inputName))
+                    errors.Add("Tehsil Name already exists.");
+
+                if (!string.IsNullOrEmpty(inputNameSL) &&
+                    duplicateTehsils.Any(z => z.tehsilnamesl != null && z.tehsilnamesl.ToLower() == inputNameSL))
                 {
-                    if (await _appContext.tehsil.AnyAsync(z => z.id != tehsilMasterDTO.TehsilId && z.tehsilcode.ToLower() == tehsilMasterDTO.TehsilCode.ToLower()))
-                        errors.Add("Tehsil code already exists.");
-
-                    if (await _appContext.tehsil.AnyAsync(z => z.id != tehsilMasterDTO.TehsilId && z.tehsilname.ToLower() == tehsilMasterDTO.TehsilName.ToLower()))
-                        errors.Add("Tehsil Name already exists.");
-
-                    if (!string.IsNullOrWhiteSpace(tehsilMasterDTO.TehsilNameSL) &&
-                        await _appContext.tehsil.AnyAsync(z => z.id != tehsilMasterDTO.TehsilId && (z.tehsilnamesl != null && z.tehsilnamesl.ToLower() == tehsilMasterDTO.TehsilNameSL.ToLower())))
-                    {
-                        errors.Add("Tehsil Name SL already exists.");
-                    }
+                    errors.Add("Tehsil Name SL already exists.");
                 }
 
                 if (errors.Any())
                 {
-                    _logger.LogWarning("Tehsil update failed due to duplicate data: {Errors}", string.Join(", ", errors));
+                    _logger.LogWarning(
+                        "Tehsil update failed for TehsilId {TehsilId}. Errors: {Errors}",
+                        tehsilMasterDTO.TehsilId,
+                        string.Join(", ", errors));
+
                     return BadRequest(new ResponseDto
                     {
                         Success = false,
-                        Message = string.Join("\n", errors)
+                        Message = string.Join(Environment.NewLine, errors)
                     });
                 }
 
-                // Update the properties of the existing tehsil entity
                 existingTehsil.tehsilcode = tehsilMasterDTO.TehsilCode?.Trim() ?? "";
                 existingTehsil.tehsilname = tehsilMasterDTO.TehsilName?.Trim() ?? "";
                 existingTehsil.tehsilnamesl = tehsilMasterDTO.TehsilNameSL?.Trim() ?? "";
@@ -265,7 +265,7 @@ namespace BankingPlatform.API.Controllers
                 }
 
                 // Check if the tehsil to be deleted exists
-                var existingTehsil = await _appContext.tehsil.FindAsync(tehsilMasterDTO.TehsilId, 1);
+                var existingTehsil = await _appContext.tehsil.FindAsync(tehsilMasterDTO.TehsilId, tehsilMasterDTO.BranchId);
                 if (existingTehsil == null)
                 {
                     return NotFound(new ResponseDto

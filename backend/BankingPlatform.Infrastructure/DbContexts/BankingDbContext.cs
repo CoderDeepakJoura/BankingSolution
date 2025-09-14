@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
-
+﻿
+global using Microsoft.EntityFrameworkCore;
 namespace BankingPlatform.Infrastructure.Models;
 
 public partial class BankingDbContext : DbContext
@@ -15,47 +13,55 @@ public partial class BankingDbContext : DbContext
     {
     }
 
-    public virtual DbSet<user> users { get; set; }
+    public virtual DbSet<User> user { get; set; }
     public virtual DbSet<Zone> zone { get; set; }
     public virtual DbSet<Thana> thana { get; set; }
     public virtual DbSet<PostOffice> postoffice { get; set; }
     public virtual DbSet<Tehsil> tehsil { get; set; }
+    public virtual DbSet<Category> category { get; set; }
+    public virtual DbSet<branchMaster> branchmaster { get; set; }
+    public virtual DbSet<AccountHeadType> accountheadtype { get; set; }
+    public virtual DbSet<DayBeginEndInfo> daybeginendinfo { get; set; }
+    public virtual DbSet<DayBeginEndInfoDetail> daybeginendinfodetail { get; set; }
+    public virtual DbSet<AccountHead> accounthead { get; set; }
+    public virtual DbSet<Member> member { get; set; }
+    public virtual DbSet<MemberNominee> membernominee { get; set; }
+    public virtual DbSet<Relation> relation { get; set; }
+    public virtual DbSet<Village> village { get; set; }
 
    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<user>(entity =>
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(BankingDbContext).Assembly);
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
-            entity.HasKey(e => new { e.id, e.branchcode }).HasName("users_pkey");
-        });
-        modelBuilder.Entity<Zone>(entity =>
-        {
-            entity.HasKey(e => new { e.id, e.branchid }).HasName("zones_pkey");
-            entity.Property(e => e.id).ValueGeneratedOnAdd();
-            entity.HasIndex(e => new { e.id, e.zonename, e.zonecode }).IsUnique();
+            // Table name
+            entity.SetTableName(entity.GetTableName()!.ToLower());
 
-        });
-        modelBuilder.Entity<Thana>(entity =>
-        {
-            entity.HasKey(e => new { e.id, e.branchid }).HasName("thana_pkey");
-            entity.Property(e => e.id).ValueGeneratedOnAdd();
-            entity.HasIndex(e => new { e.id, e.thananame, e.thanacode }).IsUnique();
+            // Columns
+            foreach (var property in entity.GetProperties())
+            {
+                property.SetColumnName(property.GetColumnName()!.ToLower());
+            }
 
-        });
-        modelBuilder.Entity<Tehsil>(entity =>
-        {
-            entity.HasKey(e => new { e.id, e.branchid }).HasName("tehsil_pkey");
-            entity.Property(e => e.id).ValueGeneratedOnAdd();
-            entity.HasIndex(e => new { e.id, e.tehsilname, e.tehsilcode }).IsUnique();
+            // Keys
+            foreach (var key in entity.GetKeys())
+            {
+                key.SetName(key.GetName()!.ToLower());
+            }
 
-        });
-        modelBuilder.Entity<PostOffice>(entity =>
-        {
-            entity.HasKey(e => new { e.id, e.branchid }).HasName("postOffice_pkey");
-            entity.Property(e => e.id).ValueGeneratedOnAdd();
-            entity.HasIndex(e => new { e.id, e.postofficename, e.postofficecode }).IsUnique();
+            // Foreign keys
+            foreach (var fk in entity.GetForeignKeys())
+            {
+                fk.SetConstraintName(fk.GetConstraintName()!.ToLower());
+            }
 
-        });
+            // Indexes
+            foreach (var index in entity.GetIndexes())
+            {
+                index.SetDatabaseName(index.GetDatabaseName()!.ToLower());
+            }
+        }
 
         OnModelCreatingPartial(modelBuilder);
     }

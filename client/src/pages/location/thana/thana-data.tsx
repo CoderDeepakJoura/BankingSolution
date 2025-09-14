@@ -7,10 +7,11 @@ import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import ThanaTable from "./thana-table";
 import { useNavigate } from "react-router-dom";
-
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 // Define the async function to fetch Thanas and ensure the return type is correct.
-const fetchThanas = async (filter: ThanaFilter) => {
-  const res = await ThanaApiService.fetchthanas(filter);
+const fetchThanas = async (filter: ThanaFilter, branchId: number) => {
+  const res = await ThanaApiService.fetchthanas(filter, branchId);
   return {
     // Ensure 'success' is a boolean, defaulting to false if undefined.
     success: res.success ?? false, // Ensure 'data' is a Thana array, defaulting to an empty array.
@@ -21,7 +22,7 @@ const fetchThanas = async (filter: ThanaFilter) => {
 };
 
 // Define the async function for adding a Thana.
-const addThana = async () => {
+const addThana = async (branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Add New Thana",
     html: `
@@ -40,6 +41,7 @@ const addThana = async () => {
           placeholder="Enter Thana Name" 
           aria-required="true"
           autocomplete="off"
+          autoFocus = "true"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
       </div>
@@ -177,9 +179,13 @@ const addThana = async () => {
       const ThanacodeInput = document.getElementById(
         "Thanacode"
       ) as HTMLInputElement;
+      const ThananameslInput = document.getElementById(
+        "Thananamesl"
+      ) as HTMLInputElement;
 
       const Thananame = ThananameInput.value.trim();
       const Thanacode = ThanacodeInput.value.trim();
+      const Thananamesl = ThananameslInput.value.trim();
 
       // Keep track of the first empty element
       let firstEmptyElement: HTMLInputElement | null = null;
@@ -195,7 +201,7 @@ const addThana = async () => {
         firstEmptyElement.focus();
         return null;
       }
-      return { Thananame, Thanacode };
+      return { Thananame, Thanacode, Thananamesl };
     },
   });
 
@@ -203,7 +209,9 @@ const addThana = async () => {
     try {
       await ThanaApiService.add_new_thana(
         formValues.Thananame,
-        formValues.Thanacode
+        formValues.Thanacode,
+        formValues.Thananamesl,
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -219,7 +227,7 @@ const addThana = async () => {
 };
 
 // Define the async function for modifying a Thana.
-const modifyThana = async (Thana: Thana) => {
+const modifyThana = async (Thana: Thana, branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Modify Thana",
     html: `
@@ -239,6 +247,10 @@ const modifyThana = async (Thana: Thana) => {
           placeholder="Enter Thana Name" 
           aria-required="true"
           autocomplete="off"
+          autoFocus = "true"
+          required
+          pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
+          maxlength="50"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
       </div>
@@ -259,6 +271,8 @@ const modifyThana = async (Thana: Thana) => {
           placeholder="Enter Thana Code" 
           aria-required="true"
           autocomplete="off"
+          required
+          pattern="[a-zA-Z0-9]{1,10}"
           maxlength="10"
           
         >
@@ -373,8 +387,13 @@ const modifyThana = async (Thana: Thana) => {
         "Thanacode"
       ) as HTMLInputElement;
 
+      const ThananameslInput = document.getElementById(
+        "Thananamesl"
+      ) as HTMLInputElement;
+
       const Thananame = ThananameInput.value.trim();
       const Thanacode = ThanacodeInput.value.trim();
+      const Thananamesl = ThananameslInput.value.trim();
 
       // Keep track of the first empty element
       let firstEmptyElement: HTMLInputElement | null = null;
@@ -390,7 +409,7 @@ const modifyThana = async (Thana: Thana) => {
         firstEmptyElement.focus();
         return null;
       }
-      return { id: Thana.thanaId, Thananame, Thanacode };
+      return { id: Thana.thanaId, Thananame, Thanacode, Thananamesl };
     },
   });
 
@@ -399,7 +418,9 @@ const modifyThana = async (Thana: Thana) => {
       await ThanaApiService.modify_thana(
         formValues.id,
         formValues.Thananame,
-        formValues.Thanacode
+        formValues.Thanacode,
+        formValues.Thananamesl,
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -415,7 +436,7 @@ const modifyThana = async (Thana: Thana) => {
 };
 
 // Define the async function for deleting a Thana.
-const deleteThana = async (Thana: Thana) => {
+const deleteThana = async (Thana: Thana, branchId: number) => {
   const result = await Swal.fire({
     title: "Delete Thana",
     text: `Are you sure you want to delete "${Thana.thanaName}"? This action cannot be undone.`,
@@ -432,7 +453,8 @@ const deleteThana = async (Thana: Thana) => {
         Thana.thanaId,
         Thana.thanaName,
         Thana.thanaCode,
-        Thana.thanaNameSL
+        Thana.thanaNameSL,
+        branchId
       );
       Swal.fire({
         title: "Deleted!",
@@ -451,12 +473,19 @@ const deleteThana = async (Thana: Thana) => {
 
 const ThanaMaster: React.FC = () => {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.user);
+  const fetchThanasWithBranch = React.useCallback(
+    async (filter: ThanaFilter) => {
+      return await fetchThanas(filter, user.branchid);
+    },
+    [user.branchid]
+  );
   return (
     <CRUDMaster<Thana>
-      fetchData={fetchThanas}
-      addEntry={addThana}
-      modifyEntry={modifyThana}
-      deleteEntry={deleteThana}
+      fetchData={fetchThanasWithBranch}
+      addEntry={() => addThana(user.branchid)}
+      modifyEntry={(thana) => modifyThana(thana, user.branchid)}
+      deleteEntry={(thana) => deleteThana(thana, user.branchid)}
       pageTitle="Thana Operations"
       addLabel="Add Thana"
       onClose={() => navigate("/Thana")}

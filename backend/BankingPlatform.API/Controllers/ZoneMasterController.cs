@@ -1,4 +1,4 @@
-﻿using BankingPlatform.API.DTO.Zone;
+﻿using BankingPlatform.API.DTO;
 using BankingPlatform.Infrastructure.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -115,7 +115,7 @@ namespace BankingPlatform.API.Controllers
 
         [HttpPost("get_all_zones")]
         [Authorize]
-        public async Task<IActionResult> GetAllZones([FromBody] ZoneFilterDto filter)
+        public async Task<IActionResult> GetAllZones([FromBody] LocationFilterDTO filter)
         {
             try
             {

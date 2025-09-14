@@ -7,10 +7,12 @@ import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import PostOfficeTable from "./postOffice-table";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 
 // Define the async function to fetch PostOffices and ensure the return type is correct.
-const fetchPostOffices = async (filter: PostOfficeFilter) => {
-  const res = await PostOfficeApiService.fetchPostOffices(filter);
+const fetchPostOffices = async (filter: PostOfficeFilter, branchId : number) => {
+  const res = await PostOfficeApiService.fetchPostOffices(filter, branchId);
   return {
     // Ensure 'success' is a boolean, defaulting to false if undefined.
     success: res.success ?? false, // Ensure 'data' is a PostOffice array, defaulting to an empty array.
@@ -21,7 +23,7 @@ const fetchPostOffices = async (filter: PostOfficeFilter) => {
 };
 
 // Define the async function for adding a PostOffice.
-const addPostOffice = async () => {
+const addPostOffice = async (branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Add New Post Office",
     html: `
@@ -39,6 +41,7 @@ const addPostOffice = async () => {
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
           placeholder="Enter Post Office Name" 
           aria-required="true"
+          autoFocus="true"
           autocomplete="off"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
@@ -167,7 +170,7 @@ const addPostOffice = async () => {
   </style>
 `,
     showCancelButton: true,
-    confirmButtonText: "Add PostOffice",
+    confirmButtonText: "Add Post Office",
     confirmButtonColor: "#3085d6",
     cancelButtonColor: "#d33",
     preConfirm: () => {
@@ -177,9 +180,13 @@ const addPostOffice = async () => {
       const PostOfficecodeInput = document.getElementById(
         "PostOfficecode"
       ) as HTMLInputElement;
+      const PostOfficenameslInput = document.getElementById(
+        "PostOfficenamesl"
+      ) as HTMLInputElement;
 
       const PostOfficename = PostOfficenameInput.value.trim();
       const PostOfficecode = PostOfficecodeInput.value.trim();
+      const PostOfficenamesl = PostOfficenameslInput.value.trim();
 
       // Keep track of the first empty element
       let firstEmptyElement: HTMLInputElement | null = null;
@@ -195,7 +202,7 @@ const addPostOffice = async () => {
         firstEmptyElement.focus(); // Set focus to the first empty element
         return null;
       }
-      return { PostOfficename, PostOfficecode };
+      return { PostOfficename, PostOfficecode, PostOfficenamesl };
     },
   });
 
@@ -203,7 +210,9 @@ const addPostOffice = async () => {
     try {
       await PostOfficeApiService.add_new_PostOffice(
         formValues.PostOfficename,
-        formValues.PostOfficecode
+        formValues.PostOfficecode,
+        formValues.PostOfficenamesl,
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -219,7 +228,7 @@ const addPostOffice = async () => {
 };
 
 // Define the async function for modifying a PostOffice.
-const modifyPostOffice = async (PostOffice: PostOffice) => {
+const modifyPostOffice = async (PostOffice: PostOffice, branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Modify Post Office",
     html: `
@@ -239,6 +248,7 @@ const modifyPostOffice = async (PostOffice: PostOffice) => {
           placeholder="Enter PostOffice Name" 
           aria-required="true"
           autocomplete="off"
+          autoFocus= "true"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
       </div>
@@ -363,7 +373,7 @@ const modifyPostOffice = async (PostOffice: PostOffice) => {
   </style>
 `,
     showCancelButton: true,
-    confirmButtonText: "Update PostOffice",
+    confirmButtonText: "Update Post Office",
     confirmButtonColor: "#3085d6",
     cancelButtonColor: "#d33",
     preConfirm: () => {
@@ -373,8 +383,12 @@ const modifyPostOffice = async (PostOffice: PostOffice) => {
       const PostOfficecodeInput = document.getElementById(
         "PostOfficecode"
       ) as HTMLInputElement;
+      const PostOfficenameslInput = document.getElementById(
+        "PostOfficenamesl"
+      ) as HTMLInputElement;
 
       const PostOfficename = PostOfficenameInput.value.trim();
+      const PostOfficenamesl = PostOfficenameslInput.value.trim();
       const PostOfficecode = PostOfficecodeInput.value.trim();
 
       // Keep track of the first empty element
@@ -391,7 +405,7 @@ const modifyPostOffice = async (PostOffice: PostOffice) => {
         firstEmptyElement.focus(); // Set focus to the first empty element
         return null;
       }
-      return { id: PostOffice.postOfficeId, PostOfficename, PostOfficecode };
+      return { id: PostOffice.postOfficeId, PostOfficename, PostOfficecode, PostOfficenamesl };
     },
   });
 
@@ -400,7 +414,9 @@ const modifyPostOffice = async (PostOffice: PostOffice) => {
       await PostOfficeApiService.modify_PostOffice(
         formValues.id,
         formValues.PostOfficename,
-        formValues.PostOfficecode
+        formValues.PostOfficecode,
+        formValues.PostOfficenamesl,
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -420,9 +436,9 @@ const modifyPostOffice = async (PostOffice: PostOffice) => {
 };
 
 // Define the async function for deleting a PostOffice.
-const deletePostOffice = async (PostOffice: PostOffice) => {
+const deletePostOffice = async (PostOffice: PostOffice, branchId: number) => {
   const result = await Swal.fire({
-    title: "Delete PostOffice",
+    title: "Delete Post Office",
     text: `Are you sure you want to delete "${PostOffice.postOfficeName}"? This action cannot be undone.`,
     icon: "warning",
     showCancelButton: true,
@@ -437,7 +453,8 @@ const deletePostOffice = async (PostOffice: PostOffice) => {
         PostOffice.postOfficeId,
         PostOffice.postOfficeName,
         PostOffice.postOfficeCode,
-        PostOffice.postOfficeNameSL
+        PostOffice.postOfficeNameSL,
+        branchId
       );
       Swal.fire({
         title: "Deleted!",
@@ -449,7 +466,7 @@ const deletePostOffice = async (PostOffice: PostOffice) => {
     } catch (err: any) {
       Swal.fire(
         "Error!",
-        err.message || "Failed to delete PostOffice.",
+        err.message || "Failed to delete Post Office.",
         "error"
       );
     }
@@ -460,12 +477,20 @@ const deletePostOffice = async (PostOffice: PostOffice) => {
 
 const PostOfficeMaster: React.FC = () => {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.user);
+  const branchId = user.branchid;
+  const fetchPostOfficesWithBranch = React.useCallback(
+      async (filter: PostOfficeFilter) => {
+        return await fetchPostOffices(filter, branchId);
+      },
+      [user.branchid]
+    );
   return (
     <CRUDMaster<PostOffice>
-      fetchData={fetchPostOffices}
-      addEntry={addPostOffice}
-      modifyEntry={modifyPostOffice}
-      deleteEntry={deletePostOffice}
+      fetchData={fetchPostOfficesWithBranch}
+      addEntry={() => addPostOffice(branchId)}
+      modifyEntry={(postoffice) => modifyPostOffice(postoffice, branchId)}
+      deleteEntry={(postoffice) => deletePostOffice(postoffice, branchId)}
       pageTitle="Post Office Operations"
       addLabel="Add Post Office"
       onClose={() => navigate("/PostOffice")}

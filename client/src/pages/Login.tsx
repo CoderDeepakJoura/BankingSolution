@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ApiService from '../services/api';
+import Swal from "sweetalert2";
 const Login = () => {
   const [username, setUserName] = useState("");
   const [password, setPassword] = useState("");
@@ -19,22 +20,36 @@ const Login = () => {
 
     try {
       const data = await ApiService.login(username, password, branchcode);
+      console.log(data);
       if (!data.success) {
-        setError(data.message || "Login failed");
+        Swal.fire({
+          icon: "error",
+          title: "Login Failed",
+          text: data.message || "Something went wrong.",
+          confirmButtonColor: "#2563eb",
+        });
+        setIsLoading(false);
         return;
       }
-      navigate("/dashboard");
+      navigate("/workingdate");
     } catch (error) {
-      setError("Network error. Please try again.");
-      console.error("Login error:", error);
-      alert("An error occurred while logging in. Please try again later.");
+      console.log(error);
+      Swal.fire({
+          icon: "error",
+          title: "Login Failed",
+          text: error.message || "Something went wrong.",
+          confirmButtonColor: "#2563eb",
+        });
+        setIsLoading(false);
+        return;
+      
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className=" bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
@@ -69,9 +84,9 @@ const Login = () => {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold mb-2">Welcome Back</h2>
-                <p className="text-blue-100 text-sm">
+                {/* <p className="text-blue-100 text-sm">
                   Access your secure banking dashboard
-                </p>
+                </p> */}
               </div>
             </div>
 

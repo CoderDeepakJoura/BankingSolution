@@ -45,7 +45,9 @@ export class ApiService {
 
     try {
       const response = await fetch(url, config);
-
+      if (response.status === 401) {
+        throw new Error("Unauthorized");
+      }
       if (!response.ok) {
         const contentType = response.headers.get('content-type');
         let errorMessage = 'Request failed';
@@ -104,6 +106,17 @@ export class ApiService {
    async validate_token(): Promise<ApiResponse> {
     return this.makeRequest('/auth/validate_token', {
       method: 'GET'
+    });
+  }
+  async get_login_info(): Promise<ApiResponse> {
+    return this.makeRequest('/auth/me', {
+      method: 'GET'
+    });
+  }
+  async set_working_date(WorkingDate: string): Promise<ApiResponse<AuthResponse>> {
+    return this.makeRequest<AuthResponse>('/auth/working-date', {
+      method: 'POST',
+      body: JSON.stringify({ WorkingDate: WorkingDate })
     });
   }
 }

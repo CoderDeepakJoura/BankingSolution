@@ -3,7 +3,7 @@ import React from "react";
 const Header = () => {
   return (
     
-    <header className="relative z-10 w-full py-6 px-8 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-lg">
+    <header className="sticky top-0 relative z-10 w-full py-6 px-8 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-lg">
         
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <div className="flex items-center space-x-4">
@@ -14,13 +14,13 @@ const Header = () => {
           </div>
           <div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-              SecureBank
+              ADH Solution
             </h1>
             <p className="text-xs text-gray-500 font-medium tracking-wide">Enterprise Banking Platform</p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-6">
+        {/* <div className="flex items-center space-x-6">
           <div className="hidden md:flex items-center space-x-4 text-sm text-gray-600">
             <span className="flex items-center space-x-1">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -29,7 +29,7 @@ const Header = () => {
             <span className="text-gray-400">|</span>
             <span>24/7 Support</span>
           </div>
-        </div>
+        </div> */}
       </div>
     </header>
   );

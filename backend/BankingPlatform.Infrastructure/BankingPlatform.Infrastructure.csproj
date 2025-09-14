@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\BankingPlatform.Domain\BankingPlatform.Domain.csproj" />
     <ProjectReference Include="..\BankingPlatform.Application\BankingPlatform.Application.csproj" />
+    <ProjectReference Include="..\BankingPlatform.Common\BankingPlatform.Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>

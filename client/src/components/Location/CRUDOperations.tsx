@@ -12,7 +12,16 @@ import { X } from "lucide-react"; // Importing a close icon from lucide-react
 
 interface CRUDMasterProps<T> {
   // Functions to perform API operations.
-  fetchData: (filter: { searchTerm: string; pageNumber: number; pageSize: number }) => Promise<{ success: boolean; data: T[]; totalCount: number; message?: string }>;
+  fetchData: (filter: {
+    searchTerm: string;
+    pageNumber: number;
+    pageSize: number;
+  }) => Promise<{
+    success: boolean;
+    data: T[];
+    totalCount: number;
+    message?: string;
+  }>;
   addEntry: () => Promise<void>;
   modifyEntry: (item: T) => Promise<void>;
   deleteEntry: (item: T) => Promise<void>;
@@ -21,8 +30,12 @@ interface CRUDMasterProps<T> {
   pageTitle: string;
   addLabel: string;
   searchPlaceholder: string;
-  renderTable: (data: T[], handleModify: (item: T) => void, handleDelete: (item: T) => void) => ReactNode;
-  
+  renderTable: (
+    data: T[],
+    handleModify: (item: T) => void,
+    handleDelete: (item: T) => void
+  ) => ReactNode;
+
   // A function to get a unique key from each item.
   getKey: (item: T) => string | number;
 
@@ -73,9 +86,16 @@ const CRUDMaster = <T,>({
       } else {
         setError(res.message || "Failed to fetch data.");
       }
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // fetch was aborted -> silently ignore
+        return;
+      }
+
+      if (err instanceof Error) {
         setError(err.message || "An unexpected error occurred.");
+      } else {
+        setError("An unexpected error occurred.");
       }
     } finally {
       setIsLoading(false);
@@ -128,12 +148,12 @@ const CRUDMaster = <T,>({
       (_, i) => startPage + i
     );
   };
-  
+
   return (
     <DashboardLayout
       enableScroll={false}
       mainContent={
-        <div className="p-4 sm:p-8 bg-gray-100 min-h-screen">
+        <div className="p-4 sm:p-8 bg-gray-100">
           <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
               {pageTitle}
@@ -145,16 +165,15 @@ const CRUDMaster = <T,>({
               >
                 <FaPlus className="mr-2" /> {addLabel}
               </button>
-              
-                <button
-                  onClick={onClose}
-                  className="flex items-center bg-red-600 text-white px-4 py-2 rounded-full shadow-md hover:bg-red-700 transition-colors font-semibold focus:outline-none focus:ring-2 focus:ring-red-500"
-                  aria-label="Close"
-                  title="Close"
-                >
-                  <X className="mr-2" /> Close
-                </button>
-              
+
+              <button
+                onClick={onClose}
+                className="flex items-center bg-red-600 text-white px-4 py-2 rounded-full shadow-md hover:bg-red-700 transition-colors font-semibold focus:outline-none focus:ring-2 focus:ring-red-500"
+                aria-label="Close"
+                title="Close"
+              >
+                <X className="mr-2" /> Close
+              </button>
             </div>
           </div>
           <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200 mb-6">
@@ -195,11 +214,18 @@ const CRUDMaster = <T,>({
           {isLoading ? (
             <div className="space-y-3 animate-pulse">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="bg-gray-200 rounded-lg h-12 w-full"></div>
+                <div
+                  key={i}
+                  className="bg-gray-200 rounded-lg h-12 w-full"
+                ></div>
               ))}
             </div>
           ) : data.length > 0 ? (
-            renderTable(data, (item) => modifyEntry(item).then(loadData), (item) => deleteEntry(item).then(loadData))
+            renderTable(
+              data,
+              (item) => modifyEntry(item).then(loadData),
+              (item) => deleteEntry(item).then(loadData)
+            )
           ) : (
             <div className="flex flex-col justify-center items-center py-12 text-gray-500">
               <FaBoxOpen className="text-4xl mb-2" />
@@ -246,14 +272,18 @@ const CRUDMaster = <T,>({
                     key={page}
                     onClick={() => setPageNumber(page)}
                     className={`px-3 py-1 rounded-full text-sm ${
-                      page === pageNumber ? "bg-blue-600 text-white" : "border bg-white"
+                      page === pageNumber
+                        ? "bg-blue-600 text-white"
+                        : "border bg-white"
                     }`}
                   >
                     {page}
                   </button>
                 ))}
                 <button
-                  onClick={() => setPageNumber((prev) => Math.min(prev + 1, totalPages))}
+                  onClick={() =>
+                    setPageNumber((prev) => Math.min(prev + 1, totalPages))
+                  }
                   disabled={pageNumber >= totalPages}
                   className="px-3 py-1 border rounded-full text-sm disabled:opacity-50"
                 >

@@ -1,5 +1,4 @@
 ﻿using BankingPlatform.API.DTO;
-using BankingPlatform.API.DTO.Zone;
 using BankingPlatform.Infrastructure.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -39,49 +38,45 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-
+                string inputCode = thanaMasterDTO.ThanaCode.Trim().ToLower();
+                string inputName = thanaMasterDTO.ThanaName.Trim().ToLower();
+                string? inputNameSL = thanaMasterDTO.ThanaNameSL?.Trim().ToLower();
 
                 var errors = new List<string>();
-                bool anyExists = await _appContext.thana
-                    .AnyAsync(z =>
-                        (z.thanacode.ToLower() == thanaMasterDTO.ThanaCode.ToLower() ||
-                         z.thananame.ToLower() == thanaMasterDTO.ThanaName.ToLower() ||
-                         (z.thananamesl != null && z.thananamesl.ToLower() == thanaMasterDTO.ThanaNameSL.ToLower())));
 
-                if (anyExists)
+                var duplicateThanas = await _appContext.thana
+                    .Where(z => z.branchid == thanaMasterDTO.BranchId &&
+                                (z.thanacode.ToLower() == inputCode ||
+                                 z.thananame.ToLower() == inputName ||
+                                 (!string.IsNullOrEmpty(inputNameSL) && z.thananamesl != null && z.thananamesl.ToLower() == inputNameSL)))
+                    .ToListAsync();
+
+                if (duplicateThanas.Any(z => z.thanacode.ToLower() == inputCode))
+                    errors.Add("Thana Code already exists.");
+
+                if (duplicateThanas.Any(z => z.thananame.ToLower() == inputName))
+                    errors.Add("Thana Name already exists.");
+
+                if (!string.IsNullOrEmpty(inputNameSL) &&
+                    duplicateThanas.Any(z => z.thananamesl != null && z.thananamesl.ToLower() == inputNameSL))
                 {
-                    if (await _appContext.thana.AnyAsync(z => z.id != thanaMasterDTO.ThanaId && z.thanacode.ToLower() == thanaMasterDTO.ThanaCode.ToLower()))
-                        errors.Add("Thana code already exists.");
-
-                    if (await _appContext.thana.AnyAsync(z => z.id != thanaMasterDTO.ThanaId && z.thananame.ToLower() == thanaMasterDTO.ThanaName.ToLower()))
-                        errors.Add("Thana Name already exists.");
-
-                    if (!string.IsNullOrWhiteSpace(thanaMasterDTO.ThanaNameSL) &&
-                        await _appContext.thana.AnyAsync(z => z.id != thanaMasterDTO.ThanaId && z.thananamesl !=null && z.thananamesl.ToLower() == thanaMasterDTO.ThanaNameSL.ToLower()))
-                    {
-                        errors.Add("Thana Name SL already exists.");
-                    }
+                    errors.Add("Thana Name SL already exists.");
                 }
 
                 if (errors.Any())
                 {
-                    _logger.LogWarning("Thana update failed due to duplicate data: {Errors}", string.Join(", ", errors));
+                    _logger.LogWarning(
+                        "Thana update failed for ThanaId {ThanaId}. Errors: {Errors}",
+                        thanaMasterDTO.ThanaId,
+                        string.Join(", ", errors));
+
                     return BadRequest(new ResponseDto
                     {
                         Success = false,
-                        Message = string.Join("\n", errors)
+                        Message = string.Join(Environment.NewLine, errors)
                     });
                 }
 
-                // Return all errors if any
-                if (errors.Any())
-                {
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = string.Join("\n", errors)
-                    });
-                }
                 thanaMasterDTO.ThanaCode = thanaMasterDTO.ThanaCode?.Trim() ?? "";
                 thanaMasterDTO.ThanaName = thanaMasterDTO.ThanaName?.Trim() ?? "";
                 thanaMasterDTO.ThanaNameSL = thanaMasterDTO.ThanaNameSL?.Trim() ?? "";
@@ -89,7 +84,7 @@ namespace BankingPlatform.API.Controllers
 
                 await _appContext.thana.AddAsync(new Thana
                 {
-                    branchid = 1,
+                    branchid = thanaMasterDTO.BranchId,
                     thananame = thanaMasterDTO.ThanaName,
                     thananamesl = thanaMasterDTO.ThanaNameSL,
                     thanacode = thanaMasterDTO.ThanaCode
@@ -114,9 +109,9 @@ namespace BankingPlatform.API.Controllers
             }
         }
 
-        [HttpPost("get_all_thanas")]
+        [HttpPost("get_all_thanas/{branchid}")]
         [Authorize]
-        public async Task<IActionResult> GetAllThanas([FromBody] ZoneFilterDto filter)
+        public async Task<IActionResult> GetAllThanas([FromRoute] int branchid, [FromBody] LocationFilterDTO filter)
         {
             try
             {
@@ -133,10 +128,11 @@ namespace BankingPlatform.API.Controllers
                 var totalCount = await query.CountAsync();
 
                 var items = await query
+                    .Where(x=> x.branchid == branchid)
                     .OrderBy(z => z.thananame)
                     .Skip((filter.PageNumber - 1) * filter.PageSize)
                     .Take(filter.PageSize)
-                    .Select(z => new ThanaMasterDto(z.thananame, z.thanacode, z.thananamesl, z.id))
+                    .Select(z => new ThanaMasterDto(z.thananame, z.thanacode, z.thananamesl, z.id, z.branchid))
                     .ToListAsync();
 
                 return Ok(new
@@ -176,7 +172,7 @@ namespace BankingPlatform.API.Controllers
                 }
 
                 // Check if the thana to be modified exists
-                var existingThana = await _appContext.thana.FindAsync(thanaMasterDTO.ThanaId, 1);
+                var existingThana = await _appContext.thana.FindAsync(thanaMasterDTO.ThanaId, thanaMasterDTO.BranchId);
                 if (existingThana == null)
                 {
                     return NotFound(new ResponseDto
@@ -186,36 +182,43 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                // Check for duplicates, excluding the current thana being modified
+                string inputCode = thanaMasterDTO.ThanaCode.Trim().ToLower();
+                string inputName = thanaMasterDTO.ThanaName.Trim().ToLower();
+                string? inputNameSL = thanaMasterDTO.ThanaNameSL?.Trim().ToLower();
+
                 var errors = new List<string>();
-                bool anyExists = await _appContext.thana
-                    .AnyAsync(z => z.id != thanaMasterDTO.ThanaId &&
-                        (z.thanacode.ToLower() == thanaMasterDTO.ThanaCode.ToLower() ||
-                         z.thananame.ToLower() == thanaMasterDTO.ThanaName.ToLower() ||
-                         (z.thananamesl != null && z.thananamesl.ToLower() == thanaMasterDTO.ThanaNameSL.ToLower())));
 
-                if (anyExists)
+                var duplicateThanas = await _appContext.thana
+                    .Where(z => z.id != thanaMasterDTO.ThanaId && z.branchid == thanaMasterDTO.BranchId
+                                &&
+                                (z.thanacode.ToLower() == inputCode ||
+                                 z.thananame.ToLower() == inputName ||
+                                 (!string.IsNullOrEmpty(inputNameSL) && z.thananamesl != null && z.thananamesl.ToLower() == inputNameSL)))
+                    .ToListAsync();
+
+                if (duplicateThanas.Any(z => z.thanacode.ToLower() == inputCode))
+                    errors.Add("Thana Code already exists.");
+
+                if (duplicateThanas.Any(z => z.thananame.ToLower() == inputName))
+                    errors.Add("Thana Name already exists.");
+
+                if (!string.IsNullOrEmpty(inputNameSL) &&
+                    duplicateThanas.Any(z => z.thananamesl != null && z.thananamesl.ToLower() == inputNameSL))
                 {
-                    if (await _appContext.thana.AnyAsync(z => z.id != thanaMasterDTO.ThanaId && z.thanacode.ToLower() == thanaMasterDTO.ThanaCode.ToLower()))
-                        errors.Add("Thana code already exists.");
-
-                    if (await _appContext.thana.AnyAsync(z => z.id != thanaMasterDTO.ThanaId && z.thananame.ToLower() == thanaMasterDTO.ThanaName.ToLower()))
-                        errors.Add("Thana Name already exists.");
-
-                    if (!string.IsNullOrWhiteSpace(thanaMasterDTO.ThanaNameSL) &&
-                        await _appContext.thana.AnyAsync(z => z.id != thanaMasterDTO.ThanaId && (z.thananamesl != null && z.thananamesl.ToLower() == thanaMasterDTO.ThanaNameSL.ToLower())))
-                    {
-                        errors.Add("Thana Name SL already exists.");
-                    }
+                    errors.Add("Thana Name SL already exists.");
                 }
 
                 if (errors.Any())
                 {
-                    _logger.LogWarning("Thana update failed due to duplicate data: {Errors}", string.Join(", ", errors));
+                    _logger.LogWarning(
+                        "Thana update failed for ThanaId {ThanaId}. Errors: {Errors}",
+                        thanaMasterDTO.ThanaId,
+                        string.Join(", ", errors));
+
                     return BadRequest(new ResponseDto
                     {
                         Success = false,
-                        Message = string.Join("\n", errors)
+                        Message = string.Join(Environment.NewLine, errors)
                     });
                 }
 
@@ -265,7 +268,7 @@ namespace BankingPlatform.API.Controllers
                 }
 
                 // Check if the thana to be deleted exists
-                var existingThana = await _appContext.thana.FindAsync(thanaMasterDTO.ThanaId, 1);
+                var existingThana = await _appContext.thana.FindAsync(thanaMasterDTO.ThanaId, thanaMasterDTO.BranchId);
                 if (existingThana == null)
                 {
                     return NotFound(new ResponseDto

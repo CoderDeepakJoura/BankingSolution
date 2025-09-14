@@ -6,12 +6,13 @@ namespace BankingPlatform.API.DTO.PostOffice
     {
         public PostOfficeMasterDTO() { }
 
-        public PostOfficeMasterDTO(string postOfficeName, string postOfficeCode, string? postOfficeNameSl, int postOfficeId)
+        public PostOfficeMasterDTO(string postOfficeName, string postOfficeCode, string? postOfficeNameSl, int postOfficeId, int branchId)
         {
             PostOfficeName = postOfficeName;
             PostOfficeCode = postOfficeCode;
             PostOfficeNameSL = postOfficeNameSl;
             PostOfficeId = postOfficeId;
+            BranchId = branchId;
         }
 
         [Required(ErrorMessage = "Post Office Code is required")]
@@ -26,5 +27,7 @@ namespace BankingPlatform.API.DTO.PostOffice
         public string? PostOfficeNameSL { get; set; } = string.Empty;
 
         public int PostOfficeId { get; set; } = 0;
+        [Required]
+        public int BranchId { get; set; } = 0;
     }
 }

@@ -17,7 +17,20 @@ import PostOfficeData from "./pages/location/postOffice/postOffice-data";
 import CategoryMaster from "./pages/location/category/category-master";
 import CategoryOperations from "./pages/location/category/category-operations";
 import CategoryData from "./pages/location/category/category-data";
-
+import VillageMaster from "./pages/location/village/village-master";
+import VillageOperations from "./pages/location/village/village-operations";
+import VillageData from "./pages/location/village/village-data";
+import AccountHeadTypeMaster from "./pages/accounthead/accountheadtype/accountheadtype-master";
+import AccountHeadTypeOperations from "./pages/accounthead/accountheadtype/accountheadtype-operations";
+import AccountHeadTypeData from "./pages/accounthead/accountheadtype/accountheadtype-data";
+import WorkingDateMaster from "./pages/WorkingDate/WorkingDate";
+import AccountHeadMaster from "./pages/accounthead/accounthead/accounthead-master";
+import AccountHeadOperations from "./pages/accounthead/accounthead/accounthead-operations";
+import AccountHeadData from "./pages/accounthead/accounthead/accounthead-data";
+import MemberMaster from "./pages/member/member-master";
+import RelationOperations from "./pages/Miscalleneous/relation/relation-operations";
+import RelationData from "./pages/Miscalleneous/relation/relation-data";
+import RelationMaster from "./pages/Miscalleneous/relation/relation-master";
 
 
 
@@ -44,6 +57,20 @@ export default function App() {
         <Route path="/category-operations" element={<CategoryOperations />} />
         <Route path="/category" element={<CategoryMaster />} />
         <Route path="/category-info" element={<CategoryData />} />
+        <Route path="/village-operations" element={<VillageOperations />} />
+        <Route path="/village" element={<VillageMaster />} />
+        <Route path="/village-info" element={<VillageData />} />
+        <Route path="/accountheadtype-operations" element={<AccountHeadTypeOperations />} />
+        <Route path="/accountheadtype" element={<AccountHeadTypeMaster />} />
+        <Route path="/accountheadtype-info" element={<AccountHeadTypeData />} />
+        <Route path="/workingdate" element={<WorkingDateMaster />} />
+        <Route path="/accounthead-operations" element={<AccountHeadOperations />} />
+        <Route path="/accounthead" element={<AccountHeadMaster />} />
+        <Route path="/accounthead-info" element={<AccountHeadData />} />
+        <Route path="/member" element={<MemberMaster />} />
+        <Route path="/relation-operations" element={<RelationOperations />} />
+        <Route path="/relation-info" element={<RelationData />} />
+        <Route path="/relation" element={<RelationMaster />} />
       </Routes>
     </BrowserRouter>
   );

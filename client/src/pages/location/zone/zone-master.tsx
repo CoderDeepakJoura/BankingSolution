@@ -74,7 +74,7 @@ const ZoneMaster: React.FC = () => {
     <DashboardLayout
     enableScroll = {false}
       mainContent={
-        <div className="min-h-screen bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
+        <div className=" bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Header Section */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8">
