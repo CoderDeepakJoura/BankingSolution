@@ -2,11 +2,11 @@ import React from "react";
 import VillageApiService, {
   Village,
   VillageFilter,
-} from "../../../services/village/villageapi";
-import ZoneApiService from "../../../services/zone/zoneapi";
-import ThanaApiService from "../../../services/thana/thanaapi";
-import PostOfficeApiService from "../../../services/PostOffice/postOfficeapi";
-import TehsilApiService from "../../../services/tehsil/tehsilapi";
+} from "../../../services/location/village/villageapi";
+import ZoneApiService from "../../../services/location/zone/zoneapi";
+import ThanaApiService from "../../../services/location/thana/thanaapi";
+import PostOfficeApiService from "../../../services/location/PostOffice/postOfficeapi";
+import TehsilApiService from "../../../services/location/tehsil/tehsilapi";
 import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import VillageTable from "./village-table";
@@ -17,10 +17,8 @@ import { RootState } from "../../../redux";
 // Define the async function to fetch Villages and ensure the return type is correct.
 const fetchVillages = async (filter: VillageFilter, branchId: number) => {
   try {
-    console.log('Attempting to fetch villages with:', { filter, branchId });
     const res = await VillageApiService.fetchVillages(filter, branchId);
-    console.log('Village API response:', res);
-    
+
     return {
       success: res.success ?? false,
       data: res.villages ?? [],
@@ -28,33 +26,59 @@ const fetchVillages = async (filter: VillageFilter, branchId: number) => {
       message: res.message ?? "",
     };
   } catch (error) {
-    console.error('Error in fetchVillages:', error);
-    
+    console.error("Error in fetchVillages:", error);
+
     // Return empty data instead of throwing
     return {
       success: false,
       data: [],
       totalCount: 0,
-      message: "Unable to connect to server. Please check if the API is running.",
+      message:
+        "Unable to connect to server. Please check if the API is running.",
     };
   }
 };
 
-
 // Define the async function for adding a Village.
-const addVillage = async (branchId: number, zones: any[], thanas: any[], postOffices: any[], tehsils: any[]) => {
-  const zoneOptions = zones.map(zone => 
-    `<option value="${zone.zoneId || zone.id}">${zone.zoneName || zone.name}</option>`
-  ).join('');
-  const thanaOptions = thanas.map(thana => 
-    `<option value="${thana.thanaId || thana.id}">${thana.thanaName || thana.name}</option>`
-  ).join('');
-  const postOfficeOptions = postOffices.map(postOffice => 
-    `<option value="${postOffice.postOfficeId || postOffice.id}">${postOffice.postOfficeName || postOffice.name}</option>`
-  ).join('');
-  const tehsilOptions = tehsils.map(tehsil => 
-    `<option value="${tehsil.tehsilId || tehsil.id}">${tehsil.tehsilName || tehsil.name}</option>`
-  ).join('');
+const addVillage = async (
+  branchId: number,
+  zones: any[],
+  thanas: any[],
+  postOffices: any[],
+  tehsils: any[]
+) => {
+  const zoneOptions = zones
+    .map(
+      (zone) =>
+        `<option value="${zone.zoneId || zone.id}">${
+          zone.zoneName || zone.name
+        }</option>`
+    )
+    .join("");
+  const thanaOptions = thanas
+    .map(
+      (thana) =>
+        `<option value="${thana.thanaId || thana.id}">${
+          thana.thanaName || thana.name
+        }</option>`
+    )
+    .join("");
+  const postOfficeOptions = postOffices
+    .map(
+      (postOffice) =>
+        `<option value="${postOffice.postOfficeId || postOffice.id}">${
+          postOffice.postOfficeName || postOffice.name
+        }</option>`
+    )
+    .join("");
+  const tehsilOptions = tehsils
+    .map(
+      (tehsil) =>
+        `<option value="${tehsil.tehsilId || tehsil.id}">${
+          tehsil.tehsilName || tehsil.name
+        }</option>`
+    )
+    .join("");
 
   const { value: formValues } = await Swal.fire({
     title: "Add New Village",
@@ -226,13 +250,22 @@ const addVillage = async (branchId: number, zones: any[], thanas: any[], postOff
     cancelButtonColor: "#d33",
     width: 650,
     preConfirm: () => {
-      const VillageName = (document.getElementById("VillageName") as HTMLInputElement).value.trim();
-      const VillageNameSL = (document.getElementById("VillageNameSL") as HTMLInputElement).value.trim();
-      const ZoneId = (document.getElementById("ZoneId") as HTMLSelectElement).value;
-      const ThanaId = (document.getElementById("ThanaId") as HTMLSelectElement).value;
-      const PostOfficeId = (document.getElementById("PostOfficeId") as HTMLSelectElement).value;
-      const TehsilId = (document.getElementById("TehsilId") as HTMLSelectElement).value;
-      
+      const VillageName = (
+        document.getElementById("VillageName") as HTMLInputElement
+      ).value.trim();
+      const VillageNameSL = (
+        document.getElementById("VillageNameSL") as HTMLInputElement
+      ).value.trim();
+      const ZoneId = (document.getElementById("ZoneId") as HTMLSelectElement)
+        .value;
+      const ThanaId = (document.getElementById("ThanaId") as HTMLSelectElement)
+        .value;
+      const PostOfficeId = (
+        document.getElementById("PostOfficeId") as HTMLSelectElement
+      ).value;
+      const TehsilId = (
+        document.getElementById("TehsilId") as HTMLSelectElement
+      ).value;
 
       if (!VillageName) {
         Swal.showValidationMessage("Village Name is required");
@@ -260,20 +293,19 @@ const addVillage = async (branchId: number, zones: any[], thanas: any[], postOff
         return null;
       }
 
-      return { 
-        VillageName, 
-        VillageNameSL, 
-        ZoneId, 
-        ThanaId, 
+      return {
+        VillageName,
+        VillageNameSL,
+        ZoneId,
+        ThanaId,
         PostOfficeId,
-        TehsilId
+        TehsilId,
       };
     },
   });
 
   if (formValues) {
     try {
-      console.log("Adding village with payload:", formValues);
       await VillageApiService.add_new_village(
         formValues.VillageName,
         formValues.VillageNameSL || "",
@@ -283,7 +315,7 @@ const addVillage = async (branchId: number, zones: any[], thanas: any[], postOff
         Number(formValues.TehsilId),
         branchId
       );
-      
+
       Swal.fire({
         title: "Success!",
         text: "New Village has been added.",
@@ -300,48 +332,66 @@ const addVillage = async (branchId: number, zones: any[], thanas: any[], postOff
 
 // Define the async function for modifying a Village.
 const modifyVillage = async (
-  village: Village, 
-  zones: any[], 
-  thanas: any[], 
-  postOffices: any[], 
-  tehsils: any[], 
+  village: Village,
+  zones: any[],
+  thanas: any[],
+  postOffices: any[],
+  tehsils: any[],
   branchId: number
 ) => {
-  // Create options for zones
-  const zoneOptions = zones.map(zone => {
-    const zoneId = (zone.zoneId || zone.id)?.toString();
-    const villageZoneId = village.zoneId?.toString();
-    const isSelected = zoneId === villageZoneId;
-    
-    return `<option value="${zone.zoneId || zone.id}" ${isSelected ? 'selected' : ''}>${zone.zoneName || zone.name}</option>`;
-  }).join('');
+  
+  const zoneOptions = zones
+    .map((zone) => {
+      const zoneId = (zone.zoneId || zone.id)?.toString();
+      const villageZoneId = village.zoneId?.toString();
+      const isSelected = zoneId === villageZoneId;
+
+      return `<option value="${zone.zoneId || zone.id}" ${
+        isSelected ? "selected" : ""
+      }>${zone.zoneName || zone.name}</option>`;
+    })
+    .join("");
 
   // Create options for thanas
-  const thanaOptions = thanas.map(thana => {
-    const thanaId = (thana.thanaId || thana.id)?.toString();
-    const villageThanaId = village.thanaId?.toString();
-    const isSelected = thanaId === villageThanaId;
-    
-    return `<option value="${thana.thanaId || thana.id}" ${isSelected ? 'selected' : ''}>${thana.thanaName || thana.name}</option>`;
-  }).join('');
+  const thanaOptions = thanas
+    .map((thana) => {
+      const thanaId = (thana.thanaId || thana.id)?.toString();
+      const villageThanaId = village.thanaId?.toString();
+      const isSelected = thanaId === villageThanaId;
+
+      return `<option value="${thana.thanaId || thana.id}" ${
+        isSelected ? "selected" : ""
+      }>${thana.thanaName || thana.name}</option>`;
+    })
+    .join("");
 
   // Create options for post offices
-  const postOfficeOptions = postOffices.map(postOffice => {
-    const postOfficeId = (postOffice.postOfficeId || postOffice.id)?.toString();
-    const villagePostOfficeId = village.postOfficeId?.toString();
-    const isSelected = postOfficeId === villagePostOfficeId;
-    
-    return `<option value="${postOffice.postOfficeId || postOffice.id}" ${isSelected ? 'selected' : ''}>${postOffice.postOfficeName || postOffice.name}</option>`;
-  }).join('');
+  const postOfficeOptions = postOffices
+    .map((postOffice) => {
+      const postOfficeId = (
+        postOffice.postOfficeId || postOffice.id
+      )?.toString();
+      const villagePostOfficeId = village.postOfficeId?.toString();
+      const isSelected = postOfficeId === villagePostOfficeId;
+
+      return `<option value="${postOffice.postOfficeId || postOffice.id}" ${
+        isSelected ? "selected" : ""
+      }>${postOffice.postOfficeName || postOffice.name}</option>`;
+    })
+    .join("");
 
   // Create options for tehsils
-  const tehsilOptions = tehsils.map(tehsil => {
-    const tehsilId = (tehsil.tehsilId || tehsil.id)?.toString();
-    const villageTehsilId = village.tehsilId?.toString();
-    const isSelected = tehsilId === villageTehsilId;
-    
-    return `<option value="${tehsil.tehsilId || tehsil.id}" ${isSelected ? 'selected' : ''}>${tehsil.tehsilName || tehsil.name}</option>`;
-  }).join('');
+  const tehsilOptions = tehsils
+    .map((tehsil) => {
+      const tehsilId = (tehsil.tehsilId || tehsil.id)?.toString();
+      const villageTehsilId = village.tehsilId?.toString();
+      const isSelected = tehsilId === villageTehsilId;
+
+      return `<option value="${tehsil.tehsilId || tehsil.id}" ${
+        isSelected ? "selected" : ""
+      }>${tehsil.tehsilName || tehsil.name}</option>`;
+    })
+    .join("");
 
   const { value: formValues } = await Swal.fire({
     title: "Modify Village",
@@ -358,7 +408,7 @@ const modifyVillage = async (
         <input 
           id="VillageName" 
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-          value="${village.villageName || ''}"
+          value="${village.villageName || ""}"
           placeholder="Enter Village Name" 
           required
           autoFocus={true}
@@ -378,7 +428,7 @@ const modifyVillage = async (
         <input 
           id="VillageNameSL" 
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-          value="${village.villageNameSL || ''}"
+          value="${village.villageNameSL || ""}"
           placeholder="Enter Village Name SL" 
           lang="si"
           maxlength="100"
@@ -496,12 +546,22 @@ const modifyVillage = async (
     cancelButtonColor: "#d33",
     width: 650,
     preConfirm: () => {
-      const VillageName = (document.getElementById("VillageName") as HTMLInputElement).value.trim();
-      const VillageNameSL = (document.getElementById("VillageNameSL") as HTMLInputElement).value.trim();
-      const ZoneId = (document.getElementById("ZoneId") as HTMLSelectElement).value;
-      const ThanaId = (document.getElementById("ThanaId") as HTMLSelectElement).value;
-      const PostOfficeId = (document.getElementById("PostOfficeId") as HTMLSelectElement).value;
-      const TehsilId = (document.getElementById("TehsilId") as HTMLSelectElement).value;
+      const VillageName = (
+        document.getElementById("VillageName") as HTMLInputElement
+      ).value.trim();
+      const VillageNameSL = (
+        document.getElementById("VillageNameSL") as HTMLInputElement
+      ).value.trim();
+      const ZoneId = (document.getElementById("ZoneId") as HTMLSelectElement)
+        .value;
+      const ThanaId = (document.getElementById("ThanaId") as HTMLSelectElement)
+        .value;
+      const PostOfficeId = (
+        document.getElementById("PostOfficeId") as HTMLSelectElement
+      ).value;
+      const TehsilId = (
+        document.getElementById("TehsilId") as HTMLSelectElement
+      ).value;
 
       if (!VillageName) {
         Swal.showValidationMessage("Village Name is required");
@@ -529,22 +589,20 @@ const modifyVillage = async (
         return null;
       }
 
-      return { 
-        id: village.villageId, 
-        VillageName, 
-        VillageNameSL, 
-        ZoneId, 
-        ThanaId, 
+      return {
+        id: village.villageId,
+        VillageName,
+        VillageNameSL,
+        ZoneId,
+        ThanaId,
         PostOfficeId,
-        TehsilId
+        TehsilId,
       };
     },
   });
 
   if (formValues) {
     try {
-      console.log("Updating village with values:", formValues);
-      
       // Updated API call to include all location IDs
       await VillageApiService.modifyVillage(
         formValues.id,
@@ -554,9 +612,9 @@ const modifyVillage = async (
         Number(formValues.ThanaId),
         Number(formValues.PostOfficeId),
         Number(formValues.TehsilId),
-        branchId ?? 1
+        branchId
       );
-      
+
       Swal.fire({
         title: "Success!",
         text: "Village has been updated.",
@@ -566,11 +624,7 @@ const modifyVillage = async (
       });
     } catch (err: any) {
       console.error("Error updating village:", err);
-      Swal.fire(
-        "Error!",
-        err.message || "Failed to update Village.",
-        "error"
-      );
+      Swal.fire("Error!", err.message || "Failed to update Village.", "error");
     }
   }
 };
@@ -589,15 +643,14 @@ const deleteVillage = async (village: Village, branchId: number) => {
 
   if (result.isConfirmed) {
     try {
-      console.log("Deleting village with ID:", village.villageId);
       await VillageApiService.deleteVillage(
         village.villageId,
-        village.villageName, 
-        village.villageCode || 'AUTO',
-        village.villageNameSL || "", 
+        village.villageName,
+        village.villageCode || "AUTO",
+        village.villageNameSL || "",
         branchId
       );
-      
+
       Swal.fire({
         title: "Deleted!",
         text: `Village "${village.villageName}" has been deleted.`,
@@ -607,11 +660,7 @@ const deleteVillage = async (village: Village, branchId: number) => {
       });
     } catch (err: any) {
       console.error("Error deleting village:", err);
-      Swal.fire(
-        "Error!",
-        err.message || "Failed to delete Village.",
-        "error"
-      );
+      Swal.fire("Error!", err.message || "Failed to delete Village.", "error");
     }
   }
 };
@@ -630,59 +679,69 @@ const VillageMaster: React.FC = () => {
 
   // Fetch location data on component mount
   React.useEffect(() => {
-  let isCancelled = false;
+    let isCancelled = false;
 
-  const fetchLocationData = async () => {
-    // Prevent multiple calls using ref
-    if (loadingRef.current) {
-      console.log('Location data already loading...');
-      return;
-    }
+    const fetchLocationData = async () => {
 
-    loadingRef.current = true;
-    
-    try {
-      console.log('Fetching location data...');
-      const [zonesRes, thanasRes, postOfficesRes, tehsilsRes] = await Promise.all([
-        ZoneApiService.getAllZones(user.branchid),
-        ThanaApiService.getAllThanas(user.branchid),
-        PostOfficeApiService.getAllPostOffices(user.branchid),
-        TehsilApiService.getAllTehsils(user.branchid)
-      ]);
+      loadingRef.current = true;
 
-      if (!isCancelled) {
-        if (zonesRes.success) setZones(zonesRes.data || []);
-        if (thanasRes.success) setThanas(thanasRes.data || []);
-        if (postOfficesRes.success) setPostOffices(postOfficesRes.data || []);
-        if (tehsilsRes.success) setTehsils(tehsilsRes.data || []);
+      try {
         
-        console.log('Location data loaded successfully');
+        const [zonesRes, thanasRes, postOfficesRes, tehsilsRes] =
+          await Promise.all([
+            ZoneApiService.getAllZones(user.branchid),
+            ThanaApiService.getAllThanas(user.branchid),
+            PostOfficeApiService.getAllPostOffices(user.branchid),
+            TehsilApiService.getAllTehsils(user.branchid),
+          ]);
+          console.log("data", zonesRes, thanasRes, postOfficesRes, tehsilsRes)
+
+        if (!isCancelled) {
+          if (zonesRes.success) setZones(zonesRes.data || []);
+          if (thanasRes.success) setThanas(thanasRes.data || []);
+          if (postOfficesRes.success) setPostOffices(postOfficesRes.data || []);
+          if (tehsilsRes.success) setTehsils(tehsilsRes.data || []);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Error fetching location data:", error);
+        }
+      } finally {
+        loadingRef.current = false;
       }
-    } catch (error) {
-      if (!isCancelled) {
-        console.error("Error fetching location data:", error);
-      }
-    } finally {
-      loadingRef.current = false;
-    }
-  };
+    };
 
-  fetchLocationData();
+    fetchLocationData();
 
-  return () => {
-    isCancelled = true;
-  };
-}, [user.branchid]);// Dependencies array
+    return () => {
+      isCancelled = true;
+    };
+  }, [user.branchid]); // Dependencies array
 
-  const fetchVillagesWithBranch = React.useCallback(async (filter: VillageFilter) => {
-    return await fetchVillages(filter, user.branchid);
-  }, [user.branchid]);
-
+  const fetchVillagesWithBranch = React.useCallback(
+    async (filter: VillageFilter) => {
+      return await fetchVillages(filter, user.branchid);
+    },
+    [user.branchid]
+  );
+  console.log(zones, thanas, postOffices, tehsils)
   return (
+    
     <CRUDMaster<Village>
       fetchData={fetchVillagesWithBranch}
-      addEntry={() => addVillage(user.branchid, zones, thanas, postOffices, tehsils)}
-      modifyEntry={(village) => modifyVillage(village, zones, thanas, postOffices, tehsils, user.branchid)}
+      addEntry={() =>
+        addVillage(user.branchid, zones, thanas, postOffices, tehsils)
+      }
+      modifyEntry={(village) =>
+        modifyVillage(
+          village,
+          zones,
+          thanas,
+          postOffices,
+          tehsils,
+          user.branchid
+        )
+      }
       deleteEntry={(village) => deleteVillage(village, user.branchid)}
       pageTitle="Village Operations"
       addLabel="Add Village"

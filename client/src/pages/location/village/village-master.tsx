@@ -6,11 +6,11 @@ import { FaPlus, FaTimes, FaMapMarkerAlt, FaGlobe, FaSave, FaArrowLeft, FaInfoCi
 // Assume these imports exist and their services fetch data from an API
 // For demonstration, these will be mocked in the useEffect hook.
 import DashboardLayout from "../../../Common/Layout";
-import VillageApiService from "../../../services/village/villageapi";
-import ZoneApiService from "../../../services/zone/zoneapi";
-import ThanaApiService from "../../../services/thana/thanaapi";
-import PostOfficeApiService from "../../../services/PostOffice/postOfficeapi";
-import TehsilApiService from "../../../services/tehsil/tehsilapi";
+import VillageApiService from "../../../services/location/village/villageapi";
+import ZoneApiService from "../../../services/location/zone/zoneapi";
+import ThanaApiService from "../../../services/location/thana/thanaapi";
+import PostOfficeApiService from "../../../services/location/PostOffice/postOfficeapi";
+import TehsilApiService from "../../../services/location/tehsil/tehsilapi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import Select, { SingleValue } from "react-select";
@@ -95,10 +95,10 @@ const VillageMaster = () => {
   useEffect(() => {
     const fetchDropdownData = async () => {
       try {
-        const zonesRes = await ZoneApiService.getAllZones(Number(user.branchid));
-        const thanasRes = await ThanaApiService.getAllThanas(Number(user.branchid));
-        const postOfficesRes = await PostOfficeApiService.getAllPostOffices(Number(user.branchid));
-        const tehsilsRes = await TehsilApiService.getAllTehsils(Number(user.branchid));
+        const zonesRes = await ZoneApiService.getAllZones(user.branchid);
+        const thanasRes = await ThanaApiService.getAllThanas(user.branchid);
+        const postOfficesRes = await PostOfficeApiService.getAllPostOffices(user.branchid);
+        const tehsilsRes = await TehsilApiService.getAllTehsils(user.branchid);
         
         setZones(zonesRes.data || []); // Added fallback for undefined data
         setThanas(thanasRes.data || []); // Added fallback for undefined data
@@ -227,7 +227,7 @@ const VillageMaster = () => {
                   </div>
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                      Village Master with Autocomplete
+                      Village Master
                     </h1>
                   </div>
                 </div>
@@ -251,7 +251,7 @@ const VillageMaster = () => {
                   </div>
                   <div>
                     <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Create New Village</h2>
-                    <p className="text-sm text-gray-600">Fill in the Village details below with autocomplete support</p>
+                    <p className="text-sm text-gray-600">Fill in the Village details below </p>
                   </div>
                 </div>
               </div>

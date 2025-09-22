@@ -38,31 +38,38 @@ namespace BankingPlatform.API.Controllers
                         Message = "Invalid request data: " + string.Join(", ", Modelerrors)
                     });
                 }
-
-
-
                 var errors = new List<string>();
-                bool anyExists = await _appContext.accounthead
-                    .AnyAsync(z =>
-                        (
-                         z.name.ToLower() == accountheadMasterDTO.AccountHeadName.ToLower()
-                         || z.headcode == Convert.ToInt64(accountheadMasterDTO.HeadCode) ||
-                         (z.namesl != null && z.namesl.ToLower() == accountheadMasterDTO.AccountHeadNameSL.ToLower())));
 
-                if (anyExists)
+                // Normalize inputs for case-insensitive comparisons
+                var normalizedName = accountheadMasterDTO.AccountHeadName?.Trim().ToLower();
+                var normalizedNameSL = accountheadMasterDTO.AccountHeadNameSL?.Trim().ToLower();
+                var headCode = Convert.ToInt64(accountheadMasterDTO.HeadCode);
+
+                // Get all possible duplicates in a single query
+                var duplicates = await _appContext.accounthead
+                    .Where(z => z.branchid == accountheadMasterDTO.BranchID &&
+                                (
+                                    z.name.ToLower() == normalizedName ||
+                                    z.headcode == headCode ||
+                                    (normalizedNameSL != null && z.namesl != null && z.namesl.ToLower() == normalizedNameSL)
+                                ))
+                    .ToListAsync();
+
+                // Check conflicts in memory
+                if (duplicates.Any(d => d.name.ToLower() == normalizedName))
                 {
+                    errors.Add("Account Head Name already exists.");
+                }
 
-                    if (await _appContext.accounthead.AnyAsync(z => z.id != accountheadMasterDTO.AccountHeadId && z.name == accountheadMasterDTO.AccountHeadName.ToLower()))
-                        errors.Add("Account Head Name already exists.");
+                if (duplicates.Any(d => d.headcode == headCode))
+                {
+                    errors.Add("Account Head Code already exists.");
+                }
 
-                    if (await _appContext.accounthead.AnyAsync(z => z.id != accountheadMasterDTO.AccountHeadId && z.headcode == Convert.ToInt64(accountheadMasterDTO.HeadCode)))
-                        errors.Add("\nAccount Head Code already exists.");
-
-                    if (!string.IsNullOrWhiteSpace(accountheadMasterDTO.AccountHeadNameSL) &&
-                        await _appContext.accounthead.AnyAsync(z => z.id != accountheadMasterDTO.AccountHeadId && (z.namesl != null && z.namesl.ToLower() == accountheadMasterDTO.AccountHeadNameSL.ToLower())))
-                    {
-                        errors.Add("\nAccount Head Name SL already exists.");
-                    }
+                if (!string.IsNullOrWhiteSpace(normalizedNameSL) &&
+                    duplicates.Any(d => d.namesl != null && d.namesl.ToLower() == normalizedNameSL))
+                {
+                    errors.Add("Account Head Name SL already exists.");
                 }
 
                 if (errors.Any())
@@ -75,15 +82,6 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                // Return all errors if any
-                if (errors.Any())
-                {
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = string.Join("\n", errors)
-                    });
-                }
                 accountheadMasterDTO.AccountHeadName = accountheadMasterDTO.AccountHeadName?.Trim() ?? "";
                 accountheadMasterDTO.AccountHeadNameSL = accountheadMasterDTO.AccountHeadNameSL?.Trim() ?? "";
 
@@ -119,10 +117,10 @@ namespace BankingPlatform.API.Controllers
             }
         }
 
-        [HttpPost("get_all_accounthead")]
+        [HttpPost("get_all_accounthead/{branchId}")]
         [EnableRateLimiting("Auth")]
         [Authorize]
-        public async Task<IActionResult> GetAllAccountHeads([FromBody] LocationFilterDTO filter)
+        public async Task<IActionResult> GetAllAccountHeads([FromRoute] int branchId, [FromBody] LocationFilterDTO filter)
         {
             try
             {
@@ -140,6 +138,7 @@ namespace BankingPlatform.API.Controllers
                 var totalCount = await query.CountAsync();
 
                 var itemsRaw = await query
+                         .Where(x=> x.branchid == branchId)
                          .OrderBy(z => z.name)
                          .Skip((filter.PageNumber - 1) * filter.PageSize)
                          .Take(filter.PageSize)
@@ -161,7 +160,7 @@ namespace BankingPlatform.API.Controllers
 
                 foreach (var z in itemsRaw)
                 {
-                    string parentHead = await _commonfns.GetHeadCodeFromId(z.parentid, z.branchid);
+                    string parentHead = _commonfns.GetHeadCodeFromId(z.parentid, z.branchid);
 
                     items.Add(new AccountHeadDTO(
                         z.name,
@@ -225,31 +224,37 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                // Check for duplicates, excluding the current accounthead being modified
                 var errors = new List<string>();
-                bool anyExists = await _appContext.accounthead
-                    .AnyAsync(z => z.id != accountheadMasterDTO.AccountHeadId
-                    && z.branchid == accountheadMasterDTO.BranchID
-                    &&
-                        (z.name.ToLower() == accountheadMasterDTO.AccountHeadName.ToLower() ||
-                        z.headcode == Convert.ToInt64(accountheadMasterDTO.HeadCode) ||
-                         (z.namesl != null && z.namesl.ToLower() == accountheadMasterDTO.AccountHeadNameSL.ToLower())));
 
-                if (anyExists)
+                // Normalize inputs for case-insensitive comparisons
+                var normalizedName = accountheadMasterDTO.AccountHeadName?.Trim().ToLower();
+                var normalizedNameSL = accountheadMasterDTO.AccountHeadNameSL?.Trim().ToLower();
+                var headCode = Convert.ToInt64(accountheadMasterDTO.HeadCode);
+                var duplicates = await _appContext.accounthead
+                    .Where(z => z.id != accountheadMasterDTO.AccountHeadId &&
+                                z.branchid == accountheadMasterDTO.BranchID &&
+                                (
+                                    z.name.ToLower() == normalizedName ||
+                                    z.headcode == headCode ||
+                                    (normalizedNameSL != null && z.namesl != null && z.namesl.ToLower() == normalizedNameSL)
+                                ))
+                    .ToListAsync();
+
+                // Check conflicts in memory
+                if (duplicates.Any(d => d.name.ToLower() == normalizedName))
                 {
-                    if (await _appContext.accounthead.AnyAsync(z => z.id != accountheadMasterDTO.AccountHeadId
-                    && z.branchid == accountheadMasterDTO.BranchID
-                    && z.name.ToLower() == accountheadMasterDTO.AccountHeadName.ToLower()))
-                        errors.Add("Account Head Name already exists.");
+                    errors.Add("Account Head Name already exists.");
+                }
 
-                    if (await _appContext.accounthead.AnyAsync(z => z.id != accountheadMasterDTO.AccountHeadId && z.headcode == Convert.ToInt64(accountheadMasterDTO.HeadCode)))
-                        errors.Add("Account Head Code already exists.");
+                if (duplicates.Any(d => d.headcode == headCode))
+                {
+                    errors.Add("Account Head Code already exists.");
+                }
 
-                    if (!string.IsNullOrWhiteSpace(accountheadMasterDTO.AccountHeadNameSL) &&
-                        await _appContext.accounthead.AnyAsync(z => z.id != accountheadMasterDTO.AccountHeadId && z.branchid == accountheadMasterDTO.BranchID && (z.namesl != null && z.namesl.ToLower() == accountheadMasterDTO.AccountHeadNameSL.ToLower())))
-                    {
-                        errors.Add("Account Head Name SL already exists.");
-                    }
+                if (!string.IsNullOrWhiteSpace(normalizedNameSL) &&
+                    duplicates.Any(d => d.namesl != null && d.namesl.ToLower() == normalizedNameSL))
+                {
+                    errors.Add("Account Head Name SL already exists.");
                 }
 
                 if (errors.Any())
@@ -261,6 +266,7 @@ namespace BankingPlatform.API.Controllers
                         Message = string.Join("\n", errors)
                     });
                 }
+
 
                 // Update the properties of the existing accounthead entity
                 existingAccountHead.name = accountheadMasterDTO.AccountHeadName?.Trim() ?? "";

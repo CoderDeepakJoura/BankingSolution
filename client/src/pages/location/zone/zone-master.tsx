@@ -1,10 +1,11 @@
 import React from "react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate } from "react-router-dom";
-import ZoneApiService from "../../../services/zone/zoneapi";
+import ZoneApiService from "../../../services/location/zone/zoneapi";
 import Swal from "sweetalert2";
 import { FaPlus, FaTimes, FaMapMarkerAlt, FaCode, FaGlobe, FaSave, FaArrowLeft, FaInfoCircle } from "react-icons/fa";
-
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 const ZoneMaster: React.FC = () => {
   const navigate = useNavigate();
 
@@ -13,7 +14,7 @@ const ZoneMaster: React.FC = () => {
   const [zoneNameSL, setZoneNameSL] = React.useState("");
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(false);
-
+  const user = useSelector((state: RootState) => state.user);
   const hindiRegex = /^[\u0900-\u097F\s.,!?]*$/;
 
   const handleZoneNameSLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,6 +33,8 @@ const ZoneMaster: React.FC = () => {
     setZoneNameSL("");
     setError("");
     setLoading(false);
+    const zonename = document.getElementById("zoneName") as HTMLInputElement;
+    zonename.focus();
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -40,7 +43,7 @@ const ZoneMaster: React.FC = () => {
     setError("");
 
     try {
-      const response = await ZoneApiService.add_new_zone(zoneName, zoneCode, zoneNameSL || "");
+      const response = await ZoneApiService.add_new_zone(zoneName, zoneCode, zoneNameSL || "", user.branchid);
 
       if (response.success) {
         Swal.fire({
@@ -118,36 +121,6 @@ const ZoneMaster: React.FC = () => {
               {/* Form Content */}
               <form className="p-6 sm:p-8" onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {/* Zone Code Field */}
-                  <div className="flex flex-col">
-                    <label htmlFor="zoneCode" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
-                      Zone Code
-                      <span className="text-red-500 text-xs">*</span>
-                    </label>
-                    <div className="relative group">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors">
-                        <FaCode className="text-sm" />
-                      </div>
-                      <input
-                        type="text"
-                        id="zoneCode"
-                        value={zoneCode}
-                        autoFocus={true}
-                        onChange={(e) => setZoneCode(e.target.value.toUpperCase())}
-                        required
-                        pattern="[a-zA-Z0-9]{2,10}"
-                        maxLength={10}
-                        className="w-full pl-10 pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50 font-mono uppercase"
-                        placeholder="Enter zone code"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                      <FaInfoCircle />
-                      2-10 alphanumeric characters, auto uppercase
-                    </p>
-                  </div>
-
                   {/* Zone Name Field */}
                   <div className="flex flex-col">
                     <label htmlFor="zoneName" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
@@ -165,6 +138,8 @@ const ZoneMaster: React.FC = () => {
                         value={zoneName}
                         onChange={(e) => setZoneName(e.target.value)}
                         required
+                        pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
+                        autoFocus={true}
                         maxLength={50}
                         className="w-full pl-10 pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50"
                         placeholder="Enter zone name"
@@ -175,7 +150,34 @@ const ZoneMaster: React.FC = () => {
                       Descriptive name for the zone (max 50 characters)
                     </p>
                   </div>
-
+                  {/* Zone Code Field */}
+                  <div className="flex flex-col">
+                    <label htmlFor="zoneCode" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+                      Zone Code
+                      <span className="text-red-500 text-xs">*</span>
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors">
+                        <FaCode className="text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        id="zoneCode"
+                        value={zoneCode}
+                        onChange={(e) => setZoneCode(e.target.value.toUpperCase())}
+                        required
+                        pattern="[a-zA-Z0-9]{2,10}"
+                        maxLength={10}
+                        className="w-full pl-10 pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50 font-mono uppercase"
+                        placeholder="Enter zone code"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                      <FaInfoCircle />
+                      2-10 alphanumeric characters, auto uppercase
+                    </p>
+                  </div>
                   {/* Zone Name SL Field */}
                   <div className="flex flex-col">
                     <label htmlFor="zoneNameSL" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">

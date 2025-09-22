@@ -1,6 +1,6 @@
 import React from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
-import { Thana } from "../../../services/thana/thanaapi";
+import { Thana } from "../../../services/location/thana/thanaapi";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
 
 interface ThanaTableProps {

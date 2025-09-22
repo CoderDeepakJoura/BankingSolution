@@ -4,11 +4,22 @@ import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import AccountHeadTypeApiService from "../../../services/accountHead/accountheadtypeapi";
 import Swal from "sweetalert2";
-import { FaPlus, FaTimes, FaMapMarkerAlt, FaCode, FaGlobe, FaSave, FaArrowLeft, FaInfoCircle } from "react-icons/fa";
-
+import {
+  FaPlus,
+  FaTimes,
+  FaMapMarkerAlt,
+  FaCode,
+  FaGlobe,
+  FaSave,
+  FaArrowLeft,
+  FaInfoCircle,
+} from "react-icons/fa";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 const AccountHeadTypeMaster: React.FC = () => {
+  
   const navigate = useNavigate();
-
+  const user = useSelector((state: RootState) => state.user);
   const [AccountHeadTypeName, setAccountHeadTypeName] = React.useState("");
   const [AccountHeadTypeNameSL, setAccountHeadTypeNameSL] = React.useState("");
   const [error, setError] = React.useState("");
@@ -16,7 +27,9 @@ const AccountHeadTypeMaster: React.FC = () => {
 
   const hindiRegex = /^[\u0900-\u097F\s.,!?]*$/;
 
-  const handleAccountHeadTypeNameSLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAccountHeadTypeNameSLChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const inputText = e.target.value;
     if (inputText === "" || hindiRegex.test(inputText)) {
       setAccountHeadTypeNameSL(inputText);
@@ -40,7 +53,11 @@ const AccountHeadTypeMaster: React.FC = () => {
     setError("");
 
     try {
-      const response = await AccountHeadTypeApiService.add_new_accountheadtype(AccountHeadTypeName, AccountHeadTypeNameSL || "");
+      const response = await AccountHeadTypeApiService.add_new_accountheadtype(
+        AccountHeadTypeName,
+        AccountHeadTypeNameSL || "",
+        user.branchid
+      );
 
       if (response.success) {
         Swal.fire({
@@ -72,7 +89,7 @@ const AccountHeadTypeMaster: React.FC = () => {
 
   return (
     <DashboardLayout
-    enableScroll = {false}
+      enableScroll={false}
       mainContent={
         <div className=" bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
@@ -108,8 +125,12 @@ const AccountHeadTypeMaster: React.FC = () => {
                     <FaPlus className="text-white text-sm" />
                   </div>
                   <div>
-                    <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Create New Account Head Type</h2>
-                    <p className="text-sm text-gray-600">Fill in the Account Head Type details below</p>
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
+                      Create New Account Head Type
+                    </h2>
+                    <p className="text-sm text-gray-600">
+                      Fill in the Account Head Type details below
+                    </p>
                   </div>
                 </div>
               </div>
@@ -119,7 +140,10 @@ const AccountHeadTypeMaster: React.FC = () => {
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
                   {/* AccountHeadType Name Field */}
                   <div className="flex flex-col">
-                    <label htmlFor="AccountHeadTypeName" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                    <label
+                      htmlFor="AccountHeadTypeName"
+                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"
+                    >
                       <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
                       Account Head Type Name
                       <span className="text-red-500 text-xs">*</span>
@@ -144,16 +168,22 @@ const AccountHeadTypeMaster: React.FC = () => {
                     </div>
                     <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                       <FaInfoCircle />
-                      Descriptive name for the Account Head Type (max 50 characters)
+                      Descriptive name for the Account Head Type (max 50
+                      characters)
                     </p>
                   </div>
 
                   {/* AccountHeadType Name SL Field */}
                   <div className="flex flex-col">
-                    <label htmlFor="AccountHeadTypeNameSL" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                    <label
+                      htmlFor="AccountHeadTypeNameSL"
+                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"
+                    >
                       <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
                       Account Head Type Name (In SL)
-                      <span className="text-emerald-600 text-xs font-medium">(Hindi/Devanagari)</span>
+                      <span className="text-emerald-600 text-xs font-medium">
+                        (Hindi/Devanagari)
+                      </span>
                     </label>
                     <div className="relative group">
                       <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors">
@@ -167,8 +197,8 @@ const AccountHeadTypeMaster: React.FC = () => {
                         maxLength={50}
                         className={`w-full pl-10 pr-4 py-2 sm:py-3 border-2 rounded-lg focus:ring-2 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50 ${
                           error
-                            ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
-                            : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
+                            ? "border-red-300 focus:border-red-500 focus:ring-red-100"
+                            : "border-gray-200 focus:border-emerald-500 focus:ring-emerald-100"
                         }`}
                         placeholder="Enter Account Head Type name in Hindi/Devanagari"
                         lang="hi"
@@ -182,7 +212,8 @@ const AccountHeadTypeMaster: React.FC = () => {
                     ) : (
                       <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                         <FaInfoCircle />
-                        Optional field for Hindi/Devanagari script (max 50 characters)
+                        Optional field for Hindi/Devanagari script (max 50
+                        characters)
                       </p>
                     )}
                   </div>

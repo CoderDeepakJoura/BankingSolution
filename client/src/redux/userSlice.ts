@@ -14,7 +14,7 @@ interface UserState {
 
 const initialState: UserState = {
   name: "User",
-  branchid : 1
+  branchid : 0
 };
 
 const userSlice = createSlice({

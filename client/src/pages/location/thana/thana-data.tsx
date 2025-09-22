@@ -2,7 +2,7 @@ import React from "react";
 import ThanaApiService, {
   Thana,
   ThanaFilter,
-} from "../../../services/thana/thanaapi";
+} from "../../../services/location/thana/thanaapi";
 import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import ThanaTable from "./thana-table";

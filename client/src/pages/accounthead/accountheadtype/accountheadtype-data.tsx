@@ -7,10 +7,11 @@ import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import AccountHeadTypeTable from "./accountheadtype-table";
 import { useNavigate } from "react-router-dom";
-
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 // Define the async function to fetch AccountHeadTypes and ensure the return type is correct.
-const fetchAccountHeadTypes = async (filter: AccountHeadTypeFilter) => {
-  const res = await AccountHeadTypeApiService.fetchaccountheadtype(filter);
+const fetchAccountHeadTypes = async (filter: AccountHeadTypeFilter, branchId: number) => {
+  const res = await AccountHeadTypeApiService.fetchaccountheadtype(filter, branchId);
   return {
     // Ensure 'success' is a boolean, defaulting to false if undefined.
     success: res.success ?? false, // Ensure 'data' is a AccountHeadType array, defaulting to an empty array.
@@ -21,9 +22,9 @@ const fetchAccountHeadTypes = async (filter: AccountHeadTypeFilter) => {
 };
 
 // Define the async function for adding a AccountHeadType.
-const addAccountHeadType = async () => {
+const addAccountHeadType = async (branchId: number) => {
   const { value: formValues } = await Swal.fire({
-    title: "Add New AccountHeadType",
+    title: "Add New Account Head Type",
     html: `
   <div class="swal2-form-container space-y-6 p-2">
     <!-- Account Head Type Name Field -->
@@ -179,11 +180,12 @@ const addAccountHeadType = async () => {
     try {
       await AccountHeadTypeApiService.add_new_accountheadtype(
         formValues.AccountHeadTypename,
-        formValues.AccountHeadTypenamesl || ""
+        formValues.AccountHeadTypenamesl || "",
+        branchId
       );
       Swal.fire({
         title: "Success!",
-        text: "New AccountHeadType has been added.",
+        text: "New Account Head Type has been added.",
         icon: "success",
         timer: 1500,
         showConfirmButton: false,
@@ -195,9 +197,9 @@ const addAccountHeadType = async () => {
 };
 
 // Define the async function for modifying a AccountHeadType.
-const modifyAccountHeadType = async (AccountHeadType: AccountHeadType) => {
+const modifyAccountHeadType = async (AccountHeadType: AccountHeadType, branchId: number) => {
   const { value: formValues } = await Swal.fire({
-    title: "Modify AccountHeadType",
+    title: "Modify Account Head Type",
     html: `
   <div class="swal2-form-container space-y-6 p-2">
     <!-- Account Head Type Name Field -->
@@ -350,7 +352,8 @@ const modifyAccountHeadType = async (AccountHeadType: AccountHeadType) => {
       await AccountHeadTypeApiService.modify_accountheadtype(
         formValues.id,
         formValues.AccountHeadTypename,
-        formValues.AccountHeadTypenamesl || ""
+        formValues.AccountHeadTypenamesl || "",
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -370,7 +373,7 @@ const modifyAccountHeadType = async (AccountHeadType: AccountHeadType) => {
 };
 
 // Define the async function for deleting a AccountHeadType.
-const deleteAccountHeadType = async (AccountHeadType: AccountHeadType) => {
+const deleteAccountHeadType = async (AccountHeadType: AccountHeadType, branchId: number) => {
   const result = await Swal.fire({
     title: "Delete Account Head Type",
     text: `Are you sure you want to delete "${AccountHeadType.accountHeadTypeName}"? This action cannot be undone.`,
@@ -386,7 +389,8 @@ const deleteAccountHeadType = async (AccountHeadType: AccountHeadType) => {
       await AccountHeadTypeApiService.delete_accountheadtype(
         AccountHeadType.accountHeadTypeId,
         AccountHeadType.accountHeadTypeName,
-        AccountHeadType.accountHeadTypeNameSL
+        AccountHeadType.accountHeadTypeNameSL,
+        branchId
       );
       Swal.fire({
         title: "Deleted!",
@@ -409,12 +413,19 @@ const deleteAccountHeadType = async (AccountHeadType: AccountHeadType) => {
 
 const AccountHeadTypeMaster: React.FC = () => {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.user);
+   const fetchAccountHeadTypesWithBranch = React.useCallback(
+      async (filter: AccountHeadTypeFilter) => {
+        return await fetchAccountHeadTypes(filter, user.branchid);
+      },
+      [user.branchid]
+    );
   return (
     <CRUDMaster<AccountHeadType>
-      fetchData={fetchAccountHeadTypes}
-      addEntry={addAccountHeadType}
-      modifyEntry={modifyAccountHeadType}
-      deleteEntry={deleteAccountHeadType}
+      fetchData={fetchAccountHeadTypesWithBranch}
+      addEntry={() => addAccountHeadType(user.branchid)}
+      modifyEntry={(accountheadtypes) => modifyAccountHeadType(accountheadtypes, user.branchid)}
+      deleteEntry={(accountheadtypes) => deleteAccountHeadType(accountheadtypes, user.branchid)}
       pageTitle="Account Head Type Operations"
       addLabel="Add Account Head Type"
       onClose={() => navigate("/AccountHeadType")}

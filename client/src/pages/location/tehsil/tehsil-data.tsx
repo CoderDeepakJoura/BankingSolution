@@ -2,7 +2,7 @@ import React from "react";
 import TehsilApiService, {
   Tehsil,
   TehsilFilter,
-} from "../../../services/tehsil/tehsilapi";
+} from "../../../services/location/tehsil/tehsilapi";
 import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import TehsilTable from "./tehsil-table";

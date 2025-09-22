@@ -1,52 +1,53 @@
-// components/ValidationSummary.tsx
 import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { ValidationError } from '../../services/Validations/validation';
+
 interface ValidationSummaryProps {
   errors: ValidationError[];
   errorsByTab: Record<string, ValidationError[]>;
   isVisible: boolean;
   onErrorClick?: (fieldName: string, tab: string) => void;
   onClose?: () => void;
+  tabNames?: Record<string, string>; // Added optional tabNames prop
 }
 
-export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ 
-  errors, 
+export const ValidationSummary: React.FC<ValidationSummaryProps> = ({
+  errors,
   errorsByTab,
-  isVisible, 
+  isVisible,
   onErrorClick,
-  onClose
+  onClose,
+  tabNames: customTabNames, // Rename incoming tabNames prop
 }) => {
   if (!isVisible || errors.length === 0) return null;
 
   const scrollToField = (fieldName: string, tab: string) => {
-    // Switch to the tab containing the error
     const tabButtons = document.querySelectorAll('[data-tab-id]');
     const targetTab = Array.from(tabButtons).find(
       button => button.getAttribute('data-tab-id') === tab
     ) as HTMLButtonElement;
-    
+
     if (targetTab) {
       targetTab.click();
-      
-      // Wait for tab switch, then scroll to field
+
       setTimeout(() => {
         const cleanFieldName = fieldName.replace(/\[|\]|\./g, '_');
-        const element = document.getElementById(cleanFieldName) || 
-                      document.querySelector(`[name="${fieldName}"]`) ||
-                      document.querySelector(`input[placeholder*="${fieldName}"]`);
-        
+        const element =
+          document.getElementById(cleanFieldName) ||
+          document.querySelector(`[name="${fieldName}"]`) ||
+          document.querySelector(`input[placeholder*="${fieldName}"]`);
+
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           (element as HTMLElement).focus();
         }
       }, 100);
     }
-    
     onErrorClick?.(fieldName, tab);
   };
 
-  const tabNames = {
+  // Use passed tabNames prop or fall back to defaults
+  const tabNames = customTabNames ?? {
     basic: 'Basic Info',
     address: 'Address',
     contact: 'Contact',
@@ -72,12 +73,12 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({
               </button>
             )}
           </div>
-          
+
           <div className="max-h-64 overflow-y-auto space-y-3">
             {Object.entries(errorsByTab).map(([tab, tabErrors]) => (
               <div key={tab} className="border-l-2 border-red-300 pl-3">
                 <h4 className="font-medium text-red-700 text-sm mb-1">
-                  {tabNames[tab as keyof typeof tabNames] || tab} ({tabErrors.length})
+                  {tabNames[tab] || tab} ({tabErrors.length})
                 </h4>
                 <ul className="space-y-1">
                   {tabErrors.map((error, index) => (

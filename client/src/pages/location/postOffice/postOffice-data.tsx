@@ -2,7 +2,7 @@ import React from "react";
 import PostOfficeApiService, {
   PostOffice,
   PostOfficeFilter,
-} from "../../../services/PostOffice/postOfficeapi";
+} from "../../../services/location/PostOffice/postOfficeapi";
 import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import PostOfficeTable from "./postOffice-table";

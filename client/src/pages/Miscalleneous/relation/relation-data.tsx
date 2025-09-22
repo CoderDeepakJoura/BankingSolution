@@ -217,6 +217,7 @@ const modifyRelation = async (Relation: Relation) => {
           required
           aria-required="true"
           autocomplete="off"
+          autoFocus={true}
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
       </div>

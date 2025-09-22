@@ -151,7 +151,6 @@ const CRUDMaster = <T,>({
 
   return (
     <DashboardLayout
-      enableScroll={false}
       mainContent={
         <div className="p-4 sm:p-8 bg-gray-100">
           <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">

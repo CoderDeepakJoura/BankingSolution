@@ -1,12 +1,14 @@
 ﻿using BankingPlatform.API.DTO.AccountHead;
 using BankingPlatform.API.DTO.CommonDTO;
-using BankingPlatform.API.DTO.PostOffice;
-using BankingPlatform.API.DTO.Tehsil;
+using BankingPlatform.API.DTO.Location.PostOffice;
+using BankingPlatform.API.DTO.Location.State;
+using BankingPlatform.API.DTO.Location.Tehsil;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BankingPlatform.API.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class FetchDataController : ControllerBase
@@ -17,7 +19,6 @@ namespace BankingPlatform.API.Controllers
             _context = context;
         }
 
-        [Authorize]
         [HttpPost("get_all_accountheadtypes")]
         public async Task<IActionResult> GetHeadType([FromBody] CommonDTO commonDTO)
         {
@@ -37,7 +38,6 @@ namespace BankingPlatform.API.Controllers
             );
         }
 
-        [Authorize]
         [HttpPost("get_all_accountheads")]
         public async Task<IActionResult> GetAllHeads([FromBody] CommonDTO commonDTO)
         {
@@ -56,7 +56,7 @@ namespace BankingPlatform.API.Controllers
             }
             );
         }
-        [Authorize]
+
         [HttpPost("get_all_postoffices")]
         public async Task<IActionResult> GetAllPostOffices([FromBody] CommonDTO commonDTO)
         {
@@ -75,7 +75,6 @@ namespace BankingPlatform.API.Controllers
             }
             );
         }
-        [Authorize]
         [HttpPost("get_all_zones")]
         public async Task<IActionResult> GetAllZones([FromBody] CommonDTO commonDTO)
         {
@@ -113,10 +112,16 @@ namespace BankingPlatform.API.Controllers
             }
             );
         }
-        [Authorize]
+        
         [HttpPost("get_all_tehsils")]
         public async Task<IActionResult> GetAllTehsils([FromBody] CommonDTO commonDTO)
         {
+            if (commonDTO.BranchId == null || commonDTO.BranchId == 0)
+                return BadRequest(new ResponseDto
+                {
+                    Success = false,
+                    Message = "Some error occured while fetching Tehsils."
+                });
             var tehsils = await _context.tehsil
             .Where(x => x.branchid == commonDTO.BranchId)
             .Select(x => new TehsilMasterDTO
@@ -129,8 +134,24 @@ namespace BankingPlatform.API.Controllers
             {
                 Success = true,
                 data = tehsils
-            }
-            );
+            });
+        }
+
+        [HttpGet("states")]
+        public async Task<IActionResult> GetAllStates()
+        {
+            var states = await _context.state
+            .Select(x => new StateDTO
+            {
+                StateId = x.id,
+                StateName = x.statecode + "-" + x.statename
+            })
+            .ToListAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = states
+            });
         }
     }
 }

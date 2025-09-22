@@ -1,5 +1,5 @@
 ﻿using BankingPlatform.API.DTO;
-using BankingPlatform.API.DTO.Village;
+using BankingPlatform.API.DTO.Location.Village;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -38,48 +38,38 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
+                string villageName = villageMasterDTO.VillageName.Trim().ToLower();
+                string? villageNameSL = villageMasterDTO.VillageNameSL?.Trim().ToLower();
 
+                var duplicateVillages = await _appContext.village
+                    .Where(v => v.branchid == villageMasterDTO.BranchId)
+                    .Where(v =>
+                        v.villagename.ToLower() == villageName ||
+                        (!string.IsNullOrEmpty(villageNameSL) && v.villagenamesl != null && v.villagenamesl.ToLower() == villageNameSL)
+                    )
+                    .ToListAsync();
 
                 var errors = new List<string>();
-                bool anyExists = await _appContext.village
-                    .AnyAsync(z =>
-                        (
-                         z.villagename.ToLower() == villageMasterDTO.VillageName.ToLower()
-                          ||
-                         (z.villagenamesl != null && z.villagenamesl.ToLower() == villageMasterDTO.VillageNameSL.ToLower())));
 
-                if (anyExists)
-                {
+                if (duplicateVillages.Any(v => v.villagename.ToLower() == villageName))
+                    errors.Add("Village Name already exists.");
 
-                    if (await _appContext.village.AnyAsync(z => z.id != villageMasterDTO.VillageId && z.villagename == villageMasterDTO.VillageName.ToLower()))
-                        errors.Add("Village Name already exists.");
-
-                    if (!string.IsNullOrWhiteSpace(villageMasterDTO.VillageNameSL) &&
-                        await _appContext.village.AnyAsync(z => z.id != villageMasterDTO.VillageId && (z.villagenamesl != null && z.villagenamesl.ToLower() == villageMasterDTO.VillageNameSL.ToLower())))
-                    {
-                        errors.Add("\nVillage Name SL already exists.");
-                    }
-                }
+                if (!string.IsNullOrEmpty(villageNameSL) &&
+                    duplicateVillages.Any(v => v.villagenamesl != null && v.villagenamesl.ToLower() == villageNameSL))
+                    errors.Add("Village Name SL already exists.");
 
                 if (errors.Any())
                 {
-                    _logger.LogWarning("Village update failed due to duplicate data: {Errors}", string.Join(", ", errors));
+                    _logger.LogWarning("Village create failed for VillageId {VillageId}. Errors: {Errors}",
+                        villageMasterDTO.VillageId, string.Join(", ", errors));
+
                     return BadRequest(new ResponseDto
                     {
                         Success = false,
-                        Message = string.Join("\n", errors)
+                        Message = string.Join(Environment.NewLine, errors)
                     });
                 }
 
-                // Return all errors if any
-                if (errors.Any())
-                {
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = string.Join("\n", errors)
-                    });
-                }
                 villageMasterDTO.VillageName = villageMasterDTO.VillageName?.Trim() ?? "";
                 villageMasterDTO.VillageNameSL = villageMasterDTO.VillageNameSL?.Trim() ?? "";
 
@@ -218,36 +208,36 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                // Check for duplicates, excluding the current village being modified
+                string villageName = villageMasterDTO.VillageName.Trim().ToLower();
+                string? villageNameSL = villageMasterDTO.VillageNameSL?.Trim().ToLower();
+
+                var duplicateVillages = await _appContext.village
+                    .Where(v => v.id != villageMasterDTO.VillageId
+                    && v.branchid == villageMasterDTO.BranchId)
+                    .Where(v =>
+                        v.villagename.ToLower() == villageName ||
+                        (!string.IsNullOrEmpty(villageNameSL) && v.villagenamesl != null && v.villagenamesl.ToLower() == villageNameSL)
+                    )
+                    .ToListAsync();
+
                 var errors = new List<string>();
-                bool anyExists = await _appContext.village
-                    .AnyAsync(z => z.id != villageMasterDTO.VillageId
-                    && z.branchid == villageMasterDTO.BranchId
-                    &&
-                        (z.villagename.ToLower() == villageMasterDTO.VillageName.ToLower() ||
-                         (z.villagenamesl != null && z.villagenamesl.ToLower() == villageMasterDTO.VillageNameSL.ToLower())));
 
-                if (anyExists)
-                {
-                    if (await _appContext.village.AnyAsync(z => z.id != villageMasterDTO.VillageId
-                    && z.branchid == villageMasterDTO.BranchId
-                    && z.villagename.ToLower() == villageMasterDTO.VillageName.ToLower()))
-                        errors.Add("Village Name already exists.");
+                if (duplicateVillages.Any(v => v.villagename.ToLower() == villageName))
+                    errors.Add("Village Name already exists.");
 
-                    if (!string.IsNullOrWhiteSpace(villageMasterDTO.VillageNameSL) &&
-                        await _appContext.village.AnyAsync(z => z.id != villageMasterDTO.VillageId && z.branchid == villageMasterDTO.BranchId && (z.villagenamesl != null && z.villagenamesl.ToLower() == villageMasterDTO.VillageNameSL.ToLower())))
-                    {
-                        errors.Add("Village Name SL already exists.");
-                    }
-                }
+                if (!string.IsNullOrEmpty(villageNameSL) &&
+                    duplicateVillages.Any(v => v.villagenamesl != null && v.villagenamesl.ToLower() == villageNameSL))
+                    errors.Add("Village Name SL already exists.");
 
                 if (errors.Any())
                 {
-                    _logger.LogWarning("Village update failed due to duplicate data: {Errors}", string.Join(", ", errors));
+                    _logger.LogWarning("Village update failed for VillageId {VillageId}. Errors: {Errors}",
+                        villageMasterDTO.VillageId, string.Join(", ", errors));
+
                     return BadRequest(new ResponseDto
                     {
                         Success = false,
-                        Message = string.Join("\n", errors)
+                        Message = string.Join(Environment.NewLine, errors)
                     });
                 }
 

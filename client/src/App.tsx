@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Dashboard, Login } from './pages';
-import AccountsModule from "./pages/AccountsOperations";
+import AccountsModule from "./components/AccountMasters/AccountsOperations";
 import ZoneMaster from "./pages/location/zone/zone-master";
 import ZoneData from "./pages/location/zone/zone-data"; 
 import SessionExpired from "./pages/session-expired";
@@ -31,7 +31,11 @@ import MemberMaster from "./pages/member/member-master";
 import RelationOperations from "./pages/Miscalleneous/relation/relation-operations";
 import RelationData from "./pages/Miscalleneous/relation/relation-data";
 import RelationMaster from "./pages/Miscalleneous/relation/relation-master";
-
+import GeneralAccMaster from "./pages/accountMasters/generalAccountMaster/generalAccount-master";
+import GeneralAccMasterData from "./pages/accountMasters/generalAccountMaster/generalAccount-data";
+import StateMaster from "./pages/location/state/state-master";
+import StateOperations from "./pages/location/state/state-operations";
+import StateData from "./pages/location/state/state-data";
 
 
 export default function App() {
@@ -40,7 +44,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/accountsoperations" element={<AccountsModule />} />
+        <Route path="/account-operations" element={<AccountsModule />} />
         <Route path="/zone" element={<ZoneMaster />} />
         <Route path="/session-expired" element={<SessionExpired />} />
         <Route path="/zone-operations" element={<ZoneOperations />} />
@@ -71,6 +75,11 @@ export default function App() {
         <Route path="/relation-operations" element={<RelationOperations />} />
         <Route path="/relation-info" element={<RelationData />} />
         <Route path="/relation" element={<RelationMaster />} />
+        <Route path="/generalacc-master" element={<GeneralAccMaster />} />
+        <Route path="/generalacc-master-info" element={<GeneralAccMasterData />} />
+        <Route path="/state-operations" element={<StateOperations />} />
+        <Route path="/state" element={<StateMaster />} />
+        <Route path="/state-info" element={<StateData />} />
       </Routes>
     </BrowserRouter>
   );

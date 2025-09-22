@@ -19,7 +19,7 @@ interface AccountHeadType {
   accountHeadTypeName: string;
 }
 
-interface AccountHead {
+export interface AccountHead {
   accountHeadId: number;
   accountHeadName: string;
 }

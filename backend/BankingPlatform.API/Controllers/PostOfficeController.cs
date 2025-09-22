@@ -1,5 +1,5 @@
 ﻿using BankingPlatform.API.DTO;
-using BankingPlatform.API.DTO.PostOffice;
+using BankingPlatform.API.DTO.Location.PostOffice;
 using BankingPlatform.Infrastructure.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;

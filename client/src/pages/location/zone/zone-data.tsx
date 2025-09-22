@@ -2,30 +2,27 @@ import React from "react";
 import ZoneApiService, {
   Zone,
   ZoneFilter,
-} from "../../../services/zone/zoneapi";
+} from "../../../services/location/zone/zoneapi";
 import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import ZoneTable from "./zone-table";
 import { useNavigate } from "react-router-dom";
-
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
 // Define the async function to fetch zones and ensure the return type is correct.
-const fetchZones = async (filter: ZoneFilter) => {
-  const res = await ZoneApiService.fetchZones(filter);
+const fetchZones = async (filter: ZoneFilter, branchId: number) => {
+  const res = await ZoneApiService.fetchZones(filter, branchId);
 
   return {
-    // Ensure 'success' is a boolean, defaulting to false if undefined.
     success: res.success ?? false,
-    // Ensure 'data' is a Zone array, defaulting to an empty array.
     data: res.zones ?? [],
-    // Ensure 'totalCount' is a number, defaulting to 0.
     totalCount: res.totalCount ?? 0,
-    // Ensure 'message' is a string, defaulting to an empty string.
     message: res.message ?? "",
   };
 };
 
 // Define the async function for adding a zone.
-const addZone = async () => {
+const addZone = async (branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Add New Zone",
     html: `
@@ -44,6 +41,7 @@ const addZone = async () => {
           placeholder="Enter Zone Name" 
           aria-required="true"
           autocomplete="off"
+          autoFocus= "true"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
       </div>
@@ -178,11 +176,15 @@ const addZone = async () => {
       const zonenameInput = document.getElementById(
         "zonename"
       ) as HTMLInputElement;
+      const zonenameslInput = document.getElementById(
+        "zonenamesl"
+      ) as HTMLInputElement;
       const zonecodeInput = document.getElementById(
         "zonecode"
       ) as HTMLInputElement;
 
       const zonename = zonenameInput.value.trim();
+      const zonenamesl = zonenameslInput.value.trim();
       const zonecode = zonecodeInput.value.trim();
 
       // Keep track of the first empty element
@@ -199,7 +201,7 @@ const addZone = async () => {
         firstEmptyElement.focus();
         return null;
       }
-      return { zonename, zonecode };
+      return { zonename, zonecode, zonenamesl };
     },
   });
 
@@ -207,7 +209,9 @@ const addZone = async () => {
     try {
       await ZoneApiService.add_new_zone(
         formValues.zonename,
-        formValues.zonecode
+        formValues.zonecode,
+        formValues.zonenamesl,
+        branchId
       );
       Swal.fire({
         title: "Success!",
@@ -223,7 +227,7 @@ const addZone = async () => {
 };
 
 // Define the async function for modifying a zone.
-const modifyZone = async (zone: Zone) => {
+const modifyZone = async (zone: Zone, branchId: number) => {
   const { value: formValues } = await Swal.fire({
     title: "Modify Zone",
     html: `
@@ -243,6 +247,7 @@ const modifyZone = async (zone: Zone) => {
           placeholder="Enter Zone Name" 
           aria-required="true"
           autocomplete="off"
+          autoFocus= "true"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
       </div>
@@ -376,8 +381,12 @@ const modifyZone = async (zone: Zone) => {
       const zonecodeInput = document.getElementById(
         "zonecode"
       ) as HTMLInputElement;
+      const zonenameslInput = document.getElementById(
+        "zonenamesl"
+      ) as HTMLInputElement;
 
       const zonename = zonenameInput.value.trim();
+      const zonenamesl = zonenameslInput.value.trim();
       const zonecode = zonecodeInput.value.trim();
 
       // Keep track of the first empty element
@@ -394,7 +403,7 @@ const modifyZone = async (zone: Zone) => {
         firstEmptyElement.focus();
         return null;
       }
-      return { id: zone.zoneId, zonename, zonecode };
+      return { id: zone.zoneId, zonename, zonecode, zonenamesl };
     },
   });
 
@@ -403,11 +412,13 @@ const modifyZone = async (zone: Zone) => {
       await ZoneApiService.modify_zone(
         formValues.id,
         formValues.zonename,
-        formValues.zonecode
+        formValues.zonecode,
+        formValues.zonenamesl,
+        branchId
       );
       Swal.fire({
         title: "Success!",
-        text: "Zone has been updated.",
+        text: "Zone has been updated successfully.",
         icon: "success",
         timer: 1500,
         showConfirmButton: false,
@@ -419,7 +430,7 @@ const modifyZone = async (zone: Zone) => {
 };
 
 // Define the async function for deleting a zone.
-const deleteZone = async (zone: Zone) => {
+const deleteZone = async (zone: Zone, branchId: number) => {
   const result = await Swal.fire({
     title: "Delete Zone",
     text: `Are you sure you want to delete "${zone.zoneName}"? This action cannot be undone.`,
@@ -436,7 +447,8 @@ const deleteZone = async (zone: Zone) => {
         zone.zoneId,
         zone.zoneName,
         zone.zoneCode,
-        zone.zoneNameSL
+        zone.zoneNameSL,
+        branchId
       );
       Swal.fire({
         title: "Deleted!",
@@ -455,13 +467,19 @@ const deleteZone = async (zone: Zone) => {
 
 const ZoneMaster: React.FC = () => {
   const navigate = useNavigate();
-
+  const user = useSelector((state: RootState) => state.user);
+  const fetchZonesWithBranch = React.useCallback(
+    async (filter: ZoneFilter) => {
+      return await fetchZones(filter, user.branchid);
+    },
+    [user.branchid]
+  );
   return (
     <CRUDMaster<Zone>
-      fetchData={fetchZones}
-      addEntry={addZone}
-      modifyEntry={modifyZone}
-      deleteEntry={deleteZone}
+      fetchData={fetchZonesWithBranch}
+      addEntry={() => addZone(user.branchid)}
+      modifyEntry={(zones) => modifyZone(zones, user.branchid)}
+      deleteEntry={(zones) => deleteZone(zones, user.branchid)}
       pageTitle="Zone Operations"
       addLabel="Add Zone"
       searchPlaceholder="Search by name or code..."

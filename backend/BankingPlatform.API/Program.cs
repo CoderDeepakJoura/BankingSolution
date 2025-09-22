@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using System.Text.Json;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.API.Services;
+using BankingPlatform.API.Service.AccountMasters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddLogging();
+builder.Services.AddScoped<GeneralAccountMasterService>();
 
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")

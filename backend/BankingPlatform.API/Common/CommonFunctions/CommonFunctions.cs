@@ -38,12 +38,12 @@ namespace BankingPlatform.API.Common.CommonFunctions
             return parts.Length > 0 ? Int32.Parse(parts[parts.Length - 1]) : 0 ;
         }
 
-        public async Task<string> GetHeadCodeFromId(int? id, int branchId)
+        public string GetHeadCodeFromId(int? id, int branchId)
         {
             string result = "";
             if (id != null && branchId > 0)
             {
-                var data = await _context.accounthead.FirstOrDefaultAsync(x => x.branchid == branchId && x.id == id);
+                var data = _context.accounthead.FirstOrDefault(x => x.branchid == branchId && x.id == id);
                 if (data != null)
                     result = data.headcode + "-" + data.name;
             }
@@ -66,6 +66,11 @@ namespace BankingPlatform.API.Common.CommonFunctions
                                      .Where(x => x.branchid == branchId && x.id == zoneId)
                                      .Select(x => x.tehsilname)
                                      .FirstOrDefaultAsync() ?? "";
+
+        public string GetStateFromId(int stateId) => _context.state
+                                    .Where(x => x.id == stateId)
+                                    .Select(x => x.statename)
+                                    .FirstOrDefault() ?? "";
 
     }
 }

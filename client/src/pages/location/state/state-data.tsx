@@ -1,0 +1,439 @@
+import React from "react";
+import StateApiService, {
+  State,
+  StateFilter,
+} from "../../../services/location/state/stateapi";
+import Swal from "sweetalert2";
+import CRUDMaster from "../../../components/Location/CRUDOperations";
+import StateTable from "./state-table";
+import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
+// Define the async function to fetch states and ensure the return type is correct.
+const fetchStates = async (filter: StateFilter) => {
+  const res = await StateApiService.getStates(filter.searchTerm, filter.pageNumber, filter.pageSize);
+
+  return {
+    success: res.success ?? false,
+    data: res.states ?? [],
+    totalCount: res.totalCount ?? 0,
+    message: res.message ?? "",
+  };
+};
+
+// Define the async function for adding a state.
+const addState = async () => {
+  const { value: formValues } = await Swal.fire({
+    title: "Add New State",
+    html: `
+  <div class="swal2-form-container space-y-6 p-2">
+    <!-- State Name Field -->
+    <div class="swal2-input-group">
+      <label for="statename" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+        <div class="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
+        State Name
+        <span class="text-red-500 text-xs">*</span>
+      </label>
+      <div class="relative">
+        <input 
+          id="statename" 
+          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
+          placeholder="Enter State Name" 
+          aria-required="true"
+          autocomplete="off"
+          autoFocus= "true"
+        >
+        <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
+      </div>
+    </div>
+
+    <!-- State Code Field -->
+    <div class="swal2-input-group">
+      <label for="statecode" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+        <div class="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+        State Code
+        <span class="text-red-500 text-xs">*</span>
+      </label>
+      <div class="relative">
+        <input 
+          id="statecode" 
+          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50 font-mono" 
+          placeholder="Enter State Code" 
+          aria-required="true"
+          autocomplete="off"
+          maxlength="10"
+          "
+        >
+        <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-purple-200"></div>
+      </div>
+    </div>
+    <!-- Status Indicator -->
+    <div class="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg p-4 mt-6">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full flex items-center justify-center">
+          <span class="text-white text-sm font-bold">+</span>
+        </div>
+        <div class="flex-1">
+          <p class="text-sm font-semibold text-slate-700">Creating New State</p>
+          <p class="text-xs text-slate-500 mt-1">Fill in all the required information to add a new state.</p>
+        </div>
+        <div class="text-right">
+          <div class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">
+            <div class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+            New
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Creation Guidelines -->
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3">
+      <div class="flex items-start gap-2">
+        <div class="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center mt-0.5">
+          <span class="text-white text-xs font-bold">i</span>
+        </div>
+        <div class="text-xs text-slate-600">
+          <p class="font-medium text-blue-700">Creation Guidelines:</p>
+          <ul class="list-disc list-inside mt-1 space-y-1 text-blue-600">
+            <li>State name should be descriptive and unique</li>
+            <li>Fields marked with * are required for successful creation</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .swal2-form-container {
+      text-align: left;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .swal2-input-group {
+      margin-bottom: 0 !important;
+    }
+    .swal2-input-group input:focus {
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    }
+    .swal2-input-group input:hover {
+      border-color: rgb(148, 163, 184) !important;
+      transform: translateY(-1px);
+    }
+    .swal2-input-group input[lang="si"] {
+      font-family: 'Noto Sans Sinhala', 'Iskoola Pota', sans-serif;
+    }
+    .swal2-popup {
+      padding: 2rem !important;
+      max-width: 500px !important;
+    }
+    .swal2-html-container {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .swal2-form-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .swal2-form-container::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 10px;
+    }
+    .swal2-form-container::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+    .swal2-form-container::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+`,
+    showCancelButton: true,
+    confirmButtonText: "Add State",
+    confirmButtonColor: "#3085d6",
+    cancelButtonColor: "#d33",
+    preConfirm: () => {
+      const statenameInput = document.getElementById(
+        "statename"
+      ) as HTMLInputElement;
+      const statecodeInput = document.getElementById(
+        "statecode"
+      ) as HTMLInputElement;
+
+      const statename = statenameInput.value.trim();
+      const statecode = statecodeInput.value.trim();
+
+      // Keep track of the first empty element
+      let firstEmptyElement: HTMLInputElement | null = null;
+
+      if (!statename) {
+        firstEmptyElement = statenameInput;
+      } else if (!statecode) {
+        firstEmptyElement = statecodeInput;
+      }
+
+      if (firstEmptyElement) {
+        Swal.showValidationMessage("Please fill in all required fields");
+        firstEmptyElement.focus();
+        return null;
+      }
+      return { statename, statecode };
+    },
+  });
+
+  if (formValues) {
+    try {
+      await StateApiService.createState(
+        formValues.statename,
+        formValues.statecode
+      );
+      Swal.fire({
+        title: "Success!",
+        text: "New state has been added.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (err: any) {
+      Swal.fire("Error!", err.message || "Failed to add state.", "error");
+    }
+  }
+};
+
+// Define the async function for modifying a state.
+const modifyState = async (state: State) => {
+  const { value: formValues } = await Swal.fire({
+    title: "Modify State",
+    html: `
+  <div class="swal2-form-container space-y-6 p-2">
+    <!-- State Name Field -->
+    <div class="swal2-input-group">
+      <label for="statename" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+        <div class="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
+        State Name
+        <span class="text-red-500 text-xs">*</span>
+      </label>
+      <div class="relative">
+        <input 
+          id="statename" 
+          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
+          value="${state.stateName}"
+          placeholder="Enter State Name" 
+          aria-required="true"
+          autocomplete="off"
+          autoFocus= "true"
+        >
+        <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
+      </div>
+    </div>
+
+    <!-- State Code Field -->
+    <div class="swal2-input-group">
+      <label for="statecode" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+        <div class="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+        State Code
+        <span class="text-red-500 text-xs">*</span>
+      </label>
+      <div class="relative">
+        <input 
+          id="statecode" 
+          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50 uppercase font-mono" 
+          value="${state.stateCode || ""}"
+          placeholder="Enter State Code" 
+          aria-required="true"
+          autocomplete="off"
+          maxlength="10"
+          style="text-transform: uppercase;"
+        >
+        <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-purple-200"></div>
+      </div>
+    </div>
+
+    <!-- Status Indicator -->
+    <div class="bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-lg p-4 mt-6">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+          <span class="text-white text-sm font-bold">✓</span>
+        </div>
+        <div class="flex-1">
+          <p class="text-sm font-semibold text-slate-700">Editing State Information</p>
+          <p class="text-xs text-slate-500 mt-1">Update the state details above. Fields marked with * are required.</p>
+        </div>
+       
+      </div>
+    </div>
+
+    <!-- Quick Actions Hint -->
+    <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-3">
+      <div class="flex items-start gap-2">
+        <div class="w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center mt-0.5">
+          <span class="text-white text-xs font-bold">!</span>
+        </div>
+        <div class="text-xs text-slate-600">
+          <p class="font-medium text-amber-700">Important Notes:</p>
+          <ul class="list-disc list-inside mt-1 space-y-1 text-amber-600">
+            <li>State code changes may affect existing records</li>
+            <li>Ensure State Name and State Code is unique in the system</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .swal2-form-container {
+      text-align: left;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .swal2-input-group {
+      margin-bottom: 0 !important;
+    }
+    .swal2-input-group input:focus {
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    }
+    .swal2-input-group input:hover {
+      border-color: rgb(148, 163, 184) !important;
+      transform: translateY(-1px);
+    }
+    .swal2-input-group input[lang="si"] {
+      font-family: 'Noto Sans Sinhala', 'Iskoola Pota', sans-serif;
+    }
+    .swal2-popup {
+      padding: 2rem !important;
+      max-width: 500px !important;
+    }
+    .swal2-html-container {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .swal2-form-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .swal2-form-container::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 10px;
+    }
+    .swal2-form-container::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+    .swal2-form-container::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+`,
+    showCancelButton: true,
+    confirmButtonText: "Update State",
+    confirmButtonColor: "#3085d6",
+    cancelButtonColor: "#d33",
+    preConfirm: () => {
+      const statenameInput = document.getElementById(
+        "statename"
+      ) as HTMLInputElement;
+      const statecodeInput = document.getElementById(
+        "statecode"
+      ) as HTMLInputElement;
+
+      const statename = statenameInput.value.trim();
+      const statecode = statecodeInput.value.trim();
+
+      // Keep track of the first empty element
+      let firstEmptyElement: HTMLInputElement | null = null;
+
+      if (!statename) {
+        firstEmptyElement = statenameInput;
+      } else if (!statecode) {
+        firstEmptyElement = statecodeInput;
+      }
+
+      if (firstEmptyElement) {
+        Swal.showValidationMessage("Please fill in all required fields");
+        firstEmptyElement.focus();
+        return null;
+      }
+      return { id: state.stateId, statename, statecode };
+    },
+  });
+
+  if (formValues) {
+    try {
+      await StateApiService.updateState(
+        formValues.id,
+        formValues.statename,
+        formValues.statecode
+      );
+      Swal.fire({
+        title: "Success!",
+        text: "State has been updated successfully.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (err: any) {
+      Swal.fire("Error!", err.message || "Failed to update state.", "error");
+    }
+  }
+};
+
+// Define the async function for deleting a state.
+const deleteState = async (state: State) => {
+  const result = await Swal.fire({
+    title: "Delete State",
+    text: `Are you sure you want to delete "${state.stateName}"? This action cannot be undone.`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#3085d6",
+    cancelButtonColor: "#d33",
+    confirmButtonText: "Yes, delete it!",
+  });
+
+  if (result.isConfirmed) {
+    try {
+      await StateApiService.deleteState(
+        state.stateId
+      );
+      Swal.fire({
+        title: "Deleted!",
+        text: `State "${state.stateName}" has been deleted.`,
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (err: any) {
+      Swal.fire("Error!", err.message || "Failed to delete state.", "error");
+    }
+  }
+};
+
+// --- StateMaster Component ---
+
+const StateMaster: React.FC = () => {
+  const navigate = useNavigate();
+  const fetchStatesWithBranch = async (filter: StateFilter) => {
+    return await fetchStates(filter);
+};
+
+
+  
+  return (
+    <CRUDMaster<State>
+      fetchData={fetchStatesWithBranch}
+      addEntry={() => addState()}
+      modifyEntry={(states) => modifyState(states)}
+      deleteEntry={(states) => deleteState(states)}
+      pageTitle="State Operations"
+      addLabel="Add State"
+      searchPlaceholder="Search by name or code..."
+      onClose={() => navigate("/state")}
+      renderTable={(states, handleModify, handleDelete) => (
+        <StateTable
+          states={states}
+          handleModify={handleModify}
+          handleDelete={handleDelete}
+        />
+      )}
+      getKey={(state) => state.stateId}
+    />
+  );
+};
+
+export default StateMaster;

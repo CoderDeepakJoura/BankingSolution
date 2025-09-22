@@ -1,6 +1,6 @@
 import React from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
-import { Tehsil } from "../../../services/tehsil/tehsilapi";
+import { Tehsil } from "../../../services/location/tehsil/tehsilapi";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
 
 interface TehsilTableProps {

@@ -1,5 +1,5 @@
 ﻿using BankingPlatform.API.DTO;
-using BankingPlatform.API.DTO.Relation;
+using BankingPlatform.API.DTO.Location.Relation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 

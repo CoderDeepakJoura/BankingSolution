@@ -28,6 +28,9 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<MemberNominee> membernominee { get; set; }
     public virtual DbSet<Relation> relation { get; set; }
     public virtual DbSet<Village> village { get; set; }
+    public virtual DbSet<State> state { get; set; }
+    public virtual DbSet<AccountMaster> accountmaster { get; set; }
+    public virtual DbSet<GSTInfo> accgstinfo { get; set; }
 
    
     protected override void OnModelCreating(ModelBuilder modelBuilder)

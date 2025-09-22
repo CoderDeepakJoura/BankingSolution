@@ -3,7 +3,7 @@
     public class AccountHeadTypeDTO
     {
         public AccountHeadTypeDTO() { }
-        public AccountHeadTypeDTO(string accountheadtypeName, string? accountheadtypeNameSl, int accountheadtypeId, int branchId = 0)
+        public AccountHeadTypeDTO(string accountheadtypeName, string? accountheadtypeNameSl, int accountheadtypeId, int branchId)
         {
             AccountHeadTypeName = accountheadtypeName;
             AccountHeadTypeNameSL = accountheadtypeNameSl;

@@ -1,5 +1,5 @@
 ﻿using BankingPlatform.API.DTO;
-using BankingPlatform.API.DTO.Tehsil;
+using BankingPlatform.API.DTO.Location.Tehsil;
 using BankingPlatform.Infrastructure.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;

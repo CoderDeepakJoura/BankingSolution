@@ -38,49 +38,42 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-               
+                string zoneCode = zoneMasterDTO.ZoneCode.Trim().ToLower();
+                string zoneName = zoneMasterDTO.ZoneName.Trim().ToLower();
+                string? zoneNameSL = zoneMasterDTO.ZoneNameSL?.Trim().ToLower();
+                var duplicateZones = await _appContext.zone
+                    .Where(z => z.branchid == zoneMasterDTO.BranchId)
+                    .Where(z =>
+                        z.zonecode.ToLower() == zoneCode ||
+                        z.zonename.ToLower() == zoneName ||
+                        (!string.IsNullOrEmpty(zoneNameSL) && z.zonenamesl != null && z.zonenamesl.ToLower() == zoneNameSL)
+                    )
+                    .ToListAsync();
 
                 var errors = new List<string>();
-                bool anyExists = await _appContext.zone
-                    .AnyAsync(z => 
-                        (z.zonecode.ToLower() == zoneMasterDTO.ZoneCode.ToLower() ||
-                         z.zonename.ToLower() == zoneMasterDTO.ZoneName.ToLower() ||
-                         (z.zonenamesl != null && z.zonenamesl.ToLower() == zoneMasterDTO.ZoneNameSL.ToLower())));
 
-                if (anyExists)
-                {
-                    if (await _appContext.zone.AnyAsync(z => z.id != zoneMasterDTO.ZoneId && z.zonecode == zoneMasterDTO.ZoneCode.ToLower()))
-                        errors.Add("Zone code already exists.");
+                if (duplicateZones.Any(z => z.zonecode.ToLower() == zoneCode))
+                    errors.Add("Zone Code already exists.");
 
-                    if (await _appContext.zone.AnyAsync(z => z.id != zoneMasterDTO.ZoneId && z.zonename == zoneMasterDTO.ZoneName.ToLower()))
-                        errors.Add("Zone Name already exists.");
+                if (duplicateZones.Any(z => z.zonename.ToLower() == zoneName))
+                    errors.Add("Zone Name already exists.");
 
-                    if (!string.IsNullOrWhiteSpace(zoneMasterDTO.ZoneNameSL) &&
-                        await _appContext.zone.AnyAsync(z => z.id != zoneMasterDTO.ZoneId && (z.zonenamesl != null && z.zonenamesl.ToLower() == zoneMasterDTO.ZoneNameSL.ToLower())))
-                    {
-                        errors.Add("Zone Name SL already exists.");
-                    }
-                }
+                if (!string.IsNullOrEmpty(zoneNameSL) &&
+                    duplicateZones.Any(z => z.zonenamesl != null && z.zonenamesl.ToLower() == zoneNameSL))
+                    errors.Add("Zone Name SL already exists.");
 
                 if (errors.Any())
                 {
-                    _logger.LogWarning("Zone update failed due to duplicate data: {Errors}", string.Join(", ", errors));
+                    _logger.LogWarning("Zone update failed for ZoneId {ZoneId}. Errors: {Errors}",
+                        zoneMasterDTO.ZoneId, string.Join(", ", errors));
+
                     return BadRequest(new ResponseDto
                     {
                         Success = false,
-                        Message = string.Join("\n", errors)
+                        Message = string.Join(Environment.NewLine, errors)
                     });
                 }
 
-                // Return all errors if any
-                if (errors.Any())
-                {
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = string.Join("\n", errors)
-                    });
-                }
                 zoneMasterDTO.ZoneCode = zoneMasterDTO.ZoneCode?.Trim() ?? "";
                 zoneMasterDTO.ZoneName = zoneMasterDTO.ZoneName?.Trim() ?? "";
                 zoneMasterDTO.ZoneNameSL = zoneMasterDTO.ZoneNameSL?.Trim() ?? "";
@@ -88,7 +81,7 @@ namespace BankingPlatform.API.Controllers
 
                 await _appContext.zone.AddAsync(new Zone
                 {
-                    branchid = 1,
+                    branchid = zoneMasterDTO.BranchId,
                     zonename = zoneMasterDTO.ZoneName,
                     zonenamesl = zoneMasterDTO.ZoneNameSL,
                     zonecode = zoneMasterDTO.ZoneCode
@@ -113,9 +106,9 @@ namespace BankingPlatform.API.Controllers
             }
         }
 
-        [HttpPost("get_all_zones")]
+        [HttpPost("get_all_zones/{branchId}")]
         [Authorize]
-        public async Task<IActionResult> GetAllZones([FromBody] LocationFilterDTO filter)
+        public async Task<IActionResult> GetAllZones([FromRoute] int branchId, [FromBody] LocationFilterDTO filter)
         {
             try
             {
@@ -132,10 +125,11 @@ namespace BankingPlatform.API.Controllers
                 var totalCount = await query.CountAsync();
 
                 var items = await query
+                    .Where(x=> x.branchid == branchId)
                     .OrderBy(z => z.zonename)
                     .Skip((filter.PageNumber - 1) * filter.PageSize)
                     .Take(filter.PageSize)
-                    .Select(z => new ZoneMasterDto(z.zonename, z.zonecode, z.zonenamesl, z.id))
+                    .Select(z => new ZoneMasterDto(z.zonename, z.zonecode, z.zonenamesl, z.id, z.branchid))
                     .ToListAsync();
                
                 return Ok(new
@@ -175,7 +169,7 @@ namespace BankingPlatform.API.Controllers
                 }
 
                 // Check if the zone to be modified exists
-                var existingZone = await _appContext.zone.FindAsync(zoneMasterDTO.ZoneId, 1);
+                var existingZone = await _appContext.zone.FindAsync(zoneMasterDTO.ZoneId, zoneMasterDTO.BranchId);
                 if (existingZone == null)
                 {
                     return NotFound(new ResponseDto
@@ -185,36 +179,39 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                // Check for duplicates, excluding the current zone being modified
+                string zoneCode = zoneMasterDTO.ZoneCode.Trim().ToLower();
+                string zoneName = zoneMasterDTO.ZoneName.Trim().ToLower();
+                string? zoneNameSL = zoneMasterDTO.ZoneNameSL?.Trim().ToLower();
+                var duplicateZones = await _appContext.zone
+                    .Where(z => z.id != zoneMasterDTO.ZoneId && z.branchid == zoneMasterDTO.BranchId)
+                    .Where(z =>
+                        z.zonecode.ToLower() == zoneCode ||
+                        z.zonename.ToLower() == zoneName ||
+                        (!string.IsNullOrEmpty(zoneNameSL) && z.zonenamesl != null && z.zonenamesl.ToLower() == zoneNameSL)
+                    )
+                    .ToListAsync();
+
                 var errors = new List<string>();
-                bool anyExists = await _appContext.zone
-                    .AnyAsync(z => z.id != zoneMasterDTO.ZoneId &&
-                        (z.zonecode.ToLower() == zoneMasterDTO.ZoneCode.ToLower() ||
-                         z.zonename.ToLower() == zoneMasterDTO.ZoneName.ToLower() ||
-                         (z.zonenamesl != null && z.zonenamesl.ToLower() == zoneMasterDTO.ZoneNameSL.ToLower())));
 
-                if (anyExists)
-                {
-                    if (await _appContext.zone.AnyAsync(z => z.id != zoneMasterDTO.ZoneId && z.zonecode.ToLower() == zoneMasterDTO.ZoneCode.ToLower()))
-                        errors.Add("Zone code already exists.");
+                if (duplicateZones.Any(z => z.zonecode.ToLower() == zoneCode))
+                    errors.Add("Zone Code already exists.");
 
-                    if (await _appContext.zone.AnyAsync(z => z.id != zoneMasterDTO.ZoneId && z.zonename.ToLower() == zoneMasterDTO.ZoneName.ToLower()))
-                        errors.Add("Zone Name already exists.");
+                if (duplicateZones.Any(z => z.zonename.ToLower() == zoneName))
+                    errors.Add("Zone Name already exists.");
 
-                    if (!string.IsNullOrWhiteSpace(zoneMasterDTO.ZoneNameSL) &&
-                        await _appContext.zone.AnyAsync(z => z.id != zoneMasterDTO.ZoneId && (z.zonenamesl != null && z.zonenamesl.ToLower() == zoneMasterDTO.ZoneNameSL.ToLower())))
-                    {
-                        errors.Add("Zone Name SL already exists.");
-                    }
-                }
+                if (!string.IsNullOrEmpty(zoneNameSL) &&
+                    duplicateZones.Any(z => z.zonenamesl != null && z.zonenamesl.ToLower() == zoneNameSL))
+                    errors.Add("Zone Name SL already exists.");
 
                 if (errors.Any())
                 {
-                    _logger.LogWarning("Zone update failed due to duplicate data: {Errors}", string.Join(", ", errors));
+                    _logger.LogWarning("Zone update failed for ZoneId {ZoneId}. Errors: {Errors}",
+                        zoneMasterDTO.ZoneId, string.Join(", ", errors));
+
                     return BadRequest(new ResponseDto
                     {
                         Success = false,
-                        Message = string.Join("\n", errors)
+                        Message = string.Join(Environment.NewLine, errors)
                     });
                 }
 
@@ -264,7 +261,7 @@ namespace BankingPlatform.API.Controllers
                 }
 
                 // Check if the zone to be deleted exists
-                var existingZone = await _appContext.zone.FindAsync(zoneMasterDTO.ZoneId, 1);
+                var existingZone = await _appContext.zone.FindAsync(zoneMasterDTO.ZoneId, zoneMasterDTO.BranchId);
                 if (existingZone == null)
                 {
                     return NotFound(new ResponseDto

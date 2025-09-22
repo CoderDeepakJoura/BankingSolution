@@ -1,6 +1,6 @@
 import React from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
-import { Zone } from "../../../services/zone/zoneapi";
+import { Zone } from "../../../services/location/zone/zoneapi";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
 
 interface ZoneTableProps {

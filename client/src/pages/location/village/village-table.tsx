@@ -1,6 +1,6 @@
 import React from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
-import { Village, village } from "../../../services/village/villageapi";
+import { Village, village } from "../../../services/location/village/villageapi";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
 
 interface VillageTableProps {

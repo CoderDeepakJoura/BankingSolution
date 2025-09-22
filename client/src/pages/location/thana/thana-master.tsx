@@ -1,7 +1,7 @@
 import React from "react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate } from "react-router-dom";
-import ThanaApiService from "../../../services/thana/thanaapi";
+import ThanaApiService from "../../../services/location/thana/thanaapi";
 import Swal from "sweetalert2";
 import {
   FaPlus,

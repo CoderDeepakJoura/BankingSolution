@@ -123,12 +123,13 @@ class accountheadApiService extends ApiService {
 
   // ✅ Fixed to match your ACTUAL backend response structure
   async fetchaccounthead(
-    filter: AccountHeadFilter
+    filter: AccountHeadFilter,
+    branchId: number
   ): Promise<ApiResponse<accountheadResponse>> {
     
     
     try {
-      const response = await this.makeRequest<any>('/accounthead/get_all_accounthead', {
+      const response = await this.makeRequest<any>(`/accounthead/get_all_accounthead/${branchId}`, {
         method: 'POST',
         body: JSON.stringify(filter),
         headers: { 'Content-Type': 'application/json' },

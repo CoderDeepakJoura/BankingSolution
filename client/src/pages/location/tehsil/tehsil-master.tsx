@@ -1,7 +1,7 @@
 import React from "react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate } from "react-router-dom";
-import TehsilApiService from "../../../services/tehsil/tehsilapi";
+import TehsilApiService from "../../../services/location/tehsil/tehsilapi";
 import Swal from "sweetalert2";
 import {
   FaPlus,

@@ -1,6 +1,6 @@
 import React from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
-import { PostOffice } from "../../../services/PostOffice/postOfficeapi";
+import { PostOffice } from "../../../services/location/PostOffice/postOfficeapi";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
 
 interface PostOfficeTableProps {

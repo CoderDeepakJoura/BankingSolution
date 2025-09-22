@@ -1,7 +1,7 @@
 import React from "react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate } from "react-router-dom";
-import PostOfficeApiService from "../../../services/PostOffice/postOfficeapi";
+import PostOfficeApiService from "../../../services/location/PostOffice/postOfficeapi";
 import Swal from "sweetalert2";
 import { FaPlus, FaTimes, FaMapMarkerAlt, FaCode, FaGlobe, FaSave, FaArrowLeft, FaInfoCircle } from "react-icons/fa";
 import { useSelector } from "react-redux";
