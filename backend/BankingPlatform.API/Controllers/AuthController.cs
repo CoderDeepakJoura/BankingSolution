@@ -1,4 +1,5 @@
 ﻿using BankingPlatform.API.Common;
+using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.WorkingDate;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
@@ -159,6 +160,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error during login for user: {Username}, branch: {BranchCode}",
                     loginDto?.Username ?? "unknown", loginDto?.BranchCode ?? "unknown");
+                await _commonFns.LogErrors(ex, nameof(Login), "AuthController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -169,7 +171,7 @@ namespace BankingPlatform.API.Controllers
 
         [HttpPost("logout")]
         [Authorize]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
             try
             {
@@ -201,22 +203,13 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during logout");
+                await _commonFns.LogErrors(ex, nameof(Logout), "AuthController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
                     Message = "An error occurred during logout"
                 });
             }
-        }
-
-        [Authorize]
-        [HttpGet("validate_token")]
-        public async Task<IActionResult> ValidateToken()
-        {
-            return Ok(new ResponseDto
-            {
-                Success = true
-            });
         }
         [Authorize]
         [HttpPost("working-date")]
@@ -293,7 +286,8 @@ namespace BankingPlatform.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during logout");
+                _logger.LogError(ex, "Error while setting Working Date");
+                await _commonFns.LogErrors(ex, nameof(SetWorkingDate), "AuthController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -324,7 +318,7 @@ namespace BankingPlatform.API.Controllers
 
         private void GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate)
         {
-            var user = _httpContextAccessor.HttpContext.User!;
+            var user = _httpContextAccessor.HttpContext!.User!;
 
             userName = user.FindFirst(ClaimTypes.Name)?.Value!;
             branchCode = user.FindFirst("branchCode")?.Value!;

@@ -15,10 +15,12 @@ namespace BankingPlatform.API.Controllers
     {
         private readonly BankingDbContext _appContext;
         private readonly ILogger<CategoryMasterController> _logger;
-        public CategoryMasterController(BankingDbContext appcontext, ILogger<CategoryMasterController> logger)
+        private readonly CommonFunctions _commonFunctions;
+        public CategoryMasterController(BankingDbContext appcontext, ILogger<CategoryMasterController> logger, CommonFunctions commonFunctions)
         {
             _appContext = appcontext;
             _logger = logger;
+            _commonFunctions = commonFunctions;
         }
 
         [Authorize]
@@ -71,15 +73,7 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                // Return all errors if any
-                if (errors.Any())
-                {
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = string.Join("\n", errors)
-                    });
-                }
+                
                 categoryMasterDTO.CategoryName = categoryMasterDTO.CategoryName?.Trim() ?? "";
                 categoryMasterDTO.CategoryNameSL = categoryMasterDTO.CategoryNameSL?.Trim() ?? "";
 
@@ -102,6 +96,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Category : {CategoryName},  CategoryNameSL : {CategoryNameSL}",
                        categoryMasterDTO?.CategoryName ?? "unknown", categoryMasterDTO?.CategoryNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(CreateCategory), "CategoryMasterController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -123,8 +118,8 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = filter.SearchTerm;
                     query = query.Where(z =>
-                        z.categoryname.Contains(term) ||
-                        z.categorynamesl != null && z.categorynamesl.Contains(term));
+                        z.categoryname.ToLower().Contains(term.ToLower()) ||
+                        z.categorynamesl != null && z.categorynamesl.ToLower().Contains(term.ToLower()));
                 }
                 var totalCount = await query.CountAsync();
 
@@ -146,6 +141,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching Categorys");
+                await _commonFunctions.LogErrors(ex, nameof(GetAllCategorys), "CategoryMasterController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -232,6 +228,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Category : {CategoryName}, CategoryNameSL : {CategoryNameSL}",
                        categoryMasterDTO?.CategoryName ?? "unknown", categoryMasterDTO?.CategoryNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(ModifyCategory), "CategoryMasterController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -283,6 +280,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while deleting Category : {CategoryName}, CategoryNameSL : {CategoryNameSL}",
                        categoryMasterDTO?.CategoryName ?? "unknown", categoryMasterDTO?.CategoryNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(DeleteCategory), "CategoryMasterController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,

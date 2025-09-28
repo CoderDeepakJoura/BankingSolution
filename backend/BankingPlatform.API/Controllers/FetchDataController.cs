@@ -1,4 +1,5 @@
 ﻿using BankingPlatform.API.DTO.AccountHead;
+using BankingPlatform.API.DTO.Category;
 using BankingPlatform.API.DTO.CommonDTO;
 using BankingPlatform.API.DTO.Location.PostOffice;
 using BankingPlatform.API.DTO.Location.State;
@@ -145,6 +146,23 @@ namespace BankingPlatform.API.Controllers
             {
                 StateId = x.id,
                 StateName = x.statecode + "-" + x.statename
+            })
+            .ToListAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = states
+            });
+        }
+
+        [HttpGet("categoryinfo/{branchid}")]
+        public async Task<IActionResult> GetAllCategorys([FromRoute] int branchid)
+        {
+            var states = await _context.category
+            .Select(x => new CategoryMasterDTO
+            {
+                CategoryId = x.id,
+                CategoryName = x.categoryname
             })
             .ToListAsync();
             return Ok(new

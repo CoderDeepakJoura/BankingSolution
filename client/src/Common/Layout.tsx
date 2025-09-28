@@ -55,6 +55,32 @@ interface DashboardLayoutProps {
   enableScroll?: boolean;
 }
 
+export const useBrowserNavigationControl = (shouldDisable: boolean = true) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!shouldDisable) return;
+
+    // Add a dummy entry to history to prevent going back
+    const handlePopState = (event: PopStateEvent) => {
+      event.preventDefault();
+      // Push the current location back to prevent navigation
+      window.history.pushState(null, "", location.pathname + location.search);
+    };
+
+    // Push current state to prevent back
+    window.history.pushState(null, "", location.pathname + location.search);
+
+    // Listen for browser navigation attempts
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [location, shouldDisable]);
+};
+
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   mainContent,
   enableScroll = true,
@@ -68,43 +94,43 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
+  useBrowserNavigationControl(true);
+  useEffect(() => {
+    const init = async () => {
+      try {
+        // const tokenResult = await ApiService.validate_token();
 
-useEffect(() => {
-  const init = async () => {
-    try {
-      // const tokenResult = await ApiService.validate_token();
+        // if (!tokenResult.success) {
+        //   navigate("/session-expired");
+        //   return;
+        // }
 
-      // if (!tokenResult.success) {
-      //   navigate("/session-expired");
-      //   return;
-      // }
-
-      // only run this if token is valid
-      const data = await ApiService.get_login_info();
-      if (data.success) {
-        dispatch(
-          setUser({
-            name: data.userName,
-            email: data.email,
-            branch_name: data.branchName,
-            address: data.address,
-            contact: data.contact,
-            workingdate: data.workingDate,
-            branchid: data.branchId,
-          })
-        );
-      } else {
+        // only run this if token is valid
+        const data = await ApiService.get_login_info();
+        if (data.success) {
+          dispatch(
+            setUser({
+              name: data.userName,
+              email: data.email,
+              branch_name: data.branchName,
+              address: data.address,
+              contact: data.contact,
+              workingdate: data.workingDate,
+              branchid: data.branchId,
+            })
+          );
+        } else {
+          navigate("/session-expired");
+        }
+      } catch (error) {
+        console.error("Error in session init:", error);
         navigate("/session-expired");
       }
-    } catch (error) {
-      console.error("Error in session init:", error);
-      navigate("/session-expired");
-    }
-  };
+    };
 
-  init();
-  setActivePath(location.pathname);
-}, [location.pathname, navigate, dispatch]);
+    init();
+    setActivePath(location.pathname);
+  }, [location.pathname, navigate, dispatch]);
 
   React.useEffect(() => {
     const currentPath = location.pathname;
@@ -181,6 +207,8 @@ useEffect(() => {
               path: "/accountheadtype-operations",
             },
             { label: "Account Head Master", path: "/accounthead-operations" },
+            { label: "Caste Master", path: "/caste-operations" },
+            { label: "Category Master", path: "/category-operations" },
             { label: "Relation Master", path: "/relation-operations" },
             { label: "State Master", path: "/state-operations" },
           ],
@@ -189,7 +217,6 @@ useEffect(() => {
           label: "Location Masters",
           path: "",
           subItems: [
-            { label: "Category Master", path: "/category-operations" },
             { label: "Post Office Master", path: "/postOffice-operations" },
             { label: "Tehsil Master", path: "/tehsil-operations" },
             { label: "Thana Master", path: "/thana-operations" },
@@ -202,7 +229,7 @@ useEffect(() => {
           path: "",
           subItems: [
             { label: "Account Masters", path: "/account-operations" },
-            // { label: "Post Office Master", path: "/postOffice-operations" },
+            { label: "Member Master", path: "/member-operations" },
             // { label: "Tehsil Master", path: "/tehsil-operations" },
             // { label: "Thana Master", path: "/thana-operations" },
             // { label: "Zone Master", path: "/zone-operations" },
@@ -221,7 +248,7 @@ useEffect(() => {
         // { label: "HR & Payroll", path: "/modules/hr-payroll" },
         // { label: "No-Code Builder", path: "/modules/no-code-builder" },
       ],
-    }
+    },
   ];
 
   const MenuItem: React.FC<MenuItemProps> = ({
@@ -364,33 +391,38 @@ useEffect(() => {
               </button>
             </div>
 
-            <nav className="h-[calc(100vh-64px)] overflow-y-auto">
-              {menuItems.map((item) => {
-                const isParentActive =
-                  activePath === item.path ||
-                  (item.hasSubItems &&
-                    item.subItems?.some(
-                      (subItem) =>
-                        activePath === subItem.path ||
-                        subItem.subItems?.some(
-                          (thirdItem) => activePath === thirdItem.path
-                        )
-                    ));
-                return (
-                  <MenuItem
-                    key={item.label}
-                    icon={item.icon}
-                    label={item.label}
-                    hasSubItems={item.hasSubItems}
-                    isExpanded={expandedItems[item.label]}
-                    isActive={isParentActive}
-                    subItems={item.subItems}
-                    isCollapsed={isCollapsed}
-                    path={item.path}
-                    level={1}
-                  />
-                );
-              })}
+            <nav
+              className="flex-1 overflow-y-auto overflow-x-hidden"
+              style={{ maxHeight: "calc(100vh - 140px)", paddingBottom: "13px" }}
+            >
+              <div className="min-h-full pb-4">
+                {menuItems.map((item) => {
+                  const isParentActive =
+                    activePath === item.path ||
+                    (item.hasSubItems &&
+                      item.subItems?.some(
+                        (subItem) =>
+                          activePath === subItem.path ||
+                          subItem.subItems?.some(
+                            (thirdItem) => activePath === thirdItem.path
+                          )
+                      ));
+                  return (
+                    <MenuItem
+                      key={item.label}
+                      icon={item.icon}
+                      label={item.label}
+                      hasSubItems={item.hasSubItems}
+                      isExpanded={expandedItems[item.label]}
+                      isActive={isParentActive}
+                      subItems={item.subItems}
+                      isCollapsed={isCollapsed}
+                      path={item.path}
+                      level={1}
+                    />
+                  );
+                })}
+              </div>
             </nav>
           </div>
         </>

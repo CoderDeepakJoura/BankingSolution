@@ -1,4 +1,5 @@
-﻿using BankingPlatform.API.DTO;
+﻿using BankingPlatform.API.Common.CommonFunctions;
+using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Location.Tehsil;
 using BankingPlatform.Infrastructure.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -15,10 +16,12 @@ namespace BankingPlatform.API.Controllers
     {
         private readonly BankingDbContext _appContext;
         private readonly ILogger<TehsilController> _logger;
-        public TehsilController(BankingDbContext appcontext, ILogger<TehsilController> logger)
+        private readonly CommonFunctions _commonfunctions;
+        public TehsilController(BankingDbContext appcontext, ILogger<TehsilController> logger, CommonFunctions commonfunctions)
         {
             _appContext = appcontext;
             _logger = logger;
+            _commonfunctions = commonfunctions;
         }
 
         [Authorize]
@@ -101,6 +104,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Tehsil : {TehsilName}, TehsilCode: {TehsilCode}, TehsilNameSL : {TehsilNameSL}",
                        tehsilMasterDTO?.TehsilName ?? "unknown", tehsilMasterDTO?.TehsilCode ?? "unknown", tehsilMasterDTO?.TehsilNameSL ?? "unknown");
+                await _commonfunctions.LogErrors(ex, nameof(CreateTehsil), "TehsilController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -121,9 +125,9 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = filter.SearchTerm;
                     query = query.Where(z =>
-                        z.tehsilname.Contains(term) ||
-                        z.tehsilcode.Contains(term) ||
-                        z.tehsilnamesl != null && z.tehsilnamesl.Contains(term));
+                        z.tehsilname.ToLower().Contains(term.ToLower()) ||
+                        z.tehsilcode.ToLower().Contains(term.ToLower()) ||
+                        z.tehsilnamesl != null && z.tehsilnamesl.ToLower().Contains(term.ToLower()));
                 }
                 var totalCount = await query.CountAsync();
 
@@ -145,6 +149,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching Tehsils");
+                await _commonfunctions.LogErrors(ex, nameof(GetAllTehsils), "TehsilController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -237,6 +242,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Tehsil : {TehsilName}, TehsilCode: {TehsilCode}, TehsilNameSL : {TehsilNameSL}",
                        tehsilMasterDTO?.TehsilName ?? "unknown", tehsilMasterDTO?.TehsilCode ?? "unknown", tehsilMasterDTO?.TehsilNameSL ?? "unknown");
+                await _commonfunctions.LogErrors(ex, nameof(ModifyTehsil), "TehsilController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -274,6 +280,12 @@ namespace BankingPlatform.API.Controllers
                         Message = "Tehsil not found."
                     });
                 }
+                if (await _commonfunctions.CheckIfLocationDataInUse(tehsilMasterDTO.BranchId, 0, 0, 0, tehsilMasterDTO.TehsilId))
+                    return BadRequest(new ResponseDto
+                    {
+                        Success = false,
+                        Message = "Tehsil is in use and cannot be deleted."
+                    });
 
                 _appContext.tehsil.Remove(existingTehsil);
                 await _appContext.SaveChangesAsync();
@@ -288,6 +300,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while deleting Tehsil : {TehsilName}, TehsilCode: {TehsilCode}, TehsilNameSL : {TehsilNameSL}",
                        tehsilMasterDTO?.TehsilName ?? "unknown", tehsilMasterDTO?.TehsilCode ?? "unknown", tehsilMasterDTO?.TehsilNameSL ?? "unknown");
+                await _commonfunctions.LogErrors(ex, nameof(DeleteTehsil), "TehsilController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,

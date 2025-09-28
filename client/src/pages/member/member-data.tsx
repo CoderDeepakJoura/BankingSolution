@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Swal from "sweetalert2";
-import CRUDMaster from "../../../components/Location/CRUDOperations";
-import GeneralAccountTable from "./generalAccount-table";
+import CRUDMaster from "../../components/Location/CRUDOperations";
+import GeneralAccountTable from "./member-table";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { RootState } from "../../../redux";
+import { RootState } from "../../redux";
 import GeneralAccountApiService, {
   GeneralAccountFilter,
   CommonAccMasterDTO,
   AccountMasterDTO,
   GSTInfoDTO,
-} from "../../../services/accountMasters/generalAccountMaster/generalAccServiceapi";
-import AccountHeadApiService from "../../../services/accountHead/accountheadapi";
-import commonservice from "../../../services/common/commonservice";
-import { State } from "../../../services/common/commonservice";
+} from "../../services/accountMasters/generalAccountMaster/generalAccServiceapi";
+import AccountHeadApiService from "../../services/accountHead/accountheadapi";
+import commonservice from "../../services/common/commonservice";
+import { State } from "../../services/common/commonservice";
 
 // Enhanced Fetch General Accounts function with proper data transformation
 const fetchGeneralAccounts = async (
@@ -555,14 +555,14 @@ const addOrModifyAccountMaster = async (
             accOpeningDate: new Date().toISOString(),
             isAccClosed: false
           },
-          gstInfoDTO: formValues.gstInNo != "" || formValues.stateId > 0 ? {
+          gstInfoDTO: formValues.gstInNo || formValues.stateId ? {
             branchId: branchId,
             accId: formValues.id,
-            stateId: formValues.stateId > 0 ? formValues.stateId : 0,
+            stateId: formValues.stateId,
             gstInNo: formValues.gstInNo,
           } : undefined,
         };
-        console.log("Update DTO:", updateDTO);
+
         await GeneralAccountApiService.updateGeneralAccount(updateDTO);
       } else {
         // Create new account

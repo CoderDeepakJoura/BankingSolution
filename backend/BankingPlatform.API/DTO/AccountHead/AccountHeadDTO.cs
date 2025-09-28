@@ -5,7 +5,7 @@
         public AccountHeadDTO() { }
 
         // Fixed constructor parameter name
-        public AccountHeadDTO(string accountheadName, string? accountheadNameSl, int branchID, string accountHeadType, string? isAnnexure, string? showInReport, string headCode, int accountheadId, string? parentHeadCode, int? parentid)
+        public AccountHeadDTO(string accountheadName, string? accountheadNameSl, int branchID, string accountHeadType, string? isAnnexure, string? showInReport, string headCode, int accountheadId, string? parentHeadCode, int? parentid, string accountHeadTypeName = "")
         {
             AccountHeadName = accountheadName;
             AccountHeadNameSL = accountheadNameSl;
@@ -17,6 +17,7 @@
             HeadCode = headCode;
             ParentHeadCode = parentHeadCode; // Fixed assignment
             ParentId = parentid;
+            AccountHeadTypeName = accountHeadTypeName;
         }
 
         [Required(ErrorMessage = "Branch ID is required")]
@@ -43,5 +44,6 @@
 
         public int AccountHeadId { get; set; } = 0;
         public int? ParentId { get; set; } = 0;
+        public string? AccountHeadTypeName { get; set; }
     }
 }

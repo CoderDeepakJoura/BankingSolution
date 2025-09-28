@@ -68,7 +68,7 @@ const AccountHeadMaster: React.FC = () => {
       }
     };
     fetchTypesAndParents();
-  }, [user.branchid]);
+  }, []);
 
   const handleAccountHeadNameSLChange = (
     e: React.ChangeEvent<HTMLInputElement>

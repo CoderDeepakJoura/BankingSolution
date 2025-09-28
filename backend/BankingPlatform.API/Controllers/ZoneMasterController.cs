@@ -14,10 +14,12 @@ namespace BankingPlatform.API.Controllers
     {
         private readonly BankingDbContext _appContext;
         private readonly ILogger<ZoneMasterController> _logger;
-        public ZoneMasterController(BankingDbContext appcontext, ILogger<ZoneMasterController> logger)
+        private readonly CommonFunctions _commonfunctions;
+        public ZoneMasterController(BankingDbContext appcontext, ILogger<ZoneMasterController> logger, CommonFunctions commonfunctions)
         {
             _appContext = appcontext;
             _logger = logger;
+            _commonfunctions = commonfunctions;
         }
 
         [Authorize]
@@ -98,6 +100,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Zone : {ZoneName}, ZoneCode: {ZoneCode}, ZoneNameSL : {ZoneNameSL}",
                        zoneMasterDTO?.ZoneName ?? "unknown", zoneMasterDTO?.ZoneCode ?? "unknown", zoneMasterDTO?.ZoneNameSL ?? "unknown");
+                await _commonfunctions.LogErrors(ex, nameof(CreateZone), "ZoneMasterController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -118,9 +121,9 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = filter.SearchTerm;
                     query = query.Where(z =>
-                        z.zonename.Contains(term) ||
-                        z.zonecode.Contains(term) ||
-                        z.zonenamesl != null && z.zonenamesl.Contains(term));
+                        z.zonename.ToLower().Contains(term.ToLower()) ||
+                        z.zonecode.ToLower().Contains(term.ToLower()) ||
+                        z.zonenamesl != null && z.zonenamesl.ToLower().Contains(term.ToLower()));
                 }
                 var totalCount = await query.CountAsync();
 
@@ -142,6 +145,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching Zones");
+                await _commonfunctions.LogErrors(ex, nameof(GetAllZones), "ZoneMasterController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -233,6 +237,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Zone : {ZoneName}, ZoneCode: {ZoneCode}, ZoneNameSL : {ZoneNameSL}",
                        zoneMasterDTO?.ZoneName ?? "unknown", zoneMasterDTO?.ZoneCode ?? "unknown", zoneMasterDTO?.ZoneNameSL ?? "unknown");
+                await _commonfunctions.LogErrors(ex, nameof(ModifyZone), "ZoneMasterController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -270,7 +275,12 @@ namespace BankingPlatform.API.Controllers
                         Message = "Zone not found."
                     });
                 }
-
+                if (await _commonfunctions.CheckIfLocationDataInUse(zoneMasterDTO.BranchId, zoneMasterDTO.ZoneId))
+                    return BadRequest(new ResponseDto
+                    {
+                        Success = false,
+                        Message = "Zone is in use and cannot be deleted."
+                    });
                 _appContext.zone.Remove(existingZone);
                 await _appContext.SaveChangesAsync();
 
@@ -284,6 +294,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while deleting Zone : {ZoneName}, ZoneCode: {ZoneCode}, ZoneNameSL : {ZoneNameSL}",
                        zoneMasterDTO?.ZoneName ?? "unknown", zoneMasterDTO?.ZoneCode ?? "unknown", zoneMasterDTO?.ZoneNameSL ?? "unknown");
+                await _commonfunctions.LogErrors(ex, nameof(DeleteZone), "ZoneMasterController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,

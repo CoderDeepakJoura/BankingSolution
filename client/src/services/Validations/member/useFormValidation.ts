@@ -1,18 +1,29 @@
 // hooks/useFormValidation.ts
 import { useState, useCallback } from 'react';
 import { ValidationError, ValidationResult, ValidationRule } from '../validation';
+
 export const useFormValidation = () => {
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // Validation rules for all fields
+  // Enhanced validation rules with new requirements
   const validationRules: Record<string, ValidationRule> = {
-    // Basic Info Tab
+    // Basic Info Tab - Updated rules
     accountNumber: { 
-      required: true, 
-      requiredMessage: "Account Number is required",
       maxLength: 100, 
-      tab: 'basic' 
+      tab: 'basic',
+      // Custom validation for either account number OR membership numbers
+      customMessage: "Either Account Number, Nominal Membership No, or Permanent Membership No is required"
+    },
+    nominalMembershipNo: { 
+      maxLength: 100, 
+      tab: 'basic',
+      customMessage: "Either Account Number, Nominal Membership No, or Permanent Membership No is required"
+    },
+    permanentMembershipNo: { 
+      maxLength: 100, 
+      tab: 'basic',
+      customMessage: "Either Account Number, Nominal Membership No, or Permanent Membership No is required"
     },
     firstName: { 
       required: true, 
@@ -83,6 +94,12 @@ export const useFormValidation = () => {
       customMessage: "Joining date cannot be in the future",
       tab: 'basic' 
     },
+    // ✅ NEW: Caste is mandatory
+    casteId: { 
+      required: true, 
+      requiredMessage: "Caste selection is required", 
+      tab: 'basic' 
+    },
 
     // Address Tab
     addressLine1: { 
@@ -105,7 +122,7 @@ export const useFormValidation = () => {
       tab: 'address' 
     },
 
-    // Contact Tab
+    // Contact Tab - At least one contact is mandatory (handled in custom validation)
     phoneNo1: {
       pattern: /^[6-9]\d{9}$/,
       patternMessage: "Please enter a valid 10-digit mobile number starting with 6-9",
@@ -117,17 +134,14 @@ export const useFormValidation = () => {
       tab: 'contact'
     },
 
-    // Documents Tab
-    panCardNo: {
-      pattern: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
-      patternMessage: "PAN format should be ABCDE1234F",
-      tab: 'documents'
-    },
+    // Documents Tab - ✅ NEW: Aadhaar is mandatory
     aadhaarCardNo: {
+      required: true, // ✅ Now mandatory
+      requiredMessage: "Aadhaar Card Number is required",
       pattern: /^\d{4}\s\d{4}\s\d{4}$/,
       patternMessage: "Aadhaar format should be 1234 5678 9012",
       custom: (value: any) => {
-        if (!value) return true; // Optional field
+        if (!value) return false; // Required field
         const digits = value.replace(/\s/g, '');
         // Simple Luhn algorithm check for Aadhaar
         return digits.length === 12 && /^\d{12}$/.test(digits);
@@ -135,10 +149,59 @@ export const useFormValidation = () => {
       customMessage: "Please enter a valid 12-digit Aadhaar number",
       tab: 'documents'
     },
+    panCardNo: {
+      pattern: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
+      patternMessage: "PAN format should be ABCDE1234F",
+      tab: 'documents'
+    },
     gstiNo: {
       pattern: /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
       patternMessage: "Please enter a valid GSTIN format",
       tab: 'documents'
+    },
+
+    // ✅ NEW: Voucher Info Tab - All mandatory
+    voucherNumber: {
+      required: true,
+      requiredMessage: "Voucher Number is required",
+      maxLength: 50,
+      tab: 'voucher'
+    },
+    voucherDate: {
+      required: true,
+      requiredMessage: "Voucher Date is required",
+      custom: (value: any) => {
+        if (!value) return false;
+        const voucherDate = new Date(value);
+        const today = new Date();
+        return voucherDate <= today;
+      },
+      customMessage: "Voucher date cannot be in the future",
+      tab: 'voucher'
+    },
+    voucherAmount: {
+      required: true,
+      requiredMessage: "Voucher Amount is required",
+      custom: (value: any) => {
+        if (!value) return false;
+        const amount = parseFloat(value);
+        return amount > 0;
+      },
+      customMessage: "Voucher amount must be greater than 0",
+      tab: 'voucher'
+    },
+    voucherType: {
+      required: true,
+      requiredMessage: "Voucher Type is required",
+      tab: 'voucher'
+    },
+    voucherDescription: {
+      required: true,
+      requiredMessage: "Voucher Description is required",
+      minLength: 10,
+      maxLength: 500,
+      customMessage: "Voucher description must be at least 10 characters long",
+      tab: 'voucher'
     }
   };
 
@@ -205,6 +268,63 @@ export const useFormValidation = () => {
     return fieldErrors;
   }, []);
 
+  // ✅ NEW: Custom validation for account/membership numbers
+  const validateAccountOrMembership = useCallback((formData: any): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    
+    const hasAccountNumber = formData.accountNumber?.trim();
+    const hasNominalMembership = formData.nominalMembershipNo?.trim();
+    const hasPermanentMembership = formData.permanentMembershipNo?.trim();
+    
+    // At least one must be provided
+    if (!hasAccountNumber && !hasNominalMembership && !hasPermanentMembership) {
+      errors.push({
+        field: 'accountNumber',
+        message: "Either Account Number, Nominal Membership No, or Permanent Membership No is required",
+        type: 'custom',
+        tab: 'basic'
+      });
+    }
+    
+    return errors;
+  }, []);
+
+  // ✅ NEW: Custom validation for contact information
+  const validateContactInfo = useCallback((formData: any): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    
+    const hasPhone1 = formData.phoneNo1?.trim();
+    const hasPhone2 = formData.phoneNo2?.trim();
+    
+    // At least one contact number is required
+    if (!hasPhone1 && !hasPhone2) {
+      errors.push({
+        field: 'phoneNo1',
+        message: "At least one contact number is required",
+        type: 'custom',
+        tab: 'contact'
+      });
+    }
+    
+    return errors;
+  }, []);
+
+  // ✅ NEW: Custom validation for document uploads
+  const validateDocumentUploads = useCallback((documentUploads: any[]): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    
+    if (!documentUploads || documentUploads.length === 0) {
+      errors.push({
+        field: 'documentUploads',
+        message: "At least one document image must be uploaded",
+        type: 'custom',
+        tab: 'documents'
+      });
+    }
+    
+    return errors;
+  }, []);
+
   const validateNominee = useCallback((nominee: any, index: number): ValidationError[] => {
     const nomineeErrors: ValidationError[] = [];
     
@@ -261,14 +381,39 @@ export const useFormValidation = () => {
     return nomineeErrors;
   }, []);
 
-  const validateForm = useCallback((formData: any, nominees: any[]): ValidationResult => {
+  // ✅ UPDATED: Enhanced form validation with all new rules
+  const validateForm = useCallback((
+    formData: any, 
+    nominees: any[], 
+    voucherData: any, 
+    documentUploads: any[]
+  ): ValidationResult => {
     const allErrors: ValidationError[] = [];
     
     // Validate main form fields
     Object.keys(validationRules).forEach(fieldName => {
-      const fieldErrors = validateField(fieldName, formData[fieldName], formData);
+      let fieldValue = formData[fieldName];
+      
+      // Check if field is in voucher data
+      if (fieldName.startsWith('voucher')) {
+        fieldValue = voucherData[fieldName];
+      }
+      
+      const fieldErrors = validateField(fieldName, fieldValue, formData);
       allErrors.push(...fieldErrors);
     });
+
+    // ✅ NEW: Validate account/membership numbers (either one required)
+    const accountErrors = validateAccountOrMembership(formData);
+    allErrors.push(...accountErrors);
+
+    // ✅ NEW: Validate contact information (at least one required)
+    const contactErrors = validateContactInfo(formData);
+    allErrors.push(...contactErrors);
+
+    // ✅ NEW: Validate document uploads (mandatory)
+    const documentErrors = validateDocumentUploads(documentUploads);
+    allErrors.push(...documentErrors);
 
     // Validate nominees
     nominees.forEach((nominee, index) => {
@@ -298,7 +443,7 @@ export const useFormValidation = () => {
       errorsByField,
       errorsByTab
     };
-  }, [validateField, validateNominee]);
+  }, [validateField, validateNominee, validateAccountOrMembership, validateContactInfo, validateDocumentUploads]);
 
   const clearErrors = useCallback(() => {
     setErrors([]);

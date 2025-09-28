@@ -1,4 +1,5 @@
-﻿using BankingPlatform.API.DTO;
+﻿using BankingPlatform.API.Common.CommonFunctions;
+using BankingPlatform.API.DTO;
 using BankingPlatform.Infrastructure.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -14,10 +15,12 @@ namespace BankingPlatform.API.Controllers
     {
         private readonly BankingDbContext _appContext;
         private readonly ILogger<ThanaController> _logger;
-        public ThanaController(BankingDbContext appcontext, ILogger<ThanaController> logger)
+        private readonly CommonFunctions _commonFunctions;
+        public ThanaController(BankingDbContext appcontext, ILogger<ThanaController> logger, CommonFunctions commonFunctions)
         {
             _appContext = appcontext;
             _logger = logger;
+            _commonFunctions = commonFunctions;
         }
 
         [Authorize]
@@ -101,6 +104,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Thana : {ThanaName}, ThanaCode: {ThanaCode}, ThanaNameSL : {ThanaNameSL}",
                        thanaMasterDTO?.ThanaName ?? "unknown", thanaMasterDTO?.ThanaCode ?? "unknown", thanaMasterDTO?.ThanaNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(CreateThana), "ThanaController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -121,9 +125,9 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = filter.SearchTerm;
                     query = query.Where(z =>
-                        z.thananame.Contains(term) ||
-                        z.thanacode.Contains(term) ||
-                        z.thananamesl != null && z.thananamesl.Contains(term));
+                        z.thananame.ToLower().Contains(term.ToLower()) ||
+                        z.thanacode.ToLower().Contains(term.ToLower()) ||
+                        z.thananamesl != null && z.thananamesl.ToLower().Contains(term.ToLower()));
                 }
                 var totalCount = await query.CountAsync();
 
@@ -145,6 +149,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching Thanas");
+                await _commonFunctions.LogErrors(ex, nameof(GetAllThanas), "ThanaController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -240,6 +245,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Thana : {ThanaName}, ThanaCode: {ThanaCode}, ThanaNameSL : {ThanaNameSL}",
                        thanaMasterDTO?.ThanaName ?? "unknown", thanaMasterDTO?.ThanaCode ?? "unknown", thanaMasterDTO?.ThanaNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(ModifyThana), "ThanaController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -277,7 +283,12 @@ namespace BankingPlatform.API.Controllers
                         Message = "Thana not found."
                     });
                 }
-
+                if (await _commonFunctions.CheckIfLocationDataInUse(thanaMasterDTO.BranchId, 0, thanaMasterDTO.ThanaId))
+                    return BadRequest(new ResponseDto
+                    {
+                        Success = false,
+                        Message = "Thana is in use and cannot be deleted."
+                    });
                 _appContext.thana.Remove(existingThana);
                 await _appContext.SaveChangesAsync();
 
@@ -291,6 +302,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while deleting Thana : {ThanaName}, ThanaCode: {ThanaCode}, ThanaNameSL : {ThanaNameSL}",
                        thanaMasterDTO?.ThanaName ?? "unknown", thanaMasterDTO?.ThanaCode ?? "unknown", thanaMasterDTO?.ThanaNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(DeleteThana), "ThanaController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,

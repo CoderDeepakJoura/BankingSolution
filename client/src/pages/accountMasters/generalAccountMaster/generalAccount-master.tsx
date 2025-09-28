@@ -192,7 +192,7 @@ const GeneralAccountMaster = () => {
         gstInfoDTO = {
           branchId: user.branchid,
           accId: 0, // Will be set by backend after account creation
-          stateId: Number(selectedState?.stateId),
+          stateId: selectedState != null ? Number(selectedState?.stateId) : 0,
           gstInNo: accMasterData.gstiNo,
         };
       }

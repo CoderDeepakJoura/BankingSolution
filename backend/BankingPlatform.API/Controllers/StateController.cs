@@ -1,4 +1,5 @@
-﻿using BankingPlatform.API.Controllers;
+﻿using BankingPlatform.API.Common.CommonFunctions;
+using BankingPlatform.API.Controllers;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Location.State;
 using Microsoft.AspNetCore.Http;
@@ -14,12 +15,13 @@ namespace BankingPlatform.API.Controllers
         private readonly BankingDbContext _appContext;
         private readonly ILogger<StateController> _logger;
         private readonly CommonFunctions _commonfns;
-
-        public StateController(BankingDbContext appcontext, ILogger<StateController> logger, CommonFunctions commonfns)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        public StateController(BankingDbContext appcontext, ILogger<StateController> logger, CommonFunctions commonfns, IHttpContextAccessor httpContextAccessor)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonfns = commonfns;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -95,10 +97,11 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating State : {StateName},  StateCode : {StateCode}",
                        stateMasterDTO?.StateName ?? "unknown", stateMasterDTO?.StateCode ?? "unknown");
+                await _commonfns.LogErrors(ex, nameof(CreateState), "StateController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
-                    Message = "An unexpected error occurred"
+                    Message = "An unexpected error occurred" + ex.Message
                 });
             }
         }
@@ -118,8 +121,8 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = searchTerm;
                     query = query.Where(z =>
-                        z.statename.Contains(term) ||
-                        z.statecode.ToString().Contains(term));
+                        z.statename.ToLower().Contains(term.ToLower()) ||
+                        z.statecode.Contains(term));
                 }
 
                 var totalCount = await query.CountAsync();
@@ -140,10 +143,11 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching States");
+                await _commonfns.LogErrors(ex, nameof(GetAllStates), "StateController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
-                    Message = "Unexpected error while fetching States"
+                    Message = "Unexpected error while fetching States." + ex.Message
                 });
             }
         }
@@ -151,9 +155,9 @@ namespace BankingPlatform.API.Controllers
         /// <summary>
         /// Update state - PUT /api/state/{id}
         /// </summary>
-        [HttpPut("{id:int}")]
+        [HttpPut("{id}")]
         [EnableRateLimiting("Auth")]
-        public async Task<IActionResult> ModifyState(int id, [FromBody] StateDTO stateMasterDTO)
+        public async Task<IActionResult> ModifyState([FromRoute] int id, [FromBody] StateDTO stateMasterDTO)
         {
             try
             {
@@ -226,6 +230,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while updating State : {StateName}, StateCode : {StateCode}",
                        stateMasterDTO?.StateName ?? "unknown", stateMasterDTO?.StateCode ?? "unknown");
+                await _commonfns.LogErrors(ex, nameof(ModifyState), "StateController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -234,12 +239,9 @@ namespace BankingPlatform.API.Controllers
             }
         }
 
-        /// <summary>
-        /// Delete state - DELETE /api/state/{id}
-        /// </summary>
-        [HttpDelete("{id:int}")]
+        [HttpDelete("{id}")]
         [EnableRateLimiting("Auth")]
-        public async Task<IActionResult> DeleteState(int id)
+        public async Task<IActionResult> DeleteState([FromRoute] int id)
         {
             try
             {
@@ -253,7 +255,13 @@ namespace BankingPlatform.API.Controllers
                         Message = "State not found."
                     });
                 }
-
+                var user = _httpContextAccessor.HttpContext!.User!;
+                if (await _commonfns.CheckIfStateInUse(id, Int32.Parse(user.FindFirst("branchId")?.Value!)))
+                    return BadRequest(new ResponseDto
+                    {
+                        Success = false,
+                        Message = "State is in use and cannot be deleted."
+                    });
                 _appContext.state.Remove(existingState);
                 await _appContext.SaveChangesAsync();
 
@@ -266,6 +274,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while deleting State with ID: {StateId}", id);
+                await _commonfns.LogErrors(ex, nameof(DeleteState), "StateController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,

@@ -62,7 +62,7 @@ const RelationMaster: React.FC = () => {
     } catch (err: any) {
       Swal.fire({
         icon: "error",
-        title: "An unexpected error occurred!",
+        title: "Error!",
         text: err.message || "Please check your network connection.",
       });
     } finally {

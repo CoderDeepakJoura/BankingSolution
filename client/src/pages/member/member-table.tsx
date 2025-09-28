@@ -1,7 +1,7 @@
 import React from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
-import { CommonAccMasterDTO } from "../../../services/accountMasters/generalAccountMaster/generalAccServiceapi";
-import GenericTable, { Column } from "../../../components/Location/GenericTable";
+import { CommonAccMasterDTO } from "../../services/accountMasters/generalAccountMaster/generalAccServiceapi";
+import GenericTable, { Column } from "../../components/Location/GenericTable";
 
 interface GeneralAccountTableProps {
   accounts: CommonAccMasterDTO[];
@@ -87,10 +87,8 @@ const GeneralAccountTable: React.FC<GeneralAccountTableProps> = ({
       render: (row) =>
         row.gstInNo || row.stateId ? (
           <div className="flex flex-col space-y-1">
-            {row.gstInNo != "" && (
-                  <span className="font-mono text-xs text-green-600">GSTIn No: {row.gstInNo}</span>
-            )}
-            {row.stateId > 0 && (
+            <span className="font-mono text-xs text-green-600">{row.gstInNo}</span>
+            {row.stateId && (
               <span className="text-xs text-gray-500">State: {row.stateName}</span>
             )}
           </div>

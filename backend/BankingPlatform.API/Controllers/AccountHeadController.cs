@@ -1,4 +1,5 @@
-﻿using BankingPlatform.API.DTO;
+﻿using BankingPlatform.API.Common.CommonFunctions;
+using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.AccountHead;
 using BankingPlatform.Infrastructure.Models;
 using Microsoft.AspNetCore.Http;
@@ -109,6 +110,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating AccountHead : {AccountHeadName},  AccountHeadNameSL : {AccountHeadNameSL}",
                        accountheadMasterDTO?.AccountHeadName ?? "unknown", accountheadMasterDTO?.AccountHeadNameSL ?? "unknown");
+                await _commonfns.LogErrors(ex, nameof(CreateAccountHead), "AccountHeadController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -130,10 +132,10 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = filter.SearchTerm;
                     query = query.Where(z =>
-                        z.name.Contains(term) ||
-                        z.headcode.ToString().Contains(term) ||
+                        z.name.ToLower().Contains(term.ToLower()) ||
+                        z.headcode.ToString().ToLower().Contains(term.ToLower()) ||
 
-                        z.namesl != null && z.namesl.Contains(term));
+                        z.namesl != null && z.namesl.ToLower().Contains(term.ToLower()));
                 }
                 var totalCount = await query.CountAsync();
 
@@ -161,7 +163,7 @@ namespace BankingPlatform.API.Controllers
                 foreach (var z in itemsRaw)
                 {
                     string parentHead = _commonfns.GetHeadCodeFromId(z.parentid, z.branchid);
-
+                    string accountHeadTypeName = _commonfns.GetAccountHeadTypeNameFromId(z.accountheadtypeid, z.branchid);
                     items.Add(new AccountHeadDTO(
                         z.name,
                         z.namesl,
@@ -172,7 +174,8 @@ namespace BankingPlatform.API.Controllers
                         z.headcode.ToString(),
                         z.id,
                         parentHead,
-                        z.parentid
+                        z.parentid,
+                        accountHeadTypeName
                     ));
                 }
 
@@ -187,6 +190,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching AccountHeads");
+                await _commonfns.LogErrors(ex, nameof(GetAllAccountHeads), "AccountHeadController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -290,6 +294,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating AccountHead : {AccountHeadName}, AccountHeadNameSL : {AccountHeadNameSL}",
                        accountheadMasterDTO?.AccountHeadName ?? "unknown", accountheadMasterDTO?.AccountHeadNameSL ?? "unknown");
+                await _commonfns.LogErrors(ex, nameof(ModifyAccountHead), "AccountHeadController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -341,6 +346,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while deleting AccountHead : {AccountHeadName}, AccountHeadNameSL : {AccountHeadNameSL}",
                        accountheadMasterDTO?.AccountHeadName ?? "unknown", accountheadMasterDTO?.AccountHeadNameSL ?? "unknown");
+                await _commonfns.LogErrors(ex, nameof(DeleteAccountHead), "AccountHeadController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,

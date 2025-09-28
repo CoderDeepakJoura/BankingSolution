@@ -28,6 +28,8 @@ import AccountHeadMaster from "./pages/accounthead/accounthead/accounthead-maste
 import AccountHeadOperations from "./pages/accounthead/accounthead/accounthead-operations";
 import AccountHeadData from "./pages/accounthead/accounthead/accounthead-data";
 import MemberMaster from "./pages/member/member-master";
+import MemberOperations from "./pages/member/member-operations";
+import MemberData from "./pages/member/member-data";
 import RelationOperations from "./pages/Miscalleneous/relation/relation-operations";
 import RelationData from "./pages/Miscalleneous/relation/relation-data";
 import RelationMaster from "./pages/Miscalleneous/relation/relation-master";
@@ -36,6 +38,9 @@ import GeneralAccMasterData from "./pages/accountMasters/generalAccountMaster/ge
 import StateMaster from "./pages/location/state/state-master";
 import StateOperations from "./pages/location/state/state-operations";
 import StateData from "./pages/location/state/state-data";
+import CasteMaster from "./pages/caste/caste-master";
+import CasteOperations from "./pages/caste/caste-operations";
+import CasteData from "./pages/caste/caste-data";
 
 
 export default function App() {
@@ -72,6 +77,8 @@ export default function App() {
         <Route path="/accounthead" element={<AccountHeadMaster />} />
         <Route path="/accounthead-info" element={<AccountHeadData />} />
         <Route path="/member" element={<MemberMaster />} />
+        <Route path="/member-operations" element={<MemberOperations />} />
+        <Route path="/member-info" element={<MemberData />} />
         <Route path="/relation-operations" element={<RelationOperations />} />
         <Route path="/relation-info" element={<RelationData />} />
         <Route path="/relation" element={<RelationMaster />} />
@@ -80,6 +87,9 @@ export default function App() {
         <Route path="/state-operations" element={<StateOperations />} />
         <Route path="/state" element={<StateMaster />} />
         <Route path="/state-info" element={<StateData />} />
+        <Route path="/caste-operations" element={<CasteOperations />} />
+        <Route path="/caste" element={<CasteMaster />} />
+        <Route path="/caste-info" element={<CasteData />} />
       </Routes>
     </BrowserRouter>
   );

@@ -96,6 +96,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Village : {VillageName},  VillageNameSL : {VillageNameSL}",
                        villageMasterDTO?.VillageName ?? "unknown", villageMasterDTO?.VillageNameSL ?? "unknown");
+                await _commonfns.LogErrors(ex, nameof(CreateVillage), "VillageController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -116,9 +117,9 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = filter.SearchTerm;
                     query = query.Where(z =>
-                        z.villagename.Contains(term) ||
+                        z.villagename.ToLower().Contains(term.ToLower()) ||
 
-                        z.villagenamesl != null && z.villagenamesl.Contains(term));
+                        z.villagenamesl != null && z.villagenamesl.ToLower().Contains(term.ToLower()));
                 }
                 var totalCount = await query.CountAsync();
 
@@ -172,6 +173,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching Villages");
+                await _commonfns.LogErrors(ex, nameof(GetAllVillages), "VillageController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -262,6 +264,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Village : {VillageName}, VillageNameSL : {VillageNameSL}",
                        villageMasterDTO?.VillageName ?? "unknown", villageMasterDTO?.VillageNameSL ?? "unknown");
+                await _commonfns.LogErrors(ex, nameof(ModifyVillage), "VillageController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -312,6 +315,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while deleting Village : {VillageName}, VillageNameSL : {VillageNameSL}",
                        villageMasterDTO?.VillageName ?? "unknown", villageMasterDTO?.VillageNameSL ?? "unknown");
+                await _commonfns.LogErrors(ex, nameof(DeleteVillage), "VillageController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,

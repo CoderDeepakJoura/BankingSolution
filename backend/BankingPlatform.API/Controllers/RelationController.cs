@@ -11,10 +11,12 @@ namespace BankingPlatform.API.Controllers
     {
         private readonly BankingDbContext _appContext;
         private readonly ILogger<RelationController> _logger;
-        public RelationController(BankingDbContext appcontext, ILogger<RelationController> logger)
+        private readonly CommonFunctions _commonFunctions;
+        public RelationController(BankingDbContext appcontext, ILogger<RelationController> logger, CommonFunctions commonFunctions)
         {
             _appContext = appcontext;
             _logger = logger;
+            _commonFunctions = commonFunctions;
         }
 
         [Authorize]
@@ -38,38 +40,31 @@ namespace BankingPlatform.API.Controllers
 
 
                 var errors = new List<string>();
-                bool anyExists = await _appContext.relation
-                    .AnyAsync(z =>
-                        (
-                         z.description.ToLower() == relationMasterDTO.Description.ToLower() ||
-                         (z.descriptionsl != null && z.descriptionsl.ToLower() == relationMasterDTO.DescriptionSL.ToLower())));
+                var normalizedName = relationMasterDTO.Description?.Trim().ToLower();
+                var normalizedNameSL = relationMasterDTO.DescriptionSL?.Trim().ToLower();
 
-                if (anyExists)
+                var duplicates = await _appContext.relation
+                    .Where(z =>
+                                (
+                                    z.description.ToLower() == normalizedName ||
+                                    (normalizedNameSL != null && z.descriptionsl != null && z.descriptionsl.ToLower() == normalizedNameSL)
+                                ))
+                    .ToListAsync();
+
+                if (duplicates.Any(d => d.description.ToLower() == normalizedName))
                 {
+                    errors.Add("Relation Name already exists.");
+                }
 
-                    if (await _appContext.relation.AnyAsync(z => z.id != relationMasterDTO.RelationId && z.description == relationMasterDTO.Description.ToLower()))
-                        errors.Add("Relation Name already exists.");
-
-                    if (!string.IsNullOrWhiteSpace(relationMasterDTO.DescriptionSL) &&
-                        await _appContext.relation.AnyAsync(z => z.id != relationMasterDTO.RelationId && (z.descriptionsl != null && z.descriptionsl.ToLower() == relationMasterDTO.DescriptionSL.ToLower())))
-                    {
-                        errors.Add("Relation Name SL already exists.");
-                    }
+                if (!string.IsNullOrWhiteSpace(normalizedNameSL) &&
+                    duplicates.Any(d => d.descriptionsl != null && d.descriptionsl.ToLower() == normalizedNameSL))
+                {
+                    errors.Add("Relation Name SL already exists.");
                 }
 
                 if (errors.Any())
                 {
-                    _logger.LogWarning("Relation update failed due to duplicate data: {Errors}", string.Join(", ", errors));
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = string.Join("\n", errors)
-                    });
-                }
-
-                // Return all errors if any
-                if (errors.Any())
-                {
+                    _logger.LogWarning("Relation insert failed due to duplicate data: {Errors}", string.Join(", ", errors));
                     return BadRequest(new ResponseDto
                     {
                         Success = false,
@@ -97,6 +92,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Relation : {Description},  DescriptionSL : {DescriptionSL}",
                        relationMasterDTO?.Description ?? "unknown", relationMasterDTO?.DescriptionSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(CreateRelation), "RelationController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -118,8 +114,8 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = filter.SearchTerm;
                     query = query.Where(z =>
-                        z.description.Contains(term) ||
-                        z.descriptionsl != null && z.descriptionsl.Contains(term));
+                        z.description.ToLower().Contains(term.ToLower()) ||
+                        z.descriptionsl != null && z.descriptionsl.ToLower().Contains(term.ToLower()));
                 }
                 var totalCount = await query.CountAsync();
 
@@ -140,6 +136,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching Relations");
+                await _commonFunctions.LogErrors(ex, nameof(GetAllRelations), "RelationController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -223,6 +220,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating Relation : {Description}, DescriptionSL : {DescriptionSL}",
                        relationMasterDTO?.Description ?? "unknown", relationMasterDTO?.DescriptionSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(ModifyRelation), "RelationController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -274,6 +272,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while deleting Relation : {Description}, DescriptionSL : {DescriptionSL}",
                        relationMasterDTO?.Description ?? "unknown", relationMasterDTO?.DescriptionSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(DeleteRelation), "RelationController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,

@@ -15,11 +15,13 @@ namespace BankingPlatform.API.Controllers.AccountMasters
     {
         private readonly GeneralAccountMasterService _service;
         public ILogger<GeneralAccMasterController> _logger;
+        private readonly CommonFunctions _commonFunctions;
 
-        public GeneralAccMasterController(GeneralAccountMasterService service, ILogger<GeneralAccMasterController> logger)
+        public GeneralAccMasterController(GeneralAccountMasterService service, ILogger<GeneralAccMasterController> logger, CommonFunctions commonFunctions)
         {
             _service = service;
             _logger = logger;
+            _commonFunctions = commonFunctions;
         }
 
         [HttpPost]
@@ -42,8 +44,8 @@ namespace BankingPlatform.API.Controllers.AccountMasters
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while deleting General Account.");
-
+                _logger.LogError(ex, "Error occurred while adding General Account.");
+                await _commonFunctions.LogErrors(ex, nameof(CreateGeneralAccount), "GeneralAccMasterController");
                 return BadRequest(new ResponseDto
                 {
                     Success = false,
@@ -65,13 +67,13 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                     TotalCount = result.TotalCount
                 });
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error while fetching General Accounts");
-                return StatusCode(500, new ResponseDto
+                await _commonFunctions.LogErrors(ex, nameof(GetAllGeneralAccounts), "GeneralAccMasterController");
+                return BadRequest(new ResponseDto
                 {
                     Success = false,
-                    Message = "Unexpected error while fetching General Accounts"
+                    Message = "An error occurred while fetching General Accounts. Please try again later."
                 });
             }
         }
@@ -84,10 +86,11 @@ namespace BankingPlatform.API.Controllers.AccountMasters
             {
                 var result = await _service.UpdateGeneralAccountAsync(dto);
                 if (result != "Success") return NotFound(new { Success = false, Message = result });
-                return Ok(new { Success = true, message = "Member updated successfully" });
+                return Ok(new { Success = true, message = "General Account updated successfully" });
             }
             catch(Exception ex)
             {
+                await _commonFunctions.LogErrors(ex, nameof(UpdateGeneralAccount), "GeneralAccMasterController");
                 return BadRequest(new ResponseDto
                 {
                     Success = false,
@@ -111,9 +114,8 @@ namespace BankingPlatform.API.Controllers.AccountMasters
             }
             catch (Exception ex)
             {
-                // Log exception for debugging (e.g., Serilog, NLog, built-in ILogger)
                 _logger.LogError(ex, "Error occurred while deleting General Account.");
-
+                await _commonFunctions.LogErrors(ex, nameof(DeleteGeneralAccount), "GeneralAccMasterController");
                 return BadRequest(new ResponseDto
                 {
                     Success = false,

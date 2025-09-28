@@ -31,6 +31,9 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<State> state { get; set; }
     public virtual DbSet<AccountMaster> accountmaster { get; set; }
     public virtual DbSet<GSTInfo> accgstinfo { get; set; }
+    public virtual DbSet<Caste> caste { get; set; }
+    public virtual DbSet<ErrorLog> errorlog { get; set; }
+   
 
    
     protected override void OnModelCreating(ModelBuilder modelBuilder)

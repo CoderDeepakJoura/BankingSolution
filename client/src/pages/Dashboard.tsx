@@ -30,7 +30,7 @@ const App: React.FC = () => {
               <Building2 className="text-blue-600 mt-1" size={24} />
               <div>
                 <p className="text-sm text-gray-500">Branch Name</p>
-                <p className="text-lg font-semibold text-gray-800">{branchInfo.name}</p>
+                <p className="text-lg font-semibold text-gray-800">{branchInfo.branch_name}</p>
               </div>
             </div>
 
@@ -47,8 +47,8 @@ const App: React.FC = () => {
             <div className="flex items-start space-x-4">
               <User2 className="text-purple-600 mt-1" size={24} />
               <div>
-                <p className="text-sm text-gray-500">Branch Name</p>
-                <p className="text-lg font-medium text-gray-800">{branchInfo.branch_name}</p>
+                <p className="text-sm text-gray-500">User Name</p>
+                <p className="text-lg font-medium text-gray-800">{branchInfo.name}</p>
               </div>
             </div>
 

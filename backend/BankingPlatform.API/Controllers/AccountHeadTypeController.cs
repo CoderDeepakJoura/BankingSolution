@@ -10,11 +10,13 @@ namespace BankingPlatform.API.Controllers
     public class AccountHeadTypeController : ControllerBase
     {
         private readonly BankingDbContext _appContext;
+        private readonly CommonFunctions _commonFunctions;
         private readonly ILogger<AccountHeadTypeController> _logger;
-        public AccountHeadTypeController(BankingDbContext appcontext, ILogger<AccountHeadTypeController> logger)
+        public AccountHeadTypeController(BankingDbContext appcontext, ILogger<AccountHeadTypeController> logger, CommonFunctions commonFunctions)
         {
             _appContext = appcontext;
             _logger = logger;
+            _commonFunctions = commonFunctions;
         }
 
         [Authorize]
@@ -41,7 +43,7 @@ namespace BankingPlatform.API.Controllers
                 var normalizedNameSL = accountheadtypeMasterDTO.AccountHeadTypeNameSL?.Trim().ToLower();
 
                 var duplicates = await _appContext.accountheadtype
-                    .Where(z => z.id == accountheadtypeMasterDTO.BranchId &&
+                    .Where(z => z.branchid == accountheadtypeMasterDTO.BranchId &&
                                 (
                                     z.description.ToLower() == normalizedName ||
                                     (normalizedNameSL != null && z.descriptionsl != null && z.descriptionsl.ToLower() == normalizedNameSL)
@@ -91,6 +93,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating AccountHeadType : {AccountHeadTypeName},  AccountHeadTypeNameSL : {AccountHeadTypeNameSL}",
                        accountheadtypeMasterDTO?.AccountHeadTypeName ?? "unknown", accountheadtypeMasterDTO?.AccountHeadTypeNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(CreateAccountHeadType), "AccountHeadTypeController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -112,8 +115,8 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = filter.SearchTerm;
                     query = query.Where(z =>
-                        z.description.Contains(term) ||
-                        z.descriptionsl != null && z.descriptionsl.Contains(term));
+                        z.description.ToLower().Contains(term.ToLower()) ||
+                        z.descriptionsl != null && z.descriptionsl.ToLower().Contains(term.ToLower()));
                 }
                 var totalCount = await query.CountAsync();
 
@@ -135,6 +138,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching AccountHeadTypes");
+                await _commonFunctions.LogErrors(ex, nameof(GetAllAccountHeadTypes), "AccountHeadTypeController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -224,6 +228,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating AccountHeadType : {AccountHeadTypeName}, AccountHeadTypeNameSL : {AccountHeadTypeNameSL}",
                        accountheadtypeMasterDTO?.AccountHeadTypeName ?? "unknown", accountheadtypeMasterDTO?.AccountHeadTypeNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(ModifyAccountHeadType), "AccountHeadTypeController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -258,10 +263,17 @@ namespace BankingPlatform.API.Controllers
                     return NotFound(new ResponseDto
                     {
                         Success = false,
-                        Message = "AccountHeadType not found."
+                        Message = "Account Head Type not found."
                     });
                 }
-
+                if(await _commonFunctions.CheckIfAccountHeadTypeInUse(accountheadtypeMasterDTO.AccountHeadTypeId, accountheadtypeMasterDTO.BranchId))
+                {
+                    return BadRequest(new ResponseDto
+                    {
+                        Success = false,
+                        Message = "Account Head Type is in use and cannot be deleted."
+                    });
+                }
                 _appContext.accountheadtype.Remove(existingAccountHeadType);
                 await _appContext.SaveChangesAsync();
 
@@ -275,6 +287,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while deleting AccountHeadType : {AccountHeadTypeName}, AccountHeadTypeNameSL : {AccountHeadTypeNameSL}",
                        accountheadtypeMasterDTO?.AccountHeadTypeName ?? "unknown", accountheadtypeMasterDTO?.AccountHeadTypeNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(DeleteAccountHeadType), "AccountHeadTypeController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,

@@ -13,6 +13,7 @@ using System.Text.Json;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.API.Services;
 using BankingPlatform.API.Service.AccountMasters;
+using BankingPlatform.API.Service.Caste;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddLogging();
 builder.Services.AddScoped<GeneralAccountMasterService>();
+builder.Services.AddScoped<CasteService>();
 
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
@@ -44,7 +46,7 @@ builder.Services.AddScoped<MemberService>();
 
 // Configure CORS with dynamic origins
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "https://localhost:5173", "http://127.0.0.1:5173" };
+    ?? new[] { "https://localhost:5173", "http://127.0.0.1:5173", "https://app.sicswave.com" };
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("_myAllowSpecificOrigins", policy =>
@@ -67,6 +69,8 @@ builder.Services.AddRateLimiter(options =>
         opt.QueueLimit = 0;
     });
 });
+
+
 
 // Configure JWT Authentication with cookie token support
 builder.Services.AddAuthentication(options =>
@@ -279,24 +283,42 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-
-// Global exception handling
-app.UseExceptionHandler(errorApp =>
+app.Use(async (context, next) =>
 {
-    errorApp.Run(async context =>
+    var origin = context.Request.Headers["Origin"].ToString();
+    var method = context.Request.Method;
+    var path = context.Request.Path;
+
+    Console.WriteLine($"🌐 Request: {method} {path} from Origin: {origin}");
+
+    // ✅ Handle preflight OPTIONS requests manually if needed
+    if (method == "OPTIONS")
     {
-        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-        var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
-        if (exception != null)
+        Console.WriteLine("🔄 Preflight OPTIONS request detected");
+
+        var allowedOrigins = new[] {
+            "https://app.sicswave.com",
+            "https://localhost:5173",
+            "http://127.0.0.1:5173"
+        };
+
+        if (allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
         {
-            logger.LogError(exception.Error, "Unhandled exception occurred.");
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync("{\"error\": \"An unexpected error occurred.\"}");
+            context.Response.Headers.Add("Access-Control-Allow-Origin", origin);
+            context.Response.Headers.Add("Access-Control-Allow-Credentials", "true");
+            context.Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            context.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+            context.Response.StatusCode = 200;
+            Console.WriteLine($"✅ Preflight handled manually for: {origin}");
+            return;
         }
-    });
+    }
+
+    await next();
 });
+
+// ✅ Apply CORS early in the pipeline
+app.UseCors("_myAllowSpecificOrigins");
 
 if (app.Environment.IsDevelopment())
 {
@@ -316,7 +338,7 @@ else
 
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseCors("_myAllowSpecificOrigins");
+//app.UseCors("_myAllowSpecificOrigins");
 //app.UseRateLimiter();
 app.UseAuthentication();
 

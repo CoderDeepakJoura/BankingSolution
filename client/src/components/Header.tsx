@@ -25,7 +25,7 @@ const Header = () => {
           </div>
           <div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-              AHS FinCore
+              Sicswave FinCore
             </h1>
             <p className="text-xs text-gray-500 font-medium tracking-wide">
               Cloud-Ready, Enterprise Banking Platform

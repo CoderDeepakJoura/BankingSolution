@@ -1,13 +1,17 @@
 ﻿
+using BankingPlatform.Infrastructure.Models;
+
 namespace BankingPlatform.API.Common.CommonFunctions
 {
     public class CommonFunctions
     {
         private readonly BankingDbContext _context;
+        private readonly IHttpContextAccessor _httpContextAccessor;
         public CommonFunctions(
-            BankingDbContext context)
+            BankingDbContext context, IHttpContextAccessor httpContextAccessor)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<branchMaster?> GetBranchInfoFromBranchCodeAsync(string branchCode)
@@ -71,6 +75,46 @@ namespace BankingPlatform.API.Common.CommonFunctions
                                     .Where(x => x.id == stateId)
                                     .Select(x => x.statename)
                                     .FirstOrDefault() ?? "";
+
+        public string GetCategoryNameFromId(int categoryId, int branchId) => _context.category
+                                    .Where(x => x.id == categoryId
+                                    && x.branchid == branchId)
+                                    .Select(x => x.categoryname)
+                                    .FirstOrDefault() ?? "";
+
+        public string GetAccountHeadTypeNameFromId(int headTypeId, int branchId) => _context.accountheadtype
+                                    .Where(x => x.id == headTypeId
+                                    && x.branchid == branchId)
+                                    .Select(x => x.description)
+                                    .FirstOrDefault() ?? "";
+
+        public async Task LogErrors(Exception ex, string functionName, string screenName)
+        {
+            var user = _httpContextAccessor.HttpContext!.User!;
+            int branchId = Int32.Parse(user.FindFirst("branchId")?.Value!);
+            int userId = Int32.Parse(user.FindFirst("userId")?.Value!);
+            var ErrorlogInfo = new ErrorLog
+            {
+                BranchId = branchId,
+                ErrorDateTime = DateTime.Now.ToUniversalTime(),
+                ErrorMessage = ex.Message,
+                StackTrace = ex.StackTrace ?? "",
+                InnerException = ex.InnerException?.Message,
+                FunctionName = functionName,
+                ScreenName = screenName,
+                UserId = 1
+            };
+             _context.errorlog.Add(ErrorlogInfo);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> CheckIfAccountHeadTypeInUse(int headTypeId, int branchId) => await _context.accounthead
+            .Where(x => x.branchid == branchId && x.accountheadtypeid == headTypeId).AnyAsync();
+        public async Task<bool> CheckIfStateInUse(int stateId, int branchId) => await _context.accgstinfo
+            .Where(x => x.BranchId == branchId && x.StateId == stateId).AnyAsync();
+        public async Task<bool> CheckIfLocationDataInUse(int branchId, int zoneId = 0 , int thanaId = 0, int postOfficeId = 0, int tehsilId = 0 ) => await _context.village
+            .Where(x => x.branchid == branchId && ((x.zoneid > 0 && x.zoneid == zoneId) || (x.thanaid > 0 && x.thanaid == thanaId) || (x.postofficeid > 0 && x.postofficeid == postOfficeId) || (x.tehsilid > 0 && x.tehsilid == tehsilId))).AnyAsync();
+
 
     }
 }

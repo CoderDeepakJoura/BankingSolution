@@ -46,9 +46,10 @@ namespace BankingPlatform.API.Service.AccountMasters
                 {
                     var duplicateGST = await _context.accgstinfo.FirstOrDefaultAsync(x =>
                                        x.BranchId == dto.GSTInfoDTO!.BranchId &&
+                                       dto.GSTInfoDTO.GSTInNo != "" &&
                                        x.GSTInNo == dto.GSTInfoDTO.GSTInNo );
 
-                    if (duplicateGST == null)
+                    if (duplicateGST != null)
                         return "GSTInNo already exists";
                 }
             }
@@ -92,9 +93,9 @@ namespace BankingPlatform.API.Service.AccountMasters
             {
                 var term = filter.SearchTerm;
                 query = query.Where(m =>
-                    m.AccountName!.Contains(term) ||
-                    m.AccountNumber.Contains(term) ||
-                    m.HeadCode.ToString().Contains(term));
+                    m.AccountName!.ToLower().Contains(term.ToLower()) ||
+                    m.AccountNumber.ToLower().Contains(term.ToLower()) ||
+                    m.HeadCode.ToString().ToLower().Contains(term.ToLower()));
             }
 
             var totalCount = await query.CountAsync();
@@ -152,7 +153,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                                        x.GSTInNo == dto.GSTInfoDTO.GSTInNo &&
                                        x.AccId != dto.AccountMasterDTO!.AccId);
 
-                    if (duplicateGST == null)
+                    if (duplicateGST != null)
                         return "GSTInNo already exists";
                 }
             }
@@ -165,7 +166,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                            .FirstOrDefaultAsync(n => n.AccId == accountMasterInfo.ID
                            && n.BranchId == accountMasterInfo.BranchId);
 
-            if (dto.GSTInfoDTO == null || dto.GSTInfoDTO.StateId == 0)
+            if (dto.GSTInfoDTO == null )
             {
                 if (gstDetail != null)
                 {
@@ -286,7 +287,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             AccId = entity.AccId,
             StateId = entity.StateId,
             GSTInNo = entity.GSTInNo,
-            StateName = _commonfunctions.GetStateFromId(entity.StateId)
+            StateName = entity.StateId > 0 ? _commonfunctions.GetStateFromId(entity.StateId) : ""
         };
 
     }

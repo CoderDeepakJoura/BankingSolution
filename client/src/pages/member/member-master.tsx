@@ -20,11 +20,160 @@ import {
   ArrowLeft,
   UserCheck,
   Globe,
-  Info
+  Info,
+  FileText,
+  Upload,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../Common/Layout';
 
-// Custom Autocomplete Component
+// File Upload Component
+const FileUploadComponent = ({ 
+  onFileSelect, 
+  acceptedTypes = "image/*", 
+  maxSize = 5 * 1024 * 1024, // 5MB
+  title = "Upload Pictures"
+}) => {
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragActive(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+  };
+
+  const handleFiles = (files) => {
+    const validFiles = files.filter(file => {
+      if (!file.type.startsWith('image/')) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Invalid File Type',
+          text: 'Please upload only image files (PNG, JPG, JPEG)',
+        });
+        return false;
+      }
+      
+      if (file.size > maxSize) {
+        Swal.fire({
+          icon: 'error',
+          title: 'File Too Large',
+          text: `File size must be less than ${maxSize / (1024 * 1024)}MB`,
+        });
+        return false;
+      }
+      
+      return true;
+    });
+
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const newFile = {
+          id: Date.now() + Math.random(),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          preview: e.target.result,
+          file: file
+        };
+        
+        setUploadedFiles(prev => [...prev, newFile]);
+        if (onFileSelect) onFileSelect(newFile);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeFile = (fileId) => {
+    setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragActive(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Upload Area */}
+      <div
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+          dragActive 
+            ? 'border-blue-400 bg-blue-50' 
+            : 'border-gray-300 hover:border-gray-400'
+        }`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <div className="flex flex-col items-center gap-2">
+          <Upload className="w-8 h-8 text-gray-400" />
+          <div>
+            <p className="text-sm font-medium text-gray-700">{title}</p>
+            <p className="text-xs text-gray-500">
+              Click to browse or drag and drop images here
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              PNG, JPG, JPEG up to {maxSize / (1024 * 1024)}MB
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={acceptedTypes}
+        onChange={(e) => handleFiles(Array.from(e.target.files))}
+        className="hidden"
+      />
+
+      {/* Uploaded Files Preview */}
+      {uploadedFiles.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-700">Uploaded Files:</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {uploadedFiles.map((file) => (
+              <div key={file.id} className="relative group">
+                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                  <img
+                    src={file.preview}
+                    alt={file.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(file.id);
+                  }}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                <p className="text-xs text-gray-600 mt-1 truncate">{file.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// AutocompleteSelect Component (keeping existing one)
 const AutocompleteSelect = ({ 
   id, 
   value, 
@@ -133,7 +282,7 @@ const AutocompleteSelect = ({
   );
 };
 
-
+// Mock data (keeping existing ones)
 const mockVillages = [
   { id: '1', name: 'Village Rajouri' },
   { id: '2', name: 'Village Karol Bagh' },
@@ -169,12 +318,12 @@ const MemberMaster = () => {
     clearErrors, 
     markFieldTouched 
   } = useFormValidation();
-
+  const navigate = useNavigate();
   const [showValidationSummary, setShowValidationSummary] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
   const [loading, setLoading] = useState(false);
 
-  // Basic Information State
+  // Basic Information State (removing status, statusDate, categoryId)
   const [memberData, setMemberData] = useState({
     accountNumber: '',
     defAreaBrId: '',
@@ -216,14 +365,26 @@ const MemberMaster = () => {
     panCardNo: '',
     aadhaarCardNo: '',
     gstiNo: '',
-    // Status fields
-    status: '',
-    statusDate: '',
-    zoneId: '',
-    categoryId: ''
+    // Zone field
+    zoneId: ''
   });
 
-  // Nominees State
+  // Voucher Info State (new tab)
+  const [voucherData, setVoucherData] = useState({
+    voucherNumber: '',
+    voucherDate: '',
+    voucherAmount: '',
+    voucherType: '',
+    voucherDescription: '',
+    referenceNumber: '',
+    approvedBy: '',
+    approvedDate: ''
+  });
+
+  // Document uploads state
+  const [documentUploads, setDocumentUploads] = useState([]);
+
+  // Nominees State (keeping existing)
   const [nominees, setNominees] = useState([
     {
       id: Date.now(),
@@ -242,6 +403,7 @@ const MemberMaster = () => {
     }
   ]);
 
+  // Existing functions (keeping all)
   const addNominee = () => {
     setNominees([...nominees, {
       id: Date.now(),
@@ -276,9 +438,17 @@ const MemberMaster = () => {
     setMemberData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Enhanced handleSubmit with validation
+  const handleVoucherInputChange = (field, value) => {
+    setVoucherData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFileUpload = (file) => {
+    setDocumentUploads(prev => [...prev, file]);
+  };
+
+  // Enhanced handleSubmit with validation (keeping existing)
   const handleSubmit = async () => {
-    const validation = validateForm(memberData, nominees);
+    const validation = validateForm(memberData, nominees, voucherData, documentUploads);
     
     if (!validation.isValid) {
       setShowValidationSummary(true);
@@ -411,11 +581,22 @@ const MemberMaster = () => {
       panCardNo: '',
       aadhaarCardNo: '',
       gstiNo: '',
-      status: '',
-      statusDate: '',
-      zoneId: '',
-      categoryId: ''
+      zoneId: ''
     });
+    
+    setVoucherData({
+      voucherNumber: '',
+      voucherDate: '',
+      voucherAmount: '',
+      voucherType: '',
+      voucherDescription: '',
+      referenceNumber: '',
+      approvedBy: '',
+      approvedDate: ''
+    });
+    
+    setDocumentUploads([]);
+    
     setNominees([{
       id: Date.now(),
       firstName: '',
@@ -431,6 +612,7 @@ const MemberMaster = () => {
       nominationDate: '',
       aadhaarCardNo: ''
     }]);
+    
     setActiveTab('basic');
     clearErrors();
     setShowValidationSummary(false);
@@ -450,17 +632,20 @@ const MemberMaster = () => {
     }
   };
 
+  // Updated tabs array with new Voucher Info tab
   const tabs = [
     { id: 'basic', label: 'Basic Info', icon: User },
     { id: 'address', label: 'Address', icon: MapPin },
     { id: 'contact', label: 'Contact', icon: Phone },
     { id: 'documents', label: 'Documents', icon: CreditCard },
+    { id: 'voucher', label: 'Voucher Info', icon: FileText }, // New tab
     { id: 'nominees', label: 'Nominees', icon: Users }
   ];
 
+  // Keep existing render functions (renderBasicInfo, renderAddressInfo, renderContactInfo)
   const renderBasicInfo = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {/* Branch */}
+      {/* Account Number */}
       <FormField 
         name="accountNumber" 
         label="Account Number" 
@@ -1060,116 +1245,235 @@ const MemberMaster = () => {
     </div>
   );
 
+  // Updated Documents tab with image upload (removed status, statusDate, categoryId)
   const renderDocumentsInfo = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <FormField 
-        name="panCardNo" 
-        label="PAN Card Number" 
-        errors={errorsByField.panCardNo || []}
-        icon={<CreditCard className="w-4 h-4 text-blue-500" />}
-        description="Format: ABCDE1234F"
-      >
-        <input
-          type="text"
-          value={memberData.panCardNo}
-          onChange={(e) => handleInputChange('panCardNo', e.target.value.toUpperCase())}
-          onBlur={() => handleFieldBlur('panCardNo')}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="Enter PAN Number"
-          maxLength={20}
-          pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
+    <div className="space-y-8">
+      {/* Document Information */}
+      <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+        <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+          <CreditCard className="w-5 h-5" />
+          Document Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <FormField 
+            name="panCardNo" 
+            label="PAN Card Number" 
+            errors={errorsByField.panCardNo || []}
+            icon={<CreditCard className="w-4 h-4 text-blue-500" />}
+            description="Format: ABCDE1234F"
+          >
+            <input
+              type="text"
+              value={memberData.panCardNo}
+              onChange={(e) => handleInputChange('panCardNo', e.target.value.toUpperCase())}
+              onBlur={() => handleFieldBlur('panCardNo')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder="Enter PAN Number"
+              maxLength={20}
+              pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
+            />
+          </FormField>
+
+          <FormField 
+            name="aadhaarCardNo" 
+            label="Aadhaar Card Number" 
+            errors={errorsByField.aadhaarCardNo || []}
+            icon={<CreditCard className="w-4 h-4 text-green-500" />}
+            description="Format: 1234 5678 9012"
+          >
+            <input
+              type="text"
+              value={memberData.aadhaarCardNo}
+              onChange={(e) => handleInputChange('aadhaarCardNo', e.target.value.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 '))}
+              onBlur={() => handleFieldBlur('aadhaarCardNo')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder="Enter Aadhaar Number"
+              maxLength={14}
+              pattern="[0-9]{4}\s[0-9]{4}\s[0-9]{4}"
+            />
+          </FormField>
+
+          <FormField 
+            name="gstiNo" 
+            label="GSTIN Number" 
+            errors={errorsByField.gstiNo || []}
+            icon={<CreditCard className="w-4 h-4 text-purple-500" />}
+          >
+            <input
+              type="text"
+              value={memberData.gstiNo}
+              onChange={(e) => handleInputChange('gstiNo', e.target.value.toUpperCase())}
+              onBlur={() => handleFieldBlur('gstiNo')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder="Enter GSTIN"
+              maxLength={25}
+            />
+          </FormField>
+        </div>
+      </div>
+
+      {/* Document Upload Section */}
+      <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+        <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
+          <ImageIcon className="w-5 h-5" />
+          Document Pictures
+        </h3>
+        <FileUploadComponent
+          onFileSelect={handleFileUpload}
+          title="Upload Document Pictures"
+          acceptedTypes="image/*"
+          maxSize={5 * 1024 * 1024}
         />
-      </FormField>
-
-      <FormField 
-        name="aadhaarCardNo" 
-        label="Aadhaar Card Number" 
-        errors={errorsByField.aadhaarCardNo || []}
-        icon={<CreditCard className="w-4 h-4 text-green-500" />}
-        description="Format: 1234 5678 9012"
-      >
-        <input
-          type="text"
-          value={memberData.aadhaarCardNo}
-          onChange={(e) => handleInputChange('aadhaarCardNo', e.target.value.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 '))}
-          onBlur={() => handleFieldBlur('aadhaarCardNo')}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="Enter Aadhaar Number"
-          maxLength={14}
-          pattern="[0-9]{4}\s[0-9]{4}\s[0-9]{4}"
-        />
-      </FormField>
-
-      <FormField 
-        name="gstiNo" 
-        label="GSTIN Number" 
-        errors={errorsByField.gstiNo || []}
-        icon={<CreditCard className="w-4 h-4 text-purple-500" />}
-      >
-        <input
-          type="text"
-          value={memberData.gstiNo}
-          onChange={(e) => handleInputChange('gstiNo', e.target.value.toUpperCase())}
-          onBlur={() => handleFieldBlur('gstiNo')}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="Enter GSTIN"
-          maxLength={25}
-        />
-      </FormField>
-
-      {/* Status Information */}
-      <FormField 
-        name="status" 
-        label="Member Status" 
-        errors={errorsByField.status || []}
-      >
-        <select
-          value={memberData.status}
-          onChange={(e) => handleInputChange('status', e.target.value)}
-          onBlur={() => handleFieldBlur('status')}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-        >
-          <option value="">Select Status</option>
-          <option value="1">Active</option>
-          <option value="2">Inactive</option>
-          <option value="3">Suspended</option>
-        </select>
-      </FormField>
-
-      <FormField 
-        name="statusDate" 
-        label="Status Date" 
-        errors={errorsByField.statusDate || []}
-      >
-        <input
-          type="date"
-          value={memberData.statusDate}
-          onChange={(e) => handleInputChange('statusDate', e.target.value)}
-          onBlur={() => handleFieldBlur('statusDate')}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-        />
-      </FormField>
-
-      <FormField 
-        name="categoryId" 
-        label="Category" 
-        errors={errorsByField.categoryId || []}
-      >
-        <select
-          value={memberData.categoryId}
-          onChange={(e) => handleInputChange('categoryId', e.target.value)}
-          onBlur={() => handleFieldBlur('categoryId')}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-        >
-          <option value="">Select Category</option>
-          <option value="1">Regular</option>
-          <option value="2">Premium</option>
-          <option value="3">VIP</option>
-        </select>
-      </FormField>
+      </div>
     </div>
   );
 
+  // New Voucher Info tab
+  const renderVoucherInfo = () => (
+    <div className="space-y-6">
+      <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
+        <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          Voucher Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <FormField 
+            name="voucherNumber" 
+            label="Voucher Number" 
+            errors={errorsByField.voucherNumber || []}
+          >
+            <input
+              type="text"
+              value={voucherData.voucherNumber}
+              onChange={(e) => handleVoucherInputChange('voucherNumber', e.target.value)}
+              onBlur={() => handleFieldBlur('voucherNumber')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder="Enter Voucher Number"
+              maxLength={50}
+            />
+          </FormField>
+
+          <FormField 
+            name="voucherDate" 
+            label="Voucher Date" 
+            errors={errorsByField.voucherDate || []}
+            icon={<Calendar className="w-4 h-4 text-purple-500" />}
+          >
+            <input
+              type="date"
+              value={voucherData.voucherDate}
+              onChange={(e) => handleVoucherInputChange('voucherDate', e.target.value)}
+              onBlur={() => handleFieldBlur('voucherDate')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+            />
+          </FormField>
+
+          <FormField 
+            name="voucherAmount" 
+            label="Voucher Amount" 
+            errors={errorsByField.voucherAmount || []}
+          >
+            <input
+              type="number"
+              value={voucherData.voucherAmount}
+              onChange={(e) => handleVoucherInputChange('voucherAmount', e.target.value)}
+              onBlur={() => handleFieldBlur('voucherAmount')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder="Enter Amount"
+              min="0"
+              step="0.01"
+            />
+          </FormField>
+
+          <FormField 
+            name="voucherType" 
+            label="Voucher Type" 
+            errors={errorsByField.voucherType || []}
+          >
+            <select
+              value={voucherData.voucherType}
+              onChange={(e) => handleVoucherInputChange('voucherType', e.target.value)}
+              onBlur={() => handleFieldBlur('voucherType')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+            >
+              <option value="">Select Voucher Type</option>
+              <option value="1">Receipt</option>
+              <option value="2">Payment</option>
+              <option value="3">Journal</option>
+              <option value="4">Contra</option>
+            </select>
+          </FormField>
+
+          <FormField 
+            name="referenceNumber" 
+            label="Reference Number" 
+            errors={errorsByField.referenceNumber || []}
+          >
+            <input
+              type="text"
+              value={voucherData.referenceNumber}
+              onChange={(e) => handleVoucherInputChange('referenceNumber', e.target.value)}
+              onBlur={() => handleFieldBlur('referenceNumber')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder="Enter Reference Number"
+              maxLength={50}
+            />
+          </FormField>
+
+          <FormField 
+            name="approvedBy" 
+            label="Approved By" 
+            errors={errorsByField.approvedBy || []}
+          >
+            <input
+              type="text"
+              value={voucherData.approvedBy}
+              onChange={(e) => handleVoucherInputChange('approvedBy', e.target.value)}
+              onBlur={() => handleFieldBlur('approvedBy')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder="Enter Approver Name"
+              maxLength={100}
+            />
+          </FormField>
+
+          <FormField 
+            name="approvedDate" 
+            label="Approved Date" 
+            errors={errorsByField.approvedDate || []}
+            icon={<Calendar className="w-4 h-4 text-green-500" />}
+          >
+            <input
+              type="date"
+              value={voucherData.approvedDate}
+              onChange={(e) => handleVoucherInputChange('approvedDate', e.target.value)}
+              onBlur={() => handleFieldBlur('approvedDate')}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+            />
+          </FormField>
+
+          <div className="lg:col-span-3">
+            <FormField 
+              name="voucherDescription" 
+              label="Voucher Description" 
+              errors={errorsByField.voucherDescription || []}
+            >
+              <textarea
+                value={voucherData.voucherDescription}
+                onChange={(e) => handleVoucherInputChange('voucherDescription', e.target.value)}
+                onBlur={() => handleFieldBlur('voucherDescription')}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none resize-vertical"
+                placeholder="Enter Voucher Description"
+                rows={3}
+                maxLength={500}
+              />
+            </FormField>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Keep existing nominees render function
   const renderNomineesInfo = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -1415,6 +1719,8 @@ const MemberMaster = () => {
         return renderContactInfo();
       case 'documents':
         return renderDocumentsInfo();
+      case 'voucher': // New tab
+        return renderVoucherInfo();
       case 'nominees':
         return renderNomineesInfo();
       default:
@@ -1441,7 +1747,7 @@ const MemberMaster = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => alert("Navigate back functionality")}
+                  onClick={() =>navigate("/member-operations")}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 font-medium"
                 >
                   <ArrowLeft className="w-4 h-4" />

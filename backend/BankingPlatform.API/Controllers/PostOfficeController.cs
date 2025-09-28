@@ -15,10 +15,12 @@ namespace BankingPlatform.API.Controllers
     {
         private readonly BankingDbContext _appContext;
         private readonly ILogger<PostOfficeController> _logger;
-        public PostOfficeController(BankingDbContext appcontext, ILogger<PostOfficeController> logger)
+        private readonly CommonFunctions _commonFunctions;
+        public PostOfficeController(BankingDbContext appcontext, ILogger<PostOfficeController> logger, CommonFunctions commonFunctions)
         {
             _appContext = appcontext;
             _logger = logger;
+            _commonFunctions = commonFunctions;
         }
 
         [Authorize]
@@ -104,6 +106,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating PostOffice : {PostOfficeName}, PostOfficeCode: {PostOfficeCode}, PostOfficeNameSL : {PostOfficeNameSL}",
                        postOfficeMasterDTO?.PostOfficeName ?? "unknown", postOfficeMasterDTO?.PostOfficeCode ?? "unknown", postOfficeMasterDTO?.PostOfficeNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(CreatePostOffice), "PostOfficeController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -124,9 +127,9 @@ namespace BankingPlatform.API.Controllers
                 {
                     var term = filter.SearchTerm;
                     query = query.Where(z =>
-                        z.postofficename.Contains(term) ||
-                        z.postofficecode.Contains(term) ||
-                        z.postofficenamesl != null && z.postofficenamesl.Contains(term));
+                        z.postofficename.ToLower().Contains(term.ToLower()) ||
+                        z.postofficecode.ToLower().Contains(term.ToLower()) ||
+                        z.postofficenamesl != null && z.postofficenamesl.ToLower().Contains(term.ToLower()));
                 }
                 var totalCount = await query.CountAsync();
 
@@ -148,6 +151,7 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error while fetching PostOffices");
+                await _commonFunctions.LogErrors(ex, nameof(GetAllPostOffices), "PostOfficeController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -245,6 +249,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while creating PostOffice : {PostOfficeName}, PostOfficeCode: {PostOfficeCode}, PostOfficeNameSL : {PostOfficeNameSL}",
                        postOfficeMasterDTO?.PostOfficeName ?? "unknown", postOfficeMasterDTO?.PostOfficeCode ?? "unknown", postOfficeMasterDTO?.PostOfficeNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(ModifyPostOffice), "PostOfficeController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
@@ -282,7 +287,12 @@ namespace BankingPlatform.API.Controllers
                         Message = "Post Office not found."
                     });
                 }
-
+                if (await _commonFunctions.CheckIfLocationDataInUse(postOfficeMasterDTO.BranchId, 0, 0, postOfficeMasterDTO.PostOfficeId, 0))
+                    return BadRequest(new ResponseDto
+                    {
+                        Success = false,
+                        Message = "Post Office is in use and cannot be deleted."
+                    });
                 _appContext.postoffice.Remove(existingPostOffice);
                 await _appContext.SaveChangesAsync();
 
@@ -296,6 +306,7 @@ namespace BankingPlatform.API.Controllers
             {
                 _logger.LogError(ex, "Unexpected error while deleting PostOffice : {PostOfficeName}, PostOfficeCode: {PostOfficeCode}, PostOfficeNameSL : {PostOfficeNameSL}",
                        postOfficeMasterDTO?.PostOfficeName ?? "unknown", postOfficeMasterDTO?.PostOfficeCode ?? "unknown", postOfficeMasterDTO?.PostOfficeNameSL ?? "unknown");
+                await _commonFunctions.LogErrors(ex, nameof(DeletePostOffice), "PostOfficeController");
                 return StatusCode(500, new ResponseDto
                 {
                     Success = false,
