@@ -1,5 +1,12 @@
 ﻿
 global using Microsoft.EntityFrameworkCore;
+using BankingPlatform.Infrastructure.Models.AccHeads;
+using BankingPlatform.Infrastructure.Models.AccMasters;
+using BankingPlatform.Infrastructure.Models.Location;
+using BankingPlatform.Infrastructure.Models.member;
+using BankingPlatform.Infrastructure.Models.Miscalleneous;
+using BankingPlatform.Infrastructure.Models.Settings;
+using BankingPlatform.Infrastructure.Models.voucher;
 namespace BankingPlatform.Infrastructure.Models;
 
 public partial class BankingDbContext : DbContext
@@ -25,7 +32,9 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<DayBeginEndInfoDetail> daybeginendinfodetail { get; set; }
     public virtual DbSet<AccountHead> accounthead { get; set; }
     public virtual DbSet<Member> member { get; set; }
-    public virtual DbSet<MemberNominee> membernominee { get; set; }
+    public virtual DbSet<MemberNomineeDetails> membernomineedetails { get; set; }
+    public virtual DbSet<MemberLocationDetails> memberlocationdetails { get; set; }
+    public virtual DbSet<MemberDocDetails> memberdocdetails { get; set; }
     public virtual DbSet<Relation> relation { get; set; }
     public virtual DbSet<Village> village { get; set; }
     public virtual DbSet<State> state { get; set; }
@@ -33,6 +42,13 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<GSTInfo> accgstinfo { get; set; }
     public virtual DbSet<Caste> caste { get; set; }
     public virtual DbSet<ErrorLog> errorlog { get; set; }
+    public virtual DbSet<Voucher> voucher { get; set; }
+    public virtual DbSet<VoucherCreditDebitDetails> vouchercreditdebitdetails { get; set; }
+    public virtual DbSet<Occupation> occupation { get; set; }
+    public virtual DbSet<GeneralSettings> generalsettings { get; set; }
+    public virtual DbSet<VoucherSettings> vouchersettings { get; set; }
+    public virtual DbSet<AccOpeningBalance> accopeningbalance { get; set; }
+    public virtual DbSet<Patwar> patwar { get; set; }
    
 
    

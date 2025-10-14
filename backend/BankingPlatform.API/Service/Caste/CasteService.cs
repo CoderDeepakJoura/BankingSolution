@@ -1,7 +1,7 @@
 ﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Controllers;
 using BankingPlatform.API.DTO;
-using BankingPlatform.API.DTO.Category;
+using BankingPlatform.API.DTO.Miscalleneous;
 using System;
 
 namespace BankingPlatform.API.Service.Caste
@@ -44,7 +44,7 @@ namespace BankingPlatform.API.Service.Caste
             dto.CasteDesciptionSL = dto.CasteDesciptionSL?.Trim() ?? "";
 
 
-            await _appContext.caste.AddAsync(new Infrastructure.Models.Caste
+            await _appContext.caste.AddAsync(new Infrastructure.Models.Miscalleneous.Caste
             {
                 branchid = dto.BranchId,
                 description = dto.CasteDescription,
@@ -124,9 +124,9 @@ namespace BankingPlatform.API.Service.Caste
             return "Success";
         }
         
-        private Infrastructure.Models.Caste MapToEntity(CasteMasterDTO dto, Infrastructure.Models.Caste entity = null)
+        private Infrastructure.Models.Miscalleneous.Caste MapToEntity(CasteMasterDTO dto, Infrastructure.Models.Miscalleneous.Caste entity = null)
         {
-            entity ??= new Infrastructure.Models.Caste();
+            entity ??= new Infrastructure.Models.Miscalleneous.Caste();
             entity.id = dto.CasteId;
             entity.branchid = dto.BranchId;
             entity.description = dto.CasteDescription!;
@@ -135,7 +135,7 @@ namespace BankingPlatform.API.Service.Caste
             return entity;
         }
 
-        private CasteMasterDTO MapToDTO(Infrastructure.Models.Caste entity) => new()
+        private CasteMasterDTO MapToDTO(Infrastructure.Models.Miscalleneous.Caste entity) => new()
         {
 
             CasteDesciptionSL = entity.descriptionsl,

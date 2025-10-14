@@ -36,7 +36,9 @@ export class ApiService {
     const url = `${this.baseURL}${endpoint}`;
     const config: RequestOptions = {
       headers: {
-        'Content-Type': 'application/json',
+       ...(!(options.body instanceof FormData) && {
+          'Content-Type': 'application/json'
+        }),
         ...options.headers
       },
       credentials: 'include',

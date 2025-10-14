@@ -3,6 +3,7 @@ using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.WorkingDate;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
+using BankingPlatform.Infrastructure.Models.Miscalleneous;
 using System.Globalization;
 using System.Net;
 using System.Security.Claims;

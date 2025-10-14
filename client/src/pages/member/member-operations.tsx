@@ -6,7 +6,7 @@ const PostOfficeModule: React.FC = () => {
     <CRUDDashboard
       title="Member Master"
       addPath="/member"
-      modifyPath="/generalacc-master-info"
+      modifyPath="/member-info"
     />
   );
 };

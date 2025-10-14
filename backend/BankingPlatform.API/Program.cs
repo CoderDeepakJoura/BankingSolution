@@ -1,20 +1,22 @@
-﻿using BankingPlatform.Infrastructure.Models;
+﻿using BankingPlatform.API.Controllers.Member;
+using BankingPlatform.API.Service;
+using BankingPlatform.API.Service.AccountMasters;
+using BankingPlatform.API.Service.Caste;
+using BankingPlatform.API.Services;
+using BankingPlatform.Common.Common.CommonClasses;
+using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
-using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.Http;
 using System.Text.Json;
-using BankingPlatform.Common.Common.CommonClasses;
-using BankingPlatform.API.Services;
-using BankingPlatform.API.Service.AccountMasters;
-using BankingPlatform.API.Service.Caste;
-
+using System.Threading.RateLimiting;
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -23,7 +25,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddLogging();
 builder.Services.AddScoped<GeneralAccountMasterService>();
 builder.Services.AddScoped<CasteService>();
-
+builder.Services.AddScoped<ImageService>();
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");
@@ -38,6 +40,7 @@ if (string.IsNullOrEmpty(jwtSettings.SecretKey) || string.IsNullOrEmpty(jwtSetti
     throw new InvalidOperationException("JWT settings (SecretKey, Issuer, or Audience) are missing or invalid.");
 }
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+builder.Services.Configure<DocPaths>(builder.Configuration.GetSection("DocPaths"));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<CommonClass>();

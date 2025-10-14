@@ -38,10 +38,16 @@ import GeneralAccMasterData from "./pages/accountMasters/generalAccountMaster/ge
 import StateMaster from "./pages/location/state/state-master";
 import StateOperations from "./pages/location/state/state-operations";
 import StateData from "./pages/location/state/state-data";
-import CasteMaster from "./pages/caste/caste-master";
-import CasteOperations from "./pages/caste/caste-operations";
-import CasteData from "./pages/caste/caste-data";
-
+import CasteMaster from "./pages/Miscalleneous/caste/caste-master";
+import CasteOperations from "./pages/Miscalleneous/caste/caste-operations";
+import CasteData from "./pages/Miscalleneous/caste/caste-data";
+import OccupationMaster from "./pages/Miscalleneous/occupation/occupation-master";
+import OccupationOperations from "./pages/Miscalleneous/occupation/occupation-operations";
+import OccupationData from "./pages/Miscalleneous/occupation/occupation-data";
+import SettingsMaster from "./pages/settings/settings-master";
+import PatwarMaster from "./pages/location/patwar/patwar-master";
+import PatwarOperations from "./pages/location/patwar/patwar-operations";
+import PatwarData from "./pages/location/patwar/patwar-data";
 
 export default function App() {
  return (
@@ -77,6 +83,7 @@ export default function App() {
         <Route path="/accounthead" element={<AccountHeadMaster />} />
         <Route path="/accounthead-info" element={<AccountHeadData />} />
         <Route path="/member" element={<MemberMaster />} />
+        <Route path="/member/:memberId" element={<MemberMaster />} />
         <Route path="/member-operations" element={<MemberOperations />} />
         <Route path="/member-info" element={<MemberData />} />
         <Route path="/relation-operations" element={<RelationOperations />} />
@@ -90,6 +97,13 @@ export default function App() {
         <Route path="/caste-operations" element={<CasteOperations />} />
         <Route path="/caste" element={<CasteMaster />} />
         <Route path="/caste-info" element={<CasteData />} />
+        <Route path="/occupation-operations" element={<OccupationOperations />} />
+        <Route path="/occupation" element={<OccupationMaster />} />
+        <Route path="/occupation-info" element={<OccupationData />} />
+        <Route path="/settings" element={<SettingsMaster />} />
+         <Route path="/patwar-operations" element={<PatwarOperations />} />
+        <Route path="/patwar" element={<PatwarMaster />} />
+        <Route path="/patwar-info" element={<PatwarData />} />
       </Routes>
     </BrowserRouter>
   );

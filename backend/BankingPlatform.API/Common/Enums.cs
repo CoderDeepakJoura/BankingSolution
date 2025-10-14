@@ -17,5 +17,22 @@
             FD = 6,
             BankFD = 7
         }
+        public enum VoucherType
+        {
+            Member = 1
+        }
+
+        public enum VoucherSubType
+        {
+            ShareMoney = 1
+        }
+
+        public enum VoucherStatus
+        {
+            MemberSM = 1,
+            AdmissionFee = 2,
+            Dr = 3,
+            Cr = 4,
+        }
     }
 }

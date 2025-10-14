@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { FaPlus, FaTimes, FaMapMarkerAlt, FaGlobe, FaSave, FaArrowLeft, FaInfoCircle, FaBuilding, FaCode, FaEnvelope, FaChevronDown, FaSearch } from "react-icons/fa";
 
-// Assume these imports exist and their services fetch data from an API
-// For demonstration, these will be mocked in the useEffect hook.
 import DashboardLayout from "../../../Common/Layout";
 import VillageApiService from "../../../services/location/village/villageapi";
 import ZoneApiService from "../../../services/location/zone/zoneapi";
@@ -35,10 +33,21 @@ interface TehsilInfo {
   tehsilName: string;
 }
 
-// Option type for react-select
 interface OptionType {
   value: number;
   label: string;
+}
+
+// Validation error state interface
+interface ValidationErrors {
+  villageName?: string;
+  villageNameSL?: string;
+  zone?: string;
+  thana?: string;
+  postOffice?: string;
+  tehsil?: string;
+  pincode?: string;
+  general?: string;
 }
 
 const VillageMaster = () => {
@@ -46,39 +55,61 @@ const VillageMaster = () => {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   
-  // State for form inputs - Fixed type initialization
+  // State for form inputs
   const [villageName, setVillageName] = useState<string>("");
   const [villageNameSL, setVillageNameSL] = useState<string>("");
   const [selectedZone, setSelectedZone] = useState<number>(0);
   const [selectedThana, setSelectedThana] = useState<number>(0);
   const [selectedPostOffice, setSelectedPostOffice] = useState<number>(0);
   const [selectedTehsil, setSelectedTehsil] = useState<number>(0);
+  const [pincode, setPincode] = useState<string>("");
 
-  // State for dropdown data, fetched from an API - Fixed array initialization
+  // State for dropdown data
   const [zones, setZones] = useState<ZoneInfo[]>([]);
   const [thanas, setThanas] = useState<ThanaInfo[]>([]);
   const [postOffices, setPostOffices] = useState<PostOfficeInfo[]>([]);
   const [tehsils, setTehsils] = useState<TehsilInfo[]>([]);
 
-  // State for UI/form management
-  const [error, setError] = useState<string>("");
+  // State for UI/form management - CHANGED TO OBJECT
+  const [errors, setErrors] = useState<ValidationErrors>({});
   const [loading, setLoading] = useState<boolean>(false);
 
   // Regex for Hindi/Devanagari script validation
   const hindiRegex = /^[\u0900-\u097F\s.,!?]*$/;
 
-  // Handles input change for Hindi script field with validation - Fixed event type
+  // Handles pincode input - only allows 6 digits
+  const handlePincodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Only allow digits and max 6 characters
+    if (/^\d{0,6}$/.test(value)) {
+      setPincode(value);
+      // Clear pincode error when user types valid input
+      setErrors(prev => ({ ...prev, pincode: undefined }));
+    }
+  };
+
+  // Handles input change for Hindi script field with validation
   const handleVillageNameSLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputText = e.target.value;
     if (inputText === "" || hindiRegex.test(inputText)) {
       setVillageNameSL(inputText);
-      setError("");
+      setErrors(prev => ({ ...prev, villageNameSL: undefined }));
     } else {
-      setError("Please enter only Hindi characters (Devanagari script).");
+      setErrors(prev => ({ 
+        ...prev, 
+        villageNameSL: "Please enter only Hindi characters (Devanagari script)." 
+      }));
     }
   };
 
-  // Resets the form to its initial state - Fixed reset values
+  // Handles village name change
+  const handleVillageNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setVillageName(e.target.value);
+    setErrors(prev => ({ ...prev, villageName: undefined }));
+  };
+
+  // Resets the form to its initial state
   const handleReset = () => {
     setVillageName("");
     setVillageNameSL("");
@@ -86,12 +117,55 @@ const VillageMaster = () => {
     setSelectedThana(0);
     setSelectedPostOffice(0);
     setSelectedTehsil(0);
-    setError("");
+    setPincode("");
+    setErrors({});
     inputRef.current?.focus();
     setLoading(false);
   };
 
-  // Fetch dropdown data on component mount (initial fetch)
+  // Validate form before submission
+  const validateForm = (): boolean => {
+    const newErrors: ValidationErrors = {};
+
+    // Validate village name
+    if (!villageName.trim()) {
+      newErrors.villageName = "Village name is required.";
+    } else if (villageName.trim().length < 2) {
+      newErrors.villageName = "Village name must be at least 2 characters.";
+    }
+
+    // Validate zone
+    if (selectedZone === 0) {
+      newErrors.zone = "Please select a Zone.";
+    }
+
+    // Validate thana
+    if (selectedThana === 0) {
+      newErrors.thana = "Please select a Thana.";
+    }
+
+    // Validate post office
+    if (selectedPostOffice === 0) {
+      newErrors.postOffice = "Please select a Post Office.";
+    }
+
+    // Validate tehsil
+    if (selectedTehsil === 0) {
+      newErrors.tehsil = "Please select a Tehsil.";
+    }
+
+    // Validate pincode
+    if (!pincode) {
+      newErrors.pincode = "Pincode is required.";
+    } else if (pincode.length !== 6) {
+      newErrors.pincode = "Pincode must be exactly 6 digits.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Fetch dropdown data on component mount
   useEffect(() => {
     const fetchDropdownData = async () => {
       try {
@@ -100,10 +174,10 @@ const VillageMaster = () => {
         const postOfficesRes = await PostOfficeApiService.getAllPostOffices(user.branchid);
         const tehsilsRes = await TehsilApiService.getAllTehsils(user.branchid);
         
-        setZones(zonesRes.data || []); // Added fallback for undefined data
-        setThanas(thanasRes.data || []); // Added fallback for undefined data
+        setZones(zonesRes.data || []);
+        setThanas(thanasRes.data || []);
         setPostOffices(postOfficesRes.data || []);
-        setTehsils(tehsilsRes.data || []); // Added fallback for undefined data
+        setTehsils(tehsilsRes.data || []);
       } catch (err) {
         console.error("Failed to fetch dropdown data:", err);
         Swal.fire({
@@ -115,25 +189,27 @@ const VillageMaster = () => {
     };
 
     fetchDropdownData();
-  }, [user.branchid]); // Added dependency
+  }, [user.branchid]);
 
-  // Handles form submission - Fixed event type and validation
+  // Handles form submission
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // Form validation
-    if (!villageName.trim()) {
-      setError("Village name is required.");
-      return;
-    }
-    
-    if (selectedZone === 0 || selectedThana === 0 || selectedPostOffice === 0 || selectedTehsil === 0) {
-      setError("Please select all required fields.");
+    // Validate form
+    if (!validateForm()) {
+      // Show error toast
+      Swal.fire({
+        icon: "warning",
+        title: "Validation Error",
+        text: "Please fill in all required fields correctly.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
       return;
     }
 
     setLoading(true);
-    setError("");
+    setErrors({});
 
     try {
       const response = await VillageApiService.add_new_village(
@@ -143,7 +219,8 @@ const VillageMaster = () => {
         selectedThana,
         selectedPostOffice,
         selectedTehsil,
-        Number(user.branchid)
+        Number(user.branchid),
+        Number(pincode)
       );
 
       if (response.success) {
@@ -174,24 +251,28 @@ const VillageMaster = () => {
     }
   };
 
-  // Fixed react-select onChange handlers with proper TypeScript typing
+  // react-select onChange handlers
   const handleZoneChange = (selectedOption: SingleValue<OptionType>) => {
     setSelectedZone(selectedOption ? selectedOption.value : 0);
+    setErrors(prev => ({ ...prev, zone: undefined }));
   };
 
   const handleThanaChange = (selectedOption: SingleValue<OptionType>) => {
     setSelectedThana(selectedOption ? selectedOption.value : 0);
+    setErrors(prev => ({ ...prev, thana: undefined }));
   };
 
   const handlePostOfficeChange = (selectedOption: SingleValue<OptionType>) => {
     setSelectedPostOffice(selectedOption ? selectedOption.value : 0);
+    setErrors(prev => ({ ...prev, postOffice: undefined }));
   };
 
   const handleTehsilChange = (selectedOption: SingleValue<OptionType>) => {
     setSelectedTehsil(selectedOption ? selectedOption.value : 0);
+    setErrors(prev => ({ ...prev, tehsil: undefined }));
   };
 
-  // Memoized options for better performance
+  // Memoized options
   const zoneData: OptionType[] = zones.map((zone) => ({
     value: zone.zoneId,
     label: zone.zoneName,
@@ -251,7 +332,7 @@ const VillageMaster = () => {
                   </div>
                   <div>
                     <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Create New Village</h2>
-                    <p className="text-sm text-gray-600">Fill in the Village details below </p>
+                    <p className="text-sm text-gray-600">Fill in the Village details below</p>
                   </div>
                 </div>
               </div>
@@ -275,19 +356,28 @@ const VillageMaster = () => {
                         id="villageName"
                         ref={inputRef}
                         value={villageName}
-                        onChange={(e) => setVillageName(e.target.value)}
-                        required
-                        pattern="^(?! )[A-Za-z0-9]+( [A-Za-z0-9]+)*$"
+                        onChange={handleVillageNameChange}
                         autoFocus={true}
                         maxLength={50}
-                        className="w-full pl-10 pr-4 py-2 sm:py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50"
+                        className={`w-full pl-10 pr-4 py-2 sm:py-3 border-2 rounded-lg focus:ring-2 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50 ${
+                          errors.villageName
+                            ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
+                            : 'border-gray-200 focus:border-blue-500 focus:ring-blue-100'
+                        }`}
                         placeholder="Enter Village name"
                       />
                     </div>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                      <FaInfoCircle />
-                      Descriptive name for the Village (max 50 characters)
-                    </p>
+                    {errors.villageName ? (
+                      <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
+                        <FaTimes className="text-xs" />
+                        {errors.villageName}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                        <FaInfoCircle />
+                        Descriptive name for the Village (max 50 characters)
+                      </p>
+                    )}
                   </div>
 
                   {/* Village Name SL Field */}
@@ -308,7 +398,7 @@ const VillageMaster = () => {
                         onChange={handleVillageNameSLChange}
                         maxLength={50}
                         className={`w-full pl-10 pr-4 py-2 sm:py-3 border-2 rounded-lg focus:ring-2 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50 ${
-                          error
+                          errors.villageNameSL
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
                             : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
                         }`}
@@ -316,10 +406,10 @@ const VillageMaster = () => {
                         lang="hi"
                       />
                     </div>
-                    {error ? (
+                    {errors.villageNameSL ? (
                       <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
                         <FaTimes className="text-xs" />
-                        {error}
+                        {errors.villageNameSL}
                       </p>
                     ) : (
                       <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
@@ -329,7 +419,7 @@ const VillageMaster = () => {
                     )}
                   </div>
 
-                  {/* Zone Field (Autocomplete) */}
+                  {/* Zone Field */}
                   <div className="flex flex-col">
                     <label htmlFor="zone" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <div className="w-2 h-2 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full"></div>
@@ -344,10 +434,25 @@ const VillageMaster = () => {
                       placeholder="Select Zone"
                       isClearable
                       className="text-sm"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: errors.zone ? '#fca5a5' : base.borderColor,
+                          '&:hover': {
+                            borderColor: errors.zone ? '#fca5a5' : base.borderColor,
+                          },
+                        }),
+                      }}
                     />
+                    {errors.zone && (
+                      <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
+                        <FaTimes className="text-xs" />
+                        {errors.zone}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Thana Field (Autocomplete) */}
+                  {/* Thana Field */}
                   <div className="flex flex-col">
                     <label htmlFor="thana" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <div className="w-2 h-2 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full"></div>
@@ -362,10 +467,25 @@ const VillageMaster = () => {
                       placeholder="Select Thana"
                       isClearable
                       className="text-sm"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: errors.thana ? '#fca5a5' : base.borderColor,
+                          '&:hover': {
+                            borderColor: errors.thana ? '#fca5a5' : base.borderColor,
+                          },
+                        }),
+                      }}
                     />
+                    {errors.thana && (
+                      <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
+                        <FaTimes className="text-xs" />
+                        {errors.thana}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Post Office Field (Autocomplete) */}
+                  {/* Post Office Field */}
                   <div className="flex flex-col">
                     <label htmlFor="postOffice" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-lime-500 rounded-full"></div>
@@ -380,10 +500,25 @@ const VillageMaster = () => {
                       placeholder="Select Post Office"
                       isClearable
                       className="text-sm"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: errors.postOffice ? '#fca5a5' : base.borderColor,
+                          '&:hover': {
+                            borderColor: errors.postOffice ? '#fca5a5' : base.borderColor,
+                          },
+                        }),
+                      }}
                     />
+                    {errors.postOffice && (
+                      <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
+                        <FaTimes className="text-xs" />
+                        {errors.postOffice}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Tehsil Field (Autocomplete) */}
+                  {/* Tehsil Field */}
                   <div className="flex flex-col">
                     <label htmlFor="tehsil" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <div className="w-2 h-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"></div>
@@ -398,7 +533,61 @@ const VillageMaster = () => {
                       placeholder="Select Tehsil"
                       isClearable
                       className="text-sm"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: errors.tehsil ? '#fca5a5' : base.borderColor,
+                          '&:hover': {
+                            borderColor: errors.tehsil ? '#fca5a5' : base.borderColor,
+                          },
+                        }),
+                      }}
                     />
+                    {errors.tehsil && (
+                      <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
+                        <FaTimes className="text-xs" />
+                        {errors.tehsil}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Pincode Field - NOW INSIDE THE GRID */}
+                  <div className="flex flex-col">
+                    <label htmlFor="pincode" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-red-500 to-pink-500 rounded-full"></div>
+                      Pincode
+                      <span className="text-red-500 text-xs">*</span>
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-red-500 transition-colors">
+                        <FaCode className="text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        id="pincode"
+                        value={pincode}
+                        onChange={handlePincodeChange}
+                        inputMode="numeric"
+                        maxLength={6}
+                        className={`w-full pl-10 pr-4 py-2 sm:py-3 border-2 rounded-lg focus:ring-2 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400 bg-gradient-to-r from-white to-gray-50 ${
+                          errors.pincode
+                            ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
+                            : 'border-gray-200 focus:border-red-500 focus:ring-red-100'
+                        }`}
+                        placeholder="Enter 6-digit Pincode"
+                      />
+                    </div>
+                    {errors.pincode ? (
+                      <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
+                        <FaTimes className="text-xs" />
+                        {errors.pincode}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                        <FaInfoCircle />
+                        6-digit postal code (numbers only)
+                      </p>
+                    )}
                   </div>
                 </div>
 

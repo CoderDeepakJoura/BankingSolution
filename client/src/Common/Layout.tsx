@@ -199,7 +199,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       hasSubItems: true,
       subItems: [
         {
-          label: "Miscalleneous Masters",
+          label: "Miscellaneous Masters",
           path: "",
           subItems: [
             {
@@ -209,6 +209,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Account Head Master", path: "/accounthead-operations" },
             { label: "Caste Master", path: "/caste-operations" },
             { label: "Category Master", path: "/category-operations" },
+            { label: "Occupation Master", path: "/occupation-operations" },
             { label: "Relation Master", path: "/relation-operations" },
             { label: "State Master", path: "/state-operations" },
           ],
@@ -217,11 +218,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: "Location Masters",
           path: "",
           subItems: [
+            { label: "Patwar Circle", path: "/patwar-operations" },
             { label: "Post Office Master", path: "/postOffice-operations" },
             { label: "Tehsil Master", path: "/tehsil-operations" },
             { label: "Thana Master", path: "/thana-operations" },
-            { label: "Zone Master", path: "/zone-operations" },
             { label: "Village Master", path: "/village-operations" },
+            { label: "Zone Master", path: "/zone-operations" },
+            
           ],
         },
         {
@@ -230,7 +233,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           subItems: [
             { label: "Account Masters", path: "/account-operations" },
             { label: "Member Master", path: "/member-operations" },
-            // { label: "Tehsil Master", path: "/tehsil-operations" },
+            { label: "Settings Master", path: "/settings" },
             // { label: "Thana Master", path: "/thana-operations" },
             // { label: "Zone Master", path: "/zone-operations" },
             // { label: "Village Master", path: "/village-operations" },

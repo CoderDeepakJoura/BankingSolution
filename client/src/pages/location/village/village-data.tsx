@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 
-// Define the async function to fetch Villages and ensure the return type is correct.
+// Fetch Villages function
 const fetchVillages = async (filter: VillageFilter, branchId: number) => {
   try {
     const res = await VillageApiService.fetchVillages(filter, branchId);
@@ -28,7 +28,6 @@ const fetchVillages = async (filter: VillageFilter, branchId: number) => {
   } catch (error) {
     console.error("Error in fetchVillages:", error);
 
-    // Return empty data instead of throwing
     return {
       success: false,
       data: [],
@@ -39,7 +38,7 @@ const fetchVillages = async (filter: VillageFilter, branchId: number) => {
   }
 };
 
-// Define the async function for adding a Village.
+// Add Village function with Pincode
 const addVillage = async (
   branchId: number,
   zones: any[],
@@ -98,7 +97,7 @@ const addVillage = async (
           placeholder="Enter Village Name" 
           aria-required="true"
           autocomplete="off"
-          autoFocus = {true}
+          autoFocus="true"
           required
           maxlength="100"
         >
@@ -118,7 +117,7 @@ const addVillage = async (
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
           placeholder="Enter Village Name SL" 
           autocomplete="off"
-          lang="si"
+          lang="hi"
           maxlength="100"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-emerald-200"></div>
@@ -205,6 +204,30 @@ const addVillage = async (
       </div>
     </div>
 
+    <!-- Pincode Field - NEW -->
+    <div class="swal2-input-group">
+      <label for="Pincode" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+        <div class="w-2 h-2 bg-gradient-to-r from-red-500 to-pink-500 rounded-full"></div>
+        Pincode
+        <span class="text-red-500 text-xs">*</span>
+      </label>
+      <div class="relative">
+        <input 
+          id="Pincode" 
+          type="text"
+          inputmode="numeric"
+          pattern="\\d{6}"
+          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
+          placeholder="Enter 6-digit Pincode" 
+          required
+          maxlength="6"
+          oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+        >
+        <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-red-200"></div>
+      </div>
+      <p class="text-xs text-slate-500 mt-1">6-digit postal code (numbers only)</p>
+    </div>
+
     <!-- Status Indicator -->
     <div class="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg p-4 mt-6">
       <div class="flex items-center gap-3">
@@ -266,6 +289,9 @@ const addVillage = async (
       const TehsilId = (
         document.getElementById("TehsilId") as HTMLSelectElement
       ).value;
+      const Pincode = (
+        document.getElementById("Pincode") as HTMLInputElement
+      ).value.trim();
 
       if (!VillageName) {
         Swal.showValidationMessage("Village Name is required");
@@ -292,6 +318,11 @@ const addVillage = async (
         (document.getElementById("TehsilId") as HTMLInputElement).focus();
         return null;
       }
+      if (!Pincode || Pincode.length !== 6) {
+        Swal.showValidationMessage("Pincode must be exactly 6 digits");
+        (document.getElementById("Pincode") as HTMLInputElement).focus();
+        return null;
+      }
 
       return {
         VillageName,
@@ -300,6 +331,7 @@ const addVillage = async (
         ThanaId,
         PostOfficeId,
         TehsilId,
+        Pincode,
       };
     },
   });
@@ -313,7 +345,8 @@ const addVillage = async (
         Number(formValues.ThanaId),
         Number(formValues.PostOfficeId),
         Number(formValues.TehsilId),
-        branchId
+        branchId,
+        Number(formValues.Pincode)
       );
 
       Swal.fire({
@@ -330,7 +363,7 @@ const addVillage = async (
   }
 };
 
-// Define the async function for modifying a Village.
+// Modify Village function with Pincode
 const modifyVillage = async (
   village: Village,
   zones: any[],
@@ -339,7 +372,6 @@ const modifyVillage = async (
   tehsils: any[],
   branchId: number
 ) => {
-  
   const zoneOptions = zones
     .map((zone) => {
       const zoneId = (zone.zoneId || zone.id)?.toString();
@@ -352,7 +384,6 @@ const modifyVillage = async (
     })
     .join("");
 
-  // Create options for thanas
   const thanaOptions = thanas
     .map((thana) => {
       const thanaId = (thana.thanaId || thana.id)?.toString();
@@ -365,7 +396,6 @@ const modifyVillage = async (
     })
     .join("");
 
-  // Create options for post offices
   const postOfficeOptions = postOffices
     .map((postOffice) => {
       const postOfficeId = (
@@ -380,7 +410,6 @@ const modifyVillage = async (
     })
     .join("");
 
-  // Create options for tehsils
   const tehsilOptions = tehsils
     .map((tehsil) => {
       const tehsilId = (tehsil.tehsilId || tehsil.id)?.toString();
@@ -411,7 +440,7 @@ const modifyVillage = async (
           value="${village.villageName || ""}"
           placeholder="Enter Village Name" 
           required
-          autoFocus={true}
+          autoFocus="true"
           maxlength="100"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
@@ -430,14 +459,12 @@ const modifyVillage = async (
           class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
           value="${village.villageNameSL || ""}"
           placeholder="Enter Village Name SL" 
-          lang="si"
+          lang="hi"
           maxlength="100"
         >
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-emerald-200"></div>
       </div>
     </div>
-
-    
 
     <!-- Zone Field -->
     <div class="swal2-input-group">
@@ -515,6 +542,31 @@ const modifyVillage = async (
       </div>
     </div>
 
+    <!-- Pincode Field - NEW -->
+    <div class="swal2-input-group">
+      <label for="Pincode" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+        <div class="w-2 h-2 bg-gradient-to-r from-red-500 to-pink-500 rounded-full"></div>
+        Pincode
+        <span class="text-red-500 text-xs">*</span>
+      </label>
+      <div class="relative">
+        <input 
+          id="Pincode" 
+          type="text"
+          inputmode="numeric"
+          pattern="\\d{6}"
+          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
+          value="${village.pinCode || ""}"
+          placeholder="Enter 6-digit Pincode" 
+          required
+          maxlength="6"
+          oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+        >
+        <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-red-200"></div>
+      </div>
+      <p class="text-xs text-slate-500 mt-1">6-digit postal code (numbers only)</p>
+    </div>
+
     <!-- Status Indicator -->
     <div class="bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-lg p-4 mt-6">
       <div class="flex items-center gap-3">
@@ -562,6 +614,9 @@ const modifyVillage = async (
       const TehsilId = (
         document.getElementById("TehsilId") as HTMLSelectElement
       ).value;
+      const Pincode = (
+        document.getElementById("Pincode") as HTMLInputElement
+      ).value.trim();
 
       if (!VillageName) {
         Swal.showValidationMessage("Village Name is required");
@@ -588,6 +643,11 @@ const modifyVillage = async (
         (document.getElementById("TehsilId") as HTMLInputElement).focus();
         return null;
       }
+      if (!Pincode || Pincode.length !== 6) {
+        Swal.showValidationMessage("Pincode must be exactly 6 digits");
+        (document.getElementById("Pincode") as HTMLInputElement).focus();
+        return null;
+      }
 
       return {
         id: village.villageId,
@@ -597,13 +657,13 @@ const modifyVillage = async (
         ThanaId,
         PostOfficeId,
         TehsilId,
+        Pincode,
       };
     },
   });
 
   if (formValues) {
     try {
-      // Updated API call to include all location IDs
       await VillageApiService.modifyVillage(
         formValues.id,
         formValues.VillageName,
@@ -612,7 +672,8 @@ const modifyVillage = async (
         Number(formValues.ThanaId),
         Number(formValues.PostOfficeId),
         Number(formValues.TehsilId),
-        branchId
+        branchId,
+        Number(formValues.Pincode)
       );
 
       Swal.fire({
@@ -629,7 +690,7 @@ const modifyVillage = async (
   }
 };
 
-// Define the async function for deleting a Village.
+// Delete Village function (unchanged)
 const deleteVillage = async (village: Village, branchId: number) => {
   const result = await Swal.fire({
     title: "Delete Village",
@@ -665,7 +726,7 @@ const deleteVillage = async (village: Village, branchId: number) => {
   }
 };
 
-// --- VillageMaster Component ---
+// VillageMaster Component
 const VillageMaster: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
@@ -674,19 +735,15 @@ const VillageMaster: React.FC = () => {
   const [postOffices, setPostOffices] = React.useState<any[]>([]);
   const [tehsils, setTehsils] = React.useState<any[]>([]);
 
-  // Add loading state to prevent multiple calls
   const loadingRef = React.useRef(false);
 
-  // Fetch location data on component mount
   React.useEffect(() => {
     let isCancelled = false;
 
     const fetchLocationData = async () => {
-
       loadingRef.current = true;
 
       try {
-        
         const [zonesRes, thanasRes, postOfficesRes, tehsilsRes] =
           await Promise.all([
             ZoneApiService.getAllZones(user.branchid),
@@ -694,7 +751,7 @@ const VillageMaster: React.FC = () => {
             PostOfficeApiService.getAllPostOffices(user.branchid),
             TehsilApiService.getAllTehsils(user.branchid),
           ]);
-          console.log("data", zonesRes, thanasRes, postOfficesRes, tehsilsRes)
+        console.log("data", zonesRes, thanasRes, postOfficesRes, tehsilsRes);
 
         if (!isCancelled) {
           if (zonesRes.success) setZones(zonesRes.data || []);
@@ -716,7 +773,7 @@ const VillageMaster: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [user.branchid]); // Dependencies array
+  }, [user.branchid]);
 
   const fetchVillagesWithBranch = React.useCallback(
     async (filter: VillageFilter) => {
@@ -724,9 +781,10 @@ const VillageMaster: React.FC = () => {
     },
     [user.branchid]
   );
-  console.log(zones, thanas, postOffices, tehsils)
+
+  console.log(zones, thanas, postOffices, tehsils);
+  
   return (
-    
     <CRUDMaster<Village>
       fetchData={fetchVillagesWithBranch}
       addEntry={() =>

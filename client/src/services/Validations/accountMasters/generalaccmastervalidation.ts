@@ -25,22 +25,16 @@ export const useFormValidation = () => {
       patternMessage: "Account Number can only contain letters and spaces.",
       tab: "basic",
     },
-    firstName: {
+    accountName: {
       required: true,
       minLength: 2,
       maxLength: 100,
       pattern: /^[a-zA-Z\s]+$/,
-      requiredMessage: "First name is required.",
-      patternMessage: "First name can only contain letters and spaces.",
+      requiredMessage: "Account name is required.",
+      patternMessage: "Account name can only contain letters and spaces.",
       tab: "basic",
     },
-    firstNameSL: {
-      maxLength: 100,
-      pattern: /^[\u0900-\u097F\s]*$/,
-      patternMessage: "Please enter valid Hindi/Devanagari characters only.",
-      tab: "basic",
-    },
-    lastNameSL: {
+    accountNameSL: {
       maxLength: 100,
       pattern: /^[\u0900-\u097F\s]*$/,
       patternMessage: "Please enter valid Hindi/Devanagari characters only.",

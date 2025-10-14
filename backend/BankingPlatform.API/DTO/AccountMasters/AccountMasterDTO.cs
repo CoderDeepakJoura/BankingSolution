@@ -101,5 +101,6 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public short? IsJointAccount { get; set; } = 0;
         public short? IsSuspenseAccount { get; set; } = 0;
         public string? HeadName { get; set; } = ""!;
+        public int? SMAccId { get; set; }
     }
 }

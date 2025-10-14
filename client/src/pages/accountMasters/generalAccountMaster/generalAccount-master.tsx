@@ -68,10 +68,8 @@ const GeneralAccountMaster = () => {
   const [accountHeadId, setaccountHeadId] = useState("");
   // Basic Information State
   const [accMasterData, setAccMasterData] = useState({
-    firstName: "",
-    lastName: "",
-    firstNameSL: "",
-    lastNameSL: "",
+    accountName: "",
+    accountNameSL: "",
     stateId: 0,
     gstiNo: "",
     accounthead: "",
@@ -175,10 +173,10 @@ const GeneralAccountMaster = () => {
         accTypeId: 3,
         accountNumber: accMasterData.accountNumber,
         accountName:
-          `${accMasterData.firstName.trim()} ${accMasterData.lastName.trim()}`.trim(),
+          `${accMasterData.accountName.trim()}`.trim(),
         accountNameSL:
-          accMasterData.firstNameSL && accMasterData.lastNameSL
-            ? `${accMasterData.firstNameSL.trim()} ${accMasterData.lastNameSL.trim()}`.trim()
+          accMasterData.accountNameSL 
+            ? `${accMasterData.accountNameSL.trim()}`.trim()
             : undefined,
         memberId: 0,
         memberBranchId: 0,
@@ -253,10 +251,8 @@ const GeneralAccountMaster = () => {
 
   const handleReset = () => {
     setAccMasterData({
-      firstName: "",
-      lastName: "",
-      firstNameSL: "",
-      lastNameSL: "",
+      accountName: "",
+      accountNameSL: "",
       gstiNo: "",
       stateId: 0,
       accounthead: "",
@@ -341,72 +337,37 @@ const GeneralAccountMaster = () => {
         />
       </FormField>
       <FormField
-        name="firstName"
-        label="First Name"
+        name="accountName"
+        label="Account Name"
         required
-        errors={errorsByField.firstName || []}
+        errors={errorsByField.accountName || []}
         icon={<User className="w-4 h-4 text-green-500" />}
       >
         <input
           type="text"
-          value={accMasterData.firstName}
-          onChange={(e) => handleInputChange("firstName", e.target.value)}
-          onBlur={() => handleFieldBlur("firstName")}
+          value={accMasterData.accountName}
+          onChange={(e) => handleInputChange("accountName", e.target.value)}
+          onBlur={() => handleFieldBlur("accountName")}
           className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="Enter First Name"
+          placeholder="Enter Account Name"
           required
           maxLength={100}
         />
       </FormField>
 
       <FormField
-        name="lastName"
-        label="Last Name"
-        errors={errorsByField.lastName || []}
-        icon={<User className="w-4 h-4 text-green-500" />}
-      >
-        <input
-          type="text"
-          value={accMasterData.lastName}
-          onChange={(e) => handleInputChange("lastName", e.target.value)}
-          onBlur={() => handleFieldBlur("lastName")}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="Enter Last Name"
-          maxLength={100}
-        />
-      </FormField>
-
-      <FormField
-        name="firstNameSL"
-        label="First Name (Hindi)"
-        errors={errorsByField.firstNameSL || []}
+        name="accountNameSL"
+        label="Account Name (Hindi)"
+        errors={errorsByField.accountNameSL || []}
         icon={<Globe className="w-4 h-4 text-purple-500" />}
       >
         <input
           type="text"
-          value={accMasterData.firstNameSL}
-          onChange={(e) => handleInputChange("firstNameSL", e.target.value)}
-          onBlur={() => handleFieldBlur("firstNameSL")}
+          value={accMasterData.accountNameSL}
+          onChange={(e) => handleInputChange("accountNameSL", e.target.value)}
+          onBlur={() => handleFieldBlur("accountNameSL")}
           className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="हिंदी में प्रथम नाम"
-          maxLength={100}
-          lang="hi"
-        />
-      </FormField>
-
-      <FormField
-        name="lastNameSL"
-        label="Last Name (Hindi)"
-        errors={errorsByField.lastNameSL || []}
-        icon={<Globe className="w-4 h-4 text-purple-500" />}
-      >
-        <input
-          type="text"
-          value={accMasterData.lastNameSL}
-          onChange={(e) => handleInputChange("lastNameSL", e.target.value)}
-          onBlur={() => handleFieldBlur("lastNameSL")}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="हिंदी में अंतिम नाम"
+          placeholder="हिंदी में नाम"
           maxLength={100}
           lang="hi"
         />

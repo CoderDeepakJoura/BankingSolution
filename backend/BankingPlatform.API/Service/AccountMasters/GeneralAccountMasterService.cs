@@ -3,7 +3,7 @@ using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.AccountMasters;
 using BankingPlatform.API.DTO.Member;
 using BankingPlatform.Infrastructure;
-using BankingPlatform.Infrastructure.Models;
+using BankingPlatform.Infrastructure.Models.AccMasters;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileSystemGlobbing.Internal;

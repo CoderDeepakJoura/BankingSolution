@@ -30,9 +30,7 @@ const AccountHeadMaster: React.FC = () => {
   const [AccountHeadName, setAccountHeadName] = useState("");
   const [AccountHeadNameSL, setAccountHeadNameSL] = useState("");
   const [AccountHeadType, setAccountHeadType] = useState<number | "">("");
-  const [accountHeadTypes, setAccountHeadTypes] = useState<AccountHeadType[]>(
-    []
-  );
+  const [accountHeadTypes, setAccountHeadTypes] = useState<AccountHeadType[]>([]);
   const [HeadCode, setHeadCode] = useState("");
   const [ParentId, setParentId] = useState("");
   const [parents, setParents] = useState<AccountHead[]>([]);

@@ -18,10 +18,11 @@ const VillageTable: React.FC<VillageTableProps> = ({
   const columns: Column<Village>[] = [
     { key: "villageName", header: "Village Name" },
     { key: "villageNameSL", header: "Village Name SL" },
-    { key: "thanaName", header: "Thana Name SL" },
-    { key: "tehsilName", header: "Tehsil Name SL" },
-    { key: "postOfficeName", header: "Post Office Name SL" },
-    { key: "zoneName", header: "Zone Name SL" },
+    { key: "thanaName", header: "Thana Name" },
+    { key: "tehsilName", header: "Tehsil Name" },
+    { key: "postOfficeName", header: "Post Office Name" },
+    { key: "zoneName", header: "Zone Name" },
+    { key: "pinCode", header: "PIN Code" },
     {
       key: "actions",
       header: "Actions",

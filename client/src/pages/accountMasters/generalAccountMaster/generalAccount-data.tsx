@@ -26,7 +26,6 @@ const fetchGeneralAccounts = async (
   message: string;
 }> => {
   try {
-    
     const res = await GeneralAccountApiService.fetchGeneralAccounts(filter, branchId);
     
     return {
@@ -61,20 +60,7 @@ const convertDTOToFormData = (dto: CommonAccMasterDTO) => {
   };
 };
 
-// Helper functions for name handling
-const getFirstName = (fullName: string): string => {
-  if (!fullName) return "";
-  const parts = fullName.trim().split(" ");
-  return parts[0] || "";
-};
-
-const getLastName = (fullName: string): string => {
-  if (!fullName) return "";
-  const parts = fullName.trim().split(" ");
-  return parts.length > 1 ? parts.slice(1).join(" ") : "";
-};
-
-// Enhanced Add/Modify Modal with all fields
+// Enhanced Add/Modify Modal with single account name field
 const addOrModifyAccountMaster = async (
   accountMasterDTO: CommonAccMasterDTO | null = null,
   branchId: number,
@@ -175,43 +161,21 @@ const addOrModifyAccountMaster = async (
                 </div>
               </div>
 
-              <!-- First Name and Last Name - 2 Column Grid -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <!-- First Name -->
+              <!-- Account Name - Full Width -->
+              <div class="mb-6">
                 <div class="swal2-input-group">
-                  <label for="firstName" class="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <label for="accountName" class="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                     <div class="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"></div>
-                    First Name
+                    Account Name
                     <span class="text-red-500 text-xs">*</span>
                   </label>
                   <div class="relative">
                     <input 
-                      id="firstName" 
+                      id="accountName" 
                       type="text"
                       class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-                      placeholder="Enter First Name" 
-                      value="${isEdit ? getFirstName(formData?.accountName || "") : ""}"
-                      maxLength="100"
-                      required
-                      
-                    />
-                    <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-blue-200"></div>
-                  </div>
-                </div>
-
-                <!-- Last Name -->
-                <div class="swal2-input-group">
-                  <label for="lastName" class="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                    <div class="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"></div>
-                    Last Name
-                  </label>
-                  <div class="relative">
-                    <input 
-                      id="lastName" 
-                      type="text"
-                      class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-                      placeholder="Enter Last Name" 
-                      value="${isEdit ? getLastName(formData?.accountName || "") : ""}"
+                      placeholder="Enter Account Name" 
+                      value="${isEdit ? (formData?.accountName || "") : ""}"
                       maxLength="100"
                       required
                     />
@@ -220,43 +184,21 @@ const addOrModifyAccountMaster = async (
                 </div>
               </div>
 
-              <!-- Hindi Name Fields - 2 Column Grid -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <!-- First Name (Hindi) -->
+              <!-- Account Name (Hindi) - Full Width -->
+              <div class="mb-6">
                 <div class="swal2-input-group">
-                  <label for="firstNameSL" class="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <label for="accountNameSL" class="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                     <div class="w-2 h-2 bg-gradient-to-r from-purple-500 to-violet-500 rounded-full"></div>
-                    First Name (Hindi)
+                    Account Name (Hindi)
                     <span class="text-emerald-600 text-xs font-medium">Optional</span>
                   </label>
                   <div class="relative">
                     <input 
-                      id="firstNameSL" 
+                      id="accountNameSL" 
                       type="text"
                       class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-                      placeholder="हिंदी में प्रथम नाम" 
-                      value="${isEdit ? getFirstName(formData?.accountNameSL || "") : ""}"
-                      lang="hi"
-                      maxLength="100"
-                    />
-                    <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-emerald-200"></div>
-                  </div>
-                </div>
-
-                <!-- Last Name (Hindi) -->
-                <div class="swal2-input-group">
-                  <label for="lastNameSL" class="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                    <div class="w-2 h-2 bg-gradient-to-r from-purple-500 to-violet-500 rounded-full"></div>
-                    Last Name (Hindi)
-                    <span class="text-emerald-600 text-xs font-medium">Optional</span>
-                  </label>
-                  <div class="relative">
-                    <input 
-                      id="lastNameSL" 
-                      type="text"
-                      class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-                      placeholder="हिंदी में अंतिम नाम" 
-                      value="${isEdit ? getLastName(formData?.accountNameSL || "") : ""}"
+                      placeholder="हिंदी में खाता नाम" 
+                      value="${isEdit ? (formData?.accountNameSL || "") : ""}"
                       lang="hi"
                       maxLength="100"
                     />
@@ -471,15 +413,12 @@ const addOrModifyAccountMaster = async (
           target.value = target.value.toUpperCase();
         });
       }
-     
     },
     preConfirm: () => {
       const accounthead = (document.getElementById("accounthead") as HTMLSelectElement).value;
       const accountNumber = (document.getElementById("accountNumber") as HTMLInputElement).value.trim();
-      const firstName = (document.getElementById("firstName") as HTMLInputElement).value.trim();
-      const lastName = (document.getElementById("lastName") as HTMLInputElement).value.trim();
-      const firstNameSL = (document.getElementById("firstNameSL") as HTMLInputElement).value.trim();
-      const lastNameSL = (document.getElementById("lastNameSL") as HTMLInputElement).value.trim();
+      const accountName = (document.getElementById("accountName") as HTMLInputElement).value.trim();
+      const accountNameSL = (document.getElementById("accountNameSL") as HTMLInputElement).value.trim();
       const stateId = (document.getElementById("stateId") as HTMLSelectElement).value;
       const gstInNo = (document.getElementById("gstInNo") as HTMLInputElement).value.trim();
 
@@ -502,11 +441,11 @@ const addOrModifyAccountMaster = async (
         return null;
       }
 
-      if (!firstName) {
-        Swal.showValidationMessage("First Name is required");
+      if (!accountName) {
+        Swal.showValidationMessage("Account Name is required");
         setTimeout(() => {
-          const firstNameField = document.getElementById("firstName");
-          if (firstNameField) firstNameField.focus();
+          const accountNameField = document.getElementById("accountName");
+          if (accountNameField) accountNameField.focus();
         }, 100);
         return null;
       }
@@ -515,10 +454,8 @@ const addOrModifyAccountMaster = async (
         id: isEdit ? formData?.accId : null,
         accounthead: accounthead,
         accountNumber,
-        firstName,
-        lastName,
-        firstNameSL,
-        lastNameSL,
+        accountName,
+        accountNameSL,
         stateId: stateId ? parseInt(stateId) : null,
         gstInNo,
       };
@@ -532,12 +469,6 @@ const addOrModifyAccountMaster = async (
         head => head.accountHeadId === Number(formValues.accounthead)
       );
 
-      // Combine first and last names
-      const accountName = `${formValues.firstName} ${formValues.lastName}`.trim();
-      const accountNameSL = formValues.firstNameSL && formValues.lastNameSL 
-        ? `${formValues.firstNameSL} ${formValues.lastNameSL}`.trim() 
-        : undefined;
-
       if (isEdit) {
         // Update existing account
         const updateDTO: CommonAccMasterDTO = {
@@ -548,21 +479,21 @@ const addOrModifyAccountMaster = async (
             headCode: selectedAccountHead?.accountHeadName.split('-')[0] || "",
             accTypeId: 3,
             accountNumber: formValues.accountNumber,
-            accountName: accountName,
-            accountNameSL: accountNameSL,
+            accountName: formValues.accountName,
+            accountNameSL: formValues.accountNameSL || undefined,
             memberId: 0,
             memberBranchId: 0,
             accOpeningDate: new Date().toISOString(),
             isAccClosed: false
           },
-          gstInfoDTO: formValues.gstInNo != "" || formValues.stateId > 0 ? {
+          gstInfoDTO: formValues.gstInNo || formValues.stateId ? {
             branchId: branchId,
             accId: formValues.id,
-            stateId: formValues.stateId > 0 ? formValues.stateId : 0,
+            stateId: formValues.stateId || 0,
             gstInNo: formValues.gstInNo,
           } : undefined,
         };
-        console.log("Update DTO:", updateDTO);
+        
         await GeneralAccountApiService.updateGeneralAccount(updateDTO);
       } else {
         // Create new account
@@ -570,19 +501,19 @@ const addOrModifyAccountMaster = async (
           accountMasterDTO: {
             branchId: branchId,
             headId: selectedAccountHead?.accountHeadId,
-            headCode:  selectedAccountHead?.accountHeadName.split('-')[0] || "" ,
+            headCode: selectedAccountHead?.accountHeadName.split('-')[0] || "",
             accTypeId: 3,
             accountNumber: formValues.accountNumber,
-            accountName: accountName,
-            accountNameSL: accountNameSL,
+            accountName: formValues.accountName,
+            accountNameSL: formValues.accountNameSL || undefined,
             memberId: 0,
             memberBranchId: 0,
             accOpeningDate: new Date().toISOString()
           },
-          gstInfoDTO: formValues.gstInNo && formValues.stateId ? {
+          gstInfoDTO: formValues.gstInNo || formValues.stateId ? {
             branchId: branchId,
             accId: 0, // Will be set by backend
-            stateId: formValues.stateId,
+            stateId: formValues.stateId || 0,
             gstInNo: formValues.gstInNo,
           } : undefined,
         };

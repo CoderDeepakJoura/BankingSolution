@@ -1,220 +1,272 @@
-// services/api/memberService.ts
-interface ResponseDto {
+// services/member/memberApi.ts
+import { AuthResponse, ApiService, ApiResponse } from "../api";
+import { API_CONFIG } from "../../constants/config";
+
+// Response interfaces
+export interface ResponseDto {
   success: boolean;
   message: string;
 }
 
-interface CombinedMemberDTO {
-  // Basic Info
+// Member Filter for search/pagination
+export interface MemberFilter {
+  searchTerm?: string;
+  pageNumber: number;
+  pageSize: number;
+}
+
+// Main Member DTO (exactly matching your C# MemberDTO)
+export interface MemberDTO {
+  // Primary keys
+  id?: number; // Nullable for new records
   branchId: number;
-  defAreaBrId?: number;
-  memberType?: string;
+
+  // Core Member Details
+  defAreaBrId: number;
+  memberType?: number;
   nominalMembershipNo?: string;
   permanentMembershipNo?: string;
-  firstName: string;
-  lastName: string;
-  firstNameSL?: string;
-  lastNameSL?: string;
-  relFirstName: string;
-  relLastName?: string;
-  relationId?: number;
-  gender: string;
-  dob: string;
-  casteId?: number;
-  joiningDate: string;
-  occupationId?: number;
-  
-  // Address
-  thana?: string;
-  addressLine1: string;
-  addressLineSL1?: string;
-  villageId1: number;
-  po1?: string;
-  tehsil1?: string;
-  addressLine2?: string;
-  addressLineSL2?: string;
-  villageId2?: number;
-  po2?: string;
-  tehsil2?: string;
-  
-  // Contact
-  phoneType1?: string;
-  phonePrefix1?: string;
-  phoneNo1?: string;
-  phoneType2?: string;
+
+  // Name Details
+  memberName: string;
+  memberNameSL?: string;
+
+  // Relationship Details
+  relativeName: string;
+  relativeNameSL?: string;
+  relationId: number;
+
+  // Personal Details
+  gender: number;
+  dob: string; // ISO date string
+
+  // Categorization
+  casteId: number;
+  categoryId: number;
+  occupationId: number;
+
+  // Dates
+  joiningDate: string; // ISO date string
+
+  // Contact Details
+  phonePrefix1: string;
+  phoneType1: number;
+  phoneNo1: string;
   phonePrefix2?: string;
+  phoneType2?: number;
   phoneNo2?: string;
-  
-  // Documents
-  panCardNo?: string;
-  aadhaarCardNo?: string;
-  gstiNo?: string;
-  status?: string;
-  statusDate?: string;
-  zoneId?: number;
-  categoryId?: number;
-  
-  // Nominees
-  nominees: NomineeDTO[];
+  email1: string | "";
+  email2: string | "";
 }
 
-interface NomineeDTO {
+// Nominee DTO (exactly matching your C# MemberNomineeDetailsDTO)
+export interface MemberNomineeDetailsDTO {
   id?: number;
-  firstName: string;
-  lastName?: string;
-  firstNameSL?: string;
-  lastNameSL?: string;
-  relation?: string;
-  age?: number;
-  isMinor: boolean;
-  dob?: string;
+  branchId: number;
+  memberId?: number; // Will be set by backend
+
+  // Nominee Personal Details
+  nomineeName: string;
+  nomRelativeName?: string;
+  relationId: number;
+  relationWithMember: number;
+  age: number;
+  dob: string; // ISO date string
+
+  isMinor?: number; // 0 or 1 (SMALLINT)
   nameOfGuardian?: string;
   nameOfGuardianSL?: string;
-  nominationDate?: string;
-  aadhaarCardNo?: string;
+  nominationDate?: string; // ISO date string
+
+  // Document Details
+  aadhaarCardNo: string;
+  panCardNo?: string;
+
+  // Share Details
+  percentageShare: number;
 }
 
-class MemberService {
-  private baseUrl: string;
+// Document Details DTO (exactly matching your C# MemberDocDetailsDTO)
+export interface MemberDocDetailsDTO {
+  id?: number;
+  branchId: number;
+  memberId?: number; // Will be set by backend
 
-  constructor(baseUrl: string = process.env.REACT_APP_API_BASE_URL || 'https://localhost:7000/api') {
-    this.baseUrl = baseUrl;
+  // Document Details
+  panCardNo: string;
+  aadhaarCardNo: string;
+  memberPicExt: string; // File extension like "jpg", "png"
+  memberSignExt: string; // File extension like "jpg", "png"
+}
+
+// Location Details DTO (exactly matching your C# MemberLocationDetailsDTO)
+export interface MemberLocationDetailsDTO {
+  id?: number;
+  branchId: number;
+  memberId?: number; // Will be set by backend
+
+  // Address Lines
+  addressLine1: string;
+  addressLineSL1?: string;
+  addressLine2?: string;
+  addressLineSL2?: string;
+
+  // Location IDs
+  villageId1: number;
+  villageId2?: number;
+  po1: number;
+  po2?: number;
+  tehsil1: number;
+  tehsil2?: number;
+  thanaId1: number;
+  thanaId2?: number;
+  zoneId1: number;
+  zoneId2?: number;
+}
+
+// Account Master DTO (stub - add fields as needed)
+export interface AccountMasterDTO {
+  // Add fields as per your AccountMasterDTO
+  [key: string]: any;
+}
+
+// Voucher DTO (matching your C# VoucherDTO)
+export interface VoucherDTO {
+  voucherNarration?: string;
+  // Add other voucher fields as needed based on your requirements
+  smAmount?: number;
+  admissionFeesAccount?: string;
+  admissionFeesAccountId?: number;
+  admissionFeeAmount?: string;
+  debitAccountId?: number;
+  debitAccountName?: string;
+  totalDebit?: number;
+  openingAmount? : number;
+}
+
+// Combined Member DTO (exactly matching your C# CombinedMemberDTO)
+export interface CombinedMemberDTO {
+  member: MemberDTO;
+  nominees: MemberNomineeDetailsDTO[];
+  documentDetails: MemberDocDetailsDTO;
+  locationDetails: MemberLocationDetailsDTO;
+  accMaster: AccountMasterDTO | null;
+  voucher: VoucherDTO;
+  voucherId?: Number | 0;
+}
+
+// Member Response for list operations
+export interface MemberResponse {
+  success: boolean;
+  members: CombinedMemberDTO[];
+  totalCount: number;
+}
+
+class MemberApiService extends ApiService {
+  constructor() {
+    super();
   }
 
-  private async makeRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
-    const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        // Add auth token if you have authentication
-        // 'Authorization': `Bearer ${getAuthToken()}`,
-        ...options.headers,
-      },
-      ...options,
-    };
+  /**
+   * Create a new member
+   */
+  async createMember(
+    combinedMemberDTO: CombinedMemberDTO,
+    memberPhoto?: File, // ✅ Add file parameters
+    memberSignature?: File
+  ): Promise<ApiResponse<ResponseDto>> {
+    const formData = new FormData();
 
-    try {
-      const response = await fetch(`${this.baseUrl}${url}`, config);
+  formData.append('memberData', JSON.stringify(combinedMemberDTO));
 
-      // Check if response is ok
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
+  if (memberPhoto) {
+    formData.append('memberPhoto', memberPhoto);
+  }
+  
+  if (memberSignature) {
+    formData.append('memberSignature', memberSignature);
+  }
+    return this.makeRequest<ResponseDto>("/member", {
+      method: "POST",
+      body: formData,
+      // Don't set Content-Type for FormData, let browser set it with boundary
+    });
+  }
 
-      // Handle 204 No Content responses
-      if (response.status === 204) {
-        return {} as T;
-      }
+  async updateMember(
+    combinedMemberDTO: CombinedMemberDTO,
+    memberPhoto?: File,
+    memberSignature?: File
+  ): Promise<ApiResponse<ResponseDto>> {
+    const formData = new FormData();
+    formData.append("memberData", JSON.stringify(combinedMemberDTO));
 
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      throw error;
+    if (memberPhoto) {
+      formData.append("memberPhoto", memberPhoto);
     }
-  }
+    if (memberSignature) {
+      formData.append("memberSignature", memberSignature);
+    }
 
-  // Transform form data to DTO format
-  private transformToDTO(memberData: any, nominees: any[]): CombinedMemberDTO {
-    return {
-      // Basic Info
-      branchId: parseInt(memberData.branchId) || 0,
-      defAreaBrId: memberData.defAreaBrId ? parseInt(memberData.defAreaBrId) : undefined,
-      memberType: memberData.memberType || undefined,
-      nominalMembershipNo: memberData.nominalMembershipNo || undefined,
-      permanentMembershipNo: memberData.permanentMembershipNo || undefined,
-      firstName: memberData.firstName,
-      lastName: memberData.lastName,
-      firstNameSL: memberData.firstNameSL || undefined,
-      lastNameSL: memberData.lastNameSL || undefined,
-      relFirstName: memberData.relFirstName,
-      relLastName: memberData.relLastName || undefined,
-      relationId: memberData.relationId ? parseInt(memberData.relationId) : undefined,
-      gender: memberData.gender,
-      dob: memberData.dob,
-      casteId: memberData.casteId ? parseInt(memberData.casteId) : undefined,
-      joiningDate: memberData.joiningDate,
-      occupationId: memberData.occupationId ? parseInt(memberData.occupationId) : undefined,
-
-      // Address
-      thana: memberData.thana || undefined,
-      addressLine1: memberData.addressLine1,
-      addressLineSL1: memberData.addressLineSL1 || undefined,
-      villageId1: parseInt(memberData.villageId1) || 0,
-      po1: memberData.po1 || undefined,
-      tehsil1: memberData.tehsil1 || undefined,
-      addressLine2: memberData.addressLine2 || undefined,
-      addressLineSL2: memberData.addressLineSL2 || undefined,
-      villageId2: memberData.villageId2 ? parseInt(memberData.villageId2) : undefined,
-      po2: memberData.po2 || undefined,
-      tehsil2: memberData.tehsil2 || undefined,
-
-      // Contact
-      phoneType1: memberData.phoneType1 || undefined,
-      phonePrefix1: memberData.phonePrefix1 || undefined,
-      phoneNo1: memberData.phoneNo1 || undefined,
-      phoneType2: memberData.phoneType2 || undefined,
-      phonePrefix2: memberData.phonePrefix2 || undefined,
-      phoneNo2: memberData.phoneNo2 || undefined,
-
-      // Documents
-      panCardNo: memberData.panCardNo || undefined,
-      aadhaarCardNo: memberData.aadhaarCardNo || undefined,
-      gstiNo: memberData.gstiNo || undefined,
-      status: memberData.status || undefined,
-      statusDate: memberData.statusDate || undefined,
-      zoneId: memberData.zoneId ? parseInt(memberData.zoneId) : undefined,
-      categoryId: memberData.categoryId ? parseInt(memberData.categoryId) : undefined,
-
-      // Nominees
-      nominees: nominees.map(nominee => ({
-        id: nominee.id,
-        firstName: nominee.firstName,
-        lastName: nominee.lastName || undefined,
-        firstNameSL: nominee.firstNameSL || undefined,
-        lastNameSL: nominee.lastNameSL || undefined,
-        relation: nominee.relation || undefined,
-        age: nominee.age ? parseInt(nominee.age) : undefined,
-        isMinor: nominee.isMinor,
-        dob: nominee.dob || undefined,
-        nameOfGuardian: nominee.nameOfGuardian || undefined,
-        nameOfGuardianSL: nominee.nameOfGuardianSL || undefined,
-        nominationDate: nominee.nominationDate || undefined,
-        aadhaarCardNo: nominee.aadhaarCardNo || undefined,
-      }))
-    };
-  }
-
-  async createMember(memberData: any, nominees: any[]): Promise<ResponseDto> {
-    const dto = this.transformToDTO(memberData, nominees);
-    return this.makeRequest<ResponseDto>('/members', {
-      method: 'POST',
-      body: JSON.stringify(dto),
+    return this.makeRequest<ResponseDto>("/member", {
+      method: "PUT",
+      body: formData,
     });
   }
 
-  async getAllMembers(): Promise<CombinedMemberDTO[]> {
-    return this.makeRequest<CombinedMemberDTO[]>('/members');
-  }
-
-  async getMemberById(id: number, branchId: number): Promise<CombinedMemberDTO> {
-    return this.makeRequest<CombinedMemberDTO>(`/members/${id}/${branchId}`);
-  }
-
-  async updateMember(memberData: any, nominees: any[]): Promise<ResponseDto> {
-    const dto = this.transformToDTO(memberData, nominees);
-    return this.makeRequest<ResponseDto>('/members', {
-      method: 'PUT',
-      body: JSON.stringify(dto),
+  /**
+   * Delete a member
+   */
+  async deleteMember(
+    memberId: number,
+    branchId: number,
+    voucherId: number
+  ): Promise<ApiResponse<ResponseDto>> {
+    return this.makeRequest<ResponseDto>(`/member/${memberId}/${branchId}/${voucherId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
   }
 
-  async deleteMember(id: number, branchId: number): Promise<{ message: string }> {
-    return this.makeRequest<{ message: string }>(`/members/${id}/${branchId}`, {
-      method: 'DELETE',
-    });
+  /**
+   * Get all members with filtering
+   */
+  async fetchMembers(
+    filter: MemberFilter,
+    branchId: number
+  ): Promise<ApiResponse<MemberResponse>> {
+    return this.makeRequest<MemberResponse>(
+      `/member/get_all_members/${branchId}`,
+      {
+        method: "POST",
+        body: JSON.stringify(filter),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  /**
+   * Get member by ID
+   */
+  async getMemberById(
+    memberId: number,
+    branchId: number
+  ): Promise<ApiResponse<CombinedMemberDTO>> {
+    return this.makeRequest<CombinedMemberDTO>(
+      `/member/get-member-info/${memberId}/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 }
 
-// Create singleton instance
-export const memberService = new MemberService();
-export default memberService;
+// ✅ Export singleton instance for reuse
+export default new MemberApiService();

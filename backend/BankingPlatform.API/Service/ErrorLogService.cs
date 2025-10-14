@@ -1,4 +1,5 @@
 ﻿using BankingPlatform.Infrastructure.Models;
+using BankingPlatform.Infrastructure.Models.Miscalleneous;
 using System.Security.Claims;
 
 namespace BankingPlatform.API.Service

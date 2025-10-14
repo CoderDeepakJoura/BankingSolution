@@ -7,7 +7,7 @@ namespace BankingPlatform.API.DTO.Location.Village
     {
         public VillageDTO() { }
 
-        public VillageDTO(int villageId, int branchId, string villageName, string? villageNameSL, int zoneId, int thanaId, int tehsilId, int postOfficeId, string? zoneName = "", string? tehsilName = "", string? postOfficeName = "", string? thanaName = "")
+        public VillageDTO(int villageId, int branchId, string villageName, string? villageNameSL, int zoneId, int thanaId, int tehsilId, int postOfficeId, int pinCode, string? zoneName = "", string? tehsilName = "", string? postOfficeName = "", string? thanaName = "")
         {
             VillageId = villageId;
             VillageName = villageName;
@@ -21,6 +21,7 @@ namespace BankingPlatform.API.DTO.Location.Village
             ZoneName = zoneName;
             ThanaName = thanaName;
             BranchId = branchId;
+            PinCode = pinCode;
             
         }
         public int VillageId { get; set; }
@@ -42,6 +43,8 @@ namespace BankingPlatform.API.DTO.Location.Village
         public string? TehsilName { get; set; }
         public string? ZoneName { get; set; }
         public string? PostOfficeName { get; set; }
+        [Required]
+        public int PinCode { get; set; }
         
     }
 }
