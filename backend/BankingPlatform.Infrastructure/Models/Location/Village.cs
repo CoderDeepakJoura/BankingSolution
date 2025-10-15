@@ -19,5 +19,6 @@ namespace BankingPlatform.Infrastructure.Models.Location
         public int postofficeid { get; set; }
         public int tehsilid { get; set; }
         public int pincode { get; set; }
+        public int patwarId { get; set; }
     }
 }

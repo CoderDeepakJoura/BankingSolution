@@ -9,6 +9,7 @@ import ZoneApiService from "../../../services/location/zone/zoneapi";
 import ThanaApiService from "../../../services/location/thana/thanaapi";
 import PostOfficeApiService from "../../../services/location/PostOffice/postOfficeapi";
 import TehsilApiService from "../../../services/location/tehsil/tehsilapi";
+import PatwarApiService from "../../../services/location/Patwar/Patwarapi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import Select, { SingleValue } from "react-select";
@@ -33,6 +34,11 @@ interface TehsilInfo {
   tehsilName: string;
 }
 
+interface PatwarInfo {
+  patwarId: number;
+  description: string;
+}
+
 interface OptionType {
   value: number;
   label: string;
@@ -48,6 +54,7 @@ interface ValidationErrors {
   tehsil?: string;
   pincode?: string;
   general?: string;
+  patwar?: string;
 }
 
 const VillageMaster = () => {
@@ -61,6 +68,7 @@ const VillageMaster = () => {
   const [selectedZone, setSelectedZone] = useState<number>(0);
   const [selectedThana, setSelectedThana] = useState<number>(0);
   const [selectedPostOffice, setSelectedPostOffice] = useState<number>(0);
+  const [selectedPatwar, setSelectedPatwar] = useState<number>(0);
   const [selectedTehsil, setSelectedTehsil] = useState<number>(0);
   const [pincode, setPincode] = useState<string>("");
 
@@ -69,6 +77,7 @@ const VillageMaster = () => {
   const [thanas, setThanas] = useState<ThanaInfo[]>([]);
   const [postOffices, setPostOffices] = useState<PostOfficeInfo[]>([]);
   const [tehsils, setTehsils] = useState<TehsilInfo[]>([]);
+  const [patwars, setPatwar] = useState<PatwarInfo[]>([]);
 
   // State for UI/form management - CHANGED TO OBJECT
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -117,6 +126,7 @@ const VillageMaster = () => {
     setSelectedThana(0);
     setSelectedPostOffice(0);
     setSelectedTehsil(0);
+    setSelectedPatwar(0);
     setPincode("");
     setErrors({});
     inputRef.current?.focus();
@@ -154,6 +164,10 @@ const VillageMaster = () => {
       newErrors.tehsil = "Please select a Tehsil.";
     }
 
+    if (selectedPatwar === 0) {
+      newErrors.patwar = "Please select a Patwar.";
+    }
+
     // Validate pincode
     if (!pincode) {
       newErrors.pincode = "Pincode is required.";
@@ -173,11 +187,13 @@ const VillageMaster = () => {
         const thanasRes = await ThanaApiService.getAllThanas(user.branchid);
         const postOfficesRes = await PostOfficeApiService.getAllPostOffices(user.branchid);
         const tehsilsRes = await TehsilApiService.getAllTehsils(user.branchid);
+        const patwarInfo = await PatwarApiService.getAllPatwars(user.branchid);
         
         setZones(zonesRes.data || []);
         setThanas(thanasRes.data || []);
         setPostOffices(postOfficesRes.data || []);
         setTehsils(tehsilsRes.data || []);
+        setPatwar(patwarInfo.data || [])
       } catch (err) {
         console.error("Failed to fetch dropdown data:", err);
         Swal.fire({
@@ -220,7 +236,8 @@ const VillageMaster = () => {
         selectedPostOffice,
         selectedTehsil,
         Number(user.branchid),
-        Number(pincode)
+        Number(pincode),
+        selectedPatwar
       );
 
       if (response.success) {
@@ -272,6 +289,11 @@ const VillageMaster = () => {
     setErrors(prev => ({ ...prev, tehsil: undefined }));
   };
 
+   const handlePatwarChange = (selectedOption: SingleValue<OptionType>) => {
+    setSelectedPatwar(selectedOption ? selectedOption.value : 0);
+    setErrors(prev => ({ ...prev, patwar: undefined }));
+  };
+
   // Memoized options
   const zoneData: OptionType[] = zones.map((zone) => ({
     value: zone.zoneId,
@@ -293,9 +315,13 @@ const VillageMaster = () => {
     label: tehsil.tehsilName,
   }));
 
+   const patwarData: OptionType[] = patwars.map((patwar) => ({
+    value: patwar.patwarId,
+    label: patwar.description,
+  }));
+
   return (
     <DashboardLayout
-      enableScroll={false}
       mainContent={
         <div className="bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
@@ -547,6 +573,38 @@ const VillageMaster = () => {
                       <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
                         <FaTimes className="text-xs" />
                         {errors.tehsil}
+                      </p>
+                    )}
+                  </div>
+
+                   <div className="flex flex-col">
+                    <label htmlFor="patwar" className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"></div>
+                      Patwar
+                      <span className="text-red-500 text-xs">*</span>
+                    </label>
+                    <Select
+                      id="PatwarInfo"
+                      options={patwarData}
+                      value={patwarData.find((option) => option.value === selectedPatwar) || null}
+                      onChange={handlePatwarChange}
+                      placeholder="Select Patwar"
+                      isClearable
+                      className="text-sm"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: errors.tehsil ? '#fca5a5' : base.borderColor,
+                          '&:hover': {
+                            borderColor: errors.tehsil ? '#fca5a5' : base.borderColor,
+                          },
+                        }),
+                      }}
+                    />
+                    {errors.patwar && (
+                      <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
+                        <FaTimes className="text-xs" />
+                        {errors.patwar}
                       </p>
                     )}
                   </div>

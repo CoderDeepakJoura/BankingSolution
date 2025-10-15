@@ -14,5 +14,6 @@ namespace BankingPlatform.Infrastructure.Models.AccHeads
         public string description { get; set; } = null!;
 
         public string? descriptionsl { get; set; }
+        public int categoryid { get; set; } = 1!;
     }
 }

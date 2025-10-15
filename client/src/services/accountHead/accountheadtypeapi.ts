@@ -13,6 +13,7 @@ export interface AccountHeadType {
   accountHeadTypeId: number ;
   accountHeadTypeName: string;
   accountHeadTypeNameSL: string;
+  categoryName: string;
 }
 
 export interface accountheadtypeResponse {
@@ -29,11 +30,12 @@ class accountheadtypeApiService extends ApiService {
   async add_new_accountheadtype(
     accountheadtypename: string,
     accountheadtypenamesl: string = "",
-    branchId : number
+    branchId : number,
+    categoryId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/accountheadtype/create_accountheadtype', {
       method: 'POST',
-      body: JSON.stringify({ accountheadtypename, accountheadtypenamesl, branchId }),
+      body: JSON.stringify({ accountheadtypename, accountheadtypenamesl, branchId, categoryId }),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -44,11 +46,12 @@ class accountheadtypeApiService extends ApiService {
     accountheadtypeid : number,
     accountheadtypename: string,
     accountheadtypenamesl: string = "",
-    branchId: number
+    branchId: number,
+    categoryId: number
   ): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/accountheadtype/modify_accountheadtype', {
       method: 'POST',
-      body: JSON.stringify({accountheadtypeid, accountheadtypename, accountheadtypenamesl, branchId }),
+      body: JSON.stringify({accountheadtypeid, accountheadtypename, accountheadtypenamesl, branchId, categoryId }),
       headers: {
         'Content-Type': 'application/json',
         

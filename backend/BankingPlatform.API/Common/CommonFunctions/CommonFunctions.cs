@@ -4,6 +4,7 @@ using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
 using BankingPlatform.Infrastructure.Models.voucher;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using System;
 
 namespace BankingPlatform.API.Common.CommonFunctions
@@ -76,6 +77,11 @@ namespace BankingPlatform.API.Common.CommonFunctions
         public async Task<string> GetTehsilFromId(int zoneId, int branchId) => await _appcontext.tehsil
                                      .Where(x => x.branchid == branchId && x.id == zoneId)
                                      .Select(x => x.tehsilname)
+                                     .FirstOrDefaultAsync() ?? "";
+
+        public async Task<string> GetPatwarFromId(int patwarId, int branchId) => await _appcontext.patwar
+                                     .Where(x => x.branchid == branchId && x.id == patwarId)
+                                     .Select(x => x.description)
                                      .FirstOrDefaultAsync() ?? "";
 
         public string GetStateFromId(int stateId) => _appcontext.state
@@ -198,6 +204,39 @@ namespace BankingPlatform.API.Common.CommonFunctions
                    .FirstOrDefaultAsync();
 
         public async Task<List<VoucherCreditDebitDetails>> GetVoucherInfoFromVoucherId(int voucherId, int branchId) => await _appcontext.vouchercreditdebitdetails.Where(x => x.BrId == branchId && x.VoucherID == voucherId).ToListAsync();
+
+        public string getHeadTypeCategoryNameFromId(int id)
+        {
+            string name = "";
+            switch (id) {
+                case 1:
+                    name = "Assets";
+                    break;
+                case 2:
+                    name = "Liabilities";
+                    break;
+                case 3:
+                    name = "Indirect Income";
+                    break;
+                case 4:
+                    name = "Indirect Expense";
+                    break;
+                case 5:
+                    name = "Direct Income";
+                    break;
+                case 6:
+                    name = "Direct Expense";
+                    break;
+                case 7:
+                    name = "Sale Return";
+                    break;
+                case 8:
+                    name = "Purchase Return";
+                    break;
+            }
+
+            return name;
+        }
 
 
     }

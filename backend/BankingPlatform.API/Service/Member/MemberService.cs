@@ -354,13 +354,14 @@ namespace BankingPlatform.API.Services
 
             VoucherDTO voucherDto = new VoucherDTO
             {
-                TotalDebit = totalDebitInfo!.VoucherAmount,
+                TotalDebit = totalDebitInfo?.VoucherAmount ?? 0,
                 smAmount = smAmount,
                 admissionFeesAccountId = admissionFeeInfo != null ? admissionFeeInfo!.AccountId : 0,
                 admissionFeeAmount = admissionFeeInfo != null ? admissionFeeInfo!.VoucherAmount : 0,
-                DebitAccountId = totalDebitInfo!.AccountId,
+                DebitAccountId = totalDebitInfo?.AccountId ?? 0,
                 OpeningAmount = existingOpeningAccInfo?.OpeningAmount > 0 ? existingOpeningAccInfo.OpeningAmount : 0,
-                VoucherNarration = narration
+                VoucherNarration = narration,
+                admissionFeesAccount = await _commonfunctions.GetAccountNameFromAccId(admissionFeeInfo != null ? admissionFeeInfo!.AccountId : 0, branchId, true)
             };
 
             AccountMasterDTO accountMasterDTO = new AccountMasterDTO

@@ -113,11 +113,11 @@ export const useFormValidation = () => {
       requiredMessage: "Primary village selection is required",
       tab: "address",
     },
-    zone1: {
-      required: true,
-      requiredMessage: "Primary zone selection is required",
-      tab: "address",
-    },
+    // zone1: {
+    //   required: true,
+    //   requiredMessage: "Primary zone selection is required",
+    //   tab: "address",
+    // },
     addressLineSL1: {
       maxLength: 150,
       pattern: /^[\u0900-\u097F\s\d\-,./]*$/,

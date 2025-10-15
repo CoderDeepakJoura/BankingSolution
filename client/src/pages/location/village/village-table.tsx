@@ -23,6 +23,7 @@ const VillageTable: React.FC<VillageTableProps> = ({
     { key: "postOfficeName", header: "Post Office Name" },
     { key: "zoneName", header: "Zone Name" },
     { key: "pinCode", header: "PIN Code" },
+    { key: "patwarName", header: "Patwar Name" },
     {
       key: "actions",
       header: "Actions",

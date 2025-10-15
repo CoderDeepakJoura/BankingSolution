@@ -3,6 +3,7 @@ using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.AccountHead;
 using BankingPlatform.API.DTO.AccountMasters;
 using BankingPlatform.API.DTO.CommonDTO;
+using BankingPlatform.API.DTO.Location.Patwar;
 using BankingPlatform.API.DTO.Location.PostOffice;
 using BankingPlatform.API.DTO.Location.Relation;
 using BankingPlatform.API.DTO.Location.State;
@@ -238,19 +239,22 @@ namespace BankingPlatform.API.Controllers
         {
 
             var locationInfo = await (from village in _context.village.AsNoTracking()
-                               join zone in _context.zone.AsNoTracking() on new { zoneId = village.zoneid, branchId = village.branchid }
-                               equals new { zoneId = zone.id, branchId = zone.branchid }
-                               join thana in _context.thana.AsNoTracking()
-                               on new { thanaId = village.thanaid, branchId = village.branchid }
-                               equals new { thanaId = thana.id, branchId = thana.branchid }
-                               join postOffice in _context.postoffice.AsNoTracking()
-                               on new { postOfficeId = village.postofficeid, branchId = village.branchid }
-                               equals new { postOfficeId = postOffice.id, branchId = postOffice.branchid }
-                               join tehsil in _context.tehsil.AsNoTracking()
-                               on new { tehsilId = village.tehsilid, branchId = village.branchid }
-                               equals new { tehsilId = tehsil.id, branchId = tehsil.branchid }
-                               where village.branchid == branchid && village.id == villageId
-                               select new { zoneName = zone.zonename, thanaName = thana.thananame, postOfficeName = postOffice.postofficename, tehsilName = tehsil.tehsilname, zoneId = zone.id, thanaId = thana.id, postofficeId = postOffice.id, tehsilId = tehsil.id, pinCode = village.pincode }
+                                      join zone in _context.zone.AsNoTracking() on new { zoneId = village.zoneid, branchId = village.branchid }
+                                      equals new { zoneId = zone.id, branchId = zone.branchid }
+                                      join thana in _context.thana.AsNoTracking()
+                                      on new { thanaId = village.thanaid, branchId = village.branchid }
+                                      equals new { thanaId = thana.id, branchId = thana.branchid }
+                                      join postOffice in _context.postoffice.AsNoTracking()
+                                      on new { postOfficeId = village.postofficeid, branchId = village.branchid }
+                                      equals new { postOfficeId = postOffice.id, branchId = postOffice.branchid }
+                                      join tehsil in _context.tehsil.AsNoTracking()
+                                      on new { tehsilId = village.tehsilid, branchId = village.branchid }
+                                      equals new { tehsilId = tehsil.id, branchId = tehsil.branchid }
+                                      join patwar in _context.patwar.AsNoTracking()
+                                      on new { patwarId = village.patwarId, branchId = village.branchid }
+                                      equals new { patwarId = patwar.id, branchId = patwar.branchid }
+                                      where village.branchid == branchid && village.id == villageId
+                                      select new { zoneName = zone.zonename, thanaName = thana.thananame, postOfficeName = postOffice.postofficename, tehsilName = tehsil.tehsilname, zoneId = zone.id, thanaId = thana.id, postofficeId = postOffice.id, tehsilId = tehsil.id, pinCode = village.pincode, patwar = patwar.description ?? "", patwarId = patwar.id }
                                ).FirstOrDefaultAsync();
             if (locationInfo == null)
                 return NotFound(new ResponseDto
@@ -264,7 +268,8 @@ namespace BankingPlatform.API.Controllers
                                     { "ThanaName", locationInfo.thanaName + "-" + locationInfo.thanaId },
                                     { "TehsilName", locationInfo.tehsilName + "-" + locationInfo.tehsilId },
                                     { "PostOfficeName", locationInfo.postOfficeName + "-" + locationInfo.postofficeId },
-                                    { "PinCode" , locationInfo.pinCode.ToString() }
+                                    { "PinCode" , locationInfo.pinCode.ToString() },
+                                    { "Patwar", locationInfo.patwar + "-" + locationInfo.patwarId}
                                 };
 
             return Ok(new
@@ -388,6 +393,22 @@ namespace BankingPlatform.API.Controllers
             {
                 Success = PANExists,
                 Message = PANExists ? "PAN already exists" : ""
+            });
+        }
+
+        [HttpGet("patwars/{branchId}")]
+        public async Task<IActionResult> PatwarInfo([FromRoute] int branchId)
+        {
+            var patwarInfo = await _context.patwar.Where(x => x.branchid == branchId).Select(x => new PatwarDTO
+            {
+                Description = x.description,
+                PatwarId = x.id
+            }).ToListAsync();
+
+            return Ok(new
+            {
+                Success = true,
+                data = patwarInfo
             });
         }
 

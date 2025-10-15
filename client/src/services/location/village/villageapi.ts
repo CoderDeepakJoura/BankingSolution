@@ -26,7 +26,9 @@ export interface Village {
   tehsilId?: number;
   tehsilName?: string; // Added for display purposes
   branchId?: number;
-  pinCode?: number
+  pinCode?: number;
+  patwarName?: string;
+  patwarId? : number;
 }
 
 // Fixed naming convention - PascalCase for interface names
@@ -47,6 +49,7 @@ export interface CreateVillageRequest {
   tehsilId: number;
   branchId: number;
   pincode: number;
+  patwarId: number;
 }
 
 // Added interface for modify village request
@@ -60,6 +63,7 @@ export interface ModifyVillageRequest {
   tehsilId: number;
   branchId: number;
   pinCode: number;
+  patwarId: number;
 }
 
 // Added interface for delete village request
@@ -95,7 +99,8 @@ class VillageApiService extends ApiService {
     postOfficeId: number,
     tehsilId: number,
     branchId: number,
-    pincode: number
+    pincode: number,
+    patwarId: number
   ): Promise<ApiResponse<AuthResponse>> {
     const requestBody: CreateVillageRequest = {
       villageName,
@@ -105,7 +110,8 @@ class VillageApiService extends ApiService {
       postOfficeId,
       tehsilId,
       branchId,
-      pincode
+      pincode,
+      patwarId
     };
 
     return this.makeRequest<AuthResponse>('/village/create_village', {
@@ -135,7 +141,8 @@ class VillageApiService extends ApiService {
     postOfficeId: number,
     tehsilId: number,
     branchId: number,
-    pinCode: number
+    pinCode: number,
+    patwarId: number
   ): Promise<ApiResponse<AuthResponse>> {
     const requestBody: ModifyVillageRequest = {
       villageId,
@@ -146,7 +153,8 @@ class VillageApiService extends ApiService {
       postOfficeId,
       tehsilId,
       branchId,
-      pinCode
+      pinCode,
+      patwarId
     };
 
     return this.makeRequest<AuthResponse>('/village/modify_village', {

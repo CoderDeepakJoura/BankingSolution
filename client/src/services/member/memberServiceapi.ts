@@ -137,7 +137,7 @@ export interface VoucherDTO {
   smAmount?: number;
   admissionFeesAccount?: string;
   admissionFeesAccountId?: number;
-  admissionFeeAmount?: string;
+  admissionFeeAmount?: number;
   debitAccountId?: number;
   debitAccountName?: string;
   totalDebit?: number;

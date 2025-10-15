@@ -80,7 +80,8 @@ namespace BankingPlatform.API.Controllers.AccountHead
                 {
                     branchid = accountheadtypeMasterDTO.BranchId,
                     description = accountheadtypeMasterDTO.AccountHeadTypeName,
-                    descriptionsl = accountheadtypeMasterDTO.AccountHeadTypeNameSL
+                    descriptionsl = accountheadtypeMasterDTO.AccountHeadTypeNameSL,
+                    categoryid = accountheadtypeMasterDTO.CategoryId
                 });
                 await _appContext.SaveChangesAsync();
 
@@ -112,22 +113,37 @@ namespace BankingPlatform.API.Controllers.AccountHead
             {
                 var query = _appContext.accountheadtype.AsNoTracking();
 
-                if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
-                {
-                    var term = filter.SearchTerm;
-                    query = query.Where(z =>
-                        z.description.ToLower().Contains(term.ToLower()) ||
-                        z.descriptionsl != null && z.descriptionsl.ToLower().Contains(term.ToLower()));
-                }
                 var totalCount = await query.CountAsync();
 
                 var items = await query
-                    .Where(x=> x.branchid == branchId)
                     .OrderBy(z => z.description)
                     .Skip((filter.PageNumber - 1) * filter.PageSize)
                     .Take(filter.PageSize)
-                    .Select(z => new AccountHeadTypeDTO(z.description, z.descriptionsl, z.id, z.branchid))
+                    .Select(z => new AccountHeadTypeDTO(
+                        z.description,
+                        z.descriptionsl,
+                        z.id,
+                        z.branchid,
+                        z.categoryid,
+                        "" 
+                    ))
                     .ToListAsync();
+
+                foreach (var item in items)
+                    item.CategoryName = _commonFunctions.getHeadTypeCategoryNameFromId(item.CategoryId);
+
+                // Step 5: Apply final in-memory filter (including CategoryName)
+                if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
+                {
+                    var term = filter.SearchTerm.ToLower();
+                    items = items
+                        .Where(x =>
+                            x.AccountHeadTypeName.ToLower().Contains(term) ||
+                            (!string.IsNullOrEmpty(x.AccountHeadTypeNameSL) && x.AccountHeadTypeNameSL.ToLower().Contains(term)) ||
+                            (!string.IsNullOrEmpty(x.CategoryName) && x.CategoryName.ToLower().Contains(term))
+                        )
+                        .ToList();
+                }
 
                 return Ok(new
                 {
@@ -215,6 +231,7 @@ namespace BankingPlatform.API.Controllers.AccountHead
                 // Update the properties of the existing accountheadtype entity
                 existingAccountHeadType.description = accountheadtypeMasterDTO.AccountHeadTypeName?.Trim() ?? "";
                 existingAccountHeadType.descriptionsl = accountheadtypeMasterDTO.AccountHeadTypeNameSL?.Trim() ?? "";
+                existingAccountHeadType.categoryid = accountheadtypeMasterDTO.CategoryId;
 
                 // Save changes to the database
                 await _appContext.SaveChangesAsync();

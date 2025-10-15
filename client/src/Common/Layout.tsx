@@ -218,7 +218,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: "Location Masters",
           path: "",
           subItems: [
-            { label: "Patwar Circle", path: "/patwar-operations" },
+            { label: "Patwar Master", path: "/patwar-operations" },
             { label: "Post Office Master", path: "/postOffice-operations" },
             { label: "Tehsil Master", path: "/tehsil-operations" },
             { label: "Thana Master", path: "/thana-operations" },

@@ -6,7 +6,7 @@ import CRUDDashboard from '../../../components/Location/CRUDDashboard';
 const PostOfficeModule: React.FC = () => {
   return (
     <CRUDDashboard
-      title="Patwar Circle"
+      title="Patwar Master"
       addPath="/patwar"
       modifyPath="/patwar-info"
     />

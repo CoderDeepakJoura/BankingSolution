@@ -22,7 +22,7 @@ namespace BankingPlatform.API.Controllers.Miscallenous
 
         
         [HttpPost]
-        public async Task<IActionResult> CreateOccupation([FromBody] PatwarDTO occupationMasterDTO)
+        public async Task<IActionResult> CreateOccupation([FromBody] OccupationDTO occupationMasterDTO)
         {
             try
             {
@@ -145,7 +145,7 @@ namespace BankingPlatform.API.Controllers.Miscallenous
         }
 
         [HttpPut]
-        public async Task<IActionResult> ModifyOccupation([FromBody] PatwarDTO occupationMasterDTO)
+        public async Task<IActionResult> ModifyOccupation([FromBody] OccupationDTO occupationMasterDTO)
         {
             try
             {

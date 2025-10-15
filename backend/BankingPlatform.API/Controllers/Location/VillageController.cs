@@ -88,7 +88,8 @@ namespace BankingPlatform.API.Controllers.Location
                     tehsilid = villageMasterDTO.TehsilId,
                     thanaid = villageMasterDTO.ThanaId,
                     zoneid = villageMasterDTO.ZoneId,
-                    pincode = villageMasterDTO.PinCode
+                    pincode = villageMasterDTO.PinCode,
+                    patwarId = villageMasterDTO.PatwarId
                 });
                 await _appContext.SaveChangesAsync();
 
@@ -144,7 +145,8 @@ namespace BankingPlatform.API.Controllers.Location
                              z.thanaid,
                              z.postofficeid,
                              z.id,
-                             z.pincode
+                             z.pincode,
+                             z.patwarId
                          })
                          .ToListAsync();
 
@@ -162,10 +164,13 @@ namespace BankingPlatform.API.Controllers.Location
                         z.tehsilid,
                         z.postofficeid,
                         z.pincode,
+                        z.patwarId,
                         await _commonfns.GetZoneNameFromId(z.zoneid, z.branchid),
                         await _commonfns.GetTehsilFromId(z.tehsilid, z.branchid),
                         await _commonfns.GetPostOfficeNameFromId(z.postofficeid, z.branchid),
-                        await _commonfns.GetThanaNameFromId(z.thanaid, z.branchid)
+                        await _commonfns.GetThanaNameFromId(z.thanaid, z.branchid),
+                        await _commonfns.GetPatwarFromId(z.patwarId, z.branchid)
+
                     ));
                 }
 
@@ -262,6 +267,7 @@ namespace BankingPlatform.API.Controllers.Location
                 existingVillage.thanaid = villageMasterDTO.ThanaId;
                 existingVillage.postofficeid = villageMasterDTO.PostOfficeId;
                 existingVillage.pincode = villageMasterDTO.PinCode;
+                existingVillage.patwarId = villageMasterDTO.PatwarId;
 
                 // Save changes to the database
                 await _appContext.SaveChangesAsync();

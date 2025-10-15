@@ -31,7 +31,7 @@ class PatwarApiService extends ApiService {
     descriptionSL: string = "",
     branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
-    return this.makeRequest<AuthResponse>('/Patwar', {
+    return this.makeRequest<AuthResponse>('/patwar', {
       method: 'POST',
       body: JSON.stringify({ description, descriptionSL, branchId }),
       headers: {
@@ -47,7 +47,7 @@ class PatwarApiService extends ApiService {
     descriptionSL: string = "",
     branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
-    return this.makeRequest<AuthResponse>('/Patwar', {
+    return this.makeRequest<AuthResponse>('/patwar', {
       method: 'PUT',
       body: JSON.stringify({Patwarid, description, descriptionSL, branchId }),
       headers: {
@@ -61,7 +61,7 @@ class PatwarApiService extends ApiService {
     Patwarid : number,
     branchId: number
   ): Promise<ApiResponse<AuthResponse>> {
-    return this.makeRequest<AuthResponse>(`/Patwar/${Patwarid}/${branchId}`, {
+    return this.makeRequest<AuthResponse>(`/patwar/${Patwarid}/${branchId}`, {
       method: 'DELETE',
       body: JSON.stringify({Patwarid, branchId }),
       headers: {
@@ -74,7 +74,7 @@ class PatwarApiService extends ApiService {
     filter: PatwarFilter,
     branchid: number
   ): Promise<ApiResponse<PatwarResponse>> {
-    return this.makeRequest<PatwarResponse>(`/Patwar/patwars_info/${branchid}`, {
+    return this.makeRequest<PatwarResponse>(`/patwar/patwars_info/${branchid}`, {
       method: 'POST',
       body: JSON.stringify(filter),
       headers: {
@@ -82,6 +82,14 @@ class PatwarApiService extends ApiService {
       },
     });
   }
+  async getAllPatwars(branchId: number): Promise<ApiResponse<PatwarResponse>> {
+      return this.makeRequest<PatwarResponse>(`/fetchdata/patwars/${branchId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
   
 }
 

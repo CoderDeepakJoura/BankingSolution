@@ -7,6 +7,7 @@ import ZoneApiService from "../../../services/location/zone/zoneapi";
 import ThanaApiService from "../../../services/location/thana/thanaapi";
 import PostOfficeApiService from "../../../services/location/PostOffice/postOfficeapi";
 import TehsilApiService from "../../../services/location/tehsil/tehsilapi";
+import PatwarApiService from "../../../services/location/Patwar/Patwarapi";
 import Swal from "sweetalert2";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import VillageTable from "./village-table";
@@ -44,7 +45,8 @@ const addVillage = async (
   zones: any[],
   thanas: any[],
   postOffices: any[],
-  tehsils: any[]
+  tehsils: any[],
+  patwars: any[]
 ) => {
   const zoneOptions = zones
     .map(
@@ -75,6 +77,14 @@ const addVillage = async (
       (tehsil) =>
         `<option value="${tehsil.tehsilId || tehsil.id}">${
           tehsil.tehsilName || tehsil.name
+        }</option>`
+    )
+    .join("");
+    const patwarOptions = patwars
+    .map(
+      (patwar) =>
+        `<option value="${patwar.patwarId}">${
+          patwar.description
         }</option>`
     )
     .join("");
@@ -203,6 +213,24 @@ const addVillage = async (
         <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-cyan-200"></div>
       </div>
     </div>
+    <div class="swal2-input-group">
+      <label for="PatwarId" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+        <div class="w-2 h-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"></div>
+        Patwar
+        <span class="text-red-500 text-xs">*</span>
+      </label>
+      <div class="relative">
+        <select 
+          id="PatwarId" 
+          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 outline-none transition-all duration-300 text-slate-700 bg-gradient-to-r from-white to-slate-50"
+          required
+        >
+          <option value="">Select Patwar</option>
+          ${patwarOptions}
+        </select>
+        <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-cyan-200"></div>
+      </div>
+    </div>
 
     <!-- Pincode Field - NEW -->
     <div class="swal2-input-group">
@@ -289,6 +317,9 @@ const addVillage = async (
       const TehsilId = (
         document.getElementById("TehsilId") as HTMLSelectElement
       ).value;
+      const PatwarId = (
+        document.getElementById("PatwarId") as HTMLSelectElement
+      ).value;
       const Pincode = (
         document.getElementById("Pincode") as HTMLInputElement
       ).value.trim();
@@ -318,6 +349,11 @@ const addVillage = async (
         (document.getElementById("TehsilId") as HTMLInputElement).focus();
         return null;
       }
+      if (!PatwarId) {
+        Swal.showValidationMessage("Patwar selection is required");
+        (document.getElementById("PatwarId") as HTMLInputElement).focus();
+        return null;
+      }
       if (!Pincode || Pincode.length !== 6) {
         Swal.showValidationMessage("Pincode must be exactly 6 digits");
         (document.getElementById("Pincode") as HTMLInputElement).focus();
@@ -332,6 +368,7 @@ const addVillage = async (
         PostOfficeId,
         TehsilId,
         Pincode,
+        PatwarId
       };
     },
   });
@@ -346,7 +383,8 @@ const addVillage = async (
         Number(formValues.PostOfficeId),
         Number(formValues.TehsilId),
         branchId,
-        Number(formValues.Pincode)
+        Number(formValues.Pincode),
+        Number(formValues.PatwarId)
       );
 
       Swal.fire({
@@ -370,7 +408,8 @@ const modifyVillage = async (
   thanas: any[],
   postOffices: any[],
   tehsils: any[],
-  branchId: number
+  branchId: number,
+  patwars: any[]
 ) => {
   const zoneOptions = zones
     .map((zone) => {
@@ -419,6 +458,18 @@ const modifyVillage = async (
       return `<option value="${tehsil.tehsilId || tehsil.id}" ${
         isSelected ? "selected" : ""
       }>${tehsil.tehsilName || tehsil.name}</option>`;
+    })
+    .join("");
+
+    const patwarOptions = patwars
+    .map((patwar) => {
+      const patwarId = (patwar.patwarId)?.toString();
+      const villagePatwarId = village.patwarId?.toString();
+      const isSelected = patwarId === villagePatwarId;
+
+      return `<option value="${patwar.patwarId}" ${
+        isSelected ? "selected" : ""
+      }>${patwar.description }</option>`;
     })
     .join("");
 
@@ -542,6 +593,24 @@ const modifyVillage = async (
       </div>
     </div>
 
+    <div class="swal2-input-group">
+      <label for="PatwarId" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+        <div class="w-2 h-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"></div>
+        Patwar
+        <span class="text-red-500 text-xs">*</span>
+      </label>
+      <div class="relative">
+        <select 
+          id="PatwarId" 
+          class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 outline-none transition-all duration-300 text-slate-700 bg-gradient-to-r from-white to-slate-50"
+          required
+        >
+          <option value="">Select Patwar</option>
+          ${patwarOptions}
+        </select>
+      </div>
+    </div>
+
     <!-- Pincode Field - NEW -->
     <div class="swal2-input-group">
       <label for="Pincode" class="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
@@ -618,6 +687,10 @@ const modifyVillage = async (
         document.getElementById("Pincode") as HTMLInputElement
       ).value.trim();
 
+      const PatwarId = (
+        document.getElementById("PatwarId") as HTMLInputElement
+      ).value.trim();
+
       if (!VillageName) {
         Swal.showValidationMessage("Village Name is required");
         (document.getElementById("VillageName") as HTMLInputElement).focus();
@@ -643,6 +716,11 @@ const modifyVillage = async (
         (document.getElementById("TehsilId") as HTMLInputElement).focus();
         return null;
       }
+      if (!PatwarId) {
+        Swal.showValidationMessage("Patwar selection is required");
+        (document.getElementById("PatwarId") as HTMLInputElement).focus();
+        return null;
+      }
       if (!Pincode || Pincode.length !== 6) {
         Swal.showValidationMessage("Pincode must be exactly 6 digits");
         (document.getElementById("Pincode") as HTMLInputElement).focus();
@@ -658,6 +736,7 @@ const modifyVillage = async (
         PostOfficeId,
         TehsilId,
         Pincode,
+        PatwarId
       };
     },
   });
@@ -673,7 +752,8 @@ const modifyVillage = async (
         Number(formValues.PostOfficeId),
         Number(formValues.TehsilId),
         branchId,
-        Number(formValues.Pincode)
+        Number(formValues.Pincode),
+        Number(formValues.PatwarId)
       );
 
       Swal.fire({
@@ -734,6 +814,7 @@ const VillageMaster: React.FC = () => {
   const [thanas, setThanas] = React.useState<any[]>([]);
   const [postOffices, setPostOffices] = React.useState<any[]>([]);
   const [tehsils, setTehsils] = React.useState<any[]>([]);
+  const [patwars, setPatwars] = React.useState<any[]>([]);
 
   const loadingRef = React.useRef(false);
 
@@ -744,20 +825,21 @@ const VillageMaster: React.FC = () => {
       loadingRef.current = true;
 
       try {
-        const [zonesRes, thanasRes, postOfficesRes, tehsilsRes] =
+        const [zonesRes, thanasRes, postOfficesRes, tehsilsRes, patwarRes] =
           await Promise.all([
             ZoneApiService.getAllZones(user.branchid),
             ThanaApiService.getAllThanas(user.branchid),
             PostOfficeApiService.getAllPostOffices(user.branchid),
             TehsilApiService.getAllTehsils(user.branchid),
+            PatwarApiService.getAllPatwars(user.branchid),
           ]);
-        console.log("data", zonesRes, thanasRes, postOfficesRes, tehsilsRes);
 
         if (!isCancelled) {
           if (zonesRes.success) setZones(zonesRes.data || []);
           if (thanasRes.success) setThanas(thanasRes.data || []);
           if (postOfficesRes.success) setPostOffices(postOfficesRes.data || []);
           if (tehsilsRes.success) setTehsils(tehsilsRes.data || []);
+          if (patwarRes.success) setPatwars(patwarRes.data || []);
         }
       } catch (error) {
         if (!isCancelled) {
@@ -788,7 +870,7 @@ const VillageMaster: React.FC = () => {
     <CRUDMaster<Village>
       fetchData={fetchVillagesWithBranch}
       addEntry={() =>
-        addVillage(user.branchid, zones, thanas, postOffices, tehsils)
+        addVillage(user.branchid, zones, thanas, postOffices, tehsils, patwars)
       }
       modifyEntry={(village) =>
         modifyVillage(
@@ -797,7 +879,8 @@ const VillageMaster: React.FC = () => {
           thanas,
           postOffices,
           tehsils,
-          user.branchid
+          user.branchid,
+          patwars
         )
       }
       deleteEntry={(village) => deleteVillage(village, user.branchid)}

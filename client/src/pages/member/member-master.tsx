@@ -269,6 +269,8 @@ const MemberMaster = () => {
   const [occupationId, setOccupationId] = useState<number | "">("");
   const [generalAccInfo, setGeneralAccounts] = useState<AccountMaster[]>([]);
   const [debitAccount, setDebitAccountId] = useState<number | "">("");
+  const [patwar1, setPatwar1] = useState<number | "">("");
+  const [patwar2, setPatwar2] = useState<number | "">("");
   // Image upload states
   const [memberPhoto, setMemberPhoto] = useState(null);
   const [memberSignature, setMemberSignature] = useState(null);
@@ -279,7 +281,7 @@ const MemberMaster = () => {
     const fetchZoneData = async () => {
       const zonesRes = await ZoneApiService.getAllZones(user.branchid);
       setZones(zonesRes.data || []);
-    }
+    };
     // Only set default if NOT in edit mode and membership type is empty
     if (!isEditMode && !membershipType) {
       setMembershipType("P");
@@ -361,9 +363,9 @@ const MemberMaster = () => {
             // Set voucher data
             setVoucherData({
               smAmount: data.voucher?.smAmount?.toString() || "",
-              admissionFeesAccount: "", // Will be set by settings
+              admissionFeesAccount: data.voucher?.admissionFeesAccount || "", // Will be set by settings
               admissionFeeAmount:
-                data.voucher?.admissionFeeAmount?.toString() || "",
+                data.voucher?.admissionFeeAmount ?? 0,
               debitAccountId: data.voucher?.debitAccountId?.toString() || "",
               debitAmount: data.voucher?.totalDebit?.toString() || "",
               narration: data.voucher?.voucherNarration || "",
@@ -394,7 +396,7 @@ const MemberMaster = () => {
                   aadhaarCardNo: nom.aadhaarCardNo || "",
                   PANCardNo: nom.panCardNo || "",
                   nomRelativeName: nom.nomRelativeName || "",
-                  percentageShare: Number(nom.percentageShare) || 0
+                  percentageShare: Number(nom.percentageShare) || 0,
                 }))
               );
             }
@@ -454,7 +456,7 @@ const MemberMaster = () => {
 
     fetchMemberData();
   }, [memberId, isEditMode, user.branchid, navigate]);
- 
+
   const zoneData: OptionType[] = zones.map((zone) => ({
     value: zone.zoneId,
     label: zone.zoneName,
@@ -484,6 +486,7 @@ const MemberMaster = () => {
         setGeneralAccounts(general_accounts.data || []);
 
         const settings = await commonservice.settings(user.branchid);
+        if(!isEditMode){
         setVoucherData((prevData) => ({
           ...prevData,
           admissionFeesAccount:
@@ -491,6 +494,7 @@ const MemberMaster = () => {
           admissionFeeAmount:
             settings.data.generalSettings.admissionFeeAmount || 0,
         }));
+      }
       } catch (err: any) {
         console.error(err);
         Swal.fire("Error", err.message || "Could not load types", "error");
@@ -590,7 +594,7 @@ const MemberMaster = () => {
   const [voucherData, setVoucherData] = useState({
     smAmount: "",
     admissionFeesAccount: "", // Set as needed
-    admissionFeeAmount: "", // Will be set via calculation or autofill
+    admissionFeeAmount: 0, // Will be set via calculation or autofill
     debitAccountId: "",
     debitAmount: "", // Calculated field
     narration: "",
@@ -779,12 +783,14 @@ const MemberMaster = () => {
     if (caption == "villageId1") {
       setThana1("");
       setPostOffice1("");
+      setPatwar1("");
       setTehsil1("");
       setZone1("");
       setPinCode1("");
     } else if (caption == "villageId2") {
       setThana2("");
       setPostOffice2("");
+      setPatwar2("");
       setTehsil2("");
       setZone2("");
       setPinCode2("");
@@ -803,7 +809,13 @@ const MemberMaster = () => {
         return;
       }
       const res = await commonservice.location_Info(villageId, user.branchid);
-      if (!res.success) throw new Error("Failed to load Location Data.");
+      if (!res.success) {
+        Swal.fire(
+          "Error",
+          "Unable to load location data. Please ensure the village master contains complete and valid location details."
+        );
+        return;
+      }
       const data = res.data;
       if (villageId1) {
         setThana1(data.ThanaName || "");
@@ -811,13 +823,14 @@ const MemberMaster = () => {
         setTehsil1(data.TehsilName || "");
         setZone1(commonservice.getLastSegment(data.ZoneName) || "");
         setPinCode1(data.PinCode || "");
+        setPatwar1(data.Patwar);
         setMemberData((prevData) => ({
           ...prevData,
           addressLine1: `Village: ${village1Label}, Thana Name: ${
             data.ThanaName.split("-")[0]
           }, Tehsil Name: ${data.TehsilName.split("-")[0]}, Post Office: ${
             data.PostOfficeName.split("-")[0]
-          },  Zone Name: ${data.ZoneName.split("-")[0]}, Pin Code: ${
+          },  Zone Name: ${data.ZoneName.split("-")[0]}, Patwar: ${data.Patwar.split("-")[0]}, Pin Code: ${
             data.PinCode
           }`,
         }));
@@ -827,19 +840,37 @@ const MemberMaster = () => {
         setTehsil2(data.TehsilName || "");
         setZone2(commonservice.getLastSegment(data.ZoneName) || "");
         setPinCode2(data.PinCode || "");
+        setPatwar1(data.Patwar);
         setMemberData((prevData) => ({
           ...prevData,
           addressLine2: `Village: ${village2Label}, Thana Name: ${
             data.ThanaName.split("-")[0]
           }, Tehsil Name: ${data.TehsilName.split("-")[0]}, Post Office: ${
             data.PostOfficeName.split("-")[0]
-          },  Zone Name: ${data.ZoneName.split("-")[0]}, Pin Code: ${
+          },  Zone Name: ${data.ZoneName.split("-")[0]}, Patwar: ${data.Patwar.split("-")[0]}, Pin Code: ${
             data.PinCode
           }`,
         }));
       }
     } catch (error) {
-      Swal.fire("Error", "Could not fetch location data", "error");
+      if (villageId1 != 0) {
+        setVillageId1("");
+        setMemberData((prevData) => ({
+          ...prevData,
+          addressLine1: "",
+        }));
+      } else if (villageId2 != 0) {
+        setVillageId2("");
+        setMemberData((prevData) => ({
+          ...prevData,
+          addressLine2: "",
+        }));
+      }
+      Swal.fire(
+        "Error",
+        "Unable to load location data. Please ensure the village master contains complete and valid location details.",
+        "error"
+      );
     }
   };
 
@@ -1017,11 +1048,10 @@ const MemberMaster = () => {
       percentageShare: Number(nominee.percentageShare), // Equal share for all nominees
     }));
     const totalNomineePercentage = nomineesDTO.reduce((sum, nominee) => {
-        return sum + (nominee.percentageShare || 0); 
+      return sum + (nominee.percentageShare || 0);
     }, 0);
 
-    if(totalNomineePercentage > 100)
-    {
+    if (totalNomineePercentage > 100) {
       await Swal.fire({
         icon: "error",
         title: "Limit exceed",
@@ -1029,8 +1059,7 @@ const MemberMaster = () => {
       });
       return;
     }
-    if(totalNomineePercentage < 100)
-    {
+    if (totalNomineePercentage < 100) {
       await Swal.fire({
         icon: "error",
         title: "Limit exceed",
@@ -1047,7 +1076,7 @@ const MemberMaster = () => {
         Number(
           commonservice.getLastSegment(voucherData.admissionFeesAccount)
         ) ?? 0,
-      admissionFeeAmount: voucherData.admissionFeeAmount,
+      admissionFeeAmount: voucherData.admissionFeeAmount ?? 0,
       debitAccountId: Number(debitAccount) ?? 0,
       totalDebit: Number(voucherData.debitAmount) || 0,
       openingAmount: Number(voucherData.openingAmount) || 0,
@@ -1333,7 +1362,7 @@ const MemberMaster = () => {
         aadhaarCardNo: "",
         PANCardNo: "",
         nomRelativeName: "",
-        percentageShare: 0
+        percentageShare: 0,
       },
     ]);
 
@@ -2237,7 +2266,7 @@ const MemberMaster = () => {
               onChange={(e) => handleInputChange("thana", e.target.value)}
               onBlur={() => handleFieldBlur("thana")}
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter Thana"
+              placeholder="Thana (auto-filled)"
               maxLength={100}
               required
               readOnly={true}
@@ -2256,7 +2285,7 @@ const MemberMaster = () => {
               onChange={(e) => handleInputChange("po1", e.target.value)}
               onBlur={() => handleFieldBlur("po1")}
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter Post Office"
+              placeholder="Post Office (auto-filled)"
               readOnly={true}
               required
             />
@@ -2280,6 +2309,23 @@ const MemberMaster = () => {
             />
           </FormField>
           <FormField
+            name="patwar1"
+            label="Patwar"
+            required
+            errors={errorsByField.patwar1 || []}
+          >
+            <input
+              type="text"
+              value={patwar1}
+              onChange={(e) => handleInputChange("patwar1", e.target.value)}
+              onBlur={() => handleFieldBlur("patwar1")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Patwar (auto-filled)"
+              readOnly={true}
+              required
+            />
+          </FormField>
+          <FormField
             name="zone1"
             label="Zone"
             required
@@ -2288,10 +2334,7 @@ const MemberMaster = () => {
             <Select
               id="zone1"
               options={zoneData}
-              value={
-                zoneData.find((option) => option.value === zone1) ||
-                null
-              }
+              value={zoneData.find((option) => option.value === zone1) || null}
               onChange={(selected) => {
                 setZone1(selected ? selected.value : "");
                 handleInputChange(
@@ -2306,6 +2349,7 @@ const MemberMaster = () => {
               className="text-sm"
             />
           </FormField>
+
           <FormField
             name="pinCode1"
             label="Pin Code"
@@ -2318,7 +2362,7 @@ const MemberMaster = () => {
               onChange={(e) => handleInputChange("pinCode1", e.target.value)}
               onBlur={() => handleFieldBlur("pinCode1")}
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter PIN Code"
+              placeholder="PIN Code (auto-filled)"
               readOnly={true}
               required
             />
@@ -2413,7 +2457,7 @@ const MemberMaster = () => {
               onChange={(e) => handleInputChange("thana2", e.target.value)}
               onBlur={() => handleFieldBlur("thana2")}
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter Thana"
+              placeholder="Thana (auto-filled)"
               maxLength={100}
               readOnly={true}
             />
@@ -2429,7 +2473,7 @@ const MemberMaster = () => {
               onChange={(e) => handleInputChange("po2", e.target.value)}
               onBlur={() => handleFieldBlur("po2")}
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter Post Office"
+              placeholder="Post Office (auto-filled)"
               readOnly={true}
             />
           </FormField>
@@ -2445,8 +2489,25 @@ const MemberMaster = () => {
               onChange={(e) => handleInputChange("tehsil2", e.target.value)}
               onBlur={() => handleFieldBlur("tehsil2")}
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter Tehsil"
+              placeholder="Tehsil (auto-filled)"
               readOnly={true}
+            />
+          </FormField>
+          <FormField
+            name="patwar2"
+            label="Patwar"
+            required
+            errors={errorsByField.patwar2 || []}
+          >
+            <input
+              type="text"
+              value={patwar2}
+              onChange={(e) => handleInputChange("patwar2", e.target.value)}
+              onBlur={() => handleFieldBlur("patwar2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Patwar (auto-filled)"
+              readOnly={true}
+              required
             />
           </FormField>
           <FormField
@@ -2458,10 +2519,7 @@ const MemberMaster = () => {
             <Select
               id="zone1"
               options={zoneData}
-              value={
-                zoneData.find((option) => option.value === zone2) ||
-                null
-              }
+              value={zoneData.find((option) => option.value === zone2) || null}
               onChange={(selected) => {
                 setZone2(selected ? selected.value : "");
                 handleInputChange(
@@ -2488,7 +2546,7 @@ const MemberMaster = () => {
               onChange={(e) => handleInputChange("pinCode2", e.target.value)}
               onBlur={() => handleFieldBlur("pinCode2")}
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter PIN Code"
+              placeholder="PIN Code (auto-filled)"
               readOnly={true}
               required
             />
@@ -2549,23 +2607,6 @@ const MemberMaster = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
-            name="email1"
-            label="Email"
-            errors={errorsByField.email1 || []}
-          >
-            <input
-              type="email" // Changed type to email
-              value={memberData.email1}
-              onChange={(e) => handleInputChange("email1", e.target.value)}
-              onBlur={() => handleFieldBlur("email1")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="example@domain.com" // Updated placeholder
-              // Removed readOnly
-              // Removed maxLength (emails can be long)
-              autoComplete="email" // Added for better browser autofill
-            />
-          </FormField>
-          <FormField
             name="phoneType1"
             label="Phone Type"
             required
@@ -2625,6 +2666,23 @@ const MemberMaster = () => {
               required
             />
           </FormField>
+          <FormField
+            name="email1"
+            label="Email"
+            errors={errorsByField.email1 || []}
+          >
+            <input
+              type="email" // Changed type to email
+              value={memberData.email1}
+              onChange={(e) => handleInputChange("email1", e.target.value)}
+              onBlur={() => handleFieldBlur("email1")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="example@domain.com" // Updated placeholder
+              // Removed readOnly
+              // Removed maxLength (emails can be long)
+              autoComplete="email" // Added for better browser autofill
+            />
+          </FormField>
         </div>
       </div>
 
@@ -2635,23 +2693,6 @@ const MemberMaster = () => {
           Secondary Contact (Optional)
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            name="email2"
-            label="Email"
-            errors={errorsByField.email2 || []}
-          >
-            <input
-              type="email" // Changed type to email
-              value={memberData.email2}
-              onChange={(e) => handleInputChange("email2", e.target.value)}
-              onBlur={() => handleFieldBlur("email2")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="example@domain.com" // Updated placeholder
-              // Removed readOnly
-              // Removed maxLength (emails can be long)
-              autoComplete="email" // Added for better browser autofill
-            />
-          </FormField>
           <FormField
             name="phoneType2"
             label="Phone Type"
@@ -2704,6 +2745,23 @@ const MemberMaster = () => {
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
               placeholder="Enter Phone Number"
               maxLength={20}
+            />
+          </FormField>
+          <FormField
+            name="email2"
+            label="Email"
+            errors={errorsByField.email2 || []}
+          >
+            <input
+              type="email" // Changed type to email
+              value={memberData.email2}
+              onChange={(e) => handleInputChange("email2", e.target.value)}
+              onBlur={() => handleFieldBlur("email2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="example@domain.com" // Updated placeholder
+              // Removed readOnly
+              // Removed maxLength (emails can be long)
+              autoComplete="email" // Added for better browser autofill
             />
           </FormField>
         </div>

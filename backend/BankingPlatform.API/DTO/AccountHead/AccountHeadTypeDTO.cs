@@ -3,12 +3,14 @@
     public class AccountHeadTypeDTO
     {
         public AccountHeadTypeDTO() { }
-        public AccountHeadTypeDTO(string accountheadtypeName, string? accountheadtypeNameSl, int accountheadtypeId, int branchId)
+        public AccountHeadTypeDTO(string accountheadtypeName, string? accountheadtypeNameSl, int accountheadtypeId, int branchId, int categoryId, string categoryName = "")
         {
             AccountHeadTypeName = accountheadtypeName;
             AccountHeadTypeNameSL = accountheadtypeNameSl;
             AccountHeadTypeId = accountheadtypeId;
             BranchId = branchId;
+            CategoryId = categoryId;
+            CategoryName = categoryName;
         }
 
         [Required(ErrorMessage = "Account Head Type Name is required")]
@@ -20,5 +22,8 @@
 
         public int AccountHeadTypeId { get; set; } = 0;
         public int BranchId { get; set; } = 0;
+        [Required]
+        public int CategoryId { get; set; } = 0;
+        public string? CategoryName { get; set; } = string.Empty;
     }
 }

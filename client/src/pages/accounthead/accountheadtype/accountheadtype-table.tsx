@@ -18,6 +18,7 @@ const AccountHeadTypeTable: React.FC<AccountHeadTypeTableProps> = ({
   const columns: Column<AccountHeadType>[] = [
     { key: "accountHeadTypeName", header: "Account Head Type Name" },
     { key: "accountHeadTypeNameSL", header: "Account Head Type Name SL" },
+    { key: "categoryName", header: "Category" },
     {
       key: "actions",
       header: "Actions",

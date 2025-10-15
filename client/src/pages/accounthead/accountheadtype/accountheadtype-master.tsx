@@ -17,11 +17,11 @@ import {
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 const AccountHeadTypeMaster: React.FC = () => {
-  
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
   const [AccountHeadTypeName, setAccountHeadTypeName] = React.useState("");
   const [AccountHeadTypeNameSL, setAccountHeadTypeNameSL] = React.useState("");
+  const [categoryId, setCategory] = React.useState("");
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 
@@ -42,6 +42,7 @@ const AccountHeadTypeMaster: React.FC = () => {
   const handleReset = () => {
     setAccountHeadTypeName("");
     setAccountHeadTypeNameSL("");
+    setCategory("");
     setError("");
     inputRef.current?.focus();
     setLoading(false);
@@ -51,12 +52,12 @@ const AccountHeadTypeMaster: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
     try {
       const response = await AccountHeadTypeApiService.add_new_accountheadtype(
         AccountHeadTypeName,
         AccountHeadTypeNameSL || "",
-        user.branchid
+        user.branchid,
+        Number(categoryId)
       );
 
       if (response.success) {
@@ -214,6 +215,45 @@ const AccountHeadTypeMaster: React.FC = () => {
                         <FaInfoCircle />
                         Optional field for Hindi/Devanagari script (max 50
                         characters)
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <label
+                      htmlFor="Category"
+                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"
+                    >
+                      <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
+                      Category<span className="text-red-500 text-xs">*</span>
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors"></div>
+                      <select
+                        value={categoryId}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                        required
+                      >
+                        <option value="">Select Category</option>
+                        <option value="1">Assets</option>
+                        <option value="2">Liabilities</option>
+                        <option value="3">Indirect Income</option>
+                        <option value="4">Indirect Expense</option>
+                        <option value="5">Direct Income</option>
+                        <option value="6">Direct Expense</option>
+                        <option value="7">Sale Return</option>
+                        <option value="8">Purchase Return</option>
+                      </select>
+                    </div>
+                    {error ? (
+                      <p className="text-red-600 text-sm flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200 mt-1">
+                        <FaTimes className="text-xs" />
+                        {error}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                        <FaInfoCircle />
+                        Category for future reporting
                       </p>
                     )}
                   </div>
