@@ -233,6 +233,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           subItems: [
             { label: "Account Masters", path: "/account-operations" },
             { label: "Member Master", path: "/member-operations" },
+            { label: "Product Masters", path: "/product-operations" },
             { label: "Settings Master", path: "/settings" },
             // { label: "Thana Master", path: "/thana-operations" },
             // { label: "Zone Master", path: "/zone-operations" },

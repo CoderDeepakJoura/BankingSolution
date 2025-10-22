@@ -2,6 +2,8 @@
 using BankingPlatform.API.Service;
 using BankingPlatform.API.Service.AccountMasters;
 using BankingPlatform.API.Service.Caste;
+using BankingPlatform.API.Service.ProductMasters.FD;
+using BankingPlatform.API.Service.ProductMasters.Savings;
 using BankingPlatform.API.Services;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
@@ -26,6 +28,8 @@ builder.Services.AddLogging();
 builder.Services.AddScoped<GeneralAccountMasterService>();
 builder.Services.AddScoped<CasteService>();
 builder.Services.AddScoped<ImageService>();
+builder.Services.AddScoped<FDProductService>();
+builder.Services.AddScoped<SavingsProductService>();
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");

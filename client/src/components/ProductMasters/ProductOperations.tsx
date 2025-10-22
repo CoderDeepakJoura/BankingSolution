@@ -1,7 +1,7 @@
-// src/pages/AccountsModule.tsx
+// src/pages/ProductsModule.tsx
 import React from 'react';
 import DashboardLayout from '../../Common/Layout'; // Assuming this is your main layout wrapper
-import AccountOperations from './AccountActions'; // Your operations component
+import ProductOperations from './ProductActions'; // Your operations component
 import { useNavigate } from 'react-router-dom';
 import { Eye, Repeat, FileText, Bell, ChevronRight, BarChart2,PlusCircle  } from 'lucide-react'; // Added FileText, Bell, ChevronRight, BarChart2 icons
 import { useEffect } from "react";
@@ -40,45 +40,40 @@ const GeneralOperationCard: React.FC<GeneralOperationCardProps> = ({ title, desc
 };
 
 
-const AccountsModule: React.FC = () => {
+const ProductsModule: React.FC = () => {
   return (
     <DashboardLayout
       mainContent={
         <div className="space-y-12 p-8 bg-gray-50 min-h-full rounded-lg shadow-inner border border-gray-100"> {/* Added subtle background and border to content area */}
           <h1 className="text-4xl font-extrabold text-gray-900 mb-8 pb-4 border-b-2 border-blue-200">
-            Account Management Dashboard            
+            Product Management Dashboard            
           </h1>
 
-          {/* Operations by Specific Account Type */}
+          {/* Operations by Specific Product Type */}
           <section>
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <PlusCircle size={24} className="text-blue-600" /> Account Type Specific Operations
+                <PlusCircle size={24} className="text-blue-600" /> Product Type Specific Operations
             </h2>
-            <div className="space-y-8"> {/* Increased spacing between AccountOperations components */}
-              <AccountOperations
-                accountType="General Account(s)"
-                addPath="/generalacc-master"
-                modifyPath="/generalacc-master-info"
+            <div className="space-y-8"> {/* Increased spacing between ProductOperations components */}
+              <ProductOperations
+                productType="FD Product(s)"
+                addPath="/fd-product"
+                modifyPath="/fdproduct-info"
               />
-               <AccountOperations
-                accountType="Loan Account(s)"
-                addPath="/accounts/savings/add"
-                modifyPath="/accounts/savings/modify"
+               <ProductOperations
+                productType="Loan Product(s)"
+                addPath="/products/savings/add"
+                modifyPath="/products/savings/modify"
               />
-              <AccountOperations
-                accountType="Saving Account(s)"
-                addPath="/accounts/savings/add"
-                modifyPath="/accounts/savings/modify"
+              <ProductOperations
+                productType="Saving Product(s)"
+                addPath="/saving-product"
+                modifyPath="/savingproduct-info"
               />
-              <AccountOperations
-                accountType="Fixed Deposit (FD) Account(s)"
-                addPath="/accounts/fd/add"
-                modifyPath="/accounts/fd/modify"
-              />
-              <AccountOperations
-                accountType="Recurring Deposit (RD) Account(s)"
-                addPath="/accounts/rd/add"
-                modifyPath="/accounts/rd/modify"
+              <ProductOperations
+                productType="Recurring Deposit (RD) Product(s)"
+                addPath="/products/rd/add"
+                modifyPath="/products/rd/modify"
               />
 
               
@@ -86,7 +81,7 @@ const AccountsModule: React.FC = () => {
               
              
 
-              {/* Add other account types here as needed */}
+              {/* Add other product types here as needed */}
             </div>
           </section>
         </div>
@@ -95,4 +90,4 @@ const AccountsModule: React.FC = () => {
   );
 };
 
-export default AccountsModule;
+export default ProductsModule;

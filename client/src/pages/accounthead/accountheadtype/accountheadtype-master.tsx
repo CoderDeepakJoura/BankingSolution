@@ -243,6 +243,8 @@ const AccountHeadTypeMaster: React.FC = () => {
                         <option value="6">Direct Expense</option>
                         <option value="7">Sale Return</option>
                         <option value="8">Purchase Return</option>
+                        <option value="9">Sale</option>
+                        <option value="10">Purchase</option>
                       </select>
                     </div>
                     {error ? (

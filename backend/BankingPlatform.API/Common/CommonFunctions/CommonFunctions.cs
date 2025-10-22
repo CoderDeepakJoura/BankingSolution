@@ -233,6 +233,12 @@ namespace BankingPlatform.API.Common.CommonFunctions
                 case 8:
                     name = "Purchase Return";
                     break;
+                case 9:
+                    name = "Sale";
+                    break;
+                case 10:
+                    name = "Purchase";
+                    break;
             }
 
             return name;

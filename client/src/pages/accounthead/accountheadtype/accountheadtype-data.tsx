@@ -43,6 +43,8 @@ const getCategoryOptions = () => {
     { value: "6", label: "Direct Expense" },
     { value: "7", label: "Sale Return" },
     { value: "8", label: "Purchase Return" },
+    { value: "9", label: "Sale" },
+    { value: "10", label: "Purchase" },
   ];
 };
 

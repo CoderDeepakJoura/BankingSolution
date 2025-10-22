@@ -105,7 +105,7 @@ namespace BankingPlatform.API.Controllers
             }
             );
         }
-        [Authorize]
+        
         [HttpPost("get_all_thanas")]
         public async Task<IActionResult> GetAllThanas([FromBody] CommonDTO commonDTO)
         {
@@ -409,6 +409,53 @@ namespace BankingPlatform.API.Controllers
             {
                 Success = true,
                 data = patwarInfo
+            });
+        }
+        [HttpGet("fd-productname-exists/{productName}/{branchId}/{productId}")]
+        public async Task<IActionResult> IfProductNameExists([FromRoute] string productName, int branchId, int productId)
+        {
+            var productexists = await _context.fdproduct.Where(x => x.BranchId == branchId && x.ProductName.ToLower() == productName.ToLower() && x.Id != productId).AnyAsync();
+
+            return Ok(new ResponseDto
+            {
+                Success = productexists,
+                Message = productexists ? "FD Product Name already exists" : ""
+            });
+        }
+
+        [HttpGet("fd-productcode-exists/{productCode}/{branchId}/{productId}")]
+        public async Task<IActionResult> IfProductCodeExists([FromRoute] string productCode, int branchId, int productId)
+        {
+            var productcodeexists = await _context.fdproduct.Where(x => x.BranchId == branchId && x.ProductCode.ToLower() == productCode.ToLower() && x.Id != productId).AnyAsync();
+
+            return Ok(new ResponseDto
+            {
+                Success = productcodeexists,
+                Message = productcodeexists ? "FD Product Code already exists" : ""
+            });
+        }
+
+        [HttpGet("saving-productname-exists/{productName}/{branchId}/{productId}")]
+        public async Task<IActionResult> IfSavingProductNameExists([FromRoute] string productName, int branchId, int productId)
+        {
+            var productexists = await _context.savingproduct.Where(x => x.BranchId == branchId && x.ProductName.ToLower() == productName.ToLower() && x.Id != productId).AnyAsync();
+
+            return Ok(new ResponseDto
+            {
+                Success = productexists,
+                Message = productexists ? "Saving Name already exists" : ""
+            });
+        }
+
+        [HttpGet("saving-productcode-exists/{productCode}/{branchId}/{productId}")]
+        public async Task<IActionResult> IfSavingProductCodeExists([FromRoute] string productCode, int branchId, int productId)
+        {
+            var productcodeexists = await _context.savingproduct.Where(x => x.BranchId == branchId && x.ProductCode.ToLower() == productCode.ToLower() && x.Id != productId).AnyAsync();
+
+            return Ok(new ResponseDto
+            {
+                Success = productcodeexists,
+                Message = productcodeexists ? "Saving Product Code already exists" : ""
             });
         }
 

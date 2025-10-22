@@ -5,6 +5,8 @@ using BankingPlatform.Infrastructure.Models.AccMasters;
 using BankingPlatform.Infrastructure.Models.Location;
 using BankingPlatform.Infrastructure.Models.member;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
+using BankingPlatform.Infrastructure.Models.ProductMasters.FD;
+using BankingPlatform.Infrastructure.Models.ProductMasters.Saving;
 using BankingPlatform.Infrastructure.Models.Settings;
 using BankingPlatform.Infrastructure.Models.voucher;
 namespace BankingPlatform.Infrastructure.Models;
@@ -49,9 +51,17 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<VoucherSettings> vouchersettings { get; set; }
     public virtual DbSet<AccOpeningBalance> accopeningbalance { get; set; }
     public virtual DbSet<Patwar> patwar { get; set; }
-   
+    public virtual DbSet<FDProduct> fdproduct { get; set; }
+    public virtual DbSet<FDProductInterestRules> fdproductinterestrules { get; set; }
+    public virtual DbSet<FDProductPostingHeads> fdproductpostingheads { get; set; }
+    public virtual DbSet<FDProductRules> fdproductrules { get; set; }
+    public virtual DbSet<SavingProduct> savingproduct { get; set; }
+    public virtual DbSet<SavingsProductInterestRules> savingproductinterestrules { get; set; }
+    public virtual DbSet<SavingsProductPostingHeads> savingproductpostingheads { get; set; }
+    public virtual DbSet<SavingsProductRules> savingproductrules { get; set; }
 
-   
+
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BankingDbContext).Assembly);

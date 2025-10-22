@@ -48,6 +48,13 @@ import SettingsMaster from "./pages/settings/settings-master";
 import PatwarMaster from "./pages/location/patwar/patwar-master";
 import PatwarOperations from "./pages/location/patwar/patwar-operations";
 import PatwarData from "./pages/location/patwar/patwar-data";
+import ProductsModule from "./components/ProductMasters/ProductOperations";
+import FDProduct from "./pages/products/FD/fdproduct-master";
+import FDProductOperations from "./pages/products/FD/fdproduct-operations";
+import FDProductData from "./pages/products/FD/fdproduct-data";
+import SavingProduct from "./pages/products/Saving/savingproduct-master";
+import SavingProductOperations from "./pages/products/Saving/savingproduct-operations";
+import SavingProductData from "./pages/products/Saving/savingproduct-data";
 
 export default function App() {
  return (
@@ -104,6 +111,15 @@ export default function App() {
          <Route path="/patwar-operations" element={<PatwarOperations />} />
         <Route path="/patwar" element={<PatwarMaster />} />
         <Route path="/patwar-info" element={<PatwarData />} />
+        <Route path="/product-operations" element={<ProductsModule />} />
+        <Route path="/fd-product" element={<FDProduct />} />
+         <Route path="/fd-product/:productId" element={<FDProduct />} />
+        <Route path="/fdproduct-operations" element={<FDProductOperations />} />
+        <Route path="/fdproduct-info" element={<FDProductData />} />
+        <Route path="/saving-product" element={<SavingProduct />} />
+         <Route path="/saving-product/:productId" element={<SavingProduct />} />
+        <Route path="/savingproduct-operations" element={<SavingProductOperations />} />
+        <Route path="/savingproduct-info" element={<SavingProductData />} />
       </Routes>
     </BrowserRouter>
   );
