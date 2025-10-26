@@ -55,6 +55,10 @@ import FDProductData from "./pages/products/FD/fdproduct-data";
 import SavingProduct from "./pages/products/Saving/savingproduct-master";
 import SavingProductOperations from "./pages/products/Saving/savingproduct-operations";
 import SavingProductData from "./pages/products/Saving/savingproduct-data";
+import SavingProductBranchWiseRule from "./pages/branchwiserule/Saving/branchwiserule";
+import FDProductBranchWiseRule from "./pages/branchwiserule/FD/branchwiserule";
+import SavingProductInterestSlab from "./pages/InterestSlabs/Saving/savinginterestslab";
+import SlabModule from "./components/InterestSlabs/SlabOperations";
 
 export default function App() {
  return (
@@ -120,6 +124,10 @@ export default function App() {
          <Route path="/saving-product/:productId" element={<SavingProduct />} />
         <Route path="/savingproduct-operations" element={<SavingProductOperations />} />
         <Route path="/savingproduct-info" element={<SavingProductData />} />
+        <Route path="/saving-productbranchwise-rule" element={<SavingProductBranchWiseRule />} />
+        <Route path="/fd-productbranchwise-rule" element={<FDProductBranchWiseRule />} />
+        <Route path="/savingproduct-interest-slab" element={<SavingProductInterestSlab />} />
+        <Route path="/slab-operations" element={<SlabModule />} />
       </Routes>
     </BrowserRouter>
   );

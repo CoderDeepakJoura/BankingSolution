@@ -1,4 +1,5 @@
 ﻿
+using BankingPlatform.API.DTO.BranchWiseRule;
 using BankingPlatform.API.DTO.Settings;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
@@ -139,35 +140,96 @@ namespace BankingPlatform.API.Common.CommonFunctions
 
         public async Task<int> GetHeadIdFromHeadCode(int branchId, long headCode) => await _appcontext.accounthead.Where(x => x.branchid == branchId && x.headcode == headCode).Select(x => x.id > 0 ? x.id : 0).FirstOrDefaultAsync();
 
-        public async Task<bool> IsAutoVerification(int branchId) => await _appcontext.vouchersettings.Where(x => x.branchid == branchId).Select(x => x.autoverification).FirstOrDefaultAsync();
+        public async Task<bool> IsAutoVerification(int branchId) => await _appcontext.vouchersettings.Where(x => x.branchid == branchId).Select(x => x.autoVerification).FirstOrDefaultAsync();
 
         public async Task<SettingsDTO> GetAllSettings(int branchId)
         {
-            var existingGeneralSettings = await _appcontext.generalsettings
-                    .FirstOrDefaultAsync(s => s.branchid == branchId);
-            var existingVoucherSettings = await _appcontext.vouchersettings
-                    .FirstOrDefaultAsync(s => s.branchid == branchId);
-            SettingsDTO settingsDTO = new SettingsDTO
+            try
             {
-                GeneralSettings = existingGeneralSettings != null
-         ? new GeneralSettingsDTO
-         {
-             AdmissionFeeAccountId = existingGeneralSettings.admissionFeeAccountId,
-             AdmissionFeeAmount = existingGeneralSettings.admissionFeeAmount,
-             BranchId = branchId
-         }
-         : new GeneralSettingsDTO { BranchId = branchId }, // Default if null
+                var existingGeneralSettings = await _appcontext.generalsettings
+                    .FirstOrDefaultAsync(s => s.branchid == branchId);
 
-                VoucherSettings = existingVoucherSettings != null
-         ? new VoucherSettingsDTO
-         {
-             AutoVerification = existingVoucherSettings.autoverification
-         }
-         : new VoucherSettingsDTO() // Default if null
-            };
+                var existingAccountSettings = await _appcontext.accountsettings
+                    .FirstOrDefaultAsync(s => s.branchid == branchId);
 
-            return settingsDTO;
+                var existingVoucherSettings = await _appcontext.vouchersettings
+                    .FirstOrDefaultAsync(s => s.branchid == branchId);
 
+                var existingTDSSettings = await _appcontext.tdssettings
+                    .FirstOrDefaultAsync(s => s.branchid == branchId);
+
+                var existingPrintingSettings = await _appcontext.printingsettings
+                    .FirstOrDefaultAsync(s => s.branchid == branchId);
+
+                SettingsDTO settingsDTO = new SettingsDTO
+                {
+                    GeneralSettings = existingGeneralSettings != null
+                        ? new GeneralSettingsDTO
+                        {
+                            BranchId = branchId,
+                            AdmissionFeeAccountId = existingGeneralSettings.admissionFeeAccountId,
+                            AdmissionFeeAmount = existingGeneralSettings.admissionFeeAmount,
+                            DefaultCashAccountId = existingGeneralSettings.defaultCashAccountId,
+                            MinimumMemberAge = existingGeneralSettings.minimumMemberAge,
+                            ShareMoneyPercentageForLoan = existingGeneralSettings.shareMoneyPercentageForLoan,
+                            BankFDMaturityReminder = existingGeneralSettings.bankFDMaturityReminder,
+                            BankFDMaturityReminderDays = existingGeneralSettings.bankFDMaturityReminderDays
+                        }
+                        : new GeneralSettingsDTO { BranchId = branchId },
+
+                    AccountSettings = existingAccountSettings != null
+                        ? new AccountSettingsDTO
+                        {
+                            BranchId = branchId,
+                            AccountVerification = existingAccountSettings.accountVerification,
+                            MemberKYC = existingAccountSettings.memberKYC,
+                            SavingAccountLength = existingAccountSettings.savingAccountLength,
+                            LoanAccountLength = existingAccountSettings.loanAccountLength,
+                            FDAccountLength = existingAccountSettings.fdAccountLength,
+                            RDAccountLength = existingAccountSettings.rdAccountLength,
+                            ShareAccountLength = existingAccountSettings.shareAccountLength
+                        }
+                        : new AccountSettingsDTO { BranchId = branchId },
+
+                    VoucherSettings = existingVoucherSettings != null
+                        ? new VoucherSettingsDTO
+                        {
+                            BranchId = branchId,
+                            VoucherPrinting = existingVoucherSettings.voucherPrinting,
+                            SingleVoucherEntry = existingVoucherSettings.singleVoucherEntry,
+                            VoucherNumberSetting = existingVoucherSettings.voucherNumberSetting,
+                            AutoVerification = existingVoucherSettings.autoVerification,
+                            ReceiptNoSetting = existingVoucherSettings.receiptNoSetting
+                        }
+                        : new VoucherSettingsDTO { BranchId = branchId },
+
+                    TDSSettings = existingTDSSettings != null
+                        ? new TDSSettingsDTO
+                        {
+                            BranchId = branchId,
+                            BankFDTDSApplicability = existingTDSSettings.bankFDTDSApplicability,
+                            BankFDTDSRate = existingTDSSettings.bankFDTDSRate,
+                            BankFDTDSDeductionFrequency = existingTDSSettings.bankFDTDSDeductionFrequency,
+                            BankFDTDSLedgerAccountId = existingTDSSettings.bankFDTDSLedgerAccountId
+                        }
+                        : new TDSSettingsDTO { BranchId = branchId },
+
+                    PrintingSettings = existingPrintingSettings != null
+                        ? new PrintingSettingsDTO
+                        {
+                            BranchId = branchId,
+                            FDReceiptSetting = existingPrintingSettings.fdReceiptSetting,
+                            RDCertificateSetting = existingPrintingSettings.rdCertificateSetting
+                        }
+                        : new PrintingSettingsDTO { BranchId = branchId }
+                };
+
+                return settingsDTO;
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
         }
 
         public async Task<string> GetAccountNameFromAccId(int accId, int branchId, bool withAccId = false)
@@ -242,6 +304,39 @@ namespace BankingPlatform.API.Common.CommonFunctions
             }
 
             return name;
+        }
+
+        public async Task<SavingDTO> GetSavingProductBranchWiseRuleInfo (int branchId, int productId)
+        {
+            var existingrule = await _appcontext.savingproductbranchwiserule
+                .FirstOrDefaultAsync(s => s.BranchId == branchId && s.SavingProductId == productId);
+            return new SavingDTO()
+            {
+                depwithdrawlimit = existingrule?.depwithdrawlimit ?? 0,
+                BranchId = branchId,
+                depwithdrawlimitinterval = existingrule?.depwithdrawlimitinterval,
+                intexpaccount = existingrule != null ? existingrule.intexpaccount : 0,
+                SavingProductId = existingrule != null ? existingrule.SavingProductId : 0,
+                Id = existingrule != null ? existingrule.Id : 0
+            };
+        }
+
+        public async Task<FDDTO> GetFDProductBranchWiseRuleInfo(int branchId, int productId)
+        {
+            var existingrule = await _appcontext.fdproductbranchwiserule
+                .FirstOrDefaultAsync(s => s.BranchId == branchId && s.FDProductId == productId);
+            return new FDDTO()
+            {
+                FDProductId = existingrule != null ? existingrule.FDProductId : 0,
+                BranchId = branchId,
+                DaysInAYear = existingrule?.DaysInAYear ?? 0,
+                AccNoGeneration = existingrule?.AccNoGeneration ?? 0,
+                ClosingChargesAccount = existingrule?.ClosingChargesAccount ?? 0,
+                InterestCalculationMethod = existingrule?.InterestCalculationMethod ?? 0,
+                IntExpenseAccount = existingrule?.IntExpenseAccount ?? 0,
+                IntPayableAccount = existingrule?.IntPayableAccount ?? 0
+
+            };
         }
 
 

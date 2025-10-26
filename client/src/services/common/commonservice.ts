@@ -1,4 +1,4 @@
-import { API_CONFIG } from '../../constants/config';
+import { API_CONFIG } from "../../constants/config";
 import { AuthResponse, ApiService, ApiResponse } from "../api";
 import Swal from "sweetalert2";
 export interface AccountMaster {
@@ -225,9 +225,9 @@ class commonService extends ApiService {
   };
 
   getImageUrl(filename: string, type: string) {
-  return `${API_CONFIG.BASE_URL}/member/member-images/${filename}/${type}`;
-}
-async productname_unique(
+    return `${API_CONFIG.BASE_URL}/member/member-images/${filename}/${type}`;
+  }
+  async productname_unique(
     branchId: number,
     productName: string,
     productId: number = 0
@@ -257,7 +257,6 @@ async productname_unique(
         },
       }
     );
-    
   }
 
   async saving_productname_unique(
@@ -290,53 +289,74 @@ async productname_unique(
         },
       }
     );
-    
   }
 
-   handleDateChange = (
-      value: string,
-      callback: (value: string) => void,
-      fieldName: string
-    ) => {
-      if (!value) {
-        callback("");
-        return;
-      }
-  
-      const selectedDate = new Date(value);
-      const today = new Date();
-  
-      today.setHours(0, 0, 0, 0);
-      selectedDate.setHours(0, 0, 0, 0);
-  
-      if (selectedDate <= today) {
-        callback(value);
-      } else {
-        Swal.fire({
-          icon: "warning",
-          title: "Invalid Date",
-          text: "Cannot select a future date. Please select today or an earlier date.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        callback(this.getCurrentDate());
-      }
-    };
+  handleDateChange = (
+    value: string,
+    callback: (value: string) => void,
+    fieldName: string
+  ) => {
+    if (!value) {
+      callback("");
+      return;
+    }
 
-   getCurrentDate = (): string => {
+    const selectedDate = new Date(value);
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate <= today) {
+      callback(value);
+    } else {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid Date",
+        text: "Cannot select a future date. Please select today or an earlier date.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      callback(this.getCurrentDate());
+    }
+  };
+
+  getCurrentDate = (): string => {
     const today = new Date();
     return today.toISOString().split("T")[0];
   };
 
-   handleResetNotAllowed = () => {
-      Swal.fire({
-        icon: "error",
-        title: "Not Allowed",
-        text: "Reset form is not allowed in modify mode.",
-      });
-    };
-  
+  handleResetNotAllowed = () => {
+    Swal.fire({
+      icon: "error",
+      title: "Not Allowed",
+      text: "Reset form is not allowed in modify mode.",
+    });
+  };
 
+  async fetch_saving_products(branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/saving-products/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  async fetch_fd_products(branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/fd-products/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
 }
 
 export default new commonService();

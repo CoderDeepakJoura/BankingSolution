@@ -12,7 +12,17 @@ namespace BankingPlatform.Infrastructure.Models.Settings
         public int id { get; set; }
         [Required]
         public int branchid { get; set; }
+
+        public bool voucherPrinting { get; set; }
+
+        public bool singleVoucherEntry { get; set; }
+
         [Required]
-        public bool autoverification { get; set; }
+        [Range(1, 2)] // 1=Day Wise, 2=Financial Year Wise
+        public int voucherNumberSetting { get; set; }
+
+        public bool autoVerification { get; set; }
+
+        public bool receiptNoSetting { get; set; }
     }
 }

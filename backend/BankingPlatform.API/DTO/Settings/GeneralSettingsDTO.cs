@@ -2,15 +2,6 @@
 {
     public class GeneralSettingsDTO
     {
-        public GeneralSettingsDTO() { }
-
-        public GeneralSettingsDTO(int branchId, int admissionFeeAccountId, decimal admissionFeeAmount)
-        {
-            BranchId = branchId;
-            AdmissionFeeAccountId = admissionFeeAccountId;
-            AdmissionFeeAmount = admissionFeeAmount;
-        }
-
         [Required]
         public int BranchId { get; set; }
 
@@ -18,6 +9,12 @@
         public decimal AdmissionFeeAmount { get; set; }
 
         public string? AdmissionFeeAccName { get; set; }
+
+        public int DefaultCashAccountId { get; set; }
+        public int MinimumMemberAge { get; set; }
+        public decimal ShareMoneyPercentageForLoan { get; set; }
+        public bool BankFDMaturityReminder { get; set; }
+        public int? BankFDMaturityReminderDays { get; set; }
     }
 
 }

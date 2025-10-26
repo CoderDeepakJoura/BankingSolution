@@ -2,14 +2,11 @@
 {
     public class VoucherSettingsDTO
     {
-        public VoucherSettingsDTO() { }
-
-        public VoucherSettingsDTO(int branchId, bool autoVerification)
-        {
-            AutoVerification = autoVerification;
-        }
-
-        [Required]
-        public bool AutoVerification { get; set; } = false;
+        public int BranchId { get; set; }
+        public bool VoucherPrinting { get; set; }
+        public bool SingleVoucherEntry { get; set; }
+        public int VoucherNumberSetting { get; set; }
+        public bool AutoVerification { get; set; }
+        public bool ReceiptNoSetting { get; set; }
     }
 }

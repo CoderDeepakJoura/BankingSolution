@@ -10,6 +10,7 @@ using BankingPlatform.API.DTO.Location.State;
 using BankingPlatform.API.DTO.Location.Tehsil;
 using BankingPlatform.API.DTO.Location.Village;
 using BankingPlatform.API.DTO.Miscalleneous;
+using BankingPlatform.API.DTO.ProductMasters.Saving;
 using BankingPlatform.API.DTO.Settings;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.member;
@@ -456,6 +457,39 @@ namespace BankingPlatform.API.Controllers
             {
                 Success = productcodeexists,
                 Message = productcodeexists ? "Saving Product Code already exists" : ""
+            });
+        }
+
+        [HttpGet("saving-products/{branchId}")]
+        public async Task<IActionResult> SavingProducts([FromRoute] int branchId)
+        {
+            var productInfo = await _context.savingproduct.Where(x => x.BranchId == branchId).Select(x=> new SavingsProductDTO
+            {
+                ProductName = x.ProductCode + "-" + x.ProductName,
+                Id = x.Id
+            }).ToListAsync();
+
+            return Ok(new
+            {
+                Success = true,
+                data = productInfo
+
+            });
+        }
+
+        [HttpGet("fd-products/{branchId}")]
+        public async Task<IActionResult> FDProducts([FromRoute] int branchId)
+        {
+            var productInfo = await _context.fdproduct.Where(x => x.BranchId == branchId).Select(x => new SavingsProductDTO
+            {
+                ProductName = x.ProductCode + "-" + x.ProductName,
+                Id = x.Id
+            }).ToListAsync();
+
+            return Ok(new
+            {
+                Success = true,
+                data = productInfo
             });
         }
 

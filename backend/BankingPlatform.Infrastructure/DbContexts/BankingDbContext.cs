@@ -2,6 +2,7 @@
 global using Microsoft.EntityFrameworkCore;
 using BankingPlatform.Infrastructure.Models.AccHeads;
 using BankingPlatform.Infrastructure.Models.AccMasters;
+using BankingPlatform.Infrastructure.Models.BranchWiseRule;
 using BankingPlatform.Infrastructure.Models.Location;
 using BankingPlatform.Infrastructure.Models.member;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
@@ -59,6 +60,11 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<SavingsProductInterestRules> savingproductinterestrules { get; set; }
     public virtual DbSet<SavingsProductPostingHeads> savingproductpostingheads { get; set; }
     public virtual DbSet<SavingsProductRules> savingproductrules { get; set; }
+    public virtual DbSet<AccountSettings> accountsettings { get; set; }
+    public virtual DbSet<TDSSettings> tdssettings { get; set; }
+    public virtual DbSet<PrintingSettings> printingsettings { get; set; }
+    public virtual DbSet<SavingProductBranchWiseRule> savingproductbranchwiserule { get; set; }
+    public virtual DbSet<FDProductBranchWiseRule> fdproductbranchwiserule { get; set; }
 
 
 

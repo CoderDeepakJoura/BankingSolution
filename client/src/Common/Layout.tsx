@@ -234,10 +234,19 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Account Masters", path: "/account-operations" },
             { label: "Member Master", path: "/member-operations" },
             { label: "Product Masters", path: "/product-operations" },
+            { label: "Product Slabs", path: "/slab-operations" },
             { label: "Settings Master", path: "/settings" },
-            // { label: "Thana Master", path: "/thana-operations" },
+           
             // { label: "Zone Master", path: "/zone-operations" },
             // { label: "Village Master", path: "/village-operations" },
+          ],
+        },
+         {
+          label: "Branch Wise Rules",
+          path: "",
+          subItems: [
+            { label: "Saving Product BranchWise Rule", path: "/saving-productbranchwise-rule" },
+             { label: "FD Product BranchWise Rule", path: "/fd-productbranchwise-rule" },
           ],
         },
         // { label: "Sales", path: "/modules/sales" },
