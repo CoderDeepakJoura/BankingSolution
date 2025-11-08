@@ -3,6 +3,7 @@ global using Microsoft.EntityFrameworkCore;
 using BankingPlatform.Infrastructure.Models.AccHeads;
 using BankingPlatform.Infrastructure.Models.AccMasters;
 using BankingPlatform.Infrastructure.Models.BranchWiseRule;
+using BankingPlatform.Infrastructure.Models.InterestSlabs.Saving;
 using BankingPlatform.Infrastructure.Models.Location;
 using BankingPlatform.Infrastructure.Models.member;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
@@ -65,8 +66,12 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<PrintingSettings> printingsettings { get; set; }
     public virtual DbSet<SavingProductBranchWiseRule> savingproductbranchwiserule { get; set; }
     public virtual DbSet<FDProductBranchWiseRule> fdproductbranchwiserule { get; set; }
-
-
+    public virtual DbSet<SavingInterestSlab> savinginterestslab { get; set; }
+    public virtual DbSet<SavingInterestSlabDetail> savinginterestslabdetail { get; set; }
+    public virtual DbSet<AccountNomineeInfo> accountnomineeinfo { get; set; }
+    public virtual DbSet<AccountDocDetails> accountdocdetails { get; set; }
+    public virtual DbSet<JointAccountInfo> jointaccountinfo { get; set; }
+    public virtual DbSet<JointAccountWithdrawalInfo> jointaccountwithdrawalinfo { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

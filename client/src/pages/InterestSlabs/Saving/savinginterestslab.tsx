@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
+import { encryptId, decryptId } from "../../../utils/encryption";
 import Select from "react-select";
 import {
   Save,
@@ -19,7 +20,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import commonservice from "../../../services/common/commonservice";
 import interestSlabService, {
-  SavingAccountInterestSlabDTO,
+  CombinedSavingIntDTO,
 } from "../../../services/interestslab/interestslabservice";
 
 // Define your interfaces/types
@@ -37,6 +38,7 @@ interface InterestSlab {
 
 interface ValidationErrors {
   savingProductId?: string;
+  slabName?: string;
   applicableDate?: string;
   slabs?: string;
 }
@@ -44,23 +46,29 @@ interface ValidationErrors {
 const SavingAccountInterestSlab = () => {
   const navigate = useNavigate();
   const { slabId: encryptedId } = useParams<{ slabId?: string }>();
-  const slabId = encryptedId ? parseInt(encryptedId) : null;
+  const slabId = encryptedId ? decryptId(encryptedId) : null;
+  // let slabId: number | null = null;
+
   const isEditMode = !!slabId;
 
   const user = useSelector((state: RootState) => state.user);
 
   const [loading, setLoading] = useState(false);
   const [savingProducts, setSavingProducts] = useState<SavingProduct[]>([]);
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
+    {}
+  );
 
   // Ref for auto-focus
   const savingProductSelectRef = useRef<any>(null);
+  const slabRef = useRef<any>(null);
 
   // Form data state
   const [formData, setFormData] = useState({
     id: null as number | null,
     branchId: user.branchid,
     savingProductId: 0,
+    slabName: "",
     applicableDate: commonservice.getTodaysDate(),
   });
 
@@ -88,6 +96,7 @@ const SavingAccountInterestSlab = () => {
   // Fetch interest slab data if in edit mode
   useEffect(() => {
     const fetchInterestSlabData = async () => {
+      console.log("Fetching interest slab data for ID:", slabId);
       if (isEditMode && slabId) {
         try {
           Swal.fire({
@@ -105,21 +114,28 @@ const SavingAccountInterestSlab = () => {
           );
 
           if (response.success && response.data) {
-            const data = response.data;
+            const res = response.data;
 
             // Populate form data
             setFormData({
-              id: data.id || null,
+              id: res.savingInterestSlab.id || null,
               branchId: user.branchid,
-              savingProductId: data.savingProductId || 0,
-              applicableDate: commonservice.splitDate(data.applicableDate),
+              savingProductId: res.savingInterestSlab.savingProductId || 0,
+              slabName: res.savingInterestSlab.slabName || "",
+              applicableDate: commonservice.splitDate(
+                res.savingInterestSlab.applicableDate
+              ),
             });
 
-            // Populate slabs
-            if (data.interestSlabs && data.interestSlabs.length > 0) {
+            // Populate slabs from savingInterestSlabDetails
+            if (
+              res.savingInterestSlabDetails &&
+              res.savingInterestSlabDetails.length > 0
+            ) {
+              let serialno = 1;
               setInterestSlabs(
-                data.interestSlabs.map((slab: any, index: number) => ({
-                  slabNo: index + 1,
+                res.savingInterestSlabDetails.map((slab: any) => ({
+                  slabNo: serialno++,
                   fromAmount: slab.fromAmount?.toString() || "0",
                   toAmount: slab.toAmount?.toString() || "",
                   interestRate: slab.interestRate?.toString() || "",
@@ -130,7 +146,7 @@ const SavingAccountInterestSlab = () => {
             Swal.close();
           } else {
             Swal.fire("Error", "Interest Slab not found", "error");
-            navigate("/interest-slab-operations");
+            navigate("/slab-operations");
           }
         } catch (error: any) {
           console.error("Error fetching interest slab:", error);
@@ -139,7 +155,7 @@ const SavingAccountInterestSlab = () => {
             title: "Error!",
             text: error.message || "Failed to load interest slab data",
           });
-          navigate("/interest-slab-operations");
+          navigate("/slab-operations");
         }
       }
     };
@@ -153,6 +169,14 @@ const SavingAccountInterestSlab = () => {
       case "savingProductId":
         if (!value || value === 0) {
           return "Saving Product is required";
+        }
+        break;
+      case "slabName":
+        if (!value || value.trim() === "") {
+          return "Slab Name is required";
+        }
+        if (value.trim().length < 3) {
+          return "Slab Name must be at least 3 characters";
         }
         break;
       case "applicableDate":
@@ -226,6 +250,9 @@ const SavingAccountInterestSlab = () => {
     );
     if (savingProductError) errors.savingProductId = savingProductError;
 
+    const slabNameError = validateField("slabName", formData.slabName);
+    if (slabNameError) errors.slabName = slabNameError;
+
     const applicableDateError = validateField(
       "applicableDate",
       formData.applicableDate
@@ -257,6 +284,31 @@ const SavingAccountInterestSlab = () => {
     handleInputChange("savingProductId", productId);
   };
 
+  const handleFieldBlur = async (fieldName: string, value: any = "") => {
+    if (fieldName == "slabName") {
+      const response = await commonservice.slabname_exists(
+        user.branchid,
+        value,
+        slabId ?? 0
+      );
+      if (response.success) {
+        setFormData((prev) => ({
+          ...prev,
+          slabName: "",
+        }));
+        Swal.fire({
+          icon: "error",
+          title: "Duplication.",
+          text: response.message,
+          didClose: () => {
+            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
+            slabRef.current?.focus();
+          },
+        });
+      }
+    }
+  };
+
   // Handle slab field change
   const handleSlabChange = (
     index: number,
@@ -267,18 +319,18 @@ const SavingAccountInterestSlab = () => {
     if (field === "toAmount" || field === "interestRate") {
       // Allow numbers and single decimal point
       let numericValue = value.replace(/[^0-9.]/g, "");
-      
+
       // Ensure only one decimal point
       const parts = numericValue.split(".");
       if (parts.length > 2) {
         numericValue = parts[0] + "." + parts.slice(1).join("");
       }
-      
+
       // Limit decimal places
       if (parts.length === 2) {
         numericValue = parts[0] + "." + parts[1].substring(0, 2);
       }
-      
+
       value = numericValue;
     }
 
@@ -370,6 +422,7 @@ const SavingAccountInterestSlab = () => {
       id: null,
       branchId: user.branchid,
       savingProductId: 0,
+      slabName: "",
       applicableDate: commonservice.getTodaysDate(),
     });
     setInterestSlabs([
@@ -397,7 +450,9 @@ const SavingAccountInterestSlab = () => {
         title: "Validation Errors",
         html: `
         <div class="text-left">
-          <p class="mb-3">Please fix the following ${errorMessages.length} error(s):</p>
+          <p class="mb-3">Please fix the following ${
+            errorMessages.length
+          } error(s):</p>
           <div class="max-h-48 overflow-y-auto text-sm">
             <ul class="ml-4 list-disc">
               ${errorMessages
@@ -417,23 +472,29 @@ const SavingAccountInterestSlab = () => {
 
     setLoading(true);
     try {
-      const dto: SavingAccountInterestSlabDTO = {
-        id: formData.id || undefined,
-        branchId: user.branchid,
-        savingProductId: Number(formData.savingProductId),
-        applicableDate: formData.applicableDate,
-        interestSlabs: interestSlabs.map((slab) => ({
+      // Build CombinedSavingIntDTO matching C# structure
+      const dto: CombinedSavingIntDTO = {
+        savingInterestSlab: {
+          id: formData.id || undefined,
+          branchId: user.branchid,
+          savingProductId: Number(formData.savingProductId),
+          slabName: formData.slabName.trim(),
+          applicableDate: formData.applicableDate,
+        },
+        savingInterestSlabDetails: interestSlabs.map((slab) => ({
           slabNo: slab.slabNo,
           fromAmount: Number(slab.fromAmount),
           toAmount: Number(slab.toAmount),
           interestRate: Number(slab.interestRate),
+          branchId: user.branchid,
+          interestSlabId: formData.id || 0,
         })),
       };
 
       console.log("Submitting DTO:", dto);
 
       const res = isEditMode
-        ? await interestSlabService.updateInterestSlab(dto)
+        ? await interestSlabService.updateInterestSlab(formData.id!, dto)
         : await interestSlabService.createInterestSlab(dto);
 
       if (res.success) {
@@ -448,7 +509,7 @@ const SavingAccountInterestSlab = () => {
           timer: 1500,
         }).then(() => {
           if (isEditMode) {
-            navigate("/interest-slab-operations");
+            navigate("/saving-slab-info");
           } else {
             handleReset();
           }
@@ -498,7 +559,7 @@ const SavingAccountInterestSlab = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate("/interest-slab-operations")}
+                  onClick={() => navigate("/slab-operations")}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 font-medium"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -515,9 +576,9 @@ const SavingAccountInterestSlab = () => {
                   <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
                     <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                       <Landmark className="w-5 h-5" />
-                      1. Select Saving Product
+                      1. Basic Information
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* Saving Product Field */}
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -532,6 +593,8 @@ const SavingAccountInterestSlab = () => {
                           id="savingProductId"
                           instanceId="saving-product-select"
                           options={savingProductOptions}
+                          isDisabled={isEditMode}
+                          autoFocus={!isEditMode}
                           value={
                             savingProductOptions.find(
                               (opt) =>
@@ -565,6 +628,44 @@ const SavingAccountInterestSlab = () => {
                         )}
                       </div>
 
+                      {/* Slab Name Field */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <span className="flex items-center gap-2">
+                            <Percent className="w-4 h-4 text-purple-500" />
+                            Slab Name
+                            <span className="text-red-500">*</span>
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.slabName}
+                          onChange={(e) =>
+                            handleInputChange("slabName", e.target.value)
+                          }
+                          className={`w-full px-3 py-2.5 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none ${
+                            validationErrors.slabName
+                              ? "border-red-500"
+                              : "border-gray-200"
+                          }`}
+                          ref={slabRef}
+                          onBlur={(e) =>
+                            handleFieldBlur("slabName", e.target.value)
+                          }
+                          placeholder="e.g., Standard Rate 2025"
+                          maxLength={50}
+                        />
+                        {validationErrors.slabName && (
+                          <span className="text-red-500 text-xs flex items-center gap-1 mt-1">
+                            <AlertCircle className="w-3 h-3" />
+                            {validationErrors.slabName}
+                          </span>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          Unique name for this slab configuration
+                        </p>
+                      </div>
+
                       {/* Applicable Date Field */}
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -578,7 +679,15 @@ const SavingAccountInterestSlab = () => {
                           type="date"
                           value={formData.applicableDate}
                           onChange={(e) =>
-                            handleInputChange("applicableDate", e.target.value)
+                            commonservice.handleDateChange(
+                              e.target.value,
+                              (val) =>
+                                handleInputChange(
+                                  "applicableDate",
+                                  val
+                                ),
+                              "effectiveFrom"
+                            )
                           }
                           max={commonservice.getTodaysDate()}
                           className={`w-full px-3 py-2.5 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none ${
@@ -586,6 +695,7 @@ const SavingAccountInterestSlab = () => {
                               ? "border-red-500"
                               : "border-gray-200"
                           }`}
+                          readOnly={isEditMode}
                         />
                         {validationErrors.applicableDate && (
                           <span className="text-red-500 text-xs flex items-center gap-1 mt-1">
@@ -594,7 +704,7 @@ const SavingAccountInterestSlab = () => {
                           </span>
                         )}
                         <p className="text-xs text-gray-500 mt-1">
-                          Define the date from which the slab will be effective
+                          Date from which slab will be effective
                         </p>
                       </div>
                     </div>
@@ -605,7 +715,7 @@ const SavingAccountInterestSlab = () => {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-green-800 flex items-center gap-2">
                         <Percent className="w-5 h-5" />
-                        3. Balance Wise Interest Rate Set
+                        2. Balance Wise Interest Rate Set
                       </h3>
                       <button
                         onClick={handleAddSlab}
@@ -632,7 +742,7 @@ const SavingAccountInterestSlab = () => {
                           1. Enter From Amount and To Amount for each slab.
                         </li>
                         <li>2. Enter Interest Rate (%).</li>
-                        <li>3. Click OK to confirm.</li>
+                        <li>3. Click Add Slab to add more ranges.</li>
                         <li>4. Click Save to store all slab ranges.</li>
                       </ul>
                     </div>
@@ -642,19 +752,19 @@ const SavingAccountInterestSlab = () => {
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                            <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold">
+                            <th className="border text-center border-gray-300 px-4 py-3 text-left text-sm font-semibold">
                               Slab No
                             </th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold">
+                            <th className="border text-center border-gray-300 px-4 py-3 text-left text-sm font-semibold">
                               From Amount
                             </th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold">
+                            <th className="border text-center border-gray-300 px-4 py-3 text-left text-sm font-semibold">
                               To Amount
                             </th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold">
+                            <th className="border text-center border-gray-300 px-4 py-3 text-left text-sm font-semibold">
                               Interest Rate (%)
                             </th>
-                            <th className="border border-gray-300 px-4 py-3 text-center text-sm font-semibold">
+                            <th className="border text-center border-gray-300 px-4 py-3 text-center text-sm font-semibold">
                               Actions
                             </th>
                           </tr>
@@ -667,7 +777,7 @@ const SavingAccountInterestSlab = () => {
                                 index % 2 === 0 ? "bg-blue-50" : "bg-white"
                               } hover:bg-blue-100 transition-colors`}
                             >
-                              <td className="border border-gray-300 px-4 py-3 text-sm font-medium">
+                              <td className="border border-gray-300 text-center px-4 py-3 text-sm font-medium">
                                 {slab.slabNo}
                               </td>
                               <td className="border border-gray-300 px-4 py-3">
@@ -689,7 +799,7 @@ const SavingAccountInterestSlab = () => {
                                       e.target.value
                                     )
                                   }
-                                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
+                                  className="w-full text-right px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
                                   placeholder="Enter To Amount"
                                   inputMode="decimal"
                                 />
@@ -705,7 +815,7 @@ const SavingAccountInterestSlab = () => {
                                       e.target.value
                                     )
                                   }
-                                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
+                                  className="w-full px-3 py-2 text-right border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
                                   placeholder="e.g., 3.0"
                                   inputMode="decimal"
                                 />

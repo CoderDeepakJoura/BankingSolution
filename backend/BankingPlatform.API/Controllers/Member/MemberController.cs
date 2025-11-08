@@ -171,5 +171,6 @@ namespace BankingPlatform.API.Controllers.Member
     public class DocPaths
     {
         public string MemberImagesDrive { get; set; } = ""!;
+        public string AccountImagesDrive { get; set; } = ""!;
     }
 }

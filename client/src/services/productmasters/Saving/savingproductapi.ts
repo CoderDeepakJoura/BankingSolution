@@ -11,6 +11,7 @@ export interface SavingsProductDTO {
   productCode: string;
   effectiveFrom: string;
   effectiveTill?: string | null;
+  isNomineeMandatoryInAccMasters: boolean | false;
   isActive?: boolean;
 }
 

@@ -1,4 +1,5 @@
-﻿using BankingPlatform.API.Common.CommonFunctions;
+﻿using BankingPlatform.API.Common;
+using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.AccountHead;
 using BankingPlatform.API.DTO.AccountMasters;
@@ -16,6 +17,8 @@ using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.member;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using System.Reflection;
 
 namespace BankingPlatform.API.Controllers
 {
@@ -350,7 +353,7 @@ namespace BankingPlatform.API.Controllers
             return Ok(new ResponseDto
             {
                 Success = accNumberExists,
-                Message = accNumberExists ? "Account Number already exists" : ""
+                Message = accNumberExists ? "Account Number already exists." : ""
             });
         }
         [HttpGet("nominal-membershipno-exists/{nominal_membershipno}/{branchId}/{memberId}")]
@@ -360,7 +363,7 @@ namespace BankingPlatform.API.Controllers
             return Ok(new ResponseDto
             {
                 Success = nomMemNoExists,
-                Message = nomMemNoExists ? "Nominal Membership already exists" : ""
+                Message = nomMemNoExists ? "Nominal Membership already exists." : ""
             });
         }
 
@@ -371,7 +374,7 @@ namespace BankingPlatform.API.Controllers
             return Ok(new ResponseDto
             {
                 Success = permMemNoExists,
-                Message = permMemNoExists ? "Permanent Membership already exists" : ""
+                Message = permMemNoExists ? "Permanent Membership already exists." : ""
             });
         }
 
@@ -382,7 +385,7 @@ namespace BankingPlatform.API.Controllers
             return Ok(new ResponseDto
             {
                 Success = aadhaarExists,
-                Message = aadhaarExists ? "Aadhaar Card No. already exists" : ""
+                Message = aadhaarExists ? "Aadhaar Card No. already exists." : ""
             });
         }
 
@@ -420,7 +423,7 @@ namespace BankingPlatform.API.Controllers
             return Ok(new ResponseDto
             {
                 Success = productexists,
-                Message = productexists ? "FD Product Name already exists" : ""
+                Message = productexists ? "FD Product Name already exists." : ""
             });
         }
 
@@ -432,7 +435,7 @@ namespace BankingPlatform.API.Controllers
             return Ok(new ResponseDto
             {
                 Success = productcodeexists,
-                Message = productcodeexists ? "FD Product Code already exists" : ""
+                Message = productcodeexists ? "FD Product Code already exists." : ""
             });
         }
 
@@ -444,7 +447,7 @@ namespace BankingPlatform.API.Controllers
             return Ok(new ResponseDto
             {
                 Success = productexists,
-                Message = productexists ? "Saving Name already exists" : ""
+                Message = productexists ? "Saving Name already exists." : ""
             });
         }
 
@@ -456,7 +459,7 @@ namespace BankingPlatform.API.Controllers
             return Ok(new ResponseDto
             {
                 Success = productcodeexists,
-                Message = productcodeexists ? "Saving Product Code already exists" : ""
+                Message = productcodeexists ? "Saving Product Code already exists." : ""
             });
         }
 
@@ -491,6 +494,102 @@ namespace BankingPlatform.API.Controllers
                 Success = true,
                 data = productInfo
             });
+        }
+
+        [HttpGet("slabname-exists/{slabName}/{branchId}/{slabId}")]
+        public async Task<IActionResult> IfSlabNameExists([FromRoute] string slabName, int branchId, int slabId)
+        {
+            var productexists = await _context.savinginterestslab.Where(x => x.BranchId == branchId && x.SlabName.ToLower() == slabName.ToLower() && x.Id != slabId).AnyAsync();
+
+            return Ok(new ResponseDto
+            {
+                Success = productexists,
+                Message = productexists ? "Slab Name already exists." : ""
+            });
+        }
+
+        [HttpGet("member-info-with-accno/{branchId}/{accountNo}")]
+        public async Task<IActionResult> getMemberInfoFromAccNo([FromRoute] string accountNo, int branchId)
+        {
+            var memberInfo = await (from p in _context.accountmaster.AsNoTracking()
+                              join q in _context.member.AsNoTracking() on new { memberId = (int)p.MemberId!, memberBranchId = (int)p.MemberBranchID! }
+                              equals new { memberId = q.Id, memberBranchId = q.BranchId }
+                              join k in _context.memberlocationdetails on new { memberId = q.Id , memberBranchId = q.BranchId }
+                              equals new { memberId = k.MemberId, memberBranchId = k.BranchId }
+                              where p.BranchId == branchId && p.AccountNumber == accountNo
+                              select new { memberName = q.MemberName, relativeName = q.RelativeName, gender = q.Gender, addressLine1 =  k.AddressLine1, dateOfBirth = q.DOB, phoneNo = q.PhoneNo1, emailId = q.Email1, memberId = q.Id, memberBranchId = q.BranchId }).FirstOrDefaultAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = memberInfo
+            });
+
+        }
+
+        [HttpGet("member-info-with-membershipno/{branchId}/{memberShipNo}/{memberType}")]
+        public async Task<IActionResult> getMemberInfoFromMembershipNo([FromRoute] string memberShipNo, int branchId, int memberType)
+        {
+            var memberInfo = await (from q in _context.member.AsNoTracking()
+                              join k in _context.memberlocationdetails on new { memberId = q.Id, memberBranchId = q.BranchId }
+                              equals new { memberId = k.MemberId, memberBranchId = k.BranchId }
+                              where q.BranchId == branchId && q.MemberType == memberType
+                              && (q.NominalMembershipNo == memberShipNo || q.PermanentMembershipNo == memberShipNo)
+                              select new { memberName = q.MemberName, relativeName = q.RelativeName, gender = q.Gender, addressLine1 = k.AddressLine1, dateOfBirth = q.DOB, phoneNo = q.PhoneNo1, emailId = q.Email1, memberId = q.Id, memberBranchId = q.BranchId }).FirstOrDefaultAsync();
+            
+            return Ok(new
+            {
+                Success = true,
+                data = memberInfo
+            });
+
+        }
+
+        [HttpGet("savingproduct-prefix-and-suffix/{productId}/{branchId}")]
+        public async Task<IActionResult> SavingProductPrefix([FromRoute]int productId, int branchId)
+        {
+            int productsuffix = 0;
+            string productPrefix = await _context.savingproduct.Where(x => x.Id == productId && x.BranchId == branchId)
+                .Select(x=> x.ProductCode).FirstOrDefaultAsync() ?? "";
+            if(productPrefix != null)
+            {
+                int accountType = (int)Enums.AccountTypes.Saving;
+                productsuffix = _context.accountmaster.Where(x => x.BranchId == branchId && x.AccTypeId == accountType && x.AccPrefix == productPrefix).Select(x => x.AccSuffix).Max() ?? productsuffix;
+                productsuffix++;
+            }
+            return Ok(new
+            {
+                Success = true,
+                data = productPrefix + "-" + productsuffix
+            });
+        }
+
+        [HttpGet("saving-suffix-exists/{productId}/{branchId}/{accountId}/{suffix}")]
+        public async Task<IActionResult> SuffixExists([FromRoute] int productId, int branchId, int accountId, int suffix)
+        {
+            bool suffixExists = await _context.accountmaster.Where(x => x.GeneralProductId == productId && x.BranchId == branchId && x.ID != accountId && x.AccSuffix == suffix)
+                .Select(x => x.AccSuffix).AnyAsync() ;
+            return Ok(new ResponseDto
+            {
+                Success = suffixExists,
+                Message = suffixExists ? "Account Suffix already exists." : ""
+            });
+        }
+
+        [HttpGet("memberpic-and-sign-ext/{branchId}/{memberId}")]
+        public async Task<IActionResult> getMemberInfoFromAccNo([FromRoute] int branchId, int memberId)
+        {
+            var memberInfo = await _context.memberdocdetails.AsNoTracking().Where(x => x.MemberId == memberId && x.BranchId == branchId).FirstOrDefaultAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = new
+                {
+                    memberPicExt = memberInfo!.MemberPicExt ?? "",
+                    memberSignExt = memberInfo!.MemberSignExt ?? "",
+                }
+              
+            });
+
         }
 
     }

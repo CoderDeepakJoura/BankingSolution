@@ -19,12 +19,14 @@
         }
         public enum VoucherType
         {
-            Member = 1
+            Member = 1,
+            Saving = 2
         }
 
         public enum VoucherSubType
         {
-            ShareMoney = 1
+            ShareMoney = 1,
+            Deposit = 2
         }
 
         public enum VoucherStatus
@@ -33,6 +35,12 @@
             AdmissionFee = 2,
             Dr = 3,
             Cr = 4,
+        }
+
+        public enum MemberType
+        {
+            Nominal = 1,
+            Permanent = 2
         }
     }
 }

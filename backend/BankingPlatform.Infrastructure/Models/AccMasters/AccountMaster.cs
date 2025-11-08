@@ -60,5 +60,165 @@ namespace BankingPlatform.Infrastructure.Models.AccMasters
         public short? IsAccAddedManually { get; set; }
         public short? IsJointAccount { get; set; }
         public short? IsSuspenseAccount { get; set; }
+        public string? RelativeName { get; set; }
+        public int? Gender { get; set; }
+        public string? PhoneNo1 { get; set; }
+        public string? Email { get; set; }
+        public string? AddressLine { get; set; }
+
+        public DateTime? DOB { get; set; }
+
+        public string? addedusing { get; set; }
+    }
+
+    [Table("accountnomineeinfo")]
+    public class AccountNomineeInfo
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Required]
+        [Column("branchid")]
+        public int BranchId { get; set; }
+
+        [Required]
+        [Column("accountid")]
+        public int AccountId { get; set; }
+
+        [Required]
+        [Column("nomineename")]
+        [MaxLength(255)]
+        public string NomineeName { get; set; }
+
+        [Required]
+        [Column("nomineedob")]
+        public DateTime NomineeDob { get; set; }
+
+        [Required]
+        [Column("relationwithaccholder")]
+        public int RelationWithAccHolder { get; set; }
+
+        [Required]
+        [Column("addressline")]
+        [MaxLength(500)]
+        public string AddressLine { get; set; }
+
+        [Required]
+        [Column("nomineedate")]
+        public DateTime NomineeDate { get; set; }
+
+        [Required]
+        [Column("isminor")]
+        public short IsMinor { get; set; }
+
+        [Column("nameofguardian")]
+        [MaxLength(255)]
+        public string? NameOfGuardian { get; set; }
+
+    }
+
+    [Table("accountdocdetails")]
+    public class AccountDocDetails
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Required]
+        [Column("branchid")]
+        public int BranchId { get; set; }
+
+        [Required]
+        [Column("accountid")]
+        public int AccountId { get; set; }
+
+        [Required]
+        [Column("picext")]
+        [MaxLength(10)]
+        public string PicExt { get; set; }
+
+        [Required]
+        [Column("signext")]
+        [MaxLength(10)]
+        public string SignExt { get; set; }
+
+    }
+    [Table("jointaccountinfo")]
+    public class JointAccountInfo
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Required]
+        [Column("branchid")]
+        public int BranchId { get; set; }
+
+        [Required]
+        [Column("accountname")]
+        [MaxLength(255)]
+        public string AccountName { get; set; }
+
+        [Required]
+        [Column("relationwithaccholder")]
+        public int RelationWithAccHolder { get; set; }
+
+        [Required]
+        [Column("dob")]
+        public DateTime Dob { get; set; }
+
+        [Required]
+        [Column("addressline")]
+        [MaxLength(500)]
+        public string AddressLine { get; set; }
+
+        [Required]
+        [Column("gender")]
+        public int Gender { get; set; }
+
+        [Required]
+        [Column("memberid")]
+        public int MemberId { get; set; }
+
+        [Required]
+        [Column("memberbrid")]
+        public int MemberBrId { get; set; }
+
+        [Required]
+        [Column("jointwithaccountid")]
+        public int JointWithAccountId { get; set; }
+        [Required]
+        [Column("jointaccholderaccountnumber")]
+        public string jointaccholderaccountnumber { get; set; } = ""!;
+    }
+
+    [Table("jointaccountwithdrawalinfo")]
+    public class JointAccountWithdrawalInfo
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Required]
+        [Column("branchid")]
+        public int BranchId { get; set; }
+
+        [Required]
+        [Column("accountid")]
+        public int AccountId { get; set; }
+
+        [Required]
+        [Column("minimumpersonsrequiredforwithdrawal")]
+        public int MinimumPersonsRequiredForWithdrawal { get; set; }
+
+        [Required]
+        [Column("jointaccountholdercompulsoryforwithdrawal")]
+        public short JointAccountHolderCompulsoryForWithdrawal { get; set; }
+
     }
 }

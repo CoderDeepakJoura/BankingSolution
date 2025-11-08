@@ -130,7 +130,7 @@ namespace BankingPlatform.API.Service.ProductMasters.Savings
                 product.ProductCode = dto.SavingsProductDTO!.ProductCode;
                 product.EffectiveFrom = dto.SavingsProductDTO!.EffectiveFrom;
                 product.EffectiveTill = dto.SavingsProductDTO!.EffectiveTill;
-
+                product.IsNomineeMandatoryInAccMasters = dto.SavingsProductDTO.IsNomineeMandatoryInAccMasters;
                 // Update Product Rules
                 if (dto.SavingsProductRulesDTO != null)
                 {
@@ -368,7 +368,8 @@ namespace BankingPlatform.API.Service.ProductMasters.Savings
                 ProductName = entity.ProductName,
                 ProductCode = entity.ProductCode,
                 EffectiveFrom = entity.EffectiveFrom,
-                EffectiveTill = entity.EffectiveTill
+                EffectiveTill = entity.EffectiveTill,
+                IsNomineeMandatoryInAccMasters = entity.IsNomineeMandatoryInAccMasters
             };
         }
 
@@ -433,7 +434,8 @@ namespace BankingPlatform.API.Service.ProductMasters.Savings
                 ProductName = dto.ProductName,
                 ProductCode = dto.ProductCode,
                 EffectiveFrom = dto.EffectiveFrom,
-                EffectiveTill = dto.EffectiveTill
+                EffectiveTill = dto.EffectiveTill,
+                IsNomineeMandatoryInAccMasters = dto.IsNomineeMandatoryInAccMasters
             };
         }
 

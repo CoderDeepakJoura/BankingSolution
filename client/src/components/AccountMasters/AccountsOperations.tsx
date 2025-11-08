@@ -67,8 +67,8 @@ const AccountsModule: React.FC = () => {
               />
               <AccountOperations
                 accountType="Saving Account(s)"
-                addPath="/accounts/savings/add"
-                modifyPath="/accounts/savings/modify"
+                addPath="/saving-acc-master"
+                modifyPath="/saving-acc-info"
               />
               <AccountOperations
                 accountType="Fixed Deposit (FD) Account(s)"

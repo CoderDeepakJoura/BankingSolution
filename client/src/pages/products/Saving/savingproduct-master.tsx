@@ -153,6 +153,7 @@ const SavingsProductMaster = () => {
         productCode: "",
         effectiveFrom: getCurrentDate(),
         effectiveTill: "",
+        isNomineeMandatoryInAccMasters: false
       },
       savingsProductRulesDTO: {
         branchId: user.branchid,
@@ -440,7 +441,7 @@ const SavingsProductMaster = () => {
         if (!isEditMode) {
           handleReset();
         } else {
-          navigate("/savingproduct-operations");
+          navigate("/savingproduct-info");
         }
       } else {
         throw new Error(
@@ -473,6 +474,7 @@ const SavingsProductMaster = () => {
         productCode: "",
         effectiveFrom: getCurrentDate(),
         effectiveTill: "",
+        isNomineeMandatoryInAccMasters: false
       },
       savingsProductRulesDTO: {
         branchId: user.branchid,
@@ -683,6 +685,41 @@ const SavingsProductMaster = () => {
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
             />
           </FormField>
+          <FormField
+          name="isNomineeMandatoryInAccMasters"
+          label="Nominee Mandatory"
+          errors={errorsByField.isNomineeMandatoryInAccMasters || []}
+          icon={<User className="w-4 h-4 text-indigo-500" />}
+        >
+          <div className="flex items-center space-x-3 mt-2">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={
+                  combinedSavingsData.savingsProductDTO
+                    ?.isNomineeMandatoryInAccMasters || false
+                }
+                onChange={(e) =>
+                  handleProductChange(
+                    "isNomineeMandatoryInAccMasters",
+                    e.target.checked
+                  )
+                }
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <span className="ml-3 text-sm font-medium text-gray-700">
+                {combinedSavingsData.savingsProductDTO
+                  ?.isNomineeMandatoryInAccMasters
+                  ? "Yes"
+                  : "No"}
+              </span>
+            </label>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Require nominee information when creating accounts with this product
+          </p>
+        </FormField>
         </div>
       </div>
     </div>

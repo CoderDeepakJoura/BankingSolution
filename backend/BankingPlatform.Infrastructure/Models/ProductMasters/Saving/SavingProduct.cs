@@ -35,5 +35,7 @@ namespace BankingPlatform.Infrastructure.Models.ProductMasters.Saving
 
         [Column("effectivetill", TypeName = "timestamp without time zone")]
         public DateTime? EffectiveTill { get; set; } // Nullable
+
+        public bool IsNomineeMandatoryInAccMasters { get; set; } = false;
     }
 }

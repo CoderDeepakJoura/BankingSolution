@@ -9,6 +9,7 @@ class commonService extends ApiService {
   constructor() {
     super();
   }
+  private workingDate?: string;
   async get_states(): Promise<ApiResponse<any>> {
     return this.makeRequest<AuthResponse>("/fetchdata/states", {
       method: "GET",
@@ -210,10 +211,46 @@ class commonService extends ApiService {
       }
     );
   }
-  getTodaysDate = () => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
+  
+  setWorkingDate = (workingDate?: string) => {
+    this.workingDate = workingDate;
   };
+ getTodaysDate = () => {
+  // If workingDate is provided, parse and format it
+  
+   if (this.workingDate) {
+      return this.parseWorkingDate(this.workingDate);
+    }
+  
+  // Otherwise, return current date
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Add this helper function to parse the working date format
+parseWorkingDate = (workingDate: string): string => {
+  // Format: "29-September-2025"
+  const parts = workingDate.split('-');
+  if (parts.length !== 3) return this.getTodaysDate(); // Fallback
+  
+  const day = parts[0].padStart(2, '0');
+  const monthName = parts[1];
+  const year = parts[2];
+  
+  // Convert month name to number
+  const months: { [key: string]: string } = {
+    'january': '01', 'february': '02', 'march': '03', 'april': '04',
+    'may': '05', 'june': '06', 'july': '07', 'august': '08',
+    'september': '09', 'october': '10', 'november': '11', 'december': '12'
+  };
+  
+  const month = months[monthName.toLowerCase()] || '01';
+  
+  return `${year}-${month}-${day}`;
+};
 
   splitDate = (dateString: string) => {
     if (!dateString) return "";
@@ -307,7 +344,7 @@ class commonService extends ApiService {
     today.setHours(0, 0, 0, 0);
     selectedDate.setHours(0, 0, 0, 0);
 
-    if (selectedDate <= today) {
+    if (selectedDate <= new Date(this.getTodaysDate())) {
       callback(value);
     } else {
       Swal.fire({
@@ -317,7 +354,7 @@ class commonService extends ApiService {
         timer: 2000,
         showConfirmButton: false,
       });
-      callback(this.getCurrentDate());
+      callback(this.getTodaysDate());
     }
   };
 
@@ -349,6 +386,73 @@ class commonService extends ApiService {
   async fetch_fd_products(branchId: number): Promise<ApiResponse<any>> {
     return this.makeRequest<AuthResponse>(
       `/fetchdata/fd-products/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  async slabname_exists(
+    branchId: number,
+    slabName: string,
+    slabId: number = 0
+  ): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/slabname-exists/${slabName}/${branchId}/${slabId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  async getSavingPrefixAndSuffix(
+    branchId: number,
+    productId: number
+  ): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/savingproduct-prefix-and-suffix/${productId}/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  getAccountImageUrl(filename: string, type: string) {
+    return `${API_CONFIG.BASE_URL}/SavingAccountMaster/savingaccount-images/${filename}/${type}`;
+  }
+
+  async saving_suffix_exists(
+    branchId: number,
+    productId: number,
+    suffix: number,
+    accountId: number = 0
+  ): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/saving-suffix-exists/${productId}/${branchId}/${accountId}/${suffix}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  async fetch_pic_and_sign_extension(
+    branchId: number,
+    memberId: number
+  ): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/memberpic-and-sign-ext/${branchId}/${memberId}`,
       {
         method: "GET",
         headers: {

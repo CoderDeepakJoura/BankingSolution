@@ -338,7 +338,35 @@ namespace BankingPlatform.API.Common.CommonFunctions
 
             };
         }
+        public string GetSavingProductNameFromId(int branchId, int productId) => _appcontext.savingproduct.Where(x => x.BranchId == branchId && x.Id == productId).Select(x => x.ProductName).FirstOrDefault() ?? "";
 
+        public async Task<(int headId, long headCode)> GetSavingProductPrincipalHead(int branchId, int productId)
+        {
+           var data = await _appcontext.savingproductpostingheads.AsNoTracking().Where(x => x.BranchId == branchId && x.SavingsProductId == productId).FirstOrDefaultAsync();
+            int headID = 0; long headCode = 0;
+            if (data != null) {
+                headID = data.PrincipalBalHeadCode;
+                headCode = Convert.ToInt64(GetHeadCodeFromId(headID, branchId).Split('-')[0]);
+            }
+            return (headID, headCode);
+
+        }
+
+        public async Task<string> GetMemberShipNoFromMemberIDandBranchID(int memberId, int memberBranchID, int memberType)
+     => await _appcontext.member
+         .AsNoTracking()
+         .Where(x => x.Id == memberId && x.BranchId == memberBranchID && x.MemberType == memberType)
+         .Select(x => memberType == 1
+             ? x.NominalMembershipNo.ToString()
+             : x.PermanentMembershipNo.ToString())
+         .FirstOrDefaultAsync() ?? "";
+
+        public async Task<string> GetShareMoneyAccNoFromMemberIDandBranchID(int memberId, int memberBranchID, int accTypeId)
+     => await _appcontext.accountmaster
+         .AsNoTracking()
+         .Where(x => x.MemberId == memberId && x.MemberBranchID == memberBranchID && x.AccTypeId == accTypeId)
+         .Select(x => x.AccountNumber)
+         .FirstOrDefaultAsync() ?? "";
 
     }
 }

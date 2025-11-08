@@ -58,7 +58,7 @@ const SlabsModule: React.FC = () => {
               <SlabOperations
                 SlabType="Saving Product Interest Slab"
                 addPath="/savingproduct-interest-slab"
-                modifyPath="/generalacc-master-info"
+                modifyPath="/saving-slab-info"
               />
             </div>
           </section>

@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Configuration;
 using System;
+using System.Security.Claims;
 
 namespace BankingPlatform.API.Services
 {
@@ -20,11 +21,13 @@ namespace BankingPlatform.API.Services
     {
         private readonly BankingDbContext _context;
         private readonly CommonFunctions _commonfunctions;
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ImageService _imageService;
-        public MemberService(BankingDbContext context, CommonFunctions commonFunctions, ImageService imageService)
+        public MemberService(BankingDbContext context, CommonFunctions commonFunctions, ImageService imageService, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _commonfunctions = commonFunctions;
+            _httpContextAccessor = httpContextAccessor;
             _imageService = imageService;
         }
 
@@ -32,9 +35,13 @@ namespace BankingPlatform.API.Services
         public async Task<CombinedMemberDTO> CreateMemberAsync(CombinedMemberDTO dto, IFormFile? memberPhoto = null,
     IFormFile? memberSignature = null)
         {
+            var claimsPrincipal = _httpContextAccessor.HttpContext?.User;
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                 var userIdClaim = claimsPrincipal?.FindFirst("userId")?.Value
+                                   ?? claimsPrincipal?.FindFirst("UserId")?.Value
+                                   ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 static DateTime ToUnspecified(DateTime dateTime) =>
         DateTime.SpecifyKind(dateTime, DateTimeKind.Unspecified);
 
@@ -134,10 +141,10 @@ namespace BankingPlatform.API.Services
                     VoucherDate = DateTime.SpecifyKind(member.JoiningDate, DateTimeKind.Unspecified),
 
                     // Other non-DateTime fields
-                    AddedBy = member.Id,
+                    AddedBy = Int32.Parse(userIdClaim!),
                     BrID = member.BranchId,
                     ModifiedBy = 0,
-                    VerifiedBy = isAutoVerification ? member.Id : 0,
+                    VerifiedBy = isAutoVerification ? Int32.Parse(userIdClaim!) : 0,
                     VoucherNarration = narration,
                     OtherBrID = 0,
                     VoucherNo = nextVrNo,
@@ -604,6 +611,7 @@ namespace BankingPlatform.API.Services
                 .FirstOrDefaultAsync(d => d.MemberId == id && d.BranchId == branchId);
             if (memberDocuments != null) entitiesToDelete.Add(memberDocuments);
 
+            
             // 3. Delete Accounts (Two separate fetches combined into one efficient query)
             var accountTypes = new List<int> {
         (int)Enums.AccountTypes.ShareMoney,
@@ -616,6 +624,13 @@ namespace BankingPlatform.API.Services
 
             entitiesToDelete.AddRange(accountsToDelete);
 
+            int smAccId = accountsToDelete.Where(x => x.AccTypeId == (int)Enums.AccountTypes.ShareMoney).Select(x => x.ID).FirstOrDefault();
+
+            var accOpeningBalance = await _context.accopeningbalance
+                .FirstOrDefaultAsync(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.ShareMoney && x.AccountId == smAccId);
+            if (accOpeningBalance != null) entitiesToDelete.Add(accOpeningBalance);
+
+
             // 4. Delete Voucher (if present)
             if (voucherId > 0)
             {
@@ -627,15 +642,21 @@ namespace BankingPlatform.API.Services
                     entitiesToDelete.Add(voucher);
                 }
             }
+            string picExt = memberDocuments != null ? memberDocuments.MemberPicExt : "";
+            string signExt = memberDocuments != null ? memberDocuments.MemberSignExt : "";
+            
 
+                
             // 5. Queue all deletions and the member itself
             _context.RemoveRange(entitiesToDelete);
             _context.member.Remove(memberToDelete); // Delete the main entity last
-
             // 6. Commit the entire transaction to the database safely
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
-
+            if (picExt != "")
+                _imageService.DeleteImage(id, "picture", picExt, "Member_Images", "Pictures");
+            if (signExt != "")
+                _imageService.DeleteImage(id, "signature", picExt, "Member_Images", "Signatures");
             return true;
         }
 
@@ -904,10 +925,18 @@ namespace BankingPlatform.API.Services
             entity.IsAccAddedManually = dto.IsAccAddedManually;
             entity.IsJointAccount = dto.IsJointAccount;
             entity.IsSuspenseAccount = dto.IsSuspenseAccount;
+            entity.RelativeName = dto.RelativeName;
+            entity.PhoneNo1 = dto.PhoneNo1;
+            entity.DOB = dto.DOB;
+            entity.Gender = dto.Gender;
+            entity.Email = dto.Email;
+            entity.AddressLine = dto.AddressLine;
+            entity.addedusing = dto.addedUsing;
+
             return entity;
         }
 
-        public AccountMasterDTO MapToDTO(AccountMaster entity) => new()
+        public AccountMasterDTO MapToDTO(AccountMaster entity, string memberShipNo = "") => new()
         {
 
             AccId = entity.ID,
@@ -930,7 +959,15 @@ namespace BankingPlatform.API.Services
             IsAccAddedManually = entity.IsAccAddedManually,
             IsJointAccount = entity.IsJointAccount,
             IsSuspenseAccount = entity.IsSuspenseAccount,
-            HeadName = _commonfunctions.GetHeadCodeFromId(entity.HeadId, entity.BranchId)
+            HeadName = _commonfunctions.GetHeadCodeFromId(entity.HeadId, entity.BranchId),
+            AddressLine = entity.AddressLine,
+            DOB = entity.DOB,
+            Email = entity.Email,
+            Gender = entity.Gender,
+            PhoneNo1 = entity.PhoneNo1,
+            RelativeName = entity.RelativeName,
+            addedUsing = entity.addedusing,
+            MembershipNo = memberShipNo
         };
 
         public Voucher MapToEntity(VoucherDTO dto, Voucher entity = null)

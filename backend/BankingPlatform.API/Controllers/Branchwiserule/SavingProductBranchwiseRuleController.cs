@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BankingPlatform.API.Controllers.Branchwiserule
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class SavingProductBranchwiseRuleController : ControllerBase

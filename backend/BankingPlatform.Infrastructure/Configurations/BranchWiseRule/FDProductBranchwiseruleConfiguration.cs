@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace BankingPlatform.Infrastructure.Configurations.BranchWiseRule
 {
-    public class FDProductBranchwieruleConfiguration: IEntityTypeConfiguration<FDProductBranchWiseRule>
+    public class FDProductBranchwiseruleConfiguration: IEntityTypeConfiguration<FDProductBranchWiseRule>
     {
         public void Configure(EntityTypeBuilder<FDProductBranchWiseRule> builder)
         {

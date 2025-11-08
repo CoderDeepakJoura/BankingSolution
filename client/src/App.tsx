@@ -1,8 +1,12 @@
+import { useEffect } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "./redux";
+import commonservice from "./services/common/commonservice";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Dashboard, Login } from './pages';
+import { Dashboard, Login } from "./pages";
 import AccountsModule from "./components/AccountMasters/AccountsOperations";
 import ZoneMaster from "./pages/location/zone/zone-master";
-import ZoneData from "./pages/location/zone/zone-data"; 
+import ZoneData from "./pages/location/zone/zone-data";
 import SessionExpired from "./pages/session-expired";
 import ZoneOperations from "./pages/location/zone/zone-operations"; // Assuming this is the correct import path for ZoneOperations
 import ThanaMaster from "./pages/location/thana/thana-master";
@@ -59,9 +63,22 @@ import SavingProductBranchWiseRule from "./pages/branchwiserule/Saving/branchwis
 import FDProductBranchWiseRule from "./pages/branchwiserule/FD/branchwiserule";
 import SavingProductInterestSlab from "./pages/InterestSlabs/Saving/savinginterestslab";
 import SlabModule from "./components/InterestSlabs/SlabOperations";
+import SavingSlabOperations from "./pages/InterestSlabs/Saving/slab-operations";
+import SavingSlabData from "./pages/InterestSlabs/Saving/slab-data";
+import SavingAccMaster from "./pages/accountMasters/Saving/saving-master";
+import SavingAccOperations from "./pages/accountMasters/Saving/saving-operations";
+import SavingAccData from "./pages/accountMasters/Saving/saving-data";
 
 export default function App() {
- return (
+  const user = useSelector((state: RootState) => state.user);
+
+  // Set working date once when user data is available
+  useEffect(() => {
+    if (user.workingdate) {
+      commonservice.setWorkingDate(user.workingdate);
+    }
+  }, [user.workingdate]);
+  return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
@@ -77,7 +94,10 @@ export default function App() {
         <Route path="/tehsil-operations" element={<TehsilOperations />} />
         <Route path="/tehsil" element={<TehsilMaster />} />
         <Route path="/tehsil-info" element={<TehsilData />} />
-        <Route path="/postOffice-operations" element={<PostOfficeOperations />} />
+        <Route
+          path="/postOffice-operations"
+          element={<PostOfficeOperations />}
+        />
         <Route path="/postOffice" element={<PostOfficeMaster />} />
         <Route path="/postOffice-info" element={<PostOfficeData />} />
         <Route path="/category-operations" element={<CategoryOperations />} />
@@ -86,11 +106,17 @@ export default function App() {
         <Route path="/village-operations" element={<VillageOperations />} />
         <Route path="/village" element={<VillageMaster />} />
         <Route path="/village-info" element={<VillageData />} />
-        <Route path="/accountheadtype-operations" element={<AccountHeadTypeOperations />} />
+        <Route
+          path="/accountheadtype-operations"
+          element={<AccountHeadTypeOperations />}
+        />
         <Route path="/accountheadtype" element={<AccountHeadTypeMaster />} />
         <Route path="/accountheadtype-info" element={<AccountHeadTypeData />} />
         <Route path="/workingdate" element={<WorkingDateMaster />} />
-        <Route path="/accounthead-operations" element={<AccountHeadOperations />} />
+        <Route
+          path="/accounthead-operations"
+          element={<AccountHeadOperations />}
+        />
         <Route path="/accounthead" element={<AccountHeadMaster />} />
         <Route path="/accounthead-info" element={<AccountHeadData />} />
         <Route path="/member" element={<MemberMaster />} />
@@ -101,34 +127,66 @@ export default function App() {
         <Route path="/relation-info" element={<RelationData />} />
         <Route path="/relation" element={<RelationMaster />} />
         <Route path="/generalacc-master" element={<GeneralAccMaster />} />
-        <Route path="/generalacc-master-info" element={<GeneralAccMasterData />} />
+        <Route
+          path="/generalacc-master-info"
+          element={<GeneralAccMasterData />}
+        />
         <Route path="/state-operations" element={<StateOperations />} />
         <Route path="/state" element={<StateMaster />} />
         <Route path="/state-info" element={<StateData />} />
         <Route path="/caste-operations" element={<CasteOperations />} />
         <Route path="/caste" element={<CasteMaster />} />
         <Route path="/caste-info" element={<CasteData />} />
-        <Route path="/occupation-operations" element={<OccupationOperations />} />
+        <Route
+          path="/occupation-operations"
+          element={<OccupationOperations />}
+        />
         <Route path="/occupation" element={<OccupationMaster />} />
         <Route path="/occupation-info" element={<OccupationData />} />
         <Route path="/settings" element={<SettingsMaster />} />
-         <Route path="/patwar-operations" element={<PatwarOperations />} />
+        <Route path="/patwar-operations" element={<PatwarOperations />} />
         <Route path="/patwar" element={<PatwarMaster />} />
         <Route path="/patwar-info" element={<PatwarData />} />
         <Route path="/product-operations" element={<ProductsModule />} />
         <Route path="/fd-product" element={<FDProduct />} />
-         <Route path="/fd-product/:productId" element={<FDProduct />} />
+        <Route path="/fd-product/:productId" element={<FDProduct />} />
         <Route path="/fdproduct-operations" element={<FDProductOperations />} />
         <Route path="/fdproduct-info" element={<FDProductData />} />
         <Route path="/saving-product" element={<SavingProduct />} />
-         <Route path="/saving-product/:productId" element={<SavingProduct />} />
-        <Route path="/savingproduct-operations" element={<SavingProductOperations />} />
+        <Route path="/saving-product/:productId" element={<SavingProduct />} />
+        <Route
+          path="/savingproduct-operations"
+          element={<SavingProductOperations />}
+        />
         <Route path="/savingproduct-info" element={<SavingProductData />} />
-        <Route path="/saving-productbranchwise-rule" element={<SavingProductBranchWiseRule />} />
-        <Route path="/fd-productbranchwise-rule" element={<FDProductBranchWiseRule />} />
-        <Route path="/savingproduct-interest-slab" element={<SavingProductInterestSlab />} />
+        <Route
+          path="/saving-productbranchwise-rule"
+          element={<SavingProductBranchWiseRule />}
+        />
+        <Route
+          path="/fd-productbranchwise-rule"
+          element={<FDProductBranchWiseRule />}
+        />
+        <Route
+          path="/savingproduct-interest-slab"
+          element={<SavingProductInterestSlab />}
+        />
         <Route path="/slab-operations" element={<SlabModule />} />
+        <Route
+          path="/savingproduct-interest-slab/:slabId"
+          element={<SavingProductInterestSlab />}
+        />
+        <Route path="/saving-slab-info" element={<SavingSlabData />} />
+        <Route
+          path="/saving-slab-operations"
+          element={<SavingSlabOperations />}
+        />
+        <Route path="/saving-acc-master" element={<SavingAccMaster />} />
+        <Route path="/saving-acc-master/:accountId" element={<SavingAccMaster />} />
+        <Route path="/saving-acc-operations" element={<SavingAccOperations />} />
+        <Route path="/saving-acc-info" element={<SavingAccData />} />
       </Routes>
+      
     </BrowserRouter>
   );
 }

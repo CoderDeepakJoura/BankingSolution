@@ -1085,6 +1085,11 @@ const MemberMaster = () => {
       BranchId: user.branchid,
       AccountNumber: memberData.accountNumber.trim(),
       AccountName: `${memberData.memberName.trim()}`,
+      RelativeName: memberData.relativeName.trim(),
+      Gender: Number(memberData.gender),
+      PhoneNo1: memberData.phoneNo1.trim(),
+      Addressline: memberData.addressLine1.trim(),
+      dob: memberData.dob,
     };
     const combinedMemberDTO: CombinedMemberDTO = {
       member: memberDTO,
@@ -1641,7 +1646,17 @@ const MemberMaster = () => {
         <input
           type="date"
           value={memberData.dob}
-          onChange={(e) => handleInputChange("dob", e.target.value)}
+          onChange={(e) =>commonservice.handleDateChange(
+                                        e.target.value,
+                                        (val) =>
+                                          handleInputChange(
+                                            "dob",
+                                            val
+                                          ),
+                                        "joiningDate"
+                                      )
+                                    }
+          // onChange={(e) => handleInputChange("dob", e.target.value)}
           onBlur={() => handleFieldBlur("dob")}
           className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
           max={commonservice.getTodaysDate()} // Prevent future dates
@@ -1677,7 +1692,17 @@ const MemberMaster = () => {
         <input
           type="date"
           value={memberData.joiningDate}
-          onChange={(e) => handleInputChange("joiningDate", e.target.value)}
+          onChange={(e) =>commonservice.handleDateChange(
+                                        e.target.value,
+                                        (val) =>
+                                          handleInputChange(
+                                            "joiningDate",
+                                            val
+                                          ),
+                                        "joiningDate"
+                                      )
+                                    }
+          // onChange={(e) => handleInputChange("joiningDate", e.target.value)}
           onBlur={() => handleFieldBlur("joiningDate")}
           readOnly
           className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
@@ -2011,9 +2036,17 @@ const MemberMaster = () => {
               <input
                 type="date"
                 value={nominee.dob}
-                onChange={(e) =>
-                  updateNominee(nominee.id, "dob", e.target.value)
-                }
+                onChange={(e) =>commonservice.handleDateChange(
+                                        e.target.value,
+                                        (val) =>
+                                         updateNominee(nominee.id, "dob", val),
+                                        "joiningDate"
+                                      )
+                                    }
+                // onChange={(e) =>
+                //   updateNominee(nominee.id, "dob", e.target.value)
+                // }
+                
                 onBlur={() => handleFieldBlur(`nominees[${index}].dob`)}
                 className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
                 max={commonservice.getTodaysDate()} // Prevent future dates

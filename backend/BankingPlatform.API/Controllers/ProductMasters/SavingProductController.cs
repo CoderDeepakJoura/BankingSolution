@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BankingPlatform.API.Controllers.ProductMasters
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class SavingsProductController : ControllerBase

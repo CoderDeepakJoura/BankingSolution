@@ -36,6 +36,8 @@
         public int? DebitAccountId { get; set; } = 0;
         public decimal? OpeningAmount { get; set; } = 0;
 
+        public string? OpeningBalanceType { get; set; } = ""!;
+
         // Optional: If you want to expose Credit/Debit details
         //public List<VoucherCreditDebitDetailsDTO>? CreditDebitDetails { get; set; }
     }

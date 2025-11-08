@@ -102,5 +102,16 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public short? IsSuspenseAccount { get; set; } = 0;
         public string? HeadName { get; set; } = ""!;
         public int? SMAccId { get; set; }
+        public string? ProductName { get; set; }
+        public string? RelativeName { get; set; }
+        public int? Gender { get; set; }
+        public string? PhoneNo1 { get; set; }
+        public string? Email { get; set; }
+        public string? AddressLine { get; set; }
+
+        public DateTime? DOB { get; set; }
+        public string? addedUsing { get; set; }
+        public string? MembershipNo { get; set; }
+
     }
 }

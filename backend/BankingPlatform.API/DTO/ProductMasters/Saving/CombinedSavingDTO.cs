@@ -27,6 +27,7 @@
         public DateTime EffectiveFrom { get; set; }
 
         public DateTime? EffectiveTill { get; set; }
+        public bool IsNomineeMandatoryInAccMasters { get; set; }
     }
     public class SavingsProductRulesDTO
     {

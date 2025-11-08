@@ -9,6 +9,7 @@ using System.Text.Json;
 
 namespace BankingPlatform.API.Controllers.ProductMasters
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class FDProductController : ControllerBase

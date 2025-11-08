@@ -5,6 +5,7 @@ import {
   ValidationResult,
   ValidationRule,
 } from "../validation";
+import commonservice from "../../common/commonservice";
 
 export const useFormValidation = () => {
   const [errors, setErrors] = useState<ValidationError[]>([]);
@@ -87,7 +88,7 @@ export const useFormValidation = () => {
         if (!value) return false;
         const joinDate = new Date(value);
         const today = new Date();
-        return joinDate <= today;
+        return joinDate <= new Date(commonservice.getTodaysDate());
       },
       customMessage: "Joining date cannot be in the future",
       tab: "basic",

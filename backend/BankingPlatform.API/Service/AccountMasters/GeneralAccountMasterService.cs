@@ -213,7 +213,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             return "Success";
         }
         // AccountMaster
-        private AccountMaster MapToEntity(AccountMasterDTO dto, AccountMaster entity = null)
+        public AccountMaster MapToEntity(AccountMasterDTO dto, AccountMaster entity = null)
         {
             entity ??= new AccountMaster();
             entity.ID = dto.AccId;
@@ -239,7 +239,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             return entity;
         }
 
-        private AccountMasterDTO MapToDTO(AccountMaster entity) => new()
+        public AccountMasterDTO MapToDTO(AccountMaster entity) => new()
         {
             
             AccId = entity.ID,
