@@ -170,7 +170,7 @@ namespace BankingPlatform.API.Controllers.AccountMasters
             [FromRoute] string fileName,
             [FromRoute] string type)
         {
-            var fileData = _imageService.GetImageFile(fileName, "Account_Images", type);
+            var fileData = _imageService.GetImageFile(fileName, "Account_Images", type, "A");
             if (fileData == null)
                 return NotFound("Image not found");
 

@@ -26,7 +26,8 @@
         public enum VoucherSubType
         {
             ShareMoney = 1,
-            Deposit = 2
+            Deposit = 2,
+            Withdrawal = 3,
         }
 
         public enum VoucherStatus

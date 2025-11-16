@@ -23,7 +23,9 @@ const Header = () => {
       console.log("Searching for:", searchTerm);
     }
   };
+  
   const navigate = useNavigate();
+  
   const LogoutFn = async () => {
     try {
       const data = await ApiService.logout();
@@ -51,7 +53,6 @@ const Header = () => {
       style={{ position: "sticky", top: 0 }}
       className="w-full bg-white border-b border-gray-200 shadow-sm z-50"
     >
-      {/* SIMPLE GRID: Left (logo), Center (search, flexible), Right (controls, min width) */}
       <nav className="flex items-center h-16 w-full px-2 md:px-8 gap-4">
         {/* Left: Logo and Brand */}
         <div className="flex items-center gap-2 flex-none min-w-0">
@@ -69,17 +70,15 @@ const Header = () => {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-
               <circle cx="12" cy="12" r="10" stroke="#FBBF24" />
             </svg>
           </div>
           <span className="text-xl font-extrabold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent truncate">
             Sicswave FinCore
           </span>
-         
         </div>
 
-        {/* Center: Search Bar (flex-1, stretches full width between fixed left/right) */}
+        {/* Center: Search Bar */}
         <form
           onSubmit={handleSearchSubmit}
           className="flex-1 flex mx-2"
@@ -112,8 +111,9 @@ const Header = () => {
           </div>
         </form>
 
-        {/* Right: Time, Date, User, Logout */}
+        {/* Right: Time, Date, Session, User, Logout */}
         <div className="flex items-center gap-1 md:gap-4 flex-none min-w-0 justify-end">
+          {/* Time */}
           <span className="hidden sm:flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap select-none">
             <svg
               className="w-5 h-5 text-indigo-700"
@@ -133,6 +133,8 @@ const Header = () => {
             })}{" "}
             IST
           </span>
+
+          {/* Working Date */}
           <span className="hidden sm:flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap select-none">
             <svg
               className="w-5 h-5 text-blue-700"
@@ -148,6 +150,22 @@ const Header = () => {
             </svg>
             {user.workingdate}
           </span>
+
+          {/* ✅ Login Session Info */}
+          <span className="hidden lg:flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap select-none">
+            <svg
+              className="w-5 h-5 text-purple-700"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <span className="font-medium">Session:</span> {user.sessionInfo || "N/A"}
+          </span>
+
+          {/* User Name */}
           <span className="flex items-center gap-1 text-sm text-gray-800 font-semibold whitespace-nowrap">
             <svg
               className="w-5 h-5 text-indigo-600"
@@ -160,6 +178,8 @@ const Header = () => {
             </svg>
             {user.name}
           </span>
+
+          {/* Logout Button */}
           <button
             onClick={handleLogout}
             className="bg-red-600 hover:bg-red-700 px-4 py-1.5 rounded-md text-white font-semibold transition ml-1"
@@ -215,16 +235,16 @@ const Header = () => {
               </p>
               <div className="flex justify-end space-x-4">
                 <button
-                  onClick={cancelLogout}
-                  className="px-4 py-2 rounded-md bg-gray-300 hover:bg-gray-400 font-semibold text-gray-800 transition"
-                >
-                  Cancel
-                </button>
-                <button
                   onClick={confirmLogout}
                   className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white font-semibold transition"
                 >
                   Logout
+                </button>
+                 <button
+                  onClick={cancelLogout}
+                  className="px-4 py-2 rounded-md bg-gray-300 hover:bg-gray-400 font-semibold text-gray-800 transition"
+                >
+                  Cancel
                 </button>
               </div>
             </div>

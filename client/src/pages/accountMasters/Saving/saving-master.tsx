@@ -33,7 +33,7 @@ import { useFormValidation } from "../../../services/Validations/accountMasters/
 import { ValidationSummary } from "../../../components/Validations/ValidationSummary";
 import { FormField } from "../../../components/Validations/FormField";
 
-interface SavingProduct {
+export interface SavingProduct {
   id: number;
   productName: string;
   productCode: string;
@@ -44,7 +44,7 @@ interface Relation {
   description: string;
 }
 
-interface DebitAccount {
+export interface DebitAccount {
   accId: number;
   accountNumber: string;
   accountName: string;
@@ -331,7 +331,6 @@ const SavingAccountMaster = () => {
             response.data.memberBranchId,
             response.data.memberId
           );
-          console.log(pic_and_sign_info);
         // Load picture and signature
         if (pic_and_sign_info.data.memberPicExt) {
           const fileName = `member_${response.data.memberId}_picture${pic_and_sign_info.data.memberPicExt}`;

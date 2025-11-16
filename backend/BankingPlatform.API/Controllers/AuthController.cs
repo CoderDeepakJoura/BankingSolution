@@ -129,7 +129,7 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                setClaims(user.username, branchInfo.branchmaster_name, branchInfo.branchmaster_code, branchInfo.id, "", branchInfo.branchmaster_phoneno1, branchInfo.branchmaster_addressline, branchInfo.branchmaster_emailid, user.id.ToString(), "");
+                setClaims(user.username, branchInfo.branchmaster_name, branchInfo.branchmaster_code, branchInfo.id, "", branchInfo.branchmaster_phoneno1, branchInfo.branchmaster_addressline, branchInfo.branchmaster_emailid, user.id.ToString(), "", "", 0);
 
 
                 // Generate token
@@ -218,8 +218,8 @@ namespace BankingPlatform.API.Controllers
         {
             try
             {
-                GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate);
-                setClaims(userName, branchName, branchCode, branchId, societyName, contact, address, email, userId, workingDateDTO.WorkingDate);
+                GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId);
+                setClaims(userName, branchName, branchCode, branchId, societyName, contact, address, email, userId, workingDateDTO.WorkingDate, workingDateDTO.sessionInfo, workingDateDTO.sessionId);
                 var tokenExpiration = DateTime.UtcNow.AddDays(_jwtSettings.ExpiryDays);
                 var token = _jwtTokenService.GenerateToken();
                 var cookieOptions = new CookieOptions
@@ -300,7 +300,7 @@ namespace BankingPlatform.API.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> GetLoginInfo()
         {
-            GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate);
+            GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId);
 
             return Ok(new
             {
@@ -313,11 +313,13 @@ namespace BankingPlatform.API.Controllers
                 Contact = contact,
                 Address = address,
                 Email = email,
-                WorkingDate = workingDate
+                WorkingDate = workingDate,
+                SessionInfo = sessionInfo,
+                SessionId = sessionId
             });
         }
 
-        private void GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate)
+        private void GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId)
         {
             var user = _httpContextAccessor.HttpContext!.User!;
 
@@ -331,10 +333,12 @@ namespace BankingPlatform.API.Controllers
             email = user.FindFirst("emailaddress")?.Value!;
             userId = user.FindFirst("userId")?.Value!;
             workingDate = user.FindFirst("workingDate").Value! ?? "";
+            sessionInfo = user.FindFirst("sessionInfo").Value! ?? "";
+            sessionId = Int32.Parse(user.FindFirst("sessionId")!.Value);
 
         }
 
-        private void setClaims(string userName, string branchName, string branchCode, int branchId, string societyName, string contact, string address, string email, string userId, string workingDate)
+        private void setClaims(string userName, string branchName, string branchCode, int branchId, string societyName, string contact, string address, string email, string userId, string workingDate, string sessionInfo, int sessionId)
         {
             _commonClass.branchCode = branchCode;
             _commonClass.branchId = branchId;
@@ -346,6 +350,8 @@ namespace BankingPlatform.API.Controllers
             _commonClass.contactno = contact;
             _commonClass.userId = userId;
             _commonClass.workingDate = workingDate;
+            _commonClass.sessionInfo = sessionInfo;
+            _commonClass.sessionId = sessionId;
         }
     }
 }

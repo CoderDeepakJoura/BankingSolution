@@ -68,6 +68,12 @@ import SavingSlabData from "./pages/InterestSlabs/Saving/slab-data";
 import SavingAccMaster from "./pages/accountMasters/Saving/saving-master";
 import SavingAccOperations from "./pages/accountMasters/Saving/saving-operations";
 import SavingAccData from "./pages/accountMasters/Saving/saving-data";
+import BranchMaster from "./pages/branchmaster/branchmaster";
+import BranchMasterOperations from "./pages/branchmaster/branchmaster-operations";
+import BranchMasterData from "./pages/branchmaster/branchmaster-data";
+import SavingDepositVoucher from "./pages/vouchers/saving/savingdeposit";
+import SavingWithdrawalVoucher from "./pages/vouchers/saving/savingwithdrawal";
+import VoucherModule from "./components/Vouchers/VoucherOperations";
 
 export default function App() {
   const user = useSelector((state: RootState) => state.user);
@@ -185,6 +191,13 @@ export default function App() {
         <Route path="/saving-acc-master/:accountId" element={<SavingAccMaster />} />
         <Route path="/saving-acc-operations" element={<SavingAccOperations />} />
         <Route path="/saving-acc-info" element={<SavingAccData />} />
+        <Route path="/branchmaster" element={<BranchMaster />} />
+        {/* <Route path="/saving-acc-master/:accountId" element={<BranchMaster />} /> */}
+        <Route path="/branchmaster-operations" element={<BranchMasterOperations />} />
+        <Route path="/branchmaster-info" element={<BranchMasterData />} />
+        <Route path="/saving-deposit-voucher" element={<SavingDepositVoucher />} />
+        <Route path="/saving-withdrawal-voucher" element={<SavingWithdrawalVoucher />} />
+        <Route path="/voucher-operations" element={<VoucherModule />} />
       </Routes>
       
     </BrowserRouter>

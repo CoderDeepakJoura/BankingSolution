@@ -13,5 +13,7 @@
         public string address { get; set; } = ""!;
         public string userId { get; set; } = ""!;
         public string workingDate { get; set; } = ""!;
+        public string sessionInfo { get; set; } = ""!;
+        public int sessionId { get; set; }
     }
 }

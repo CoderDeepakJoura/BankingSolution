@@ -2,6 +2,7 @@
 global using Microsoft.EntityFrameworkCore;
 using BankingPlatform.Infrastructure.Models.AccHeads;
 using BankingPlatform.Infrastructure.Models.AccMasters;
+using BankingPlatform.Infrastructure.Models.BranchSessions;
 using BankingPlatform.Infrastructure.Models.BranchWiseRule;
 using BankingPlatform.Infrastructure.Models.InterestSlabs.Saving;
 using BankingPlatform.Infrastructure.Models.Location;
@@ -72,6 +73,8 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<AccountDocDetails> accountdocdetails { get; set; }
     public virtual DbSet<JointAccountInfo> jointaccountinfo { get; set; }
     public virtual DbSet<JointAccountWithdrawalInfo> jointaccountwithdrawalinfo { get; set; }
+    public virtual DbSet<BranchSession> branchsession { get; set; }
+    public virtual DbSet<VoucherSavingDetail> vouchersavingdetail { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

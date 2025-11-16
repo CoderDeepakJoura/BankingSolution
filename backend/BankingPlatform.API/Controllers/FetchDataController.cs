@@ -3,6 +3,7 @@ using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.AccountHead;
 using BankingPlatform.API.DTO.AccountMasters;
+using BankingPlatform.API.DTO.BranchSession;
 using BankingPlatform.API.DTO.CommonDTO;
 using BankingPlatform.API.DTO.Location.Patwar;
 using BankingPlatform.API.DTO.Location.PostOffice;
@@ -13,6 +14,7 @@ using BankingPlatform.API.DTO.Location.Village;
 using BankingPlatform.API.DTO.Miscalleneous;
 using BankingPlatform.API.DTO.ProductMasters.Saving;
 using BankingPlatform.API.DTO.Settings;
+using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.member;
 using Microsoft.AspNetCore.Http;
@@ -132,12 +134,7 @@ namespace BankingPlatform.API.Controllers
         [HttpPost("get_all_tehsils")]
         public async Task<IActionResult> GetAllTehsils([FromBody] CommonDTO commonDTO)
         {
-            if (commonDTO.BranchId == null || commonDTO.BranchId == 0)
-                return BadRequest(new ResponseDto
-                {
-                    Success = false,
-                    Message = "Some error occured while fetching Tehsils."
-                });
+            
             var tehsils = await _context.tehsil
             .Where(x => x.branchid == commonDTO.BranchId)
             .Select(x => new TehsilMasterDTO
@@ -224,7 +221,7 @@ namespace BankingPlatform.API.Controllers
         [HttpGet("category-info/{branchid}")]
         public async Task<IActionResult> GetAllCategorys([FromRoute] int branchid)
         {
-            var states = await _context.category.Where(x=> x.branchid == branchid)
+            var categoryInfo = await _context.category.Where(x=> x.branchid == branchid)
             .Select(x => new CategoryMasterDTO
             {
                 CategoryId = x.id,
@@ -234,7 +231,7 @@ namespace BankingPlatform.API.Controllers
             return Ok(new
             {
                 Success = true,
-                data = states
+                data = categoryInfo
             });
         }
 
@@ -318,7 +315,8 @@ namespace BankingPlatform.API.Controllers
         [HttpGet("general-accounts/{branchId}")]
         public async Task<IActionResult> GetAllGeneralAccounts([FromRoute] int branchid)
         {
-            var accounts = await _context.accountmaster.Where(x => x.BranchId == branchid)
+            int accType = (int)Enums.AccountTypes.General;
+            var accounts = await _context.accountmaster.Where(x => x.BranchId == branchid && x.AccTypeId == accType)
             .Select(x => new AccountMasterDTO
             {
                 AccId = x.ID,
@@ -590,6 +588,151 @@ namespace BankingPlatform.API.Controllers
               
             });
 
+        }
+
+        [HttpGet("branch-session-info/{branchId}")]
+        public async Task<IActionResult> BranchSessions([FromRoute] int branchId)
+        {
+            var branchSessionInfo = await _context.branchsession.Where(x => x.branchid == branchId)
+            .Select(x => new BranchSessionDTO
+            {
+                Id = x.id,
+                BranchSessionInfo = x.sessionfrom + "-" + x.sessionto
+            })
+            .ToListAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = branchSessionInfo
+            });
+        }
+
+        [HttpGet("deposit-accounts-info/{branchId}/{productId}/{accountType}/{isClosed}")]
+        public async Task<IActionResult> DepositAccountsInfo([FromRoute] int branchId, int productId, int accountType, bool isClosed = false)
+        {
+            if (branchId > 0 && productId > 0)
+            {
+                var depositAccountInfo = await _context.accountmaster.AsNoTracking()
+                    .Where(x => x.BranchId == branchId && x.GeneralProductId == productId && x.AccTypeId == accountType && x.IsAccClosed == isClosed)
+                    .Select(x => new
+                    {
+                        AccId = x.ID,
+                        AccountName = x.AccPrefix + "-" + x.AccSuffix + "-" + x.AccountName + "-" + x.ID,
+                    })
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    Success = true,
+                    data = depositAccountInfo
+                });
+            }
+            else
+                return BadRequest(new ResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid parameters."
+                });
+        }
+
+        // valid for fd, rd, saving accounts
+        [HttpGet("account-info-for-deposit-accounts/{branchId}/{accountId}/{accountType}/{isClosed}")]
+        public async Task<IActionResult> DepositAccountsInfoFromDepositAccount([FromRoute] int branchId, int accountId, int accountType, bool isClosed = false)
+        {
+            
+            if(branchId > 0 && accountId > 0 && accountType > 0)
+            {
+                var memberInfo = await (from p in _context.accountmaster.AsNoTracking()
+                                        join q in _context.savingproduct.AsNoTracking()
+                                            on new { productId = (int)p.GeneralProductId!, branchId = p.BranchId }
+                                            equals new { productId = q.Id, branchId = q.BranchId }
+                                        join k in _context.member.AsNoTracking()
+                                            on new { memberId = (int)p.MemberId!, memberBranchId = (int)p.MemberBranchID! }
+                                            equals new { memberId = k.Id, memberBranchId = k.BranchId }
+                                        join l in _context.savingproductrules.AsNoTracking()
+                                            on new { productId = q.Id, branchId = q.BranchId }
+                                            equals new { productId = l.SavingsProductId, branchId = l.BranchId }
+                                        join h in _context.memberdocdetails.AsNoTracking()
+                                            on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                            equals new { memberId = h.MemberId, memberBranchId = h.BranchId }
+                                        join m in _context.memberlocationdetails.AsNoTracking()
+                                            on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                            equals new { memberId = m.MemberId, memberBranchId = m.BranchId }
+                                        join accdocdet in _context.accountdocdetails on new { accountId = p.ID, accountBranchId = p.BranchId }
+                                        equals new { accountId = accdocdet.AccountId, accountBranchId = accdocdet.BranchId }
+                                            // LEFT JOIN for nominee details
+                                        join f in _context.membernomineedetails.AsNoTracking()
+                                            on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                            equals new { memberId = f.MemberId, memberBranchId = f.BranchId }
+                                            into nomineeDetailsGroup
+                                        from nominee in nomineeDetailsGroup.DefaultIfEmpty()
+                                        where p.BranchId == branchId
+                                            && p.ID == accountId
+                                            && p.AccTypeId == accountType
+                                            && p.IsAccClosed == isClosed
+                                        select new
+                                        {
+                                            MemberName = k.MemberName,
+                                            RelativeName = k.RelativeName,
+                                            MemberShipNo = k.MemberType == (int)Enums.MemberType.Permanent
+                                                ? k.PermanentMembershipNo
+                                                : k.NominalMembershipNo,
+                                            AccountOpeningDate = p.AccOpeningDate.ToString("dd-MMM-yyyy"),
+                                            MinimumBalanceRequired = l.MinBalanceAmt,
+                                            Address = m.AddressLine1 ?? "",
+                                            ContactNo = k.PhoneNo1,
+                                            EmailId = k.Email1,
+                                            AadhaarNo = h.AadhaarCardNo,
+                                            PANCardNo = h.PanCardNo,
+                                            nomineeDetails = nominee != null ? new
+                                            {
+                                                NomineeName = nominee.NomineeName,
+                                            } : null,
+                                            MemberId = k.Id,
+                                            MemberBrId = k.BranchId,
+                                            AccountPicExt = accdocdet.PicExt,
+                                            AccountSignExt = accdocdet.SignExt
+                                        }).FirstOrDefaultAsync();
+
+                return Ok(new
+                {
+                    Success = true,
+                    data = memberInfo
+                });
+
+            }
+            else
+                return BadRequest(new ResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid parameters."
+                });
+        }
+
+        [HttpGet("joint-acc-info/{accountId}/{branchId}")]
+        public async Task<IActionResult> GetJointAccountInfoFromAccountId([FromRoute]int accountId, int branchId)
+        {
+            if(accountId > 0 && branchId > 0)
+            {
+                var jointAccInfo = await  _context.jointaccountinfo.Where(x => x.JointWithAccountId == accountId && x.BranchId == branchId).Select(x=> new JointAccountInfoDTO
+                {
+                    AccountName = x.AccountName,
+                    AddressLine = x.AddressLine,
+                    JointAccHolderAccountNumber = x.jointaccholderaccountnumber
+                }).ToListAsync() ?? new();
+
+                return Ok(new
+                {
+                    Success = true,
+                    data = jointAccInfo
+                });
+            }
+            else
+                return BadRequest(new ResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid parameters."
+                });
         }
 
     }

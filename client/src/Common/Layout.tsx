@@ -117,6 +117,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               contact: data.contact,
               workingdate: data.workingDate,
               branchid: data.branchId,
+              sessionInfo: data.sessionInfo,
+              sessionId: data.sessionId,
             })
           );
         } else {
@@ -207,6 +209,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               path: "/accountheadtype-operations",
             },
             { label: "Account Head Master", path: "/accounthead-operations" },
+            { label: "Branch Master", path: "/branchmaster-operations" },
             { label: "Caste Master", path: "/caste-operations" },
             { label: "Category Master", path: "/category-operations" },
             { label: "Occupation Master", path: "/occupation-operations" },
@@ -247,6 +250,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           subItems: [
             { label: "Saving Product BranchWise Rule", path: "/saving-productbranchwise-rule" },
              { label: "FD Product BranchWise Rule", path: "/fd-productbranchwise-rule" },
+          ],
+        },
+        ,
+         {
+          label: "Vouchers",
+          path: "",
+          subItems: [
+            { label: "Voucher Operations", path: "/voucher-operations" }
           ],
         },
         // { label: "Sales", path: "/modules/sales" },

@@ -1,10 +1,12 @@
 ﻿using BankingPlatform.API.Controllers.Member;
+using BankingPlatform.API.Mappers.Voucher;
 using BankingPlatform.API.Service;
 using BankingPlatform.API.Service.AccountMasters;
 using BankingPlatform.API.Service.Caste;
 using BankingPlatform.API.Service.InterestSlabs.Saving;
 using BankingPlatform.API.Service.ProductMasters.FD;
 using BankingPlatform.API.Service.ProductMasters.Savings;
+using BankingPlatform.API.Service.Vouchers.Saving;
 using BankingPlatform.API.Services;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
@@ -33,6 +35,9 @@ builder.Services.AddScoped<FDProductService>();
 builder.Services.AddScoped<SavingsProductService>();
 builder.Services.AddScoped<SavingInterestSlabService>();
 builder.Services.AddScoped<SavingAccountService>();
+builder.Services.AddScoped<BranchMasterService>();
+builder.Services.AddScoped<SavingVoucherService>();
+builder.Services.AddScoped<VoucherMapper>();
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");

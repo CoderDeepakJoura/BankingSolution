@@ -7,6 +7,7 @@ using BankingPlatform.Infrastructure.Models.voucher;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using System;
+using System.Security.Claims;
 
 namespace BankingPlatform.API.Common.CommonFunctions
 {
@@ -367,6 +368,17 @@ namespace BankingPlatform.API.Common.CommonFunctions
          .Where(x => x.MemberId == memberId && x.MemberBranchID == memberBranchID && x.AccTypeId == accTypeId)
          .Select(x => x.AccountNumber)
          .FirstOrDefaultAsync() ?? "";
+
+        public async Task<bool> IsAnyBranchStatedAsMain(int branchId = 0) => await _appcontext.branchmaster.AsNoTracking().Where(x => x.id != branchId && x.branchmaster_ismainbranch == 1).AnyAsync();
+
+        public string GetCurrentUserId()
+        {
+            var user = _httpContextAccessor.HttpContext!.User!;
+            return user?.FindFirst("userId")?.Value
+                                   ?? user?.FindFirst("UserId")?.Value
+                                   ?? user?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                   ?? "";
+        }
 
     }
 }

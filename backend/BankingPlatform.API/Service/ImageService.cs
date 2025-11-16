@@ -77,12 +77,14 @@ namespace BankingPlatform.API.Service
             }
         }
 
-        public (byte[] fileBytes, string contentType)? GetImageFile(string fileName, string masterFolderName, string? subFolderName = "")
+        public (byte[] fileBytes, string contentType)? GetImageFile(string fileName, string masterFolderName, string? subFolderName = "", string accountOrMember = "M")
         {
             if (string.IsNullOrEmpty(fileName))
                 return null;
 
-            var folderPath = Path.Combine(_docPaths.MemberImagesDrive, masterFolderName);
+            string driveName = accountOrMember == "M" ? _docPaths.MemberImagesDrive : _docPaths.AccountImagesDrive;
+
+            var folderPath = Path.Combine(driveName, masterFolderName);
             if (!string.IsNullOrEmpty(subFolderName))
                 folderPath = Path.Combine(folderPath, subFolderName);
 

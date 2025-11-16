@@ -531,7 +531,6 @@ const SettingsMaster = () => {
           <FormField
             name="bankFDMaturityReminderDays"
             label="Bank FD Maturity Reminder Days"
-            required
             errors={errorsByField.bankFDMaturityReminderDays || []}
             icon={<Calendar className="w-4 h-4 text-blue-500" />}
           >
@@ -615,7 +614,6 @@ const SettingsMaster = () => {
           <FormField
             name="savingAccountLength"
             label="Saving Account Length"
-            required
             errors={errorsByField.savingAccountLength || []}
           >
             <input
@@ -633,7 +631,6 @@ const SettingsMaster = () => {
           <FormField
             name="loanAccountLength"
             label="Loan Account Length"
-            required
             errors={errorsByField.loanAccountLength || []}
           >
             <input
@@ -651,7 +648,6 @@ const SettingsMaster = () => {
           <FormField
             name="fdAccountLength"
             label="FD Account Length"
-            required
             errors={errorsByField.fdAccountLength || []}
           >
             <input
@@ -669,7 +665,6 @@ const SettingsMaster = () => {
           <FormField
             name="rdAccountLength"
             label="RD Account Length"
-            required
             errors={errorsByField.rdAccountLength || []}
           >
             <input
@@ -687,7 +682,6 @@ const SettingsMaster = () => {
           <FormField
             name="shareAccountLength"
             label="Share Account Length"
-            required
             errors={errorsByField.shareAccountLength || []}
           >
             <input
@@ -1041,7 +1035,7 @@ const SettingsMaster = () => {
                   </div>
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                      System Settings
+                     Settings Master
                     </h1>
                     <p className="text-gray-600 text-sm">
                       Configure all system settings and preferences

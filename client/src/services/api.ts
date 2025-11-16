@@ -115,10 +115,10 @@ export class ApiService {
       method: 'GET'
     });
   }
-  async set_working_date(WorkingDate: string): Promise<ApiResponse<AuthResponse>> {
+  async set_working_date(WorkingDate: string, sessionInfo: string, sessionId: number): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/auth/working-date', {
       method: 'POST',
-      body: JSON.stringify({ WorkingDate: WorkingDate })
+      body: JSON.stringify({ WorkingDate: WorkingDate, sessionInfo: sessionInfo, sessionId: sessionId })
     });
   }
 }

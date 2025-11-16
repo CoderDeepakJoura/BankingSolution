@@ -9,6 +9,8 @@ interface UserState {
   address?: string;
   contact?: string;
   workingdate?: string;
+  sessionInfo: string;
+  sessionId: number;
   
 }
 
@@ -35,6 +37,8 @@ const userSlice = createSlice({
       state.contact = "";
       state.workingdate = "";
       state.branchid = 0;
+      state.sessionInfo = "";
+      state.sessionId = 0;
     },
   },
 });

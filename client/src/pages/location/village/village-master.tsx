@@ -29,7 +29,7 @@ interface PostOfficeInfo {
   postOfficeName: string;
 }
 
-interface TehsilInfo {
+export interface TehsilInfo {
   tehsilId: number;
   tehsilName: string;
 }
@@ -39,7 +39,7 @@ interface PatwarInfo {
   description: string;
 }
 
-interface OptionType {
+export interface OptionType {
   value: number;
   label: string;
 }

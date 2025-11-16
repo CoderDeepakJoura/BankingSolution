@@ -5,6 +5,29 @@ export interface AccountMaster {
   accId: number;
   accountName: string;
 }
+export interface NomineeDetails {
+  nomineeName: string;
+}
+
+// Account Information Interface
+export interface AccountInformation {
+  memberName: string;
+  relativeName: string;
+  memberShipNo: string;
+  accountOpeningDate: string;
+  minimumBalanceRequired: number;
+  address: string;
+  contactNo: string;
+  emailId: string;
+  aadhaarNo: string;
+  panCardNo: string;
+  nomineeDetails: NomineeDetails | null;
+  memberId: Number;
+  memberBrId: Number;
+  accountPicExt: string;
+  accountSignExt: string;
+  balance:string | "0";
+}
 class commonService extends ApiService {
   constructor() {
     super();
@@ -211,46 +234,55 @@ class commonService extends ApiService {
       }
     );
   }
-  
+
   setWorkingDate = (workingDate?: string) => {
     this.workingDate = workingDate;
   };
- getTodaysDate = () => {
-  // If workingDate is provided, parse and format it
-  
-   if (this.workingDate) {
+  getTodaysDate = () => {
+    // If workingDate is provided, parse and format it
+
+    if (this.workingDate) {
       return this.parseWorkingDate(this.workingDate);
     }
-  
-  // Otherwise, return current date
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
-// Add this helper function to parse the working date format
-parseWorkingDate = (workingDate: string): string => {
-  // Format: "29-September-2025"
-  const parts = workingDate.split('-');
-  if (parts.length !== 3) return this.getTodaysDate(); // Fallback
-  
-  const day = parts[0].padStart(2, '0');
-  const monthName = parts[1];
-  const year = parts[2];
-  
-  // Convert month name to number
-  const months: { [key: string]: string } = {
-    'january': '01', 'february': '02', 'march': '03', 'april': '04',
-    'may': '05', 'june': '06', 'july': '07', 'august': '08',
-    'september': '09', 'october': '10', 'november': '11', 'december': '12'
+    // Otherwise, return current date
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
-  
-  const month = months[monthName.toLowerCase()] || '01';
-  
-  return `${year}-${month}-${day}`;
-};
+
+  // Add this helper function to parse the working date format
+  parseWorkingDate = (workingDate: string): string => {
+    // Format: "29-September-2025"
+    const parts = workingDate.split("-");
+    if (parts.length !== 3) return this.getTodaysDate(); // Fallback
+
+    const day = parts[0].padStart(2, "0");
+    const monthName = parts[1];
+    const year = parts[2];
+
+    // Convert month name to number
+    const months: { [key: string]: string } = {
+      january: "01",
+      february: "02",
+      march: "03",
+      april: "04",
+      may: "05",
+      june: "06",
+      july: "07",
+      august: "08",
+      september: "09",
+      october: "10",
+      november: "11",
+      december: "12",
+    };
+
+    const month = months[monthName.toLowerCase()] || "01";
+
+    return `${year}-${month}-${day}`;
+  };
 
   splitDate = (dateString: string) => {
     if (!dateString) return "";
@@ -461,6 +493,52 @@ parseWorkingDate = (workingDate: string): string => {
       }
     );
   }
+
+  async fetch_branch_sessions(branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/branch-session-info/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  async fetch_deposit_accounts(branchId: number, productId: Number, accountType: Number, isClosed: boolean = false ): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/deposit-accounts-info/${branchId}/${productId}/${accountType}/${isClosed}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  async fetch_deposit_account_info_from_accountId(branchId: number, accountId: Number, accountType: Number, isClosed: boolean = false ): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/account-info-for-deposit-accounts/${branchId}/${accountId}/${accountType}/${isClosed}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  async fetch_joint_acc_info(branchId: number, accountId: Number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/joint-acc-info/${accountId}/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  
 }
 
 export default new commonService();
