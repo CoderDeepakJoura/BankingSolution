@@ -380,5 +380,18 @@ namespace BankingPlatform.API.Common.CommonFunctions
                                    ?? "";
         }
 
+        public async Task<int> GetSavingInterestExpenseAccount(int productId, int branchId)
+        {
+            int interestAccId = 0;
+            if(productId > 0 && branchId > 0)
+            {
+                interestAccId = await _appcontext.savingproductbranchwiserule.Where(x => x.BranchId == branchId && x.SavingProductId == productId).Select(x => x.intexpaccount).FirstOrDefaultAsync();
+            }
+            return interestAccId;
+        }
+
+        public string GetFDProductNameFromID(int productId, int branchId) => _appcontext.fdproduct.Where(x => x.BranchId == branchId && x.Id == productId).Select(x => x.ProductName).FirstOrDefault() ?? "";
+
+
     }
 }

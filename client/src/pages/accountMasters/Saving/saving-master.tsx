@@ -2302,7 +2302,7 @@ const SavingAccountMaster = () => {
                 <img
                   src={pictureFile.preview}
                   alt="Member"
-                  className="w-full h-64 object-cover rounded-lg border-2 border-blue-300"
+                  className="w-full h-64 rounded-lg border-2 border-blue-300"
                 />
                 <button
                   type="button"
@@ -2370,7 +2370,7 @@ const SavingAccountMaster = () => {
                 <img
                   src={signatureFile.preview}
                   alt="Signature"
-                  className="w-full h-64 object-contain bg-white rounded-lg border-2 border-purple-300"
+                  className="w-full h-64 bg-white rounded-lg border-2 border-purple-300"
                 />
                 <button
                   type="button"

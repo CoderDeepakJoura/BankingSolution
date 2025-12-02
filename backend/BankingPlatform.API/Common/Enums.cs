@@ -28,6 +28,7 @@
             ShareMoney = 1,
             Deposit = 2,
             Withdrawal = 3,
+            InterestPosting = 4
         }
 
         public enum VoucherStatus

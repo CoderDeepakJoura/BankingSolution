@@ -539,6 +539,17 @@ class commonService extends ApiService {
     );
   }
   
+  async default_cash_in_hand_account(branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/default-cash-in-hand-account/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
 }
 
 export default new commonService();

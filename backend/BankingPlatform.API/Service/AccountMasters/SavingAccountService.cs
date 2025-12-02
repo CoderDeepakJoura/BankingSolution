@@ -5,6 +5,7 @@ using BankingPlatform.API.DTO.AccountMasters;
 using BankingPlatform.API.DTO.Member;
 using BankingPlatform.API.DTO.ProductMasters.Saving;
 using BankingPlatform.API.DTO.Voucher;
+using BankingPlatform.API.Mappers.Voucher;
 using BankingPlatform.API.Services;
 using BankingPlatform.Infrastructure.Models.AccMasters;
 using BankingPlatform.Infrastructure.Models.member;
@@ -24,19 +25,22 @@ namespace BankingPlatform.API.Service.AccountMasters
         private readonly ImageService _imageService;
         private readonly MemberService _memberService;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly VoucherMapper _voucherMapper;
 
         public SavingAccountService(
             BankingDbContext context,
             CommonFunctions commonFunctions,
             ImageService imageService,
             MemberService memberService,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            VoucherMapper voucherMapper)
         {
             _context = context;
             _commonfunctions = commonFunctions;
             _imageService = imageService;
             _memberService = memberService;
             _httpContextAccessor = httpContextAccessor;
+            _voucherMapper = voucherMapper;
         }
 
         public async Task<string> CreateNewSavingAccAsync(CommonAccMasterDTO dto, IFormFile? picture = null , IFormFile? signature = null)
@@ -194,7 +198,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     await _context.SaveChangesAsync();
                     DateTime valueDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
                     int row = 1;
-                    VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(CommonFunctions.shareMoneyCapitalHeadCode, accountId, branchId, Enums.VoucherStatus.Cr.ToString(), narration, totalDebit, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                    VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.Cr.ToString(), narration, totalDebit, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
 
                     _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
                     row++;
@@ -375,8 +379,9 @@ namespace BankingPlatform.API.Service.AccountMasters
             var duplicateAccount = await _context.accountmaster
                 .Where(x => x.ID != dto.AccountMasterDTO!.AccId
                     && x.BranchId == dto.AccountMasterDTO.BranchId
+                    && x.GeneralProductId == dto.AccountMasterDTO.GeneralProductId
                     && x.AccTypeId == (int)Enums.AccountTypes.Saving
-                    && x.AccSuffix == dto.AccountMasterDTO!.AccSuffix)
+                    && x.AccSuffix == dto.AccountMasterDTO!.AccSuffix)  
                 .AnyAsync();
 
             if (duplicateAccount)
@@ -633,6 +638,134 @@ namespace BankingPlatform.API.Service.AccountMasters
                 await transaction.RollbackAsync();
                 return $"Error: {ex.Message}";
             }
-        }        
+        } 
+        public async Task<string> CloseSavingAccount(CloseSavingAccDTO dto)
+        {
+            var savingAccData = await _context.accountmaster.FirstOrDefaultAsync(x => x.ID == dto.DebitAccountId && x.BranchId == dto.BranchId);
+            if (savingAccData == null)
+                return "Account not found.";
+            if (savingAccData!.IsAccClosed)
+                return "This account can\'t be closed as it has already been closed.";
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                savingAccData.IsAccClosed = true;
+                savingAccData.ClosingDate = dto.VoucherDate;
+                savingAccData.ClosingRemarks = dto.Narration;
+                await _context.SaveChangesAsync();
+                int debitAccountId = (int)dto.DebitAccountId;
+                decimal totalDebit = (decimal)dto.TotalAmount;
+                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(dto.BranchId);
+                bool isAutoVerification = await _commonfunctions.IsAutoVerification(dto.BranchId);
+                string narration = dto.Narration ?? "";
+                DateTime voucherDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Unspecified);
+                if (dto.TotalInterestAmount > 0)
+                {
+                    VoucherDTO voucherDTO = new VoucherDTO
+                    {
+                        ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                        VoucherDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Unspecified),
+
+                        // Other non-DateTime fields
+                        AddedBy = Int32.Parse(_commonfunctions.GetCurrentUserId()),
+                        BrID = dto.BranchId,
+                        ModifiedBy = 0,
+                        VerifiedBy = isAutoVerification ? Int32.Parse(_commonfunctions.GetCurrentUserId()) : 0,
+                        VoucherNarration = "Saving Interest posted with amount: " + dto.TotalInterestAmount,
+                        OtherBrID = 0,
+                        VoucherNo = nextVrNo,
+                        VoucherStatus = isAutoVerification ? "V" : "A",
+                        VoucherType = (int)Enums.VoucherType.Saving,
+                        VoucherSubType = (int)Enums.VoucherSubType.InterestPosting,
+                    };
+                    var voucherInfo = _memberService.MapToEntity(voucherDTO);
+                    await _context.voucher.AddAsync(voucherInfo);
+                    await _context.SaveChangesAsync();
+                    DateTime valueDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
+                    int savingIntExpAccount = await _commonfunctions.GetSavingInterestExpenseAccount(dto.SavingProductId, dto.BranchId);
+                    if (savingIntExpAccount == 0)
+                        return "Please enter saving Interest Account in saving product branchwise rule before closing the account."; 
+                    int row = 1;
+                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(savingIntExpAccount, dto.BranchId), savingIntExpAccount, dto.BranchId, Enums.VoucherStatus.Dr.ToString(), "", dto.TotalInterestAmount, voucherDTO.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+
+                    _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
+                    row++;
+
+                    VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.DebitAccountId, dto.BranchId), dto.DebitAccountId, dto.BranchId, Enums.VoucherStatus.Cr.ToString(), "Saving Interest posted: " + dto.TotalInterestAmount, (decimal)dto.TotalInterestAmount, voucherDTO.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+
+                    await _context.vouchercreditdebitdetails.AddAsync(voucherCreditInfo);
+                    await _context.SaveChangesAsync();
+
+                    VoucherSavingDetail voucherSavingDetail = _voucherMapper.voucherSavingDetails(dto.BranchId, voucherCreditInfo.AccountId, 0, voucherCreditInfo.Id, voucherInfo.Id, voucherCreditInfo.Narration!, dto.TotalInterestAmount, voucherDTO.VoucherStatus, voucherDate, valueDate, "SIP", 0);
+                    await _context.vouchersavingdetail.AddAsync(voucherSavingDetail);
+                    await _context.SaveChangesAsync();
+
+                }
+                if(dto.TotalAmount > 0)
+                {
+                    int row = 1;
+                    VoucherDTO voucherDTO = new VoucherDTO
+                    {
+                        ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                        VoucherDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Unspecified),
+
+                        // Other non-DateTime fields
+                        AddedBy = Int32.Parse(_commonfunctions.GetCurrentUserId()),
+                        BrID = dto.BranchId,
+                        ModifiedBy = 0,
+                        VerifiedBy = isAutoVerification ? Int32.Parse(_commonfunctions.GetCurrentUserId()) : 0,
+                        VoucherNarration = narration ?? "Saving account closed with amount: " + dto.TotalAmount,
+                        OtherBrID = 0,
+                        VoucherNo = nextVrNo,
+                        VoucherStatus = isAutoVerification ? "V" : "A",
+                        VoucherType = (int)Enums.VoucherType.Saving,
+                        VoucherSubType = (int)Enums.VoucherSubType.Withdrawal,
+                    };
+
+                    var voucherInfo = _memberService.MapToEntity(voucherDTO);
+                    await _context.voucher.AddAsync(voucherInfo);
+                    await _context.SaveChangesAsync();
+                    DateTime valueDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
+                    VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(debitAccountId, dto.BranchId), dto.CreditAccountId, dto.BranchId, Enums.VoucherStatus.Cr.ToString(), "", totalDebit - (dto.closingCharges ?? 0), voucherDTO.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+
+                    _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                    row++;
+
+                    if(dto.closingCharges > 0 && dto.IncomeAccountId > 0)
+                    {
+                        VoucherCreditDebitDetails voucherIncomeCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.IncomeAccountId, dto.BranchId), (int)dto.IncomeAccountId, dto.BranchId, Enums.VoucherStatus.Cr.ToString(), "Account Closing Charges: " + dto.closingCharges, (decimal)dto.closingCharges, voucherDTO.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+
+                        _context.vouchercreditdebitdetails.Add(voucherIncomeCreditInfo);
+                        row++;
+                    }
+
+                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(debitAccountId, dto.BranchId), (int)debitAccountId, dto.BranchId, Enums.VoucherStatus.Dr.ToString(), "", totalDebit, voucherDTO.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                    _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                }
+                return "Success";
+            }
+            catch(Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return $"Error: {ex.Message}";
+            }
+        }
+        public class CloseSavingAccDTO
+        {
+            public int AccountId { get; set; }
+            public int BranchId { get; set; }
+            public int CreditAccountId { get; set; }
+            public int DebitAccountId { get; set; }
+            public int? IncomeAccountId { get; set; }
+            public DateTime VoucherDate { get; set; }
+            public decimal TotalAmount { get; set; }
+            public decimal TotalInterestAmount { get; set; }
+            public string? Narration { get; set; }
+            public decimal? closingCharges { get; set; }
+            public int SavingProductId { get; set; }
+        }
     }
 }

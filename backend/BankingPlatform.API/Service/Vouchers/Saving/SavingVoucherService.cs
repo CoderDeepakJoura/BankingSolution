@@ -26,8 +26,9 @@ namespace BankingPlatform.API.Service.Vouchers.Saving
             _voucherMapper = voucherMapper;
         }
         [HttpPost]
-        public async Task<string> AddSavingVoucher(SavingVoucherDTO dto)
+        public async Task<(string result, int voucherNo)> AddSavingVoucher(SavingVoucherDTO dto)
         {
+            int nextVrNo = 0;
 
             using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -39,7 +40,7 @@ namespace BankingPlatform.API.Service.Vouchers.Saving
                     int debitAccountId = (int)dto.Voucher!.DebitAccountId;
                     int creditAccountId = (int)dto.Voucher!.CreditAccountId!;
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.Voucher.VoucherNarration ?? "";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.Voucher.VoucherDate, DateTimeKind.Unspecified);
@@ -88,10 +89,10 @@ namespace BankingPlatform.API.Service.Vouchers.Saving
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return ex.Message ?? "Some error occured while saving entry.";
+                return (ex.Message ?? "Some error occured while saving entry.", 0);
             }
 
-            return "Success";
+            return ("Success", nextVrNo);
         }
 
         public async Task<string> UpdateSavingVoucher(SavingVoucherDTO dto)

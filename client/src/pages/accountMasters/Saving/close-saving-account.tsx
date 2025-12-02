@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { useFormValidation } from "../../../services/Validations/voucher/saving/savingwithdrawal";
+import { useFormValidation } from "../../../services/Validations/accountMasters/closesavingaccountvalidations";
 import { FormField } from "../../../components/Validations/FormField";
 import Swal from "sweetalert2";
 import { ValidationError } from "../../../services/Validations/validation";
 import Select from "react-select";
+import savingAccountService, {
+  CloseSavingAccDTO,
+} from "../../../services/accountMasters/savingaccount/savingaccountapi";
 import savingVoucherApi, {
   SavingVoucherDTO,
 } from "../../../services/vouchers/saving/savingVoucherApi";
@@ -65,7 +68,7 @@ const urlToFile = async (
   }
 };
 
-const SavingWithdrawalVoucher: React.FC = () => {
+const CloseSavingAccount: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
   const { errors, validateForm, validateField, clearErrors, markFieldTouched } =
@@ -79,6 +82,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
   const [jointHolders, setJointHolders] = useState<JointAccountHolder[]>([]);
   const [savingProducts, setSavingProducts] = useState<SavingProduct[]>([]);
   const [creditAccounts, setCreditAccounts] = useState<DebitAccount[]>([]);
+  const [incomeAccounts, setIncomeAccounts] = useState<DebitAccount[]>([]);
   const [savingProductAccounts, setSavingProductAccounts] = useState<
     SavingAccounts[]
   >([]);
@@ -91,7 +95,10 @@ const SavingWithdrawalVoucher: React.FC = () => {
     voucherDate: "",
     savingProduct: "",
     accountId: 0,
-    withdrawalAmount: "",
+    balance: "",
+    interestPaid: "",
+    closingCharges: "",
+    incomeAccount: "",
     creditAccount: "",
     narration: "",
   });
@@ -180,13 +187,15 @@ const SavingWithdrawalVoucher: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productsRes, creditAccountsRes] = await Promise.all([
+        const [productsRes, creditAccountsRes, incomeAccountsRes] = await Promise.all([
           commonservice.fetch_saving_products(user.branchid),
+          commonservice.general_accmasters_info(user.branchid),
           commonservice.general_accmasters_info(user.branchid),
         ]);
 
         setSavingProducts(productsRes.data || []);
         setCreditAccounts(creditAccountsRes.data || []);
+        setIncomeAccounts(incomeAccountsRes.data || []);
       } catch (error) {
         console.error("Error loading data:", error);
       }
@@ -199,50 +208,39 @@ const SavingWithdrawalVoucher: React.FC = () => {
     setVoucherData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Separate function for saving product change
   const handleSavingProductChange = async (selected: any) => {
     const productId = selected ? selected.value.toString() : "";
 
-    // Update state first
     setVoucherData((prev) => ({
       ...prev,
       savingProduct: productId,
       accountId: 0,
-      creditAccount: ""
+      interestPaid: "",
+      closingCharges: "",
+      incomeAccount: "",
     }));
 
-    // Clear all related data
     setSavingProductAccounts([]);
     setAccountData(null);
     setJointHolders([]);
     setPictureFile(null);
     setSignatureFile(null);
 
-    // Clear error on change
     if (selected) {
       setFieldErrors((prev) =>
         prev.filter((err) => err.field !== "savingProduct")
       );
     }
 
-    // Fetch accounts if product is selected
     if (productId && productId.trim() !== "") {
       try {
         const response = await commonservice.fetch_deposit_accounts(
           user.branchid,
           Number(productId),
-          2
+          2,
         );
         if (response.success) {
           setSavingProductAccounts(response.data || []);
-          const defCIHAccId = await commonservice.default_cash_in_hand_account(
-            user.branchid
-          );
-          if (Number(defCIHAccId.data) > 0)
-            setVoucherData((prev) => ({
-              ...prev,
-              creditAccount: defCIHAccId.data,
-            }));
         } else {
           setSavingProductAccounts([]);
         }
@@ -254,21 +252,20 @@ const SavingWithdrawalVoucher: React.FC = () => {
     }
   };
 
-  // Handle deposit amount with numeric validation (up to 2 decimal places)
-  const handleWithdrawalAmountChange = (
+  const handlebalanceChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const value = e.target.value;
 
     if (value === "") {
-      handleInputChange("withdrawalAmount", value);
+      handleInputChange("balance", value);
       return;
     }
 
     const decimalRegex = /^\d*\.?\d{0,2}$/;
 
     if (decimalRegex.test(value)) {
-      handleInputChange("withdrawalAmount", value);
+      handleInputChange("balance", value);
     }
   };
 
@@ -282,27 +279,27 @@ const SavingWithdrawalVoucher: React.FC = () => {
     label: `${d.accountName}`,
   }));
 
+  const incomeAccountOptions = incomeAccounts.map((d) => ({
+    value: d.accId,
+    label: `${d.accountName}`,
+  }));
+
   const savingProductAccountsInfo = savingProductAccounts.map((d) => ({
     value: d.accId,
     label: `${d.accountName}`,
   }));
 
-  // Custom validation function for single field
   const handleFieldBlur = (fieldName: string) => {
     markFieldTouched(fieldName);
 
-    // Validate the specific field
     const fieldValidationErrors = validateField(
       fieldName,
       voucherData[fieldName as keyof typeof voucherData],
       voucherData
     );
 
-    // Update field errors state
     setFieldErrors((prevErrors) => {
-      // Remove old errors for this field
       const otherErrors = prevErrors.filter((err) => err.field !== fieldName);
-      // Add new errors for this field
       return [...otherErrors, ...fieldValidationErrors];
     });
   };
@@ -311,10 +308,9 @@ const SavingWithdrawalVoucher: React.FC = () => {
     const validation = validateForm(voucherData);
 
     if (!validation.isValid) {
-      // Update field errors from validation result
+      console.log(validation.errors)
       setFieldErrors(validation.errors);
 
-      // Show simple error alert
       await Swal.fire({
         icon: "error",
         title: "Validation Errors",
@@ -323,11 +319,9 @@ const SavingWithdrawalVoucher: React.FC = () => {
         confirmButtonColor: "#3B82F6",
       });
 
-      // Focus on first error field
       const firstError = validation.errors[0];
       if (firstError) {
         setActiveTab(firstError.tab);
-
         setTimeout(() => {
           const cleanFieldName = firstError.field.replace(/\[|\]|\./g, "_");
           const element = document.getElementById(cleanFieldName);
@@ -343,30 +337,26 @@ const SavingWithdrawalVoucher: React.FC = () => {
 
     setLoading(true);
     try {
-      const savingVoucherPayload: SavingVoucherDTO = {
-        voucher: {
-          brID: user.branchid,
-          voucherDate: voucherData.voucherDate,
-          voucherNarration:
-            voucherData.narration ||
-            "Saving Withdrawal Voucher with amount:" +
-              voucherData.withdrawalAmount,
-          totalDebit: parseFloat(voucherData.withdrawalAmount),
-          creditAccountId: Number(voucherData.creditAccount),
-          debitAccountId: voucherData.accountId,
-        },
-        voucherSubType: "W", // "D" for Withdrawal, "W" for Withdrawal
+      const totalAmount = parseFloat(voucherData.balance) + parseFloat(voucherData.interestPaid) > 0 ? parseFloat(voucherData.balance) + parseFloat(voucherData.interestPaid) : 0 ;
+      const closeSavingAccountDTO: CloseSavingAccDTO = {
+        BranchId: user.branchid,
+        VoucherDate: voucherData.voucherDate,
+        Narration: voucherData.narration || "Saving Account Closed with amount:" + voucherData.balance,
+        TotalAmount: totalAmount,
+        CreditAccountId: Number(voucherData.creditAccount),
+        DebitAccountId: voucherData.accountId,
+        ClosingCharges: voucherData.closingCharges ? parseFloat(voucherData.closingCharges) : 0,
+        TotalInterestAmount: voucherData.interestPaid ? parseFloat(voucherData.interestPaid) : 0,
+        IncomeAccountId: voucherData.incomeAccount ? Number(voucherData.incomeAccount) : 0,
+        SavingProductId: Number(voucherData.savingProduct)
       };
-      const response = await savingVoucherApi.addSavingVoucher(
-        savingVoucherPayload
-      );
+      const response = await savingAccountService.close_Saving_Account(closeSavingAccountDTO);
 
       if (response.success) {
         await Swal.fire({
           icon: "success",
           title: "Success!",
-          text:
-            response.message || "Saving Withdrawal Voucher saved successfully.",
+          text: "Saving account closed successfully!",
           confirmButtonColor: "#3B82F6",
         });
 
@@ -374,18 +364,14 @@ const SavingWithdrawalVoucher: React.FC = () => {
         setFieldErrors([]);
         handleReset();
       } else {
-        throw new Error(response.message || "Failed to save transaction");
+        throw new Error(response.message || "Failed to close account");
       }
-
-      clearErrors();
-      setFieldErrors([]);
-      handleReset();
     } catch (error: any) {
-      console.error("Save Error:", error);
+      console.error("Close Account Error:", error);
       await Swal.fire({
         icon: "error",
         title: "Error!",
-        text: error.message || "Failed to save transaction. Please try again.",
+        text: error.message || "Failed to close account. Please try again.",
         confirmButtonColor: "#EF4444",
       });
     } finally {
@@ -398,7 +384,10 @@ const SavingWithdrawalVoucher: React.FC = () => {
       voucherDate: commonservice.getTodaysDate(),
       savingProduct: "",
       accountId: 0,
-      withdrawalAmount: "",
+      balance: "",
+      interestPaid: "",
+      closingCharges: "",
+      incomeAccount: "",
       creditAccount: "",
       narration: "",
     });
@@ -412,7 +401,6 @@ const SavingWithdrawalVoucher: React.FC = () => {
     setFieldErrors([]);
   };
 
-  // Use fieldErrors state instead of errors from hook
   const errorsByField = fieldErrors.reduce((acc, error) => {
     if (!acc[error.field]) acc[error.field] = [];
     acc[error.field].push(error);
@@ -447,23 +435,23 @@ const SavingWithdrawalVoucher: React.FC = () => {
 
   const renderVoucherForm = () => (
     <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 px-6 py-4">
+      <div className="bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 bg-gradient-to-r from-red-600 to-orange-600 rounded-lg flex items-center justify-center shadow-md">
               <FileText className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-800">
-                Saving Withdrawal Voucher
+                Close Saving Account
               </h2>
               <p className="text-sm text-gray-600">
-                Enter transaction details below
+                Enter account closing details below
               </p>
             </div>
           </div>
           <button
-            onClick={() => navigate("/voucher-operations")}
+            onClick={() => navigate("/account-operations")}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors duration-200"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -532,10 +520,10 @@ const SavingWithdrawalVoucher: React.FC = () => {
             />
           </FormField>
 
-          {/* Account No - Updated with joint account fetching */}
+          {/* Account No */}
           <FormField
             name="accountId"
-            label="Saving Account"
+            label="Account No."
             required
             errors={errorsByField.accountId || []}
           >
@@ -550,23 +538,19 @@ const SavingWithdrawalVoucher: React.FC = () => {
               onChange={async (selected) => {
                 const accountId = selected ? Number(selected.value) : 0;
 
-                // Update voucher data first
                 setVoucherData((prev) => ({
                   ...prev,
                   accountId: accountId,
                 }));
 
-                // Clear error on change
                 if (selected) {
                   setFieldErrors((prev) =>
                     prev.filter((err) => err.field !== "accountId")
                   );
                 }
 
-                // Fetch account information if valid account selected
                 if (accountId !== 0) {
                   try {
-                    // Fetch account details
                     const response =
                       await commonservice.fetch_deposit_account_info_from_accountId(
                         user.branchid,
@@ -579,7 +563,6 @@ const SavingWithdrawalVoucher: React.FC = () => {
                       setPictureFile(null);
                       setSignatureFile(null);
 
-                      // Fetch joint account holders
                       try {
                         const jointAccountResponse =
                           await commonservice.fetch_joint_acc_info(
@@ -600,7 +583,6 @@ const SavingWithdrawalVoucher: React.FC = () => {
                         setJointHolders([]);
                       }
 
-                      // Fetch pictures and signatures
                       if (
                         !response.data.accountPicExt ||
                         !response.data.accountSignExt
@@ -640,7 +622,6 @@ const SavingWithdrawalVoucher: React.FC = () => {
                     );
                   }
                 } else {
-                  // Clear all data when no account selected
                   setAccountData(null);
                   setJointHolders([]);
                   setPictureFile(null);
@@ -648,7 +629,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
                 }
               }}
               onBlur={() => handleFieldBlur("accountId")}
-              placeholder="Select Saving Account"
+              placeholder="Select Account"
               isClearable
               isDisabled={
                 !voucherData.savingProduct ||
@@ -678,28 +659,124 @@ const SavingWithdrawalVoucher: React.FC = () => {
           </FormField>
         </div>
 
-        {/* Second Row - 2 columns */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Withdrawal Amount */}
+        {/* Second Row - 4 columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          {/* Balance */}
           <FormField
-            name="withdrawalAmount"
-            label="Withdrawal Amount"
-            required
-            errors={errorsByField.withdrawalAmount || []}
+            name="balance"
+            label="Balance"
+            errors={errorsByField.balance || []}
           >
             <input
               type="text"
-              id="withdrawalAmount"
-              value={voucherData.withdrawalAmount}
-              onChange={handleWithdrawalAmountChange}
-              onBlur={() => handleFieldBlur("withdrawalAmount")}
+              id="balance"
+              value={voucherData.balance}
+              onChange={handlebalanceChange}
+              onBlur={() => handleFieldBlur("balance")}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
-              placeholder="Enter Amount (e.g., 1000.00)"
+              placeholder="Enter Amount (e.g., 10500.00)"
               inputMode="decimal"
               maxLength={18}
             />
           </FormField>
 
+          {/* Interest Paid */}
+          <FormField
+            name="interestPaid"
+            label="Interest Paid"
+            errors={errorsByField.interestPaid || []}
+          >
+            <input
+              type="text"
+              id="interestPaid"
+              value={voucherData.interestPaid}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "" || /^\d*\.?\d{0,2}$/.test(value)) {
+                  handleInputChange("interestPaid", value);
+                }
+              }}
+              onBlur={() => handleFieldBlur("interestPaid")}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
+              placeholder="Enter Interest (e.g., 500.00)"
+              inputMode="decimal"
+              maxLength={18}
+            />
+          </FormField>
+
+          {/* Closing Charges */}
+          <FormField
+            name="closingCharges"
+            label="Closing Charges"
+            errors={errorsByField.closingCharges || []}
+          >
+            <input
+              type="text"
+              id="closingCharges"
+              value={voucherData.closingCharges}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "" || /^\d*\.?\d{0,2}$/.test(value)) {
+                  handleInputChange("closingCharges", value);
+                }
+              }}
+              onBlur={() => handleFieldBlur("closingCharges")}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
+              placeholder="Enter Charges (e.g., 0.00)"
+              inputMode="decimal"
+              maxLength={18}
+            />
+          </FormField>
+
+          {/* Income Account */}
+          <FormField
+            name="incomeAccount"
+            label="Income Account"
+            errors={errorsByField.incomeAccount || []}
+          >
+            <Select
+              id="incomeAccount"
+              options={incomeAccountOptions}
+              value={
+                incomeAccountOptions.find(
+                  (opt) => opt.value === Number(voucherData.incomeAccount)
+                ) || null
+              }
+              onChange={(selected) => {
+                handleInputChange(
+                  "incomeAccount",
+                  selected ? selected.value.toString() : ""
+                );
+                if (selected) {
+                  setFieldErrors((prev) =>
+                    prev.filter((err) => err.field !== "incomeAccount")
+                  );
+                }
+              }}
+              onBlur={() => handleFieldBlur("incomeAccount")}
+              placeholder="Select Income Account"
+              isClearable
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  minHeight: "48px",
+                  borderWidth: "2px",
+                  borderColor: state.isFocused ? "#3b82f6" : "#e5e7eb",
+                  borderRadius: "0.5rem",
+                  boxShadow: state.isFocused
+                    ? "0 0 0 2px rgba(59, 130, 246, 0.2)"
+                    : "none",
+                  "&:hover": {
+                    borderColor: "#3b82f6",
+                  },
+                }),
+              }}
+            />
+          </FormField>
+        </div>
+
+        {/* Third Row - 1 column */}
+        <div className="grid grid-cols-1 gap-6 mb-6">
           {/* Credit Account */}
           <FormField
             name="creditAccount"
@@ -720,7 +797,6 @@ const SavingWithdrawalVoucher: React.FC = () => {
                   "creditAccount",
                   selected ? selected.value.toString() : ""
                 );
-                // Clear error on change
                 if (selected) {
                   setFieldErrors((prev) =>
                     prev.filter((err) => err.field !== "creditAccount")
@@ -749,21 +825,21 @@ const SavingWithdrawalVoucher: React.FC = () => {
           </FormField>
         </div>
 
-        {/* Third Row - Full width */}
+        {/* Fourth Row - Full width */}
         <div className="mb-6">
           <FormField
             name="narration"
-            label="Narration"
+            label="Narration / Closing Remarks (Optional)"
             errors={errorsByField.narration || []}
           >
-            <input
-              type="text"
+            <textarea
               id="narration"
               value={voucherData.narration}
               onChange={(e) => handleInputChange("narration", e.target.value)}
               onBlur={() => handleFieldBlur("narration")}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
-              placeholder="Enter Narration"
+              rows={3}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200 resize-none"
+              placeholder="Enter any remarks..."
             />
           </FormField>
         </div>
@@ -781,17 +857,17 @@ const SavingWithdrawalVoucher: React.FC = () => {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex items-center gap-2 px-8 py-3 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+            className="flex items-center gap-2 px-8 py-3 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
           >
             {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Saving...
+                Processing...
               </>
             ) : (
               <>
-                <Save className="w-4 h-4" />
-                Save Transaction
+                <X className="w-4 h-4" />
+                Close Account
               </>
             )}
           </button>
@@ -946,23 +1022,12 @@ const SavingWithdrawalVoucher: React.FC = () => {
               </p>
             </div>
           </div>
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0">
-              <UserCheck className="w-5 h-5 text-violet-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Balance</p>
-              <p className="text-sm font-semibold text-gray-800">
-                {accountData.balance || "N/A"}
-              </p>
-            </div>
-          </div>
         </div>
       ) : (
         <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
           <User className="w-16 h-16 mx-auto mb-4 text-gray-300" />
           <p className="text-sm text-gray-500">
-            Please select a saving account to view information
+            Please select an account to view information
           </p>
         </div>
       )}
@@ -987,7 +1052,6 @@ const SavingWithdrawalVoucher: React.FC = () => {
   const renderPhotoSignature = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Member Picture */}
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-lg border border-blue-200">
           <h4 className="text-md font-semibold text-blue-800 mb-4 flex items-center gap-2">
             <ImageIcon className="w-5 h-5" />
@@ -1011,7 +1075,6 @@ const SavingWithdrawalVoucher: React.FC = () => {
           )}
         </div>
 
-        {/* Member Signature */}
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg border border-purple-200">
           <h4 className="text-md font-semibold text-purple-800 mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5" />
@@ -1113,12 +1176,10 @@ const SavingWithdrawalVoucher: React.FC = () => {
     <DashboardLayout
       enableScroll={true}
       mainContent={
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 lg:p-8">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-red-50 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Voucher Form Section */}
             {renderVoucherForm()}
 
-            {/* Tab Navigation with Error Indicators */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="border-b border-gray-200">
                 <nav className="flex space-x-0 overflow-x-auto bg-gray-50">
@@ -1146,7 +1207,6 @@ const SavingWithdrawalVoucher: React.FC = () => {
                 </nav>
               </div>
 
-              {/* Tab Content */}
               <div className="p-6 sm:p-8 bg-white">{renderTabContent()}</div>
             </div>
           </div>
@@ -1156,4 +1216,4 @@ const SavingWithdrawalVoucher: React.FC = () => {
   );
 };
 
-export default SavingWithdrawalVoucher;
+export default CloseSavingAccount;

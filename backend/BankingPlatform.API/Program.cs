@@ -3,9 +3,11 @@ using BankingPlatform.API.Mappers.Voucher;
 using BankingPlatform.API.Service;
 using BankingPlatform.API.Service.AccountMasters;
 using BankingPlatform.API.Service.Caste;
+using BankingPlatform.API.Service.InterestSlabs.FD;
 using BankingPlatform.API.Service.InterestSlabs.Saving;
 using BankingPlatform.API.Service.ProductMasters.FD;
 using BankingPlatform.API.Service.ProductMasters.Savings;
+using BankingPlatform.API.Service.Slabs.FD;
 using BankingPlatform.API.Service.Vouchers.Saving;
 using BankingPlatform.API.Services;
 using BankingPlatform.Common.Common.CommonClasses;
@@ -58,6 +60,8 @@ builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<CommonClass>();
 builder.Services.AddScoped<CommonFunctions>();
 builder.Services.AddScoped<MemberService>();
+builder.Services.AddScoped<FDInterestSlabService>();
+builder.Services.AddScoped<FDSlabService>();
 
 // Configure CORS with dynamic origins
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()

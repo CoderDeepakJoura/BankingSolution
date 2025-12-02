@@ -200,7 +200,6 @@ class MemberApiService extends ApiService {
   ): Promise<ApiResponse<ResponseDto>> {
     const formData = new FormData();
     formData.append("memberData", JSON.stringify(combinedMemberDTO));
-
     if (memberPhoto) {
       formData.append("memberPhoto", memberPhoto);
     }

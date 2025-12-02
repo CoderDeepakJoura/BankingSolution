@@ -155,6 +155,19 @@ export interface SavingAccountResponse {
   totalCount: number;
 }
 
+export interface CloseSavingAccDTO{
+  BranchId: number;
+  CreditAccountId: number;
+  DebitAccountId: number;
+  IncomeAccountId?: number ;
+  VoucherDate: string;
+  TotalAmount: number;
+  TotalInterestAmount: number;
+  Narration?: string;
+  ClosingCharges: number;
+  SavingProductId: number;
+}
+
 class SavingAccountService extends ApiService {
   constructor() {
     super();
@@ -264,6 +277,21 @@ class SavingAccountService extends ApiService {
       `/fetchdata/member-info-with-membershipno/${branchId}/${membershipNo}/${memberType}`,
       {
         method: "GET",
+      }
+    );
+  }
+
+  async close_Saving_Account(
+    CloseSavingAccDTO: CloseSavingAccDTO
+  ): Promise<ApiResponse<MemberDetailsDTO>> {
+    return this.makeRequest(
+      `/SavingAccountMaster/close-saving-account`,
+      {
+        method: "POST",
+        body: JSON.stringify(CloseSavingAccDTO),
+        headers: {
+          "Content-Type": "application/json",
+        }
       }
     );
   }

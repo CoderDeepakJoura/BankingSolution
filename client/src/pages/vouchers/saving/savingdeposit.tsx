@@ -4,7 +4,9 @@ import { FormField } from "../../../components/Validations/FormField";
 import Swal from "sweetalert2";
 import { ValidationError } from "../../../services/Validations/validation";
 import Select from "react-select";
-import savingVoucherApi, { SavingVoucherDTO } from "../../../services/vouchers/saving/savingVoucherApi";
+import savingVoucherApi, {
+  SavingVoucherDTO,
+} from "../../../services/vouchers/saving/savingVoucherApi";
 import commonservice, {
   AccountInformation,
 } from "../../../services/common/commonservice";
@@ -206,6 +208,7 @@ const SavingDepositVoucher: React.FC = () => {
       ...prev,
       savingProduct: productId,
       accountId: 0,
+      debitAccount: ""
     }));
 
     // Clear all related data
@@ -232,6 +235,14 @@ const SavingDepositVoucher: React.FC = () => {
         );
         if (response.success) {
           setSavingProductAccounts(response.data || []);
+          const defCIHAccId = await commonservice.default_cash_in_hand_account(
+            user.branchid
+          );
+          if (Number(defCIHAccId.data) > 0)
+            setVoucherData((prev) => ({
+              ...prev,
+              debitAccount: defCIHAccId.data,
+            }));
         } else {
           setSavingProductAccounts([]);
         }
@@ -333,32 +344,37 @@ const SavingDepositVoucher: React.FC = () => {
     setLoading(true);
     try {
       const savingVoucherPayload: SavingVoucherDTO = {
-      voucher: {
-        brID: user.branchid,
-        voucherDate: voucherData.voucherDate,
-        voucherNarration: voucherData.narration || "Saving Deposit Voucher with amount:" + voucherData.depositAmount,
-        totalDebit: parseFloat(voucherData.depositAmount),
-        debitAccountId: Number(voucherData.debitAccount),
-        creditAccountId: voucherData.accountId,
-      },
-      voucherSubType: "D" // "D" for Deposit, "W" for Withdrawal
-    };
-    const response = await savingVoucherApi.addSavingVoucher(savingVoucherPayload);
+        voucher: {
+          brID: user.branchid,
+          voucherDate: voucherData.voucherDate,
+          voucherNarration:
+            voucherData.narration ||
+            "Saving Deposit Voucher with amount:" + voucherData.depositAmount,
+          totalDebit: parseFloat(voucherData.depositAmount),
+          debitAccountId: Number(voucherData.debitAccount),
+          creditAccountId: voucherData.accountId,
+        },
+        voucherSubType: "D", // "D" for Deposit, "W" for Withdrawal
+      };
+      const response = await savingVoucherApi.addSavingVoucher(
+        savingVoucherPayload
+      );
 
       if (response.success) {
-      await Swal.fire({
-        icon: "success",
-        title: "Success!",
-        text: response.message || "Saving Deposit Voucher saved successfully.",
-        confirmButtonColor: "#3B82F6",
-      });
+        await Swal.fire({
+          icon: "success",
+          title: "Success!",
+          text:
+            response.message || "Saving Deposit Voucher saved successfully.",
+          confirmButtonColor: "#3B82F6",
+        });
 
-      clearErrors();
-      setFieldErrors([]);
-      handleReset();
-    } else {
-      throw new Error(response.message || "Failed to save transaction");
-    }
+        clearErrors();
+        setFieldErrors([]);
+        handleReset();
+      } else {
+        throw new Error(response.message || "Failed to save transaction");
+      }
 
       clearErrors();
       setFieldErrors([]);
@@ -982,7 +998,7 @@ const SavingDepositVoucher: React.FC = () => {
                 <img
                   src={pictureFile.preview}
                   alt="Member"
-                  className="w-full h-64 object-cover rounded-lg border-2 border-blue-300"
+                  className="w-full h-64 rounded-lg border-2 border-blue-300"
                 />
               </div>
             </div>
@@ -1006,7 +1022,7 @@ const SavingDepositVoucher: React.FC = () => {
                 <img
                   src={signatureFile.preview}
                   alt="Signature"
-                  className="w-full h-64 object-contain bg-white rounded-lg border-2 border-purple-300"
+                  className="w-full h-64 bg-white rounded-lg border-2 border-purple-300"
                 />
               </div>
             </div>

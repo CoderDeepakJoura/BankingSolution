@@ -6,6 +6,7 @@ using BankingPlatform.API.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using static BankingPlatform.API.Service.AccountMasters.SavingAccountService;
 
 namespace BankingPlatform.API.Controllers.AccountMasters
 {
@@ -160,6 +161,26 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                 {
                     Success = false,
                     Message = "Some error occured while deleting saving account."
+                });
+            }
+        }
+
+        [HttpPost("close-saving-account")]
+        public async Task<IActionResult> CloseSavingAccount(CloseSavingAccDTO dto)
+        {
+            try
+            {
+                var result = await _service.CloseSavingAccount(dto);
+                if (result != "Success") return BadRequest(new ResponseDto { Success = false, Message = result });
+                return Ok(new ResponseDto { Success = true,  Message = "Saving Account closed successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _commonfunctions.LogErrors(ex, nameof(CloseSavingAccount), nameof(SavingAccountMasterController));
+                return BadRequest(new ResponseDto
+                {
+                    Success = false,
+                    Message = "Some error occured while closing saving account."
                 });
             }
         }

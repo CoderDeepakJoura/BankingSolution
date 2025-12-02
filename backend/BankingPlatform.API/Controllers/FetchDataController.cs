@@ -20,6 +20,7 @@ using BankingPlatform.Infrastructure.Models.member;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Identity.Client;
 using System.Reflection;
 
 namespace BankingPlatform.API.Controllers
@@ -733,6 +734,42 @@ namespace BankingPlatform.API.Controllers
                     Success = false,
                     Message = "Invalid parameters."
                 });
+        }
+
+        [HttpGet("default-cash-in-hand-account/{branchId}")]
+        public async Task<IActionResult> GetDefaultCashInHandAccount([FromRoute] int branchId)
+        {
+            if (branchId > 0)
+            {
+                var defCIHAccId = await _context.generalsettings.Where(x => x.branchid == branchId).Select(x => x.defaultCashAccountId).FirstOrDefaultAsync();
+
+                return Ok(new
+                {
+                    Success = true,
+                    data = defCIHAccId
+                });
+            }
+            else
+                return BadRequest(new ResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid parameters."
+                });
+        }
+        [HttpGet("fd-slabs/{branchId}")]
+        public async Task<IActionResult> GetFDSlabs([FromRoute] int branchId)
+        {
+            var slabInfo = await _context.fdinterestslab.Where(x => x.BranchId == branchId).Select(x => new 
+            {
+                SlabName = x.SlabName,
+                Id = x.Id
+            }).ToListAsync();
+
+            return Ok(new
+            {
+                Success = true,
+                data = slabInfo
+            });
         }
 
     }

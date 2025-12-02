@@ -74,6 +74,14 @@ import BranchMasterData from "./pages/branchmaster/branchmaster-data";
 import SavingDepositVoucher from "./pages/vouchers/saving/savingdeposit";
 import SavingWithdrawalVoucher from "./pages/vouchers/saving/savingwithdrawal";
 import VoucherModule from "./components/Vouchers/VoucherOperations";
+import CloseSavingAccount from "./pages/accountMasters/Saving/close-saving-account";
+import FDInterestSlabOperations from "./pages/InterestSlabs/FD/slab-operations";
+import FDInterestSlabData from "./pages/InterestSlabs/FD/slab-data";
+import FDProductInterestSlab from "./pages/InterestSlabs/FD/fdinterestslab";
+import FDProductSlabOperations from "./components/Slabs/SlabOperations";
+import SlabOperationsFD from "./pages/Slabs/FD/slab-operations";
+import FDSlabData from "./pages/Slabs/FD/slab-data";
+import FDSlab from "./pages/Slabs/FD/fdslab";
 
 export default function App() {
   const user = useSelector((state: RootState) => state.user);
@@ -198,6 +206,38 @@ export default function App() {
         <Route path="/saving-deposit-voucher" element={<SavingDepositVoucher />} />
         <Route path="/saving-withdrawal-voucher" element={<SavingWithdrawalVoucher />} />
         <Route path="/voucher-operations" element={<VoucherModule />} />
+        <Route path="/close-saving-account" element={<CloseSavingAccount />} />
+         <Route
+          path="/fdproduct-interest-slab"
+          element={<FDProductInterestSlab />}
+        />
+        <Route
+          path="/fdproduct-interest-slab/:slabId"
+          element={<FDProductInterestSlab />}
+        />
+        <Route path="/fd-interest-slab-info" element={<FDInterestSlabData />} />
+        
+        <Route
+          path="/slab-operations"
+          element={<FDInterestSlabOperations />}
+        />
+        <Route
+          path="/fd-slab-operations"
+          element={<FDProductSlabOperations />}
+        />
+        <Route
+          path="/fdproduct-slab"
+          element={<FDSlab />}
+        />
+        <Route
+          path="/fdproduct-slab/:slabId"
+          element={<FDSlab />}
+        />
+        <Route
+          path="/fd-product-slab-operations"
+          element={<SlabOperationsFD />}
+        />
+        <Route path="/fd-slab-info" element={<FDSlabData />} />
       </Routes>
       
     </BrowserRouter>

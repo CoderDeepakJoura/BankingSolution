@@ -4,6 +4,7 @@ using BankingPlatform.Infrastructure.Models.AccHeads;
 using BankingPlatform.Infrastructure.Models.AccMasters;
 using BankingPlatform.Infrastructure.Models.BranchSessions;
 using BankingPlatform.Infrastructure.Models.BranchWiseRule;
+using BankingPlatform.Infrastructure.Models.InterestSlabs.FD;
 using BankingPlatform.Infrastructure.Models.InterestSlabs.Saving;
 using BankingPlatform.Infrastructure.Models.Location;
 using BankingPlatform.Infrastructure.Models.member;
@@ -75,6 +76,9 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<JointAccountWithdrawalInfo> jointaccountwithdrawalinfo { get; set; }
     public virtual DbSet<BranchSession> branchsession { get; set; }
     public virtual DbSet<VoucherSavingDetail> vouchersavingdetail { get; set; }
+    public virtual DbSet<FDInterestSlab> fdinterestslab { get; set; }
+    public virtual DbSet<FDInterestSlabInfo> fdinterestslabinfo { get; set; }
+    public virtual DbSet<FDInterestSlabDetail> fdinterestslabdetail { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

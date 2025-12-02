@@ -46,19 +46,24 @@ const SlabsModule: React.FC = () => {
       mainContent={
         <div className="space-y-12 p-8 bg-gray-50 min-h-full rounded-lg shadow-inner border border-gray-100"> {/* Added subtle background and border to content area */}
           <h1 className="text-4xl font-extrabold text-gray-900 mb-8 pb-4 border-b-2 border-blue-200">
-            Slab Management Dashboard            
+            Interest Slab Management Dashboard            
           </h1>
 
           {/* Operations by Specific Account Type */}
           <section>
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <PlusCircle size={24} className="text-blue-600" /> Slab Specific Operations
+                <PlusCircle size={24} className="text-blue-600" />Interest Slab Specific Operations
             </h2>
             <div className="space-y-8"> {/* Increased spacing between AccountOperations components */}
               <SlabOperations
                 SlabType="Saving Product Interest Slab"
                 addPath="/savingproduct-interest-slab"
                 modifyPath="/saving-slab-info"
+              />
+              <SlabOperations
+                SlabType="FD Product Interest Slab"
+                addPath="/fdproduct-interest-slab"
+                modifyPath="/fd-interest-slab-info"
               />
             </div>
           </section>

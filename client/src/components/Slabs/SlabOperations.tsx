@@ -1,7 +1,7 @@
-// src/pages/AccountsModule.tsx
+// src/pages/SlabsModule.tsx
 import React from 'react';
 import DashboardLayout from '../../Common/Layout'; // Assuming this is your main layout wrapper
-import AccountOperations from './AccountActions'; // Your operations component
+import SlabOperations from './SlabActions'; // Your operations component
 import { useNavigate } from 'react-router-dom';
 import { Eye, Repeat, FileText, Bell, ChevronRight, BarChart2,PlusCircle  } from 'lucide-react'; // Added FileText, Bell, ChevronRight, BarChart2 icons
 import { useEffect } from "react";
@@ -40,54 +40,26 @@ const GeneralOperationCard: React.FC<GeneralOperationCardProps> = ({ title, desc
 };
 
 
-const AccountsModule: React.FC = () => {
+const SlabsModule: React.FC = () => {
   return (
     <DashboardLayout
       mainContent={
         <div className="space-y-12 p-8 bg-gray-50 min-h-full rounded-lg shadow-inner border border-gray-100"> {/* Added subtle background and border to content area */}
           <h1 className="text-4xl font-extrabold text-gray-900 mb-8 pb-4 border-b-2 border-blue-200">
-            Account Management Dashboard            
+           Slab Management Dashboard            
           </h1>
 
           {/* Operations by Specific Account Type */}
           <section>
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <PlusCircle size={24} className="text-blue-600" /> Account Type Specific Operations
+                <PlusCircle size={24} className="text-blue-600" /> Slab Specific Operations
             </h2>
             <div className="space-y-8"> {/* Increased spacing between AccountOperations components */}
-              <AccountOperations
-                accountType="General Account(s)"
-                addPath="/generalacc-master"
-                modifyPath="/generalacc-master-info"
+              <SlabOperations
+                SlabType="FD Product Slab"
+                addPath="/fdproduct-slab"
+                modifyPath="/fd-slab-info"
               />
-               <AccountOperations
-                accountType="Loan Account(s)"
-                addPath="/accounts/savings/add"
-                modifyPath="/accounts/savings/modify"
-              />
-              <AccountOperations
-                accountType="Saving Account(s)"
-                addPath="/saving-acc-master"
-                modifyPath="/saving-acc-info"
-                closePath= "/close-saving-account"
-              />
-              <AccountOperations
-                accountType="Fixed Deposit (FD) Account(s)"
-                addPath="/accounts/fd/add"
-                modifyPath="/accounts/fd/modify"
-              />
-              <AccountOperations
-                accountType="Recurring Deposit (RD) Account(s)"
-                addPath="/accounts/rd/add"
-                modifyPath="/accounts/rd/modify"
-              />
-
-              
-
-              
-             
-
-              {/* Add other account types here as needed */}
             </div>
           </section>
         </div>
@@ -96,4 +68,4 @@ const AccountsModule: React.FC = () => {
   );
 };
 
-export default AccountsModule;
+export default SlabsModule;

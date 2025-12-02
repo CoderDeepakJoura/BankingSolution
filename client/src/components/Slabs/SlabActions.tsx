@@ -1,22 +1,20 @@
-// src/components/AccountOperations.tsx
+// src/components/SlabOperations.tsx
 import React from 'react';
 import { PlusCircle, Edit, Trash2, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-interface AccountOperationsProps {
-  accountType: string;
+interface SlabOperationsProps {
+  SlabType: string;
   addPath: string;
   modifyPath: string;
   // deletePath: string | ""; // Made deletePath nullable
-  closePath? : string | "";
 }
 
-const AccountOperations: React.FC<AccountOperationsProps> = ({
-  accountType,
+const SlabOperations: React.FC<SlabOperationsProps> = ({
+  SlabType,
   addPath,
   modifyPath,
   // deletePath,
-  closePath
 }) => {
   const navigate = useNavigate();
 
@@ -35,28 +33,26 @@ const AccountOperations: React.FC<AccountOperationsProps> = ({
 
   return (
     <div className="bg-white p-7 rounded-xl shadow-lg border border-gray-100 transition-all duration-300 hover:shadow-xl"> {/* Enhanced container */}
-      <h2 className="text-xl font-bold text-gray-800 mb-5 border-b pb-3 border-gray-200">{accountType}</h2> {/* Stronger title with separator */}
+      <h2 className="text-xl font-bold text-gray-800 mb-5 border-b pb-3 border-gray-200">{SlabType}</h2> {/* Stronger title with separator */}
       <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
         <OperationButton
           icon={<PlusCircle size={22} />}
-          label={`Add ${accountType}`}
+          label={`Add ${SlabType}`}
           onClick={() => navigate(addPath)}
         />
         <OperationButton
           icon={<Edit size={22} />}
-          label={`Modify/Delete ${accountType}`}
+          label={`Modify/Delete ${SlabType}`}
           onClick={() => navigate(modifyPath)}
         />
-        {closePath &&
-        <OperationButton
+        {/* <OperationButton
           icon={<Trash2 size={22} />}
-          label={`Close ${accountType}`}
-          onClick={() => navigate(closePath ?? "")}
-        />
-}
+          label={`Delete ${SlabType}`}
+          onClick={() => navigate(deletePath)}
+        /> */}
       </div>
     </div>
   );
 };
 
-export default AccountOperations;
+export default SlabOperations;

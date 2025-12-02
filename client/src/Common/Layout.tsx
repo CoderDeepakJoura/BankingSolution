@@ -237,7 +237,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Account Masters", path: "/account-operations" },
             { label: "Member Master", path: "/member-operations" },
             { label: "Product Masters", path: "/product-operations" },
-            { label: "Product Slabs", path: "/slab-operations" },
+            { label: "Product Interest Slabs", path: "/slab-operations" },
+            { label: "Product Slabs", path: "/fd-slab-operations" },
             { label: "Settings Master", path: "/settings" },
            
             // { label: "Zone Master", path: "/zone-operations" },

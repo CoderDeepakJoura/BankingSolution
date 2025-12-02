@@ -34,7 +34,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Saving
                 {
                     return BadRequest(new { Success = false, Message = "Invalid voucher data" });
                 }
-                var result = await _service.AddSavingVoucher(dto);
+                (var result, int voucherNo) = await _service.AddSavingVoucher(dto);
                 if (result != "Success")
                     return BadRequest(new ResponseDto
                     {
@@ -44,7 +44,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Saving
                 return Ok(new ResponseDto
                 {
                     Success = true,
-                    Message = "Voucher added successfully."
+                    Message = "Voucher saved successfully with voucher No. " + voucherNo
                 });
             }
             catch (Exception ex)
