@@ -33,7 +33,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import AccountHeadApiService from "../../../services/accountHead/accountheadapi";
-import { AccountHead } from "../../accounthead/accounthead/accounthead-master";
+import { AccountHead, AccountHeadWithCode } from "../../accounthead/accounthead/accounthead-master";
 
 const FDProductMaster = () => {
   const navigate = useNavigate();
@@ -48,7 +48,7 @@ const FDProductMaster = () => {
   const [showValidationSummary, setShowValidationSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("header");
   const [loading, setLoading] = useState(false);
-  const [accountHeads, setAccountHeads] = useState<AccountHead[]>([]);
+  const [accountHeads, setAccountHeads] = useState<AccountHeadWithCode[]>([]);
   const isEditMode = !!productId;
 
   // Helper function to get current date in YYYY-MM-DD format
@@ -156,7 +156,7 @@ const FDProductMaster = () => {
           user.branchid
         );
         if (!res.success) throw new Error("Failed to load Account Heads");
-        const parentData: AccountHead[] = res.data || [];
+        const parentData: AccountHeadWithCode[] = res.data || [];
         setAccountHeads(parentData);
       } catch (err: any) {
         console.error(err);
@@ -178,7 +178,6 @@ const FDProductMaster = () => {
         id,
         user.branchid
       );
-
       if (response.success && response.data) {
         const formattedData = formatDatesInDTO(response.data);
         setCombinedFdData(formattedData);
@@ -501,7 +500,7 @@ const FDProductMaster = () => {
   ];
 
   const accountHeadOptions = accountHeads.map((head) => ({
-    value: head.accountHeadId,
+    value: head.headCode,
     label: head.accountHeadName,
   }));
 
@@ -806,7 +805,7 @@ const FDProductMaster = () => {
               value={accountHeadOptions.find(
                 (opt) =>
                   opt.value ===
-                  combinedFdData.fdProductPostingHeadsDTO?.principalBalHeadCode
+                  combinedFdData.fdProductPostingHeadsDTO?.principalBalHeadCode.toString()
               )}
               onChange={(selected) =>
                 handlePostingHeadsChange(
@@ -832,7 +831,7 @@ const FDProductMaster = () => {
               value={accountHeadOptions.find(
                 (opt) =>
                   opt.value ===
-                  combinedFdData.fdProductPostingHeadsDTO?.suspendedBalHeadCode
+                  combinedFdData.fdProductPostingHeadsDTO?.suspendedBalHeadCode.toString()
               )}
               onChange={(selected) =>
                 handlePostingHeadsChange(
@@ -858,7 +857,7 @@ const FDProductMaster = () => {
               value={accountHeadOptions.find(
                 (opt) =>
                   opt.value ===
-                  combinedFdData.fdProductPostingHeadsDTO?.intPayableHeadCode
+                  combinedFdData.fdProductPostingHeadsDTO?.intPayableHeadCode.toString()
               )}
               onChange={(selected) =>
                 handlePostingHeadsChange(

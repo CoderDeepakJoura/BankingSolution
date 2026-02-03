@@ -129,7 +129,7 @@ namespace BankingPlatform.API.Controllers
                     });
                 }
 
-                setClaims(user.username, branchInfo.branchmaster_name, branchInfo.branchmaster_code, branchInfo.id, "", branchInfo.branchmaster_phoneno1, branchInfo.branchmaster_addressline, branchInfo.branchmaster_emailid, user.id.ToString(), "", "", 0);
+                setClaims(user.username, branchInfo.branchmaster_name, branchInfo.branchmaster_code, branchInfo.id, "", branchInfo.branchmaster_phoneno1, branchInfo.branchmaster_addressline, branchInfo.branchmaster_emailid, user.id.ToString(), "", "", 0, false);
 
 
                 // Generate token
@@ -218,8 +218,11 @@ namespace BankingPlatform.API.Controllers
         {
             try
             {
-                GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId);
-                setClaims(userName, branchName, branchCode, branchId, societyName, contact, address, email, userId, workingDateDTO.WorkingDate, workingDateDTO.sessionInfo, workingDateDTO.sessionId);
+                GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession);
+                string[] sessionArry = workingDateDTO.sessionInfo.Split('-');
+                (int sessionFromYear, int sessionToYear) = (Convert.ToInt32(sessionArry[0]), Convert.ToInt32(sessionArry[1]));
+                isFirstSession = await _commonFns.IsFirstSession(sessionFromYear, sessionToYear);
+                setClaims(userName, branchName, branchCode, branchId, societyName, contact, address, email, userId, workingDateDTO.WorkingDate, workingDateDTO.sessionInfo, workingDateDTO.sessionId, isFirstSession);
                 var tokenExpiration = DateTime.UtcNow.AddDays(_jwtSettings.ExpiryDays);
                 var token = _jwtTokenService.GenerateToken();
                 var cookieOptions = new CookieOptions
@@ -300,7 +303,7 @@ namespace BankingPlatform.API.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> GetLoginInfo()
         {
-            GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId);
+            GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession);
 
             return Ok(new
             {
@@ -315,11 +318,12 @@ namespace BankingPlatform.API.Controllers
                 Email = email,
                 WorkingDate = workingDate,
                 SessionInfo = sessionInfo,
-                SessionId = sessionId
+                SessionId = sessionId,
+                IsFirstSession = isFirstSession
             });
         }
 
-        private void GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId)
+        private void GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession)
         {
             var user = _httpContextAccessor.HttpContext!.User!;
 
@@ -335,10 +339,11 @@ namespace BankingPlatform.API.Controllers
             workingDate = user.FindFirst("workingDate").Value! ?? "";
             sessionInfo = user.FindFirst("sessionInfo").Value! ?? "";
             sessionId = Int32.Parse(user.FindFirst("sessionId")!.Value);
+            isFirstSession = Convert.ToBoolean(user.FindFirst("isFirstSession")!.Value);
 
         }
 
-        private void setClaims(string userName, string branchName, string branchCode, int branchId, string societyName, string contact, string address, string email, string userId, string workingDate, string sessionInfo, int sessionId)
+        private void setClaims(string userName, string branchName, string branchCode, int branchId, string societyName, string contact, string address, string email, string userId, string workingDate, string sessionInfo, int sessionId, bool isFirstSession)
         {
             _commonClass.branchCode = branchCode;
             _commonClass.branchId = branchId;
@@ -352,6 +357,7 @@ namespace BankingPlatform.API.Controllers
             _commonClass.workingDate = workingDate;
             _commonClass.sessionInfo = sessionInfo;
             _commonClass.sessionId = sessionId;
+            _commonClass.isFirstSession = isFirstSession;
         }
     }
 }

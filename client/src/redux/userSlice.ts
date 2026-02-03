@@ -11,12 +11,16 @@ interface UserState {
   workingdate?: string;
   sessionInfo: string;
   sessionId: number;
+  isFirstSession: string;
   
 }
 
 const initialState: UserState = {
   name: "User",
-  branchid : 0
+  branchid : 0,
+  isFirstSession: "False",
+  sessionInfo: "",
+  sessionId: 0,
 };
 
 const userSlice = createSlice({
@@ -39,6 +43,7 @@ const userSlice = createSlice({
       state.branchid = 0;
       state.sessionInfo = "";
       state.sessionId = 0;
+      state.isFirstSession = "False";
     },
   },
 });

@@ -43,4 +43,15 @@
         //public List<VoucherCreditDebitDetailsDTO>? CreditDebitDetails { get; set; }
     }
 
+    public class FDVoucherDetailDTO
+    {
+        public int BrID { get; set; }
+        public string PaymentMode { get; set; } = "";
+        public int? CashGLAccountId { get; set; }
+        public decimal? CashGLAmount { get; set; }
+        public int? SavingProductId { get; set; }
+        public int? SavingAccountId { get; set; }
+        public decimal? SavingAmount { get; set; }
+    }
+
 }

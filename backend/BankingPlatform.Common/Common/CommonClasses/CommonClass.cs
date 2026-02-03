@@ -15,5 +15,6 @@
         public string workingDate { get; set; } = ""!;
         public string sessionInfo { get; set; } = ""!;
         public int sessionId { get; set; }
+        public bool isFirstSession { get; set; }
     }
 }

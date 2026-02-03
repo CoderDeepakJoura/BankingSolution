@@ -11,12 +11,15 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public List<AccountNomineeInfoDTO>? AccNomineeDTO { get; set; } = new();
         public List<JointAccountInfoDTO>? JointAccountInfoDTO { get; set; } = new();
         public JointAccountWithdrawalInfoDTO? JointAccountWithdrawalInfoDTO { get; set; } = new();
+        public List<FDAccountDetailDTO>? FDAccountDetailDTO { get; set; } = new();
+        public FDVoucherDetailDTO? FDVoucherDetailDTO { get; set; } = new();
 
         public IFormFile? Picture { get; set; }
         public IFormFile? Signature { get; set; }
         public string? OpeningBalance { get; set; }
         public string? OpeningBalanceType { get; set; }
         public string? ProductName { get; set; }
+        public int? AccountType { get; set; }
 
     }
     public class CreateAccountCreationRequest

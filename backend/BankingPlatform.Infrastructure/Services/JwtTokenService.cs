@@ -57,7 +57,8 @@ public class JwtTokenService
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim("JwtId", jwtId),
             new Claim("sessionInfo", _commonClass.sessionInfo),
-            new Claim("sessionId", _commonClass.sessionId.ToString())
+            new Claim("sessionId", _commonClass.sessionId.ToString()),
+            new Claim("isFirstSession", _commonClass.isFirstSession.ToString() )
         };
 
         var token = new JwtSecurityToken(

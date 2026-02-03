@@ -20,7 +20,8 @@
         public enum VoucherType
         {
             Member = 1,
-            Saving = 2
+            Saving = 2,
+            FD = 3
         }
 
         public enum VoucherSubType
@@ -28,7 +29,7 @@
             ShareMoney = 1,
             Deposit = 2,
             Withdrawal = 3,
-            InterestPosting = 4
+            InterestPosting = 4,
         }
 
         public enum VoucherStatus
@@ -37,12 +38,31 @@
             AdmissionFee = 2,
             Dr = 3,
             Cr = 4,
+            FDCr = 5,
+            FDDr = 6,
+
         }
 
         public enum MemberType
         {
             Nominal = 1,
             Permanent = 2
+        }
+
+        public enum AccountTypeOfFDProduct
+        {
+            SameAccount = 1,
+            OtherAccount = 2
+        }
+        public enum CompoundingInterval
+        {
+            NoCompounding = 1,
+            Daily = 2,
+            Monthly = 3,
+            Quarterly = 4, 
+            Half_Yearly = 5,
+            Yearly = 6,
+            Two_Yearly = 7
         }
     }
 }

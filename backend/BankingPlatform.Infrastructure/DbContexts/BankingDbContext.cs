@@ -79,6 +79,8 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<FDInterestSlab> fdinterestslab { get; set; }
     public virtual DbSet<FDInterestSlabInfo> fdinterestslabinfo { get; set; }
     public virtual DbSet<FDInterestSlabDetail> fdinterestslabdetail { get; set; }
+    public virtual DbSet<FDAccountDetail> fdaccountdetail { get; set; }
+    public virtual DbSet<VoucherFDDetail> voucherfddetail { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

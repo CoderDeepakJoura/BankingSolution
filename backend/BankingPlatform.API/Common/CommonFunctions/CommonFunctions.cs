@@ -392,6 +392,113 @@ namespace BankingPlatform.API.Common.CommonFunctions
 
         public string GetFDProductNameFromID(int productId, int branchId) => _appcontext.fdproduct.Where(x => x.BranchId == branchId && x.Id == productId).Select(x => x.ProductName).FirstOrDefault() ?? "";
 
+        public async Task<int> GetHeadIdFromHeadCode(long headCode, int branchId)
+        {
+            int headId = 0;
+            if (headCode > 0 && branchId > 0)
+            {
+                headId = await _appcontext.accounthead.Where(x => x.branchid == branchId && x.headcode == headCode).Select(x => x.id > 0 ? x.id : 0).FirstOrDefaultAsync();
+            }
+            return headId;
+        }
+
+        public async Task<(int headId, long headCode)> GetFDProductPrincipalHead(int branchId, int productId)
+        {
+            var data = await _appcontext.fdproductpostingheads.AsNoTracking().Where(x => x.BranchId == branchId && x.ProductId == productId).FirstOrDefaultAsync();
+            int headID = 0; long headCode = 0;
+            if (data != null)
+            {
+                headID = await GetHeadIdFromHeadCode(data.PrincipalBalHeadCode, branchId);
+                headCode = data.PrincipalBalHeadCode;
+            }
+            return (headID, headCode);
+
+        }
+
+        public async Task<bool> IsFirstSession(int sessionFromYear, int sessionToYear) => await _appcontext.branchsession.Where(x => x.sessionfrom == sessionFromYear && x.sessionto == sessionToYear).Select(x => x.isfirst).FirstOrDefaultAsync();
+
+        public async Task<(DateTime firstSessionFromDate, DateTime firstSessionToDate)> FirstSessionFromDateAndToDate(int branchId)
+        {
+            (DateTime firstSessionFromDate, DateTime firstSessionToDate) = (DateTime.MinValue, DateTime.MinValue);
+            var sessionInfo = await _appcontext.branchsession.AsNoTracking().Where(x => x.branchid == branchId && x.isfirst == true).FirstOrDefaultAsync();
+            if (sessionInfo != null)
+                (firstSessionFromDate, firstSessionToDate) = (sessionInfo.fromdate, sessionInfo.todate);
+            return (firstSessionFromDate, firstSessionToDate);
+        }
+
+        public async Task<string> GetAccountTypeFromProductIdAndBranchId(int productId, int branchId)
+        {
+            string accountType = "Same Account";
+            if(productId > 0 && branchId > 0)
+            {
+                int accType = await _appcontext.fdproductrules.Where(x => x.BranchId == branchId && x.ProductId == productId).Select(x => x.IntAccountType).FirstOrDefaultAsync();
+                accountType = accType == (int)Enums.AccountTypeOfFDProduct.SameAccount ? accountType : "Other Account";
+            }
+            return accountType;
+        }
+
+        public (int Years, int Months) CalculateAgeYM(DateTime dob)
+        {
+            var today = DateTime.Today;
+
+            int years = today.Year - dob.Year;
+            int months = today.Month - dob.Month;
+
+            if (today.Day < dob.Day)
+                months--;
+
+            if (months < 0)
+            {
+                years--;
+                months += 12;
+            }
+
+            return (years, months);
+        }
+
+        public string CompoundingIntervalStringFromValue(int interval)
+        {
+            string strInterval = Enums.CompoundingInterval.Quarterly.ToString();
+            if (interval == (int)Enums.CompoundingInterval.Monthly)
+                strInterval = Enums.CompoundingInterval.Monthly.ToString();
+            else if (interval == (int)Enums.CompoundingInterval.Daily)
+                strInterval = Enums.CompoundingInterval.Daily.ToString();
+            else if (interval == (int)Enums.CompoundingInterval.Half_Yearly)
+                strInterval = "Half-Yearly";
+            else if (interval == (int)Enums.CompoundingInterval.Yearly)
+                strInterval = Enums.CompoundingInterval.Yearly.ToString();
+            else if (interval == (int)Enums.CompoundingInterval.Two_Yearly)
+                strInterval = "Two-Yearly";
+            else if (interval == (int)Enums.CompoundingInterval.NoCompounding)
+                strInterval = "No-Compounding";
+            return strInterval;
+        }
+
+        public int CompoundingIntervalFromString(string strInterval)
+        {
+            return strInterval switch
+            {
+                "Monthly" => (int)Enums.CompoundingInterval.Monthly,
+                "Daily" => (int)Enums.CompoundingInterval.Daily,
+                "Half-Yearly" => (int)Enums.CompoundingInterval.Half_Yearly,
+                "Yearly" => (int)Enums.CompoundingInterval.Yearly,
+                "Two-Yearly" => (int)Enums.CompoundingInterval.Two_Yearly,
+                "No-Compounding" => (int)Enums.CompoundingInterval.NoCompounding,
+                _ => (int)Enums.CompoundingInterval.Quarterly // Default
+            };
+        }
+
+
+        public async Task<bool> AccountInUse(int accountId, int branchId)
+        {
+            bool result = false;
+            if(accountId > 0 && branchId > 0)
+            {
+                result = await _appcontext.vouchercreditdebitdetails.Where(x => x.AccountId == accountId && x.BrId == branchId).AnyAsync();
+            }
+            return result;
+        }
+
 
     }
 }

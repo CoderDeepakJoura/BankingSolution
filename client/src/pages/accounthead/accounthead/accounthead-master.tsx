@@ -24,6 +24,11 @@ export interface AccountHead {
   accountHeadName: string;
 }
 
+export interface AccountHeadWithCode {
+  headCode: string;
+  accountHeadName: string;
+}
+
 const AccountHeadMaster: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);

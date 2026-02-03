@@ -119,6 +119,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               branchid: data.branchId,
               sessionInfo: data.sessionInfo,
               sessionId: data.sessionId,
+              isFirstSession: data.isFirstSession,
             })
           );
         } else {

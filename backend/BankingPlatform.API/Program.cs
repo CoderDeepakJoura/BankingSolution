@@ -40,6 +40,7 @@ builder.Services.AddScoped<SavingAccountService>();
 builder.Services.AddScoped<BranchMasterService>();
 builder.Services.AddScoped<SavingVoucherService>();
 builder.Services.AddScoped<VoucherMapper>();
+builder.Services.AddScoped<FDAccountService>();
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");

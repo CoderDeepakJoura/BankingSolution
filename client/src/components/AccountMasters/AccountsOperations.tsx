@@ -73,8 +73,8 @@ const AccountsModule: React.FC = () => {
               />
               <AccountOperations
                 accountType="Fixed Deposit (FD) Account(s)"
-                addPath="/accounts/fd/add"
-                modifyPath="/accounts/fd/modify"
+                addPath="/fd-acc-master"
+                modifyPath="/fd-acc-info"
               />
               <AccountOperations
                 accountType="Recurring Deposit (RD) Account(s)"

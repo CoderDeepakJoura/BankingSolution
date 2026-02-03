@@ -550,6 +550,52 @@ class commonService extends ApiService {
       }
     );
   }
+
+  async fd_account_type_from_fd_product(productId : Number, branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/fd-account-type-from-fdproduct/${productId}/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  async fetch_fd_related_info(fdDate : string, periodInMonths: Number, periodInDays: Number, dob: string, productId: Number, amount: Number, branchId: Number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/fetch-fd-related-info/${fdDate}/${periodInMonths}/${periodInDays}/${dob}/${productId}/${amount}/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  async fetch_MIS_Accounts(memberId: Number, memberBranchId: Number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/fetch-mis-accounts/${memberId}/${memberBranchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+   async get_FD_Prefix_And_Suffix(branchId: Number, productId: Number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/fetch-fd-prefix-and-suffix/${branchId}/${productId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
 }
 
 export default new commonService();

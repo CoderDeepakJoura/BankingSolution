@@ -150,7 +150,7 @@ class accountheadApiService extends ApiService {
   }
 
   async fetchaccountheads(branchid: number): Promise<ApiResponse<any>> {
-    return this.makeRequest<any>('/fetchdata/get_all_accountheads', {
+    return this.makeRequest<any>('/fetchdata/get_all_accountheads-with-headCode', {
       method: 'POST',
       body: JSON.stringify({ BranchId: branchid }),
       headers: { 'Content-Type': 'application/json' },

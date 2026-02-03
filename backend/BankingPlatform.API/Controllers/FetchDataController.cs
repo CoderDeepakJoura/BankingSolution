@@ -14,12 +14,15 @@ using BankingPlatform.API.DTO.Location.Village;
 using BankingPlatform.API.DTO.Miscalleneous;
 using BankingPlatform.API.DTO.ProductMasters.Saving;
 using BankingPlatform.API.DTO.Settings;
+using BankingPlatform.API.Service.AccountMasters;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
+using BankingPlatform.Infrastructure.Models.InterestSlabs.FD;
 using BankingPlatform.Infrastructure.Models.member;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Identity.Client;
 using System.Reflection;
 
@@ -32,10 +35,12 @@ namespace BankingPlatform.API.Controllers
     {
         private readonly BankingDbContext _context;
         private readonly CommonFunctions _commonFunctions;
-        public FetchDataController(BankingDbContext context, CommonFunctions commonFunctions ) 
+        private readonly FDAccountService _fdAccountService;
+        public FetchDataController(BankingDbContext context, CommonFunctions commonFunctions, FDAccountService fdAccountService ) 
         {
             _context = context;
             _commonFunctions = commonFunctions;
+            _fdAccountService = fdAccountService;
         }
 
         [HttpPost("get_all_accountheadtypes")]
@@ -770,6 +775,109 @@ namespace BankingPlatform.API.Controllers
                 Success = true,
                 data = slabInfo
             });
+        }
+        [HttpGet("fd-account-type-from-fdproduct/{productId}/{branchId}")]
+        public async Task<IActionResult> GetFDAccountTypeFromFDProduct([FromRoute] int productId, int branchId)
+        {
+            string accountType = await _commonFunctions.GetAccountTypeFromProductIdAndBranchId(productId, branchId);
+
+            return Ok(new
+            {
+                Success = true,
+                data = accountType
+            });
+        }
+        [HttpGet("fetch-fd-related-info/{fdDate}/{periodInMonths}/{periodInDays}/{dob}/{productId}/{amount}/{branchId}")]
+        public async Task<IActionResult> CalculateFDRelatedInfo([FromRoute] DateTime fdDate, int periodInMonths, int periodInDays, DateTime dob, int productId, decimal amount, int branchId)
+        {
+            DateTime maturityDate = await _fdAccountService.CalculateMaturityDate(fdDate, periodInMonths, periodInDays);
+            (decimal intRate, string slabName, string compoundingInterval, int intCompoundingInterval, int slabId) = await _fdAccountService.SlabInfo(dob, amount, periodInMonths, periodInDays, fdDate, productId);
+            decimal maturityAmount = await _fdAccountService.CalculateMaturityAmount(amount, intRate, fdDate, maturityDate, productId, branchId, intCompoundingInterval);
+
+            return Ok(new
+            {
+                Success = true,
+                data = new
+                {
+                    maturityDate = maturityDate,
+                    interestRate = intRate,
+                    slabName = slabName,
+                    compoundingInterval = compoundingInterval,
+                    maturityAmount = maturityAmount,
+                    slabId = slabId
+                }
+            });
+        }
+
+        [HttpGet("calculate-fd-maturity-amount/{fdDate}/{periodInMonths}/{periodInDays}/{interestRate}")]
+        public async Task<IActionResult> CalculateMaturityAmount([FromRoute] DateTime fdDate, int periodInMonths, int periodInDays)
+        {
+            DateTime maturityDate = await _fdAccountService.CalculateMaturityDate(fdDate, periodInMonths, periodInDays);
+
+            return Ok(new
+            {
+                Success = true,
+                data = maturityDate
+            });
+        }
+
+        [HttpGet("fetch-mis-accounts/{memberId}/{memberBranchId}")]
+        public async Task<IActionResult> AccountsForMIS([FromRoute] int memberId, int memberBranchId)
+        {
+            int rdAccountType = (int)Enums.AccountTypes.RD;
+            int savingAccountType = (int)Enums.AccountTypes.Saving;
+            var accountsData = await _context.accountmaster
+                .Where(x=> x.MemberBranchID == memberBranchId && x.MemberId == memberId
+                && (x.AccTypeId == rdAccountType || x.AccTypeId == savingAccountType)
+                && x.IsAccClosed == false)
+                .Select(x => new
+                {
+                    AccId = x.ID,
+                    AccountName = x.AccPrefix + "-" + x.AccSuffix + "-" + x.AccountName,
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                Success = true,
+                data = accountsData
+            });
+
+        }
+        [HttpGet("fetch-fd-prefix-and-suffix/{branchId}/{productId}")]
+        public async Task<IActionResult> FDPrefix([FromRoute] int branchId, int productId)
+        {
+            int accountType = (int)Enums.AccountTypes.FD;
+            var prefix = await _context.fdproduct.Where(x => x.Id == productId && x.BranchId == branchId)
+                .Select(x => x.ProductCode).FirstOrDefaultAsync() ?? "";
+            var accountMasterInfo = await _context.accountmaster.Where(x => x.BranchId == branchId && x.GeneralProductId == productId && x.AccTypeId == accountType)
+                .Select(x => new { x.AccPrefix, x.AccSuffix }).ToListAsync();
+            var suffix = accountMasterInfo.Select(x => x.AccSuffix).Max() + 1 ?? 1;
+            return Ok(new
+            {
+                Success = true,
+                data = prefix + "-" + suffix
+            });
+
+        }
+
+        [HttpPost("get_all_accountheads-with-headCode")]
+        public async Task<IActionResult> GetAllHeadsWithHeadCode([FromBody] CommonDTO commonDTO)
+        {
+            var heads = await _context.accounthead
+            .Where(x => x.branchid == commonDTO.BranchId)
+            .Select(x => new AccountHeadDTO
+            {
+                HeadCode = x.headcode.ToString(),
+                AccountHeadName = x.headcode + "-" + x.name
+            })
+            .ToListAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = heads
+            }
+            );
         }
 
     }

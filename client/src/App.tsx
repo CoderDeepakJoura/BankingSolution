@@ -82,6 +82,9 @@ import FDProductSlabOperations from "./components/Slabs/SlabOperations";
 import SlabOperationsFD from "./pages/Slabs/FD/slab-operations";
 import FDSlabData from "./pages/Slabs/FD/slab-data";
 import FDSlab from "./pages/Slabs/FD/fdslab";
+import FDAccMaster from "./pages/accountMasters/FD/fd-master";
+import FDAccOperations from "./pages/accountMasters/FD/fd-operations";
+import FDAccData from "./pages/accountMasters/FD/fd-data";
 
 export default function App() {
   const user = useSelector((state: RootState) => state.user);
@@ -238,6 +241,11 @@ export default function App() {
           element={<SlabOperationsFD />}
         />
         <Route path="/fd-slab-info" element={<FDSlabData />} />
+                
+        <Route path="/fd-acc-master" element={<FDAccMaster />} />
+        <Route path="/fd-acc-master/:accountId" element={<FDAccMaster />} />
+        <Route path="/fd-acc-operations" element={<FDAccOperations />} />
+        <Route path="/fd-acc-info" element={<FDAccData />} />
       </Routes>
       
     </BrowserRouter>
