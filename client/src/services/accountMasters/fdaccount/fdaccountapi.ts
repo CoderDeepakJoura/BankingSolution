@@ -36,6 +36,8 @@ export interface AccountMasterDTO {
   dob?: string;
   addedUsing?: string;
   membershipNo?: string;
+  ltdNo?: string;
+  fdmaturityDate?: string;
 }
 
 // Maps to FDDetailDTO in backend
@@ -134,6 +136,9 @@ export interface CommonAccMasterDTO {
   productName?: string;
   openingBalanceType?: string;
   isOpeningEntry?: boolean;
+  savingAccountName?: string;
+  preMaturityAmount?: number;
+  fdAccountDetailDTOSingle: FDDetailDTO;
 }
 
 // For member details response
@@ -248,9 +253,13 @@ class FDAccountService extends ApiService {
 
   async getFDAccountById(
     id: number,
-    branchId: number
+    branchId: number,
+    currentDate?: string
   ): Promise<ApiResponse<CommonAccMasterDTO>> {
-    return this.makeRequest(`/FDAccountMaster/${id}/${branchId}`, {
+    const url = currentDate
+      ? `/FDAccountMaster/${id}/${branchId}/${currentDate}`
+      : `/FDAccountMaster/${id}/${branchId}`;
+    return this.makeRequest(url, {
       method: "GET",
     });
   }
@@ -357,6 +366,35 @@ class FDAccountService extends ApiService {
       }`,
       {
         method: "GET",
+      }
+    );
+  }
+  async matureFD(
+   dto: any
+  ): Promise<ApiResponse<ResponseDto>> {
+    return this.makeRequest(
+      `/FDAccountMaster/mature-or-renew-fd`,
+      {
+        method: "POST",
+        body: JSON.stringify(dto),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  async preMatureFD(
+   dto: any
+  ): Promise<ApiResponse<ResponseDto>> {
+    alert(JSON.stringify(dto));
+    return this.makeRequest(
+      `/FDAccountMaster/premature-fd`,
+      {
+        method: "POST",
+        body: JSON.stringify(dto),
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
     );
   }

@@ -62,8 +62,8 @@ const ProductsModule: React.FC = () => {
               />
                <ProductOperations
                 productType="Loan Product(s)"
-                addPath="/products/savings/add"
-                modifyPath="/products/savings/modify"
+                addPath="/loan-product"
+                modifyPath="/loanproduct-info"
               />
               <ProductOperations
                 productType="Saving Product(s)"
@@ -72,8 +72,8 @@ const ProductsModule: React.FC = () => {
               />
               <ProductOperations
                 productType="Recurring Deposit (RD) Product(s)"
-                addPath="/products/rd/add"
-                modifyPath="/products/rd/modify"
+                addPath="/rd-product"
+                modifyPath="/rdproduct-info"
               />
 
               

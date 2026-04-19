@@ -8,6 +8,7 @@ using BankingPlatform.Infrastructure.Models.AccMasters;
 using BankingPlatform.Infrastructure.Models.voucher;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Identity.Client;
 using System.Security.Claims;
 using static BankingPlatform.API.Service.AccountMasters.FDAccountService;
 
@@ -347,7 +348,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                 membershipNo = await _commonfunctions.GetMemberShipNoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, memberType);
             }
             accountMaster.AccountNumber = await _commonfunctions.GetShareMoneyAccNoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, (int)Enums.AccountTypes.ShareMoney);
+            string savingAccountInfo = await _commonfunctions.GetSavingAccInfoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, (int)Enums.AccountTypes.Saving);
 
+            DateTime memberDOB = await _commonfunctions.MemberDOBFromMemberIdAndBranchId((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!);
             return new CommonAccMasterDTO
             {
                 AccountMasterDTO = _memberService.MapToDTO(accountMaster, membershipNo),
@@ -388,7 +391,91 @@ namespace BankingPlatform.API.Service.AccountMasters
                     })
                     .ToListAsync(),
                 OpeningBalance = accOpeningBalDetail != null ? accOpeningBalDetail.OpeningAmount.ToString() : "0",
-                OpeningBalanceType = accOpeningBalDetail != null ? accOpeningBalDetail.EntryType : "Cr"
+                OpeningBalanceType = accOpeningBalDetail != null ? accOpeningBalDetail.EntryType : "Cr",
+                SavingAccountName = savingAccountInfo
+            };
+        }
+
+        public async Task<CommonAccMasterDTO?> GetFDAccountMatureOrPreMatureDetailByIdAsync(int accountId, int branchId, DateTime currentDate)
+        {
+            var accountMaster = await _context.accountmaster
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ID == accountId && m.BranchId == branchId);
+
+            if (accountMaster == null) return null;
+
+            var nominees = await _context.accountnomineeinfo
+                .AsNoTracking()
+                .Where(n => n.AccountId == accountId && n.BranchId == branchId)
+                .ToListAsync();
+
+            var accOpeningBalDetail = await _context.accopeningbalance
+                .AsNoTracking()
+                .FirstOrDefaultAsync(w => w.AccountId == accountId && w.BranchId == branchId);
+
+            string[] validValues = new[] { "NM", "PM" };
+            int fdStatus = (int)Enums.FDStatus.Open;
+            string membershipNo = "";
+            if (validValues.Contains(accountMaster.addedusing))
+            {
+                int memberType = accountMaster.addedusing == "NM" ? 1 : 2;
+                membershipNo = await _commonfunctions.GetMemberShipNoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, memberType);
+            }
+            accountMaster.AccountNumber = await _commonfunctions.GetShareMoneyAccNoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, (int)Enums.AccountTypes.ShareMoney);
+            string savingAccountInfo = await _commonfunctions.GetSavingAccInfoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, (int)Enums.AccountTypes.Saving);
+
+            DateTime memberDOB = await _commonfunctions.MemberDOBFromMemberIdAndBranchId((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!);
+            var fdDetail = await _context.fdaccountdetail
+                    .AsNoTracking()
+                    .Where(f => f.AccountId == accountId && f.BranchId == branchId && f.FDStatus == fdStatus)
+                    .Select(f => new FDAccountDetailDTO
+                    {
+                        Id = f.Id,
+                        BranchId = f.BranchId,
+                        AccountId = f.AccountId,
+                        FDAmount = f.FDAmount,
+                        FDDate = f.FDDate,
+                        FDMaturityDate = f.FDMaturityDate,
+                        MaturityAmount = f.MaturityAmount,
+                        LTDNo = f.LTDNo.ToString(),
+                        FDStatus = f.FDStatus,
+                        FDPeriodMonths = f.FDPeriodMonths,
+                        FDPeriodDays = f.FDPeriodDays,
+                        SlabId = f.SlabId,
+                        IntRate = f.IntRate,
+                        CompoundingInterval = _commonfunctions.CompoundingIntervalStringFromValue(f.IntCompInterval),
+                        SerialNo = f.SerialNo,
+                        MISAccId = f.MISAccId
+                    })
+                    .FirstOrDefaultAsync();
+
+            return new CommonAccMasterDTO
+            {
+                AccountMasterDTO = _memberService.MapToDTO(accountMaster, membershipNo),
+                AccNomineeDTO = nominees.Select(n => new AccountNomineeInfoDTO
+                {
+                    Id = n.Id,
+                    BranchId = n.BranchId,
+                    AccountId = n.AccountId,
+                    NomineeName = n.NomineeName,
+                    NomineeDob = n.NomineeDob,
+                    RelationWithAccHolder = n.RelationWithAccHolder,
+                    AddressLine = n.AddressLine,
+                    NomineeDate = n.NomineeDate,
+                    IsMinor = n.IsMinor,
+                    NameOfGuardian = n.NameOfGuardian
+                }).ToList(),
+                FDAccountDetailDTOSingle = fdDetail,
+                OpeningBalance = accOpeningBalDetail != null ? accOpeningBalDetail.OpeningAmount.ToString() : "0",
+                OpeningBalanceType = accOpeningBalDetail != null ? accOpeningBalDetail.EntryType : "Cr",
+                SavingAccountName = savingAccountInfo,
+                PreMaturityAmount = await CalculatePreMaturityAmount(memberDOB,
+                                fdDetail!.FDAmount,
+                                (currentDate - fdDetail.FDDate).Days,
+                                currentDate,
+                                (int)accountMaster.GeneralProductId!,
+                                branchId
+                                    )
             };
         }
 
@@ -549,6 +636,270 @@ namespace BankingPlatform.API.Service.AccountMasters
             }
         }
 
+        public async Task<string> MatureOrRenewFDAsync(CommonAccMasterDTO dto)
+        {
+
+            var claimsPrincipal = _httpContextAccessor.HttpContext?.User;
+            var accountMaster = await _context.accountmaster.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ID == dto.MatureOrRenewFDInfo!.FDAccountId && m.BranchId == dto.MatureOrRenewFDInfo.BranchId);
+
+            if (accountMaster == null) return "Account not found.";
+
+
+            var fdDetailInfo = await _context.fdaccountdetail
+                .FirstOrDefaultAsync(f => f.AccountId == dto.MatureOrRenewFDInfo!.FDAccountId && f.BranchId == dto.MatureOrRenewFDInfo.BranchId && f.Id == dto.MatureOrRenewFDInfo!.DetailId);
+
+            if (fdDetailInfo == null) return "FD Detail not found.";
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                if (dto.CreditAccountDetails!.GeneralAccountId > 0 || dto.CreditAccountDetails!.SavingAccountId > 0 || dto.CreditAccountDetails!.LoanAccountId > 0 || dto.MatureOrRenewFDInfo!.IsRenew)
+                {
+                    decimal totalDebit = (decimal)dto.CreditAccountDetails!.GeneralAmount + (decimal)dto.CreditAccountDetails!.SavingAmount + (decimal)dto.CreditAccountDetails!.LoanAmount + (dto.MatureOrRenewFDInfo!.IsRenew ? dto.FDAccountDetailDTOSingle!.FDAmount : 0);
+                    int accountId = (int)dto.MatureOrRenewFDInfo!.FDAccountId!;
+                    var userIdClaim = claimsPrincipal?.FindFirst("userId")?.Value
+                                   ?? claimsPrincipal?.FindFirst("UserId")?.Value
+                                   ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    int branchId = (int)dto.MatureOrRenewFDInfo.BranchId!;
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
+                    string narration = dto.MatureOrRenewFDInfo?.Narration ?? ("FD " + (dto.MatureOrRenewFDInfo!.IsRenew ? "Renewed" : "Matured") + " .");
+                    DateTime voucherDate = DateTime.SpecifyKind(dto.MatureOrRenewFDInfo!.VoucherDate, DateTimeKind.Unspecified);
+                    fdDetailInfo.FDStatus = dto.MatureOrRenewFDInfo!.IsRenew ? (int)Enums.FDStatus.Renewed : (int)Enums.FDStatus.Matured;
+                    fdDetailInfo.VoucherDate = voucherDate;
+                    dto.Voucher = new VoucherDTO
+                    {
+                        ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                        VoucherDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Unspecified),
+
+                        // Other non-DateTime fields
+                        AddedBy = Int32.Parse(userIdClaim!),
+                        BrID = branchId,
+                        ModifiedBy = 0,
+                        VerifiedBy = isAutoVerification ? Int32.Parse(userIdClaim!) : 0,
+                        VoucherNarration = narration,
+                        OtherBrID = 0,
+                        VoucherNo = nextVrNo,
+                        VoucherStatus = isAutoVerification ? "V" : "A",
+                        VoucherType = (int)Enums.VoucherType.FD,
+                        VoucherSubType = dto.MatureOrRenewFDInfo.IsRenew ? (int)Enums.VoucherSubType.Renew : (int)Enums.VoucherSubType.Mature,
+                    };
+
+                    var voucherInfo = _memberService.MapToEntity(dto.Voucher!);
+                    await _context.voucher.AddAsync(voucherInfo);
+                    await _context.SaveChangesAsync();
+                    DateTime valueDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
+                    int row = 1;
+                    if (dto.MatureOrRenewFDInfo.IsRenew)
+                    {
+                        int intCompoundingInterval = _commonfunctions.CompoundingIntervalFromString(dto.FDAccountDetailDTOSingle!.CompoundingInterval);
+                        var fdAccountDetail = new FDAccountDetail
+                        {
+                            BranchId = branchId,
+                            AccountId = accountId,
+                            FDAmount = dto.FDAccountDetailDTOSingle!.FDAmount,
+                            FDDate = DateTime.SpecifyKind(dto.FDAccountDetailDTOSingle!.FDDate, DateTimeKind.Unspecified),
+                            FDMaturityDate = DateTime.SpecifyKind(dto.FDAccountDetailDTOSingle!.FDMaturityDate, DateTimeKind.Unspecified),
+                            MaturityAmount = dto.FDAccountDetailDTOSingle!.MaturityAmount,
+                            LTDNo = Convert.ToInt32(dto.FDAccountDetailDTOSingle!.LTDNo),
+                            FDStatus = dto.FDAccountDetailDTOSingle!.FDStatus,
+                            FDPeriodMonths = dto.FDAccountDetailDTOSingle!.FDPeriodMonths,
+                            FDPeriodDays = dto.FDAccountDetailDTOSingle!.FDPeriodDays,
+                            SlabId = dto.FDAccountDetailDTOSingle!.SlabId,
+                            IntRate = dto.FDAccountDetailDTOSingle!.IntRate,
+                            IntCompInterval = intCompoundingInterval,
+                            SerialNo = dto.FDAccountDetailDTOSingle!.SerialNo,
+                            MISAccId = dto.FDAccountDetailDTOSingle!.MISAccId,
+                            InterestPaidAmount = dto.FDAccountDetailDTOSingle!.InterestPaidAmount,
+                            InterestPaidInterval = dto.FDAccountDetailDTOSingle!.InterestPaidInterval,
+                            VoucherDate = voucherDate
+                        };
+                        await _context.fdaccountdetail.AddAsync(fdAccountDetail);
+                        await _context.SaveChangesAsync();
+
+                        VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.MatureOrRenewFDInfo!.FDAccountId, branchId), (int)dto.MatureOrRenewFDInfo!.FDAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "New FD Account Credited", (decimal)dto.FDAccountDetailDTOSingle!.FDAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                        await _context.SaveChangesAsync();
+                        row++;
+                        var voucherFDDetail = new VoucherFDDetail
+                        {
+                            BrId = branchId,
+                            VoucherId = voucherInfo.Id,
+                            VAccCrDrId = voucherCreditInfo.Id,
+                            FDAccId = accountId,
+                            FDAccDetId = fdAccountDetail.Id,
+                            AmountCr = dto.FDAccountDetailDTOSingle!.FDAmount,
+                            AmountDr = 0,
+                            Operation = "RC",
+                            ValueDate = DateTime.SpecifyKind(dto.FDAccountDetailDTOSingle!.FDDate, DateTimeKind.Utc),
+                            VoucherDate = voucherDate,
+                            IntDr = 0,
+                            IntCr = 0,
+                            VoucherMainStatus = dto.Voucher.VoucherStatus
+                        };
+                        await _context.voucherfddetail.AddAsync(voucherFDDetail);
+                        await _context.SaveChangesAsync();
+
+                       
+                    }
+
+
+
+                    if (dto.CreditAccountDetails!.SavingAccountId > 0 && dto.CreditAccountDetails!.SavingAmount > 0)
+                    {
+                        VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.SavingAccountId, branchId), (int)dto.CreditAccountDetails!.SavingAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "Saving Account Credited", (decimal)dto.CreditAccountDetails!.SavingAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                        row++;
+                    }
+                    if (dto.CreditAccountDetails!.GeneralAccountId > 0 && dto.CreditAccountDetails!.GeneralAmount > 0)
+                    {
+                        VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.GeneralAccountId, branchId), (int)dto.CreditAccountDetails!.GeneralAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "General Account Credited", (decimal)dto.CreditAccountDetails!.GeneralAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                        row++;
+                    }
+                    if (dto.CreditAccountDetails!.LoanAccountId > 0 && dto.CreditAccountDetails!.LoanAmount > 0)
+                    {
+                        VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.LoanAccountId, branchId), (int)dto.CreditAccountDetails!.LoanAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "Loan Recovery", (decimal)dto.CreditAccountDetails!.LoanAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                        row++;
+                    }
+
+                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.FDDr.ToString(), narration, totalDebit, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+
+                    _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
+                    await _context.SaveChangesAsync();
+
+                    var voucherFDDetailDebit = new VoucherFDDetail
+                    {
+                        BrId = branchId,
+                        VoucherId = voucherInfo.Id,
+                        VAccCrDrId = voucherDebitInfo.Id,
+                        FDAccId = accountId,
+                        FDAccDetId = fdDetailInfo.Id,
+                        AmountCr = 0,
+                        AmountDr = dto.FDAccountDetailDTOSingle!.FDAmount,
+                        Operation = "RP",
+                        ValueDate = DateTime.SpecifyKind(dto.FDAccountDetailDTOSingle!.FDDate, DateTimeKind.Utc),
+                        VoucherDate = voucherDate,
+                        IntDr = 0,
+                        IntCr = 0,
+                        VoucherMainStatus = dto.Voucher.VoucherStatus
+                    };
+                    await _context.voucherfddetail.AddAsync(voucherFDDetailDebit);
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+
+            return "Success";
+
+
+        }
+
+
+        public async Task<string>PreMatureFDAsync(CommonAccMasterDTO dto)
+        {
+
+            var claimsPrincipal = _httpContextAccessor.HttpContext?.User;
+            var accountMaster = await _context.accountmaster.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.ID == dto.MatureOrRenewFDInfo!.FDAccountId && m.BranchId == dto.MatureOrRenewFDInfo.BranchId);
+
+            if (accountMaster == null) return "Account not found.";
+
+
+            var fdDetailInfo = await _context.fdaccountdetail
+                .FirstOrDefaultAsync(f => f.AccountId == dto.MatureOrRenewFDInfo!.FDAccountId && f.BranchId == dto.MatureOrRenewFDInfo.BranchId && f.Id == dto.MatureOrRenewFDInfo!.DetailId);
+
+            if (fdDetailInfo == null) return "FD Detail not found.";
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                if (dto.CreditAccountDetails!.GeneralAccountId > 0 || dto.CreditAccountDetails!.SavingAccountId > 0 || dto.CreditAccountDetails!.LoanAccountId > 0)
+                {
+                    decimal totalDebit = (decimal)dto.CreditAccountDetails!.GeneralAmount + (decimal)dto.CreditAccountDetails!.SavingAmount + (decimal)dto.CreditAccountDetails!.LoanAmount;
+                    int accountId = (int)dto.MatureOrRenewFDInfo!.FDAccountId!;
+                    var userIdClaim = claimsPrincipal?.FindFirst("userId")?.Value
+                                   ?? claimsPrincipal?.FindFirst("UserId")?.Value
+                                   ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    int branchId = (int)dto.MatureOrRenewFDInfo.BranchId!;
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
+                    string narration = dto.MatureOrRenewFDInfo?.Narration ?? ("FD Pre-Matured") + " .";
+                    DateTime voucherDate = DateTime.SpecifyKind(dto.MatureOrRenewFDInfo!.VoucherDate, DateTimeKind.Unspecified);
+                    fdDetailInfo.FDStatus = (int)Enums.FDStatus.Pre_Matured;
+                    fdDetailInfo.VoucherDate = voucherDate;
+                    dto.Voucher = new VoucherDTO
+                    {
+                        ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                        VoucherDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Unspecified),
+
+                        // Other non-DateTime fields
+                        AddedBy = Int32.Parse(userIdClaim!),
+                        BrID = branchId,
+                        ModifiedBy = 0,
+                        VerifiedBy = isAutoVerification ? Int32.Parse(userIdClaim!) : 0,
+                        VoucherNarration = narration,
+                        OtherBrID = 0,
+                        VoucherNo = nextVrNo,
+                        VoucherStatus = isAutoVerification ? "V" : "A",
+                        VoucherType = (int)Enums.VoucherType.FD,
+                        VoucherSubType = (int)Enums.VoucherSubType.PreMature,
+                    };
+
+                    var voucherInfo = _memberService.MapToEntity(dto.Voucher!);
+                    await _context.voucher.AddAsync(voucherInfo);
+                    await _context.SaveChangesAsync();
+
+                    DateTime valueDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
+                    int row = 1;
+                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.FDDr.ToString(), narration, totalDebit, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+
+                    _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
+                    await _context.SaveChangesAsync();
+                    row++;
+
+
+
+                    if (dto.CreditAccountDetails!.SavingAccountId > 0 && dto.CreditAccountDetails!.SavingAmount > 0)
+                    {
+                        VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.SavingAccountId, branchId), (int)dto.CreditAccountDetails!.SavingAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "Saving Account Credited", (decimal)dto.CreditAccountDetails!.SavingAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                        row++;
+                    }
+                    if (dto.CreditAccountDetails!.GeneralAccountId > 0 && dto.CreditAccountDetails!.GeneralAmount > 0)
+                    {
+                        VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.GeneralAccountId, branchId), (int)dto.CreditAccountDetails!.GeneralAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "General Account Credited", (decimal)dto.CreditAccountDetails!.GeneralAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                        row++;
+                    }
+                    if (dto.CreditAccountDetails!.LoanAccountId > 0 && dto.CreditAccountDetails!.LoanAmount > 0)
+                    {
+                        VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.LoanAccountId, branchId), (int)dto.CreditAccountDetails!.LoanAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "Loan Recovery", (decimal)dto.CreditAccountDetails!.LoanAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                        row++;
+                    }
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+
+            return "Success";
+
+
+        }
+
         public async Task<DateTime> CalculateMaturityDate(DateTime fdDate, int months, int days)
         {
             // Check if the FD date is the last day of its month
@@ -616,21 +967,29 @@ namespace BankingPlatform.API.Service.AccountMasters
         /// <summary>
         /// Calculate Maturity Amount using Simple Interest (360-day basis)
         /// </summary>
-        public decimal CalculateMaturityAmount(decimal principal, decimal annualRate, int months, int days)
+        public async Task<decimal> CalculatePreMaturityAmount(DateTime dob, decimal principal, int totalDays, DateTime currentDate, int productId, int branchId)
         {
-            // Calculate total days (30 days per month for 360-day year convention)
-            int totalDays = (months * 30) + days;
+
+            (decimal intRate, string slabName, string compoundingInterval, int intCompoundingInterval, int slabId) = await SlabInfo(dob, principal, 0, totalDays, currentDate, productId);
+            // Fetch DaysInAYear rule (360 / 365)
+            int daysInAYear = await _context.fdproductbranchwiserule
+                .Where(x => x.BranchId == branchId && x.FDProductId == productId)
+                .Select(x => x.DaysInAYear)
+                .FirstOrDefaultAsync();
+
+            if (daysInAYear <= 0)
+                daysInAYear = 360;
 
             // Convert annual rate from percentage to decimal
-            decimal rate = annualRate / 100;
+            decimal rate = intRate / 100;
 
             // Simple Interest Formula: (P × R × Days) / 360
-            decimal interest = (principal * rate * totalDays) / 360;
+            decimal interest = (principal * rate * totalDays) / daysInAYear;
 
             // Maturity Amount = Principal + Interest
-            decimal maturityAmount = principal + interest;
+            decimal preMaturityAmount = principal + interest;
 
-            return Math.Round(maturityAmount, 2);
+            return Math.Round(preMaturityAmount, 2);
         }
 
         /// <summary>

@@ -65,6 +65,16 @@ const SlabsModule: React.FC = () => {
                 addPath="/fdproduct-interest-slab"
                 modifyPath="/fd-interest-slab-info"
               />
+              <SlabOperations
+                SlabType="RD Product Interest Slab"
+                addPath="/rd-interest-slab"
+                modifyPath="/rd-slab-info"
+              />
+              <SlabOperations
+                SlabType="Loan Product Interest Slab"
+                addPath="/loan-interest-slab"
+                modifyPath="/loan-slab-info"
+              />
             </div>
           </section>
         </div>

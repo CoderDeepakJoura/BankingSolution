@@ -967,7 +967,7 @@ namespace BankingPlatform.API.Services
             PhoneNo1 = entity.PhoneNo1,
             RelativeName = entity.RelativeName,
             addedUsing = entity.addedusing,
-            MembershipNo = memberShipNo
+            MembershipNo = memberShipNo,
         };
 
         public Voucher MapToEntity(VoucherDTO dto, Voucher entity = null)

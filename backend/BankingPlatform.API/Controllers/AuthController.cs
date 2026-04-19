@@ -1,9 +1,12 @@
 ﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
+using BankingPlatform.API.Controllers.Member;
+using BankingPlatform.API.Controllers.ProductMasters;
 using BankingPlatform.API.DTO.WorkingDate;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Security.Claims;
@@ -42,6 +45,7 @@ namespace BankingPlatform.API.Controllers
         private readonly CommonFunctions _commonFns;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private CommonClass _commonClass;
+        private ScriptPath _scriptPath;
 
         public AuthController(
             BankingDbContext context,
@@ -50,7 +54,8 @@ namespace BankingPlatform.API.Controllers
             IOptions<JwtSettings> jwtOptions,
             CommonFunctions commonFunctions,
             CommonClass commonClass,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            IOptions<ScriptPath> scriptPath)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _jwtTokenService = jwtTokenService ?? throw new ArgumentNullException(nameof(jwtTokenService));
@@ -59,6 +64,7 @@ namespace BankingPlatform.API.Controllers
             _commonFns = commonFunctions ?? throw new ArgumentNullException(nameof(_commonFns));
             _commonClass = commonClass ?? throw new ArgumentNullException(nameof(_commonClass));
             _httpContextAccessor = httpContextAccessor;
+            _scriptPath = scriptPath.Value;
         }
 
         [HttpPost("login")]
@@ -323,6 +329,141 @@ namespace BankingPlatform.API.Controllers
             });
         }
 
+        [Authorize]
+        [HttpPost("run-script")]
+        public async Task<IActionResult> RunSeleniumScript()
+        {
+            try
+            {
+                string scriptPath;
+                ProcessStartInfo processInfo;
+                string logPath;
+
+                // Detect OS and configure accordingly
+                if (OperatingSystem.IsWindows())
+                {
+                    // Windows: Use .bat file
+                    scriptPath = Path.Combine(_scriptPath.LoanAdvancement, "run_loan_automation.bat");
+                    processInfo = new ProcessStartInfo
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = $"/c \"{scriptPath}\"",
+                        WorkingDirectory = _scriptPath.LoanAdvancement,
+                        UseShellExecute = true,
+                        CreateNoWindow = false
+                    };
+                }
+                else
+                {
+                    scriptPath = Path.Combine(_scriptPath.LoanAdvancement, "run_loan_automation.sh");
+                    logPath = Path.Combine(_scriptPath.LoanAdvancement, $"logs/api_run_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+
+                    _logger?.LogInformation($"Script path: {scriptPath}");
+                    _logger?.LogInformation($"Log path: {logPath}");
+
+                    if (!System.IO.File.Exists(scriptPath))
+                    {
+                        return StatusCode(500, new
+                        {
+                            success = false,
+                            error = $"Script not found: {scriptPath}"
+                        });
+                    }
+
+                    // Ensure logs directory exists
+                    var logsDir = Path.Combine(_scriptPath.LoanAdvancement, "logs");
+                    if (!Directory.Exists(logsDir))
+                    {
+                        Directory.CreateDirectory(logsDir);
+                    }
+
+                    // Make executable
+                    try
+                    {
+                        var chmodInfo = new ProcessStartInfo
+                        {
+                            FileName = "/bin/chmod",
+                            Arguments = $"+x {scriptPath}",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        Process.Start(chmodInfo)?.WaitForExit();
+                    }
+                    catch { }
+
+                    // Use bash -c with nohup and background execution
+                    // This ensures the process truly runs in background
+                    var bashCommand = $"cd {_scriptPath.LoanAdvancement} && nohup {scriptPath} > {logPath} 2>&1 & echo $!";
+
+                    processInfo = new ProcessStartInfo
+                    {
+                        FileName = "/bin/bash",
+                        Arguments = $"-c \"{bashCommand}\"",
+                        WorkingDirectory = _scriptPath.LoanAdvancement,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+
+                    //// Set environment variables (as backup)
+                    //processInfo.Environment["DISPLAY"] = ":1";
+                    //processInfo.Environment["HOME"] = Environment.GetEnvironmentVariable("HOME") ?? "/root";
+                }
+
+                var process = Process.Start(processInfo);
+
+                if (process == null)
+                {
+                    return StatusCode(500, new { success = false, error = "Failed to start process" });
+                }
+
+                // 🎯 KEY FIX: Return immediately, don't wait for completion
+                // The script runs in background
+
+                // Optional: Log PID for tracking
+                int pid = process.Id;
+
+                // Optional: Read initial output in background (don't await)
+                if (!OperatingSystem.IsWindows())
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            string output = await process.StandardOutput.ReadToEndAsync();
+                            string error = await process.StandardError.ReadToEndAsync();
+
+                            // Log output/errors for debugging
+                            Console.WriteLine($"[Automation PID:{pid}] Output: {output}");
+                            if (!string.IsNullOrEmpty(error))
+                            {
+                                Console.WriteLine($"[Automation PID:{pid}] Error: {error}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[Automation PID:{pid}] Logging error: {ex.Message}");
+                        }
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Loan automation started successfully",
+                    pid = pid // Return process ID for tracking
+                });
+            }
+            catch (Exception ex)
+            {
+                await _commonFns.LogErrors(ex, nameof(RunSeleniumScript), nameof(AuthController));
+                return StatusCode(500, new { success = false, error = ex.Message, stackTrace = ex.StackTrace });
+            }
+        }
+
+
+
         private void GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession)
         {
             var user = _httpContextAccessor.HttpContext!.User!;
@@ -359,5 +500,9 @@ namespace BankingPlatform.API.Controllers
             _commonClass.sessionId = sessionId;
             _commonClass.isFirstSession = isFirstSession;
         }
+    }
+    public class ScriptPath
+    {
+        public string LoanAdvancement { get; set; } = ""!;
     }
 }

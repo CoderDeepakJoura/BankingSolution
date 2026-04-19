@@ -15,12 +15,10 @@ namespace BankingPlatform.API.Controllers.AccountMasters
     {
         private readonly FDAccountService _service;
         private readonly CommonFunctions _commonfunctions;
-        private readonly ImageService _imageService;
-        public FDAccountMasterController(FDAccountService service, CommonFunctions commonfunctions, ImageService imageService)
+        public FDAccountMasterController(FDAccountService service, CommonFunctions commonfunctions)
         {
             _service = service;
             _commonfunctions = commonfunctions;
-            _imageService = imageService;
         }
 
         [HttpPost]
@@ -73,12 +71,12 @@ namespace BankingPlatform.API.Controllers.AccountMasters
             }
         }
 
-        [HttpGet("{id}/{branchId}")]
-        public async Task<IActionResult> GetFDAccountById(int id, int branchId)
+        [HttpGet("{id}/{branchId}/{currentDate?}")]
+        public async Task<IActionResult> GetFDAccountById(int id, int branchId, string? currentDate)
         {
             try
             {
-                var result = await _service.GetFDAccountByIdAsync(id, branchId);
+                var result = !string.IsNullOrEmpty(currentDate) ?  await _service.GetFDAccountMatureOrPreMatureDetailByIdAsync(id, branchId, Convert.ToDateTime(currentDate)) : await _service.GetFDAccountByIdAsync(id, branchId);
                 if (result == null) return NotFound();
                 return Ok(new
                 {
@@ -140,6 +138,60 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                 {
                     Success = false,
                     Message = "Some error occured while deleting fd account."
+                });
+            }
+        }
+
+        [HttpPost("mature-or-renew-fd")]
+        public async Task<IActionResult> MatureFD([FromBody] CommonAccMasterDTO dto)
+        {
+            try
+            {
+
+                var result = await _service.MatureOrRenewFDAsync(
+                    dto!
+                );
+                if (result.ToLower() != "success") return BadRequest(new ResponseDto { Success = false, Message = result });
+                return Ok(new ResponseDto
+                {
+                    Success = true,
+                    Message = "FD Account" + (dto.MatureOrRenewFDInfo!.IsRenew ? "renewed" : "matured") + " successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                await _commonfunctions.LogErrors(ex, nameof(MatureFD), nameof(FDAccountMasterController));
+                return BadRequest(new ResponseDto
+                {
+                    Success = false,
+                    Message = "Some error occured."
+                });
+            }
+        }
+
+        [HttpPost("premature-fd")]
+        public async Task<IActionResult> PreMatureFD([FromBody] CommonAccMasterDTO dto)
+        {
+            try
+            {
+
+                var result = await _service.PreMatureFDAsync(
+                    dto!
+                );
+                if (result.ToLower() != "success") return BadRequest(new ResponseDto { Success = false, Message = result });
+                return Ok(new ResponseDto
+                {
+                    Success = true,
+                    Message = "FD Account pre-matured successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                await _commonfunctions.LogErrors(ex, nameof(PreMatureFD), nameof(FDAccountMasterController));
+                return BadRequest(new ResponseDto
+                {
+                    Success = false,
+                    Message = "Some error occured while pre-maturing fd account."
                 });
             }
         }

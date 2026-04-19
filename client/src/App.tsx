@@ -85,6 +85,30 @@ import FDSlab from "./pages/Slabs/FD/fdslab";
 import FDAccMaster from "./pages/accountMasters/FD/fd-master";
 import FDAccOperations from "./pages/accountMasters/FD/fd-operations";
 import FDAccData from "./pages/accountMasters/FD/fd-data";
+import SeleniumAutomation from "./pages/seleniumautomation/automation";
+import LoanAdvancementDemo from "./pages/vouchers/Loan/loanadvancement";
+import MatureFDPage from "./pages/FixedDeposit/MatureFD/mature-fd";
+import PreMatureFDPage from "./pages/FixedDeposit/PreMatureFD/pre-mature";
+import RDAccountMaster from "./pages/accountMasters/RD/rd-master";
+import RDProductInterestSlab from "./pages/InterestSlabs/RD/rdslab";
+import SlabOperationsRD from "./pages/InterestSlabs/RD/slab-operations";
+import RDSlabData from "./pages/InterestSlabs/RD/slab-data";
+import RDProduct from "./pages/products/RD/rdproduct-master";
+import RDProductOperations from "./pages/products/RD/rdproduct-operations";
+import RDProductData from "./pages/products/RD/rdproduct-data";
+import RDProductBranchwiserule from "./pages/branchwiserule/RD/branchwiserule";
+import RDAccOperations from "./pages/accountMasters/RD/rd-operations";
+import RDAccData from "./pages/accountMasters/RD/rd-data";
+import MatureRDPage from "./pages/RecurringDeposit/mature-rd";
+import PrematureRDPage from "./pages/RecurringDeposit/premature-rd";
+import RDKistVoucher from "./pages/vouchers/RD/rdkist";
+import LoanProduct from "./pages/products/Loan/loanproduct-master";
+import LoanProductOperations from "./pages/products/Loan/loanproduct-operations";
+import LoanProductData from "./pages/products/Loan/loanproduct-data";
+import LoanProductBranchWiseRule from "./pages/branchwiserule/Loan/branchwiserule";
+import LoanInterestSlab from "./pages/InterestSlabs/Loan/loanslab";
+import LoanSlabModule from "./pages/InterestSlabs/Loan/loanslab-operations";
+import LoanSlabData from "./pages/InterestSlabs/Loan/loanslab-data";
 
 export default function App() {
   const user = useSelector((state: RootState) => state.user);
@@ -199,18 +223,33 @@ export default function App() {
           element={<SavingSlabOperations />}
         />
         <Route path="/saving-acc-master" element={<SavingAccMaster />} />
-        <Route path="/saving-acc-master/:accountId" element={<SavingAccMaster />} />
-        <Route path="/saving-acc-operations" element={<SavingAccOperations />} />
+        <Route
+          path="/saving-acc-master/:accountId"
+          element={<SavingAccMaster />}
+        />
+        <Route
+          path="/saving-acc-operations"
+          element={<SavingAccOperations />}
+        />
         <Route path="/saving-acc-info" element={<SavingAccData />} />
         <Route path="/branchmaster" element={<BranchMaster />} />
         {/* <Route path="/saving-acc-master/:accountId" element={<BranchMaster />} /> */}
-        <Route path="/branchmaster-operations" element={<BranchMasterOperations />} />
+        <Route
+          path="/branchmaster-operations"
+          element={<BranchMasterOperations />}
+        />
         <Route path="/branchmaster-info" element={<BranchMasterData />} />
-        <Route path="/saving-deposit-voucher" element={<SavingDepositVoucher />} />
-        <Route path="/saving-withdrawal-voucher" element={<SavingWithdrawalVoucher />} />
+        <Route
+          path="/saving-deposit-voucher"
+          element={<SavingDepositVoucher />}
+        />
+        <Route
+          path="/saving-withdrawal-voucher"
+          element={<SavingWithdrawalVoucher />}
+        />
         <Route path="/voucher-operations" element={<VoucherModule />} />
         <Route path="/close-saving-account" element={<CloseSavingAccount />} />
-         <Route
+        <Route
           path="/fdproduct-interest-slab"
           element={<FDProductInterestSlab />}
         />
@@ -219,35 +258,60 @@ export default function App() {
           element={<FDProductInterestSlab />}
         />
         <Route path="/fd-interest-slab-info" element={<FDInterestSlabData />} />
-        
-        <Route
-          path="/slab-operations"
-          element={<FDInterestSlabOperations />}
-        />
+
+        <Route path="/slab-operations" element={<FDInterestSlabOperations />} />
         <Route
           path="/fd-slab-operations"
           element={<FDProductSlabOperations />}
         />
-        <Route
-          path="/fdproduct-slab"
-          element={<FDSlab />}
-        />
-        <Route
-          path="/fdproduct-slab/:slabId"
-          element={<FDSlab />}
-        />
+        <Route path="/fdproduct-slab" element={<FDSlab />} />
+        <Route path="/fdproduct-slab/:slabId" element={<FDSlab />} />
         <Route
           path="/fd-product-slab-operations"
           element={<SlabOperationsFD />}
         />
         <Route path="/fd-slab-info" element={<FDSlabData />} />
-                
+
         <Route path="/fd-acc-master" element={<FDAccMaster />} />
         <Route path="/fd-acc-master/:accountId" element={<FDAccMaster />} />
         <Route path="/fd-acc-operations" element={<FDAccOperations />} />
         <Route path="/fd-acc-info" element={<FDAccData />} />
+        <Route path="/automate-data" element={<SeleniumAutomation />} />
+        <Route path="/loan-advancement" element={<LoanAdvancementDemo />} />
+        <Route path="/mature-fd-account" element={<MatureFDPage />} />
+        <Route path="/premature-fd-account" element={<PreMatureFDPage />} />
+        <Route path="/rd-acc-master" element={<RDAccountMaster />} />
+        <Route path="/rd-acc-master/:accountId" element={<RDAccountMaster />} />
+        <Route path="/rd-acc-operations" element={<RDAccOperations />} />
+        <Route path="/rd-acc-info" element={<RDAccData />} />
+        <Route path="/rd-interest-slab" element={<RDProductInterestSlab />} />
+        <Route path="/rd-slab-operations" element={<SlabOperationsRD />} />
+        <Route path="/rd-slab-info" element={<RDSlabData />} />
+        <Route
+          path="/rd-interest-slab/:slabId"
+          element={<RDProductInterestSlab />}
+        />
+        <Route path="/rd-product" element={<RDProduct />} />
+        <Route path="/rd-product/:productId" element={<RDProduct />} />
+        <Route path="/rdproduct-operations" element={<RDProductOperations />} />
+        <Route path="/rdproduct-info" element={<RDProductData />} />
+        <Route
+          path="/rd-productbranchwise-rule"
+          element={<RDProductBranchwiserule />}
+        />
+        <Route path="/mature-rd-account" element={<MatureRDPage />} />
+        <Route path="/premature-rd-account" element={<PrematureRDPage />} />
+        <Route path="/rd-kist-voucher" element={<RDKistVoucher />} />
+        <Route path="/loan-product" element={<LoanProduct />} />
+        <Route path="/loan-product/:productId" element={<LoanProduct />} />
+        <Route path="/loanproduct-operations" element={<LoanProductOperations />} />
+        <Route path="/loanproduct-info" element={<LoanProductData />} />
+        <Route path="/loan-productbranchwise-rule" element={<LoanProductBranchWiseRule />} />
+        <Route path="/loan-interest-slab" element={<LoanInterestSlab />} />
+        <Route path="/loan-interest-slab/:slabId" element={<LoanInterestSlab />} />
+        <Route path="/loan-slab-operations" element={<LoanSlabModule />} />
+        <Route path="/loan-slab-info" element={<LoanSlabData />} />
       </Routes>
-      
     </BrowserRouter>
   );
 }

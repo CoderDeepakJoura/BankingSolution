@@ -120,7 +120,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               sessionInfo: data.sessionInfo,
               sessionId: data.sessionId,
               isFirstSession: data.isFirstSession,
-            })
+            }),
           );
         } else {
           navigate("/session-expired");
@@ -146,7 +146,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           if (
             subItem.path === currentPath ||
             subItem.subItems?.some(
-              (thirdItem) => thirdItem.path === currentPath
+              (thirdItem) => thirdItem.path === currentPath,
             )
           ) {
             setExpandedItems((prev) => ({ ...prev, [item.label]: true }));
@@ -179,7 +179,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const handleItemClick = (
     label: string,
     hasSubItems: boolean,
-    path?: string
+    path?: string,
   ) => {
     if (hasSubItems) {
       toggleExpand(label);
@@ -228,7 +228,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Thana Master", path: "/thana-operations" },
             { label: "Village Master", path: "/village-operations" },
             { label: "Zone Master", path: "/zone-operations" },
-            
           ],
         },
         {
@@ -241,25 +240,40 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Product Interest Slabs", path: "/slab-operations" },
             { label: "Product Slabs", path: "/fd-slab-operations" },
             { label: "Settings Master", path: "/settings" },
-           
+            { label: "Data Automation", path: "/automate-data" },
+
             // { label: "Zone Master", path: "/zone-operations" },
             // { label: "Village Master", path: "/village-operations" },
           ],
         },
-         {
+        {
           label: "Branch Wise Rules",
           path: "",
           subItems: [
-            { label: "Saving Product BranchWise Rule", path: "/saving-productbranchwise-rule" },
-             { label: "FD Product BranchWise Rule", path: "/fd-productbranchwise-rule" },
+            {
+              label: "Saving Product BranchWise Rule",
+              path: "/saving-productbranchwise-rule",
+            },
+            {
+              label: "FD Product BranchWise Rule",
+              path: "/fd-productbranchwise-rule",
+            },
+            {
+              label: "RD Product BranchWise Rule",
+              path: "/rd-productbranchwise-rule",
+            },
+            {
+              label: "Loan Product BranchWise Rule",
+              path: "/loan-productbranchwise-rule",
+            },
           ],
         },
         ,
-         {
+        {
           label: "Vouchers",
           path: "",
           subItems: [
-            { label: "Voucher Operations", path: "/voucher-operations" }
+            { label: "Voucher Operations", path: "/voucher-operations" },
           ],
         },
         // { label: "Sales", path: "/modules/sales" },
@@ -419,7 +433,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
             <nav
               className="flex-1 overflow-y-auto overflow-x-hidden"
-              style={{ maxHeight: "calc(100vh - 140px)", paddingBottom: "13px" }}
+              style={{
+                maxHeight: "calc(100vh - 140px)",
+                paddingBottom: "13px",
+              }}
             >
               <div className="min-h-full pb-4">
                 {menuItems.map((item) => {
@@ -430,8 +447,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         (subItem) =>
                           activePath === subItem.path ||
                           subItem.subItems?.some(
-                            (thirdItem) => activePath === thirdItem.path
-                          )
+                            (thirdItem) => activePath === thirdItem.path,
+                          ),
                       ));
                   return (
                     <MenuItem

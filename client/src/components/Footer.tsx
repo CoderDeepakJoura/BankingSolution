@@ -7,7 +7,7 @@ const Footer = () => {
         <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-xs text-gray-600">
           {/* Left: Links */}
           <div className="flex flex-wrap justify-center md:justify-start gap-4">
-            <span>© {new Date().getFullYear()} SecureBank Ltd.</span>
+            <span>© {new Date().getFullYear()} Sicswave FinCore Ltd.</span>
             <a href="#" className="hover:text-blue-600 transition">Privacy Policy</a>
             <a href="#" className="hover:text-blue-600 transition">Terms of Service</a>
             <a href="#" className="hover:text-blue-600 transition">Security</a>

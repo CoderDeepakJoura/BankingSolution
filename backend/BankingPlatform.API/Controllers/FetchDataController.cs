@@ -1,4 +1,5 @@
-﻿using BankingPlatform.API.Common;
+﻿using Azure;
+using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.AccountHead;
@@ -12,6 +13,7 @@ using BankingPlatform.API.DTO.Location.State;
 using BankingPlatform.API.DTO.Location.Tehsil;
 using BankingPlatform.API.DTO.Location.Village;
 using BankingPlatform.API.DTO.Miscalleneous;
+using BankingPlatform.API.DTO.ProductMasters.RD;
 using BankingPlatform.API.DTO.ProductMasters.Saving;
 using BankingPlatform.API.DTO.Settings;
 using BankingPlatform.API.Service.AccountMasters;
@@ -19,6 +21,7 @@ using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.InterestSlabs.FD;
 using BankingPlatform.Infrastructure.Models.member;
+using BankingPlatform.Infrastructure.Models.ProductMasters.RD;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -36,11 +39,13 @@ namespace BankingPlatform.API.Controllers
         private readonly BankingDbContext _context;
         private readonly CommonFunctions _commonFunctions;
         private readonly FDAccountService _fdAccountService;
-        public FetchDataController(BankingDbContext context, CommonFunctions commonFunctions, FDAccountService fdAccountService ) 
+        private readonly RDAccountService _rdAccountService;
+        public FetchDataController(BankingDbContext context, CommonFunctions commonFunctions, FDAccountService fdAccountService, RDAccountService rdAccountService)
         {
             _context = context;
             _commonFunctions = commonFunctions;
             _fdAccountService = fdAccountService;
+            _rdAccountService = rdAccountService;
         }
 
         [HttpPost("get_all_accountheadtypes")]
@@ -645,67 +650,139 @@ namespace BankingPlatform.API.Controllers
         [HttpGet("account-info-for-deposit-accounts/{branchId}/{accountId}/{accountType}/{isClosed}")]
         public async Task<IActionResult> DepositAccountsInfoFromDepositAccount([FromRoute] int branchId, int accountId, int accountType, bool isClosed = false)
         {
-            
             if(branchId > 0 && accountId > 0 && accountType > 0)
             {
-                var memberInfo = await (from p in _context.accountmaster.AsNoTracking()
-                                        join q in _context.savingproduct.AsNoTracking()
-                                            on new { productId = (int)p.GeneralProductId!, branchId = p.BranchId }
-                                            equals new { productId = q.Id, branchId = q.BranchId }
-                                        join k in _context.member.AsNoTracking()
-                                            on new { memberId = (int)p.MemberId!, memberBranchId = (int)p.MemberBranchID! }
-                                            equals new { memberId = k.Id, memberBranchId = k.BranchId }
-                                        join l in _context.savingproductrules.AsNoTracking()
-                                            on new { productId = q.Id, branchId = q.BranchId }
-                                            equals new { productId = l.SavingsProductId, branchId = l.BranchId }
-                                        join h in _context.memberdocdetails.AsNoTracking()
-                                            on new { memberId = k.Id, memberBranchId = k.BranchId }
-                                            equals new { memberId = h.MemberId, memberBranchId = h.BranchId }
-                                        join m in _context.memberlocationdetails.AsNoTracking()
-                                            on new { memberId = k.Id, memberBranchId = k.BranchId }
-                                            equals new { memberId = m.MemberId, memberBranchId = m.BranchId }
-                                        join accdocdet in _context.accountdocdetails on new { accountId = p.ID, accountBranchId = p.BranchId }
-                                        equals new { accountId = accdocdet.AccountId, accountBranchId = accdocdet.BranchId }
-                                            // LEFT JOIN for nominee details
-                                        join f in _context.membernomineedetails.AsNoTracking()
-                                            on new { memberId = k.Id, memberBranchId = k.BranchId }
-                                            equals new { memberId = f.MemberId, memberBranchId = f.BranchId }
-                                            into nomineeDetailsGroup
-                                        from nominee in nomineeDetailsGroup.DefaultIfEmpty()
-                                        where p.BranchId == branchId
-                                            && p.ID == accountId
-                                            && p.AccTypeId == accountType
-                                            && p.IsAccClosed == isClosed
-                                        select new
-                                        {
-                                            MemberName = k.MemberName,
-                                            RelativeName = k.RelativeName,
-                                            MemberShipNo = k.MemberType == (int)Enums.MemberType.Permanent
-                                                ? k.PermanentMembershipNo
-                                                : k.NominalMembershipNo,
-                                            AccountOpeningDate = p.AccOpeningDate.ToString("dd-MMM-yyyy"),
-                                            MinimumBalanceRequired = l.MinBalanceAmt,
-                                            Address = m.AddressLine1 ?? "",
-                                            ContactNo = k.PhoneNo1,
-                                            EmailId = k.Email1,
-                                            AadhaarNo = h.AadhaarCardNo,
-                                            PANCardNo = h.PanCardNo,
-                                            nomineeDetails = nominee != null ? new
-                                            {
-                                                NomineeName = nominee.NomineeName,
-                                            } : null,
-                                            MemberId = k.Id,
-                                            MemberBrId = k.BranchId,
-                                            AccountPicExt = accdocdet.PicExt,
-                                            AccountSignExt = accdocdet.SignExt
-                                        }).FirstOrDefaultAsync();
-
-                return Ok(new
+                if (accountType == (int)Enums.AccountTypes.Saving)
                 {
-                    Success = true,
-                    data = memberInfo
-                });
+                    var memberInfo = await (from p in _context.accountmaster.AsNoTracking()
+                                            join q in _context.savingproduct.AsNoTracking()
+                                                on new { productId = (int)p.GeneralProductId!, branchId = p.BranchId }
+                                                equals new { productId = q.Id, branchId = q.BranchId }
+                                            join k in _context.member.AsNoTracking()
+                                                on new { memberId = (int)p.MemberId!, memberBranchId = (int)p.MemberBranchID! }
+                                                equals new { memberId = k.Id, memberBranchId = k.BranchId }
+                                            join l in _context.savingproductrules.AsNoTracking()
+                                                on new { productId = q.Id, branchId = q.BranchId }
+                                                equals new { productId = l.SavingsProductId, branchId = l.BranchId }
+                                            join h in _context.memberdocdetails.AsNoTracking()
+                                                on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                                equals new { memberId = h.MemberId, memberBranchId = h.BranchId }
+                                            join m in _context.memberlocationdetails.AsNoTracking()
+                                                on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                                equals new { memberId = m.MemberId, memberBranchId = m.BranchId }
+                                            join accdocdet in _context.accountdocdetails on new { accountId = p.ID, accountBranchId = p.BranchId }
+                                            equals new { accountId = accdocdet.AccountId, accountBranchId = accdocdet.BranchId }
+                                            // LEFT JOIN for nominee details
+                                            join f in _context.membernomineedetails.AsNoTracking()
+                                                on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                                equals new { memberId = f.MemberId, memberBranchId = f.BranchId }
+                                                into nomineeDetailsGroup
+                                            from nominee in nomineeDetailsGroup.DefaultIfEmpty()
+                                            where p.BranchId == branchId
+                                                && p.ID == accountId
+                                                && p.AccTypeId == accountType
+                                                && p.IsAccClosed == isClosed
+                                            select new
+                                            {
+                                                MemberName = k.MemberName,
+                                                RelativeName = k.RelativeName,
+                                                MemberShipNo = k.MemberType == (int)Enums.MemberType.Permanent
+                                                    ? k.PermanentMembershipNo
+                                                    : k.NominalMembershipNo,
+                                                AccountOpeningDate = p.AccOpeningDate.ToString("dd-MMM-yyyy"),
+                                                MinimumBalanceRequired = l.MinBalanceAmt,
+                                                Address = m.AddressLine1 ?? "",
+                                                ContactNo = k.PhoneNo1,
+                                                EmailId = k.Email1,
+                                                AadhaarNo = h.AadhaarCardNo,
+                                                PANCardNo = h.PanCardNo,
+                                                nomineeDetails = nominee != null ? new
+                                                {
+                                                    NomineeName = nominee.NomineeName,
+                                                } : null,
+                                                MemberId = k.Id,
+                                                MemberBrId = k.BranchId,
+                                                AccountPicExt = accdocdet.PicExt,
+                                                AccountSignExt = accdocdet.SignExt
+                                            }).FirstOrDefaultAsync();
 
+                    return Ok(new
+                    {
+                        Success = true,
+                        data = memberInfo
+                    });
+                }
+                else if(accountType == (int)Enums.AccountTypes.RD)
+                {
+                    var memberInfo = await (from p in _context.accountmaster.AsNoTracking()
+                                            join q in _context.rdproduct.AsNoTracking()
+                                                on new { productId = (int)p.GeneralProductId!, branchId = p.BranchId }
+                                                equals new { productId = q.Id, branchId = q.BrId }
+                                            join k in _context.member.AsNoTracking()
+                                                on new { memberId = (int)p.MemberId!, memberBranchId = (int)p.MemberBranchID! }
+                                                equals new { memberId = k.Id, memberBranchId = k.BranchId }
+                                            join h in _context.memberdocdetails.AsNoTracking()
+                                                on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                                equals new { memberId = h.MemberId, memberBranchId = h.BranchId }
+                                            join m in _context.memberlocationdetails.AsNoTracking()
+                                                on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                                equals new { memberId = m.MemberId, memberBranchId = m.BranchId }
+                                            join n in _context.rdaccountdetail.AsNoTracking()
+                                                on new { accountId = p.ID, branchId = p.BranchId }
+                                                equals new { accountId = (int)n.AccId, branchId = n.BrId }
+                                                // LEFT JOIN for nominee details
+                                            join f in _context.membernomineedetails.AsNoTracking()
+                                                on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                                equals new { memberId = f.MemberId, memberBranchId = f.BranchId }
+                                                into nomineeDetailsGroup
+                                            from nominee in nomineeDetailsGroup.DefaultIfEmpty()
+                                            where p.BranchId == branchId
+                                                && p.ID == accountId
+                                                && p.AccTypeId == accountType
+                                                && p.IsAccClosed == isClosed
+                                            select new
+                                            {
+                                                MemberName = k.MemberName,
+                                                RelativeName = k.RelativeName,
+                                                MemberShipNo = k.MemberType == (int)Enums.MemberType.Permanent
+                                                    ? k.PermanentMembershipNo
+                                                    : k.NominalMembershipNo,
+                                                AccountOpeningDate = p.AccOpeningDate.ToString("dd-MMM-yyyy"),
+                                                Address = m.AddressLine1,
+                                                ContactNo = k.PhoneNo1,
+                                                EmailId = k.Email1,
+                                                AadhaarNo = h.AadhaarCardNo,
+                                                PANCardNo = h.PanCardNo,
+                                                nomineeDetails = nominee != null ? new
+                                                {
+                                                    NomineeName = nominee.NomineeName,
+                                                } : null,
+                                                MemberId = k.Id,
+                                                MemberBrId = k.BranchId,
+                                                AccountPicExt = h.MemberPicExt,
+                                                AccountSignExt = h.MemberSignExt,
+                                                rdDetails = new RDAccountDetailDTO
+                                                {
+                                                    RdNumber = n.RdNumber,
+                                                    InterestRate = n.InterestRate,
+                                                    FirstKistDate = n.FirstKistDate,
+                                                    MaturityDate = n.MaturityDate,
+                                                    KistAmt = n.KistAmt,
+                                                    RdAmount = n.RdAmount
+                                                }
+                                            }).FirstOrDefaultAsync();
+
+                    return Ok(new
+                    {
+                        Success = true,
+                        data = memberInfo
+                    });
+                }
+                return BadRequest(new ResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid parameters."
+                });
             }
             else
                 return BadRequest(new ResponseDto
@@ -876,6 +953,198 @@ namespace BankingPlatform.API.Controllers
             {
                 Success = true,
                 data = heads
+            }
+            );
+        }
+
+        [HttpGet("open-fd-accounts/{branchId}/{fdProductId}/{currentDate}")]
+        public async Task<IActionResult> OpenFDAccounts([FromRoute] int branchId, int fdProductId, DateTime currentDate)
+        {
+            int fdStatus = (int)Enums.FDStatus.Open;
+            int accountType = (int)Enums.AccountTypes.FD;
+            var fdAccounts = await (from p in _context.accountmaster
+                                    join q in _context.fdaccountdetail
+                                    on new { accId = p.ID, branchId = p.BranchId }
+                                    equals new { accId = q.AccountId, branchId = q.BranchId }
+                                    where p.BranchId == branchId && q.FDStatus == fdStatus
+                                    && p.GeneralProductId == fdProductId && p.AccTypeId == accountType
+                                    && q.FDMaturityDate <= currentDate
+                                    select new
+                                    {
+                                        AccId = p.ID,
+                                        AccountName = p.AccPrefix + "-" + p.AccSuffix + "-" + p.AccountName,
+                                    }
+                                    ).ToListAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = fdAccounts
+            }
+            );
+        }
+
+        [HttpGet("saving-accounts/{branchId}/{currentDate}")]
+        public async Task<IActionResult> SavingAccounts([FromRoute] int branchId, DateTime currentDate)
+        {
+            int accountType = (int)Enums.AccountTypes.Saving;
+            var savingAccounts = await (from p in _context.accountmaster
+                                    where p.AccTypeId == accountType
+                                    && p.AccOpeningDate <= currentDate
+                                    && p.IsAccClosed == false
+                                    select new
+                                    {
+                                        AccId = p.ID,
+                                        AccountName = p.AccPrefix + "-" + p.AccSuffix + "-" + p.AccountName,
+                                    }
+                                    ).ToListAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = savingAccounts
+            }
+            );
+        }
+
+        [HttpGet("fd-accounts-for-premature/{branchId}/{fdProductId}/{currentDate}")]
+        public async Task<IActionResult> FDOpenAccountsForPremature([FromRoute] int branchId, int fdProductId, DateTime currentDate)
+        {
+            int openStatus = (int)Enums.FDStatus.Open;
+            int accountType = (int)Enums.AccountTypes.FD;
+            var fdAccounts = await (from p in _context.accountmaster
+                                    join q in _context.fdaccountdetail
+                                    on new { accId = p.ID, branchId = p.BranchId }
+                                    equals new { accId = q.AccountId, branchId = q.BranchId }
+                                    where p.BranchId == branchId
+                                    && p.GeneralProductId == fdProductId && p.AccTypeId == accountType
+                                    && q.FDStatus == openStatus
+                                    && p.AccOpeningDate <= currentDate
+                                    && q.FDMaturityDate < currentDate
+                                    select new
+                                    {
+                                        AccId = p.ID,
+                                        AccountName = p.AccPrefix + "-" + p.AccSuffix + "-" + p.AccountName,
+                                    }
+                                    ).ToListAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = fdAccounts
+            }
+            );
+        }
+
+        [HttpGet("rd-products/{branchId}")]
+        public async Task<IActionResult> RDProducts([FromRoute] int branchId)
+        {
+            var productInfo = await _context.rdproduct.Where(x => x.BrId == branchId).Select(x => new RDProductDTO
+            {
+                ProductName = x.ProductCode + "-" + x.ProductName,
+                Id = x.Id
+            }).ToListAsync();
+
+            return Ok(new
+            {
+                Success = true,
+                data = productInfo
+            });
+        }
+
+        [HttpGet("loan-products/{branchId}")]
+        public async Task<IActionResult> LoanProducts([FromRoute] int branchId)
+        {
+            var productInfo = await _context.loanproduct.Where(x => x.BrId == branchId)
+                .Select(x => new { id = x.Id, productName = x.Code + "-" + x.ProductName })
+                .ToListAsync();
+            return Ok(new { Success = true, data = productInfo });
+        }
+
+        [HttpGet("fetch-rd-prefix-and-suffix/{branchId}/{productId}")]
+        public async Task<IActionResult> RDPrefixAndSuffix([FromRoute] int branchId, int productId)
+        {
+            int accountType = (int)Enums.AccountTypes.RD;
+            var prefix = await _context.rdproduct.Where(x => x.Id == productId && x.BrId == branchId)
+                .Select(x => x.ProductCode).FirstOrDefaultAsync() ?? "";
+            var accountMasterInfo = await _context.accountmaster.Where(x => x.BranchId == branchId && x.GeneralProductId == productId && x.AccTypeId == accountType)
+                .Select(x => new { x.AccPrefix, x.AccSuffix }).ToListAsync();
+            var suffix = accountMasterInfo.Select(x => x.AccSuffix).Max() + 1 ?? 1;
+            return Ok(new
+            {
+                Success = true,
+                data = prefix + "-" + suffix
+            });
+
+        }
+
+        [HttpGet("fetch-rd-related-info/{rdDate}/{periodInMonths}/{productId}/{kistAmount}/{branchId}/{intCompoundingInterval}")]
+        public async Task<IActionResult> CalculateRDRelatedInfo([FromRoute] DateTime rdDate, int periodInMonths, int productId, decimal kistAmount, int branchId, int intCompoundingInterval)
+        {
+            DateTime maturityDate = await _rdAccountService.CalculateMaturityDate(rdDate, periodInMonths, 0);
+            (decimal intRate, string slabName, string compoundingInterval, int IcompoundingInterval, int slabId) = await _rdAccountService.SlabInfo(kistAmount, periodInMonths, rdDate, productId, intCompoundingInterval);
+            decimal maturityAmount = await _rdAccountService.CalculateMaturityAmount(kistAmount, intRate, rdDate, maturityDate, productId, branchId, intCompoundingInterval);
+
+            return Ok(new
+            {
+                Success = true,
+                data = new
+                {
+                    maturityDate = maturityDate,
+                    interestRate = intRate,
+                    slabName = slabName,
+                    compoundingInterval = compoundingInterval,
+                    maturityAmount = maturityAmount,
+                    slabId = slabId
+                }
+            });
+        }
+
+        [HttpGet("open-rd-accounts/{branchId}/{rdProductId}/{currentDate}")]
+        public async Task<IActionResult> OpenRDAccounts([FromRoute] int branchId, int rdProductId, DateTime currentDate)
+        {
+            int rdStatus = (int)Enums.FDStatus.Open;
+            int accountType = (int)Enums.AccountTypes.RD;
+            var rdAccounts = await (from p in _context.accountmaster
+                                    join q in _context.rdaccountdetail
+                                    on new { accId = p.ID, branchId = p.BranchId }
+                                    equals new { accId = (int)q.AccId!, branchId = q.BrId }
+                                    where p.BranchId == branchId && q.Status == rdStatus
+                                    && p.GeneralProductId == rdProductId && p.AccTypeId == accountType
+                                    && q.MaturityDate <= currentDate
+                                    select new
+                                    {
+                                        AccId = p.ID,
+                                        AccountName = p.AccPrefix + "-" + p.AccSuffix + "-" + p.AccountName,
+                                    }
+                                    ).ToListAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = rdAccounts
+            }
+            );
+        }
+
+        [HttpGet("open-rd-accounts-for-premature/{branchId}/{rdProductId}/{currentDate}")]
+        public async Task<IActionResult> OpenRDAccountsForPreMature([FromRoute] int branchId, int rdProductId, DateTime currentDate)
+        {
+            int rdStatus = (int)Enums.FDStatus.Open;
+            int accountType = (int)Enums.AccountTypes.RD;
+            var rdAccounts = await (from p in _context.accountmaster
+                                    join q in _context.rdaccountdetail
+                                    on new { accId = p.ID, branchId = p.BranchId }
+                                    equals new { accId = (int)q.AccId!, branchId = q.BrId }
+                                    where p.BranchId == branchId && q.Status == rdStatus
+                                    && p.GeneralProductId == rdProductId && p.AccTypeId == accountType
+                                    && q.MaturityDate > currentDate
+                                    select new
+                                    {
+                                        AccId = p.ID,
+                                        AccountName = p.AccPrefix + "-" + p.AccSuffix + "-" + p.AccountName,
+                                    }
+                                    ).ToListAsync();
+            return Ok(new
+            {
+                Success = true,
+                data = rdAccounts
             }
             );
         }

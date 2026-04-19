@@ -585,7 +585,7 @@ class commonService extends ApiService {
       }
     );
   }
-   async get_FD_Prefix_And_Suffix(branchId: Number, productId: Number): Promise<ApiResponse<any>> {
+  async get_FD_Prefix_And_Suffix(branchId: Number, productId: Number): Promise<ApiResponse<any>> {
     return this.makeRequest<AuthResponse>(
       `/fetchdata/fetch-fd-prefix-and-suffix/${branchId}/${productId}`,
       {
@@ -596,6 +596,108 @@ class commonService extends ApiService {
       }
     );
   }
+  async get_RD_Prefix_And_Suffix(branchId: Number, productId: Number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/fetch-rd-prefix-and-suffix/${branchId}/${productId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  async fetch_FD_Open_Accounts(branchId: Number, productId: Number, currentDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/open-fd-accounts/${branchId}/${productId}/${currentDate}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  async fetch_RD_Open_Accounts(branchId: Number, productId: Number, currentDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/open-rd-accounts/${branchId}/${productId}/${currentDate}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  async fetch_RD_Open_Accounts_For_Premature(branchId: Number, productId: Number, currentDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/open-rd-accounts-for-premature/${branchId}/${productId}/${currentDate}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  async fetch_Saving_Accounts(branchId: Number, currentDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/saving-accounts/${branchId}/${currentDate}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  async fetch_FD_Open_Accounts_For_Premature(branchId: Number, productId: Number, currentDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/fd-accounts-for-premature/${branchId}/${productId}/${currentDate}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  async fetch_rd_products(branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/rd-products/${branchId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  async fetch_loan_products(branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/loan-products/${branchId}`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+async fetch_rd_related_info(rdDate : string, periodInMonths: Number, productId: Number, amount: Number, branchId: Number, compoundingInterval: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/fetch-rd-related-info/${rdDate}/${periodInMonths}/${productId}/${amount}/${branchId}/${compoundingInterval}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+  
 }
+
 
 export default new commonService();

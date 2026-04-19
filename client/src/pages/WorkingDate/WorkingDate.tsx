@@ -41,6 +41,15 @@ const WorkingDateMaster: React.FC = () => {
   const calendarRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  // ✅ FIX 1: Always use real system date — never use commonservice.getTodaysDate()
+  // commonservice.getTodaysDate() returns the previously SAVED working date (e.g. 12-04-2013),
+  // NOT the actual current date. Using it caused wrong maxDate and empty year dropdowns.
+  const getRealToday = (): Date => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  };
+
   const validate_token = async () => {
     try {
       await api.get_login_info();
@@ -48,17 +57,6 @@ const WorkingDateMaster: React.FC = () => {
       if (err.message === "Unauthorized") {
         navigate("/session-expired");
       }
-    }
-  };
-
-  // ✅ Get today's date from your commonservice
-  const getTodaysDate = (): Date => {
-    try {
-      const dateString = commonservice.getTodaysDate();
-      return new Date(dateString);
-    } catch (error) {
-      console.error("Failed to get today's date:", error);
-      return new Date();
     }
   };
 
@@ -91,82 +89,108 @@ const WorkingDateMaster: React.FC = () => {
     }
   };
 
+  // ✅ FIX 2: Full reset of all date state before applying new session
+  // Previously, stale selectedDate / sessionDateRange from a previous session would
+  // linger and cause incorrect calendar rendering on session switch.
+  const resetDateState = () => {
+    setSelectedDate(null);
+    setSessionDateRange(null);
+    setIsCalendarOpen(false);
+    setCurrentMonth(new Date());
+  };
+
   const handleSessionChange = (sessionId: number) => {
     console.log("Selected Session ID:", sessionId);
 
+    // ✅ Always reset date state first on any session change (including clearing)
+    resetDateState();
+
     if (!sessionId || isNaN(sessionId)) {
       setSelectedSession(null);
-      setSessionDateRange(null);
-      setSelectedDate(null);
-      setIsCalendarOpen(false);
       return;
     }
 
     setSelectedSession(sessionId);
-    setSelectedDate(null);
-    setIsCalendarOpen(false);
 
     const session = branchSessions.find((s) => s.id === sessionId);
     console.log("Found Session:", session);
 
-    if (session && session.branchSessionInfo) {
-      const parts = session.branchSessionInfo.split("-");
+    if (!session || !session.branchSessionInfo) {
+      console.error("Session not found or missing branchSessionInfo");
+      return;
+    }
 
-      if (parts.length !== 2) {
-        console.error("Invalid session format:", session.branchSessionInfo);
-        alert("Invalid session format. Expected format: YYYY-YYYY");
-        setSessionDateRange(null);
-        return;
-      }
+    const parts = session.branchSessionInfo.split("-");
 
-      const fromYear = parseInt(parts[0].trim());
-      const toYear = parseInt(parts[1].trim());
+    if (parts.length !== 2) {
+      console.error("Invalid session format:", session.branchSessionInfo);
+      Swal.fire("Error", "Invalid session format. Expected format: YYYY-YYYY", "error");
+      return;
+    }
 
-      if (isNaN(fromYear) || isNaN(toYear)) {
-        console.error("Failed to parse years");
-        alert("Failed to parse session years");
-        setSessionDateRange(null);
-        return;
-      }
+    const fromYear = parseInt(parts[0].trim());
+    const toYear = parseInt(parts[1].trim());
 
-      console.log("Parsed Years - From:", fromYear, "To:", toYear);
+    if (isNaN(fromYear) || isNaN(toYear) || fromYear >= toYear) {
+      console.error("Failed to parse years or invalid range:", fromYear, toYear);
+      Swal.fire("Error", "Invalid session year range", "error");
+      return;
+    }
 
-      const sessionStart = new Date(fromYear, 3, 1);
-      const sessionEnd = new Date(toYear, 2, 31);
+    console.log("Parsed Years - From:", fromYear, "To:", toYear);
 
-      // ✅ Get today's date from commonservice
-      const today = getTodaysDate();
-      today.setHours(0, 0, 0, 0);
+    // Financial year: April 1 of fromYear → March 31 of toYear
+    const sessionStart = new Date(fromYear, 3, 1);  // April 1, fromYear
+    const sessionEnd = new Date(toYear, 2, 31);     // March 31, toYear
 
-      const maxDate = sessionEnd > today ? today : sessionEnd;
+    // ✅ FIX 3: Use real system date (new Date()), NOT commonservice.getTodaysDate()
+    // commonservice returns the previously saved working date — using it caused
+    // maxDate to become a past date (e.g. 12-04-2013) making the range invalid.
+    const today = getRealToday();
 
-      console.log("Session Date Range:", {
-        sessionStart: sessionStart.toLocaleDateString(),
-        sessionEnd: sessionEnd.toLocaleDateString(),
-        today: today.toLocaleDateString(),
-        maxDate: maxDate.toLocaleDateString(),
-      });
+    // ✅ FIX 4: Corrected maxDate logic
+    // maxDate = the earlier of (sessionEnd, today)
+    // If today is before sessionEnd → maxDate = today (can't select future dates)
+    // If today is after sessionEnd → maxDate = sessionEnd (session has fully passed)
+    const maxDate = today <= sessionEnd ? today : sessionEnd;
 
-      setSessionDateRange({
-        sessionFrom: fromYear.toString(),
-        sessionTo: toYear.toString(),
-        minDate: sessionStart,
-        maxDate: maxDate,
-      });
+    // ✅ FIX 5: Validate that minDate is not after maxDate (edge case guard)
+    if (sessionStart > maxDate) {
+      console.warn("Session hasn't started yet or is entirely in the future");
+      Swal.fire(
+        "Warning",
+        `Session ${session.branchSessionInfo} has not started yet or is not accessible.`,
+        "warning"
+      );
+      setSelectedSession(null);
+      return;
+    }
 
-      setCurrentMonth(new Date(fromYear, 3, 1));
+    console.log("Session Date Range:", {
+      sessionStart: sessionStart.toLocaleDateString(),
+      sessionEnd: sessionEnd.toLocaleDateString(),
+      today: today.toLocaleDateString(),
+      maxDate: maxDate.toLocaleDateString(),
+    });
 
-      // ✅ Auto-select today's date if within range
-      if (today >= sessionStart && today <= maxDate) {
-        setSelectedDate(today);
-        setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-        console.log("Auto-selected today's date:", today.toLocaleDateString());
-      } else {
-        console.log("Today's date is outside session range");
-      }
+    const newSessionDateRange: SessionData = {
+      sessionFrom: fromYear.toString(),
+      sessionTo: toYear.toString(),
+      minDate: sessionStart,
+      maxDate: maxDate,
+    };
+
+    setSessionDateRange(newSessionDateRange);
+
+    // ✅ FIX 6: Auto-select today only if it falls within the valid session range
+    if (today >= sessionStart && today <= maxDate) {
+      setSelectedDate(today);
+      setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+      console.log("Auto-selected today's date:", today.toLocaleDateString());
     } else {
-      console.error("Session not found");
-      setSessionDateRange(null);
+      // Start calendar view at the beginning of the session
+      setCurrentMonth(new Date(fromYear, 3, 1));
+      console.log("Today is outside session range; no auto-selection.");
     }
   };
 
@@ -232,18 +256,19 @@ const WorkingDateMaster: React.FC = () => {
   const handleTodayDate = () => {
     if (!sessionDateRange) return;
 
-    const today = getTodaysDate();
-    today.setHours(0, 0, 0, 0);
+    // ✅ FIX 7: Use getRealToday() here too, not commonservice
+    const today = getRealToday();
 
-    if (
-      today >= sessionDateRange.minDate &&
-      today <= sessionDateRange.maxDate
-    ) {
+    if (today >= sessionDateRange.minDate && today <= sessionDateRange.maxDate) {
       setSelectedDate(today);
       setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
       setIsCalendarOpen(false);
     } else {
-      alert("Today's date is not within the selected session range");
+      Swal.fire(
+        "Out of Range",
+        "Today's date is not within the selected session range.",
+        "warning"
+      );
     }
   };
 
@@ -257,17 +282,29 @@ const WorkingDateMaster: React.FC = () => {
         const formattedDate = `${day}-${month}-${year}`;
         const sessionInfo = `${sessionDateRange?.sessionFrom}-${sessionDateRange?.sessionTo}`;
 
-        const result = await api.set_working_date(formattedDate, sessionInfo, selectedSession);
+        const result = await api.set_working_date(
+          formattedDate,
+          sessionInfo,
+          selectedSession
+        );
 
         if (!result.success) {
-          Swal.fire("Error", result.message || "Failed to set working date", "error");
+          Swal.fire(
+            "Error",
+            result.message || "Failed to set working date",
+            "error"
+          );
           return;
         } else {
           navigate("/dashboard");
         }
       }
     } catch (error: any) {
-      alert(error.message || "Network error. Please try again.");
+      Swal.fire(
+        "Error",
+        error.message || "Network error. Please try again.",
+        "error"
+      );
     }
   };
 
@@ -275,12 +312,12 @@ const WorkingDateMaster: React.FC = () => {
     e.preventDefault();
 
     if (!selectedSession) {
-      alert("Please select a branch session first");
+      Swal.fire("Validation", "Please select a branch session first", "warning");
       return;
     }
 
     if (!selectedDate) {
-      alert("Please select a working date");
+      Swal.fire("Validation", "Please select a working date", "warning");
       return;
     }
 
@@ -288,8 +325,12 @@ const WorkingDateMaster: React.FC = () => {
   };
 
   const handleCancel = async () => {
-    setSelectedDate(null);
-    let result = await commonservice.logout();
+    // ✅ FIX 8: Reset all state before logout to avoid stale state on next login
+    resetDateState();
+    setSelectedSession(null);
+    setBranchSessions([]);
+
+    const result = await commonservice.logout();
     if (!result.success) {
       Swal.fire("Error", result.message || "Logout failed", "error");
       return;
@@ -297,27 +338,51 @@ const WorkingDateMaster: React.FC = () => {
     navigate("/");
   };
 
+  // ✅ FIX 9: isMonthNavigable helpers to keep prev/next buttons tightly bounded
+  const canGoToPrevMonth = (): boolean => {
+    if (!sessionDateRange) return false;
+    const prevMonth = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth() - 1,
+      1
+    );
+    const minMonthStart = new Date(
+      sessionDateRange.minDate.getFullYear(),
+      sessionDateRange.minDate.getMonth(),
+      1
+    );
+    return prevMonth >= minMonthStart;
+  };
+
+  const canGoToNextMonth = (): boolean => {
+    if (!sessionDateRange) return false;
+    const nextMonth = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth() + 1,
+      1
+    );
+    const maxMonthStart = new Date(
+      sessionDateRange.maxDate.getFullYear(),
+      sessionDateRange.maxDate.getMonth(),
+      1
+    );
+    return nextMonth <= maxMonthStart;
+  };
+
   const renderHeader = () => {
     const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
     ];
 
     if (!sessionDateRange) return null;
 
+    // ✅ FIX 10: Build year options from minDate.year to maxDate.year (not sessionFrom/To)
+    // Using sessionFrom/To years could include years where no valid days exist in the
+    // calendar, e.g. if maxDate is 12-04-2013 but sessionTo is 2014.
     const startYear = sessionDateRange.minDate.getFullYear();
     const endYear = sessionDateRange.maxDate.getFullYear();
-    const yearOptions = [];
+    const yearOptions: number[] = [];
     for (let year = startYear; year <= endYear; year++) {
       yearOptions.push(year);
     }
@@ -327,54 +392,55 @@ const WorkingDateMaster: React.FC = () => {
         <button
           type="button"
           onClick={() => {
+            if (!canGoToPrevMonth()) return;
             const newMonth =
               currentMonth.getMonth() === 0 ? 11 : currentMonth.getMonth() - 1;
             const newYear =
               currentMonth.getMonth() === 0
                 ? currentMonth.getFullYear() - 1
                 : currentMonth.getFullYear();
-            const newDate = new Date(newYear, newMonth, 1);
-
-            if (
-              newDate >=
-              new Date(
-                sessionDateRange.minDate.getFullYear(),
-                sessionDateRange.minDate.getMonth(),
-                1
-              )
-            ) {
-              setCurrentMonth(newDate);
-            }
+            setCurrentMonth(new Date(newYear, newMonth, 1));
           }}
-          className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+          disabled={!canGoToPrevMonth()}
+          className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           ◀️
         </button>
 
         <select
           value={currentMonth.getMonth()}
-          onChange={(e) =>
-            setCurrentMonth(
-              new Date(currentMonth.getFullYear(), parseInt(e.target.value), 1)
-            )
-          }
+          onChange={(e) => {
+            const newMonth = parseInt(e.target.value);
+            const newDate = new Date(currentMonth.getFullYear(), newMonth, 1);
+            const minMonthStart = new Date(
+              sessionDateRange.minDate.getFullYear(),
+              sessionDateRange.minDate.getMonth(),
+              1
+            );
+            const maxMonthStart = new Date(
+              sessionDateRange.maxDate.getFullYear(),
+              sessionDateRange.maxDate.getMonth(),
+              1
+            );
+            if (newDate >= minMonthStart && newDate <= maxMonthStart) {
+              setCurrentMonth(newDate);
+            }
+          }}
           className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {monthNames.map((month, index) => {
             const testDate = new Date(currentMonth.getFullYear(), index, 1);
-            const isDisabled =
-              testDate <
-                new Date(
-                  sessionDateRange.minDate.getFullYear(),
-                  sessionDateRange.minDate.getMonth(),
-                  1
-                ) ||
-              testDate >
-                new Date(
-                  sessionDateRange.maxDate.getFullYear(),
-                  sessionDateRange.maxDate.getMonth(),
-                  1
-                );
+            const minMonthStart = new Date(
+              sessionDateRange.minDate.getFullYear(),
+              sessionDateRange.minDate.getMonth(),
+              1
+            );
+            const maxMonthStart = new Date(
+              sessionDateRange.maxDate.getFullYear(),
+              sessionDateRange.maxDate.getMonth(),
+              1
+            );
+            const isDisabled = testDate < minMonthStart || testDate > maxMonthStart;
 
             return (
               <option key={index} value={index} disabled={isDisabled}>
@@ -384,13 +450,45 @@ const WorkingDateMaster: React.FC = () => {
           })}
         </select>
 
+        {/* ✅ FIX 11: Year dropdown now guaranteed to have options (startYear <= endYear always) */}
         <select
           value={currentMonth.getFullYear()}
-          onChange={(e) =>
-            setCurrentMonth(
-              new Date(parseInt(e.target.value), currentMonth.getMonth(), 1)
-            )
-          }
+          onChange={(e) => {
+            const newYear = parseInt(e.target.value);
+            const newDate = new Date(newYear, currentMonth.getMonth(), 1);
+
+            // Clamp month if it's out of range for the selected year
+            const minMonthStart = new Date(
+              sessionDateRange.minDate.getFullYear(),
+              sessionDateRange.minDate.getMonth(),
+              1
+            );
+            const maxMonthStart = new Date(
+              sessionDateRange.maxDate.getFullYear(),
+              sessionDateRange.maxDate.getMonth(),
+              1
+            );
+
+            if (newDate < minMonthStart) {
+              setCurrentMonth(
+                new Date(
+                  sessionDateRange.minDate.getFullYear(),
+                  sessionDateRange.minDate.getMonth(),
+                  1
+                )
+              );
+            } else if (newDate > maxMonthStart) {
+              setCurrentMonth(
+                new Date(
+                  sessionDateRange.maxDate.getFullYear(),
+                  sessionDateRange.maxDate.getMonth(),
+                  1
+                )
+              );
+            } else {
+              setCurrentMonth(newDate);
+            }
+          }}
           className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {yearOptions.map((year) => (
@@ -403,26 +501,17 @@ const WorkingDateMaster: React.FC = () => {
         <button
           type="button"
           onClick={() => {
+            if (!canGoToNextMonth()) return;
             const newMonth =
               currentMonth.getMonth() === 11 ? 0 : currentMonth.getMonth() + 1;
             const newYear =
               currentMonth.getMonth() === 11
                 ? currentMonth.getFullYear() + 1
                 : currentMonth.getFullYear();
-            const newDate = new Date(newYear, newMonth, 1);
-
-            if (
-              newDate <=
-              new Date(
-                sessionDateRange.maxDate.getFullYear(),
-                sessionDateRange.maxDate.getMonth(),
-                1
-              )
-            ) {
-              setCurrentMonth(newDate);
-            }
+            setCurrentMonth(new Date(newYear, newMonth, 1));
           }}
-          className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+          disabled={!canGoToNextMonth()}
+          className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           ▶️
         </button>
@@ -457,8 +546,8 @@ const WorkingDateMaster: React.FC = () => {
     ).getDate();
 
     const days = [];
-    const today = getTodaysDate();
-    today.setHours(0, 0, 0, 0);
+    // ✅ FIX 12: Use getRealToday() for "today" highlight in calendar
+    const today = getRealToday();
 
     for (let i = 0; i < startDay; i++) {
       days.push(<div key={`empty-${i}`} className="p-2" />);
@@ -476,7 +565,7 @@ const WorkingDateMaster: React.FC = () => {
         date < sessionDateRange.minDate || date > sessionDateRange.maxDate;
 
       const isSelected =
-        selectedDate &&
+        selectedDate !== null &&
         selectedDate.getDate() === i &&
         selectedDate.getMonth() === currentMonth.getMonth() &&
         selectedDate.getFullYear() === currentMonth.getFullYear();
@@ -512,7 +601,7 @@ const WorkingDateMaster: React.FC = () => {
     return days;
   };
 
-  // ✅ Format date as DD-MM-YYYY
+  // Format date as DD-MM-YYYY
   const formatDate = (date: Date | null): string => {
     if (!date) return "";
     return `${String(date.getDate()).padStart(2, "0")}-${String(
@@ -582,10 +671,9 @@ const WorkingDateMaster: React.FC = () => {
                       if (val) {
                         handleSessionChange(parseInt(val));
                       } else {
+                        // ✅ FIX 13: Fully reset when user clears the session dropdown
+                        resetDateState();
                         setSelectedSession(null);
-                        setSessionDateRange(null);
-                        setSelectedDate(null);
-                        setIsCalendarOpen(false);
                       }
                     }}
                     disabled={loadingSessions}

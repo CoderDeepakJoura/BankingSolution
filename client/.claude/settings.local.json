@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"e:/Codes/AHDSolution/BankingPlatform\")",
+      "Bash(ls -la \"/e/Codes/AHDSolution/BankingPlatform\")",
+      "Bash(cd /e)",
+      "Bash(xargs grep *)",
+      "Read(//e/Codes/AHDSolution/BankingPlatform/backend/**)",
+      "Read(//e/Codes/AHDSolution/BankingPlatform/backend/BankingPlatform.API/Mappers/Voucher/**)",
+      "Read(//e/Codes/AHDSolution/BankingPlatform/**)"
+    ],
+    "additionalDirectories": [
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API\\Common",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API\\Mappers\\Voucher",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API\\Service\\Vouchers",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API\\Controllers\\Vouchers",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\DbContexts"
+    ]
+  }
+}

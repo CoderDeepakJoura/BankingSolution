@@ -488,7 +488,6 @@ namespace BankingPlatform.API.Common.CommonFunctions
             };
         }
 
-
         public async Task<bool> AccountInUse(int accountId, int branchId)
         {
             bool result = false;
@@ -498,7 +497,84 @@ namespace BankingPlatform.API.Common.CommonFunctions
             }
             return result;
         }
+        public async Task<string> GetSavingAccInfoFromMemberIDandBranchID(int memberId, int memberBranchID, int accTypeId)
+     => await _appcontext.accountmaster
+         .AsNoTracking()
+         .Where(x => x.MemberId == memberId && x.MemberBranchID == memberBranchID && x.AccTypeId == accTypeId)
+         .Select(x => x.AccPrefix + "-" + x.AccSuffix + "-" + x.AccountName)
+         .FirstOrDefaultAsync() ?? "";
 
+        // <summary>
+        // this gets the dob of member
+        // </summary>
+        public async Task<DateTime> MemberDOBFromMemberIdAndBranchId(int memberId, int memberBranchId) =>
+            await _appcontext.member.Where(m => m.BranchId == memberBranchId && m.Id == memberId).Select(x => x.DOB).FirstOrDefaultAsync();
+
+        public async Task<RDProductBranchWiseRuleDTO> GetRDProductBranchWiseRuleInfo(int branchId, int productId)
+        {
+            var rule = await _appcontext.rdproductbranchwiserule
+                .FirstOrDefaultAsync(x => x.BrId == branchId && x.RDProductId == productId);
+
+            if (rule == null) return new RDProductBranchWiseRuleDTO();
+
+            return new RDProductBranchWiseRuleDTO
+            {
+                Id = rule.Id,
+                BrId = rule.BrId,
+                RDProductId = rule.RDProductId,
+                IntFormula = rule.IntFormula,
+                AccNoGeneration = rule.AccNoGeneration,
+                PrintCertificate = rule.PrintCertificate == 1,
+                KistAfterMaturity = rule.KistAfterMaturity == 1,
+                PaymentDateType = rule.PaymentDateType,
+                NoOfDayOrMonth = rule.NoOfDayOrMonth,
+                IntExpAccId = rule.IntExpAccId,
+                PenaltyIncAccId = rule.PenaltyIncAccId,
+                ClosingChargesAcc = rule.ClosingChargesAcc,
+            };
+        }
+        public async Task<(int headId, long headCode)> GetRDProductPrincipalHead(int branchId, int productId)
+        {
+            var data = await _appcontext.rdproductposting.AsNoTracking().Where(x => x.BrId == branchId && x.RDProductId == productId).FirstOrDefaultAsync();
+            int headID = 0; long headCode = 0;
+            if (data != null)
+            {
+                headID = await GetHeadIdFromHeadCode(branchId, (long)data.PrincipalBalHeadCode!);
+                headCode = (long)data.PrincipalBalHeadCode!;
+            }
+            return (headID, headCode);
+
+        }
+
+        public string GetRDSlabNameFromID(int slabId, int branchId) => _appcontext.rdinterestslab.Where(x => x.BranchId == branchId && x.Id == slabId).Select(x => x.SlabName).FirstOrDefault() ?? "";
+
+        public string GetRDProductNameFromId(int branchId, int productId) => _appcontext.rdproduct.Where(x => x.BrId == branchId && x.Id == productId).Select(x => x.ProductName).FirstOrDefault() ?? "";
+
+        public async Task<LoanProductBranchWiseRuleDTO> GetLoanProductBranchWiseRuleInfo(int branchId, int productId)
+        {
+            var existingRule = await _appcontext.loanproductbranchwiserule
+                .FirstOrDefaultAsync(s => s.BranchId == branchId && s.LoanProductId == productId);
+            return new LoanProductBranchWiseRuleDTO
+            {
+                Id = existingRule?.Id,
+                BranchId = branchId,
+                LoanProductId = productId,
+                MCLPlanId = existingRule?.MCLPlanId,
+                NPAPlanId = existingRule?.NPAPlanId,
+                LegalPlanId = existingRule?.LegalPlanId,
+                OperatedBy = existingRule?.OperatedBy,
+                AccNoOrNameFirst = existingRule?.AccNoOrNameFirst,
+                TempRecAccId = existingRule?.TempRecAccId,
+                CurrentRecoverableIntAcc = existingRule?.CurrentRecoverableIntAcc,
+                IntIncomeAcc = existingRule?.IntIncomeAcc,
+                OverdueRecoverableIntAcc = existingRule?.OverdueRecoverableIntAcc,
+                IsApplyOverInt = existingRule?.IsApplyOverInt ?? 0,
+                OVRIntProvAcc = existingRule?.OVRIntProvAcc ?? 0,
+                IntwrtDepositPledge = existingRule?.IntwrtDepositPledge,
+                OVRIntFromOpendate = existingRule?.OVRIntFromOpendate ?? 0,
+                ActOnExpPosting = existingRule?.ActOnExpPosting,
+            };
+        }
 
     }
 }

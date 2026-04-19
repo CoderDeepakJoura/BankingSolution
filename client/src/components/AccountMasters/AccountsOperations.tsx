@@ -78,14 +78,9 @@ const AccountsModule: React.FC = () => {
               />
               <AccountOperations
                 accountType="Recurring Deposit (RD) Account(s)"
-                addPath="/accounts/rd/add"
-                modifyPath="/accounts/rd/modify"
+                addPath="/rd-acc-master"
+                modifyPath="/rd-acc-info"
               />
-
-              
-
-              
-             
 
               {/* Add other account types here as needed */}
             </div>

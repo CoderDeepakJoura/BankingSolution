@@ -1,13 +1,19 @@
-﻿using BankingPlatform.API.Controllers.Member;
+﻿using BankingPlatform.API.Controllers;
+using BankingPlatform.API.Controllers.Member;
 using BankingPlatform.API.Mappers.Voucher;
 using BankingPlatform.API.Service;
 using BankingPlatform.API.Service.AccountMasters;
 using BankingPlatform.API.Service.Caste;
 using BankingPlatform.API.Service.InterestSlabs.FD;
+using BankingPlatform.API.Service.InterestSlabs.Loan;
+using BankingPlatform.API.Service.InterestSlabs.RD;
 using BankingPlatform.API.Service.InterestSlabs.Saving;
 using BankingPlatform.API.Service.ProductMasters.FD;
+using BankingPlatform.API.Service.ProductMasters.Loan;
+using BankingPlatform.API.Service.ProductMasters.RD;
 using BankingPlatform.API.Service.ProductMasters.Savings;
 using BankingPlatform.API.Service.Slabs.FD;
+using BankingPlatform.API.Service.Vouchers.RD;
 using BankingPlatform.API.Service.Vouchers.Saving;
 using BankingPlatform.API.Services;
 using BankingPlatform.Common.Common.CommonClasses;
@@ -39,8 +45,13 @@ builder.Services.AddScoped<SavingInterestSlabService>();
 builder.Services.AddScoped<SavingAccountService>();
 builder.Services.AddScoped<BranchMasterService>();
 builder.Services.AddScoped<SavingVoucherService>();
+builder.Services.AddScoped<RDKistVoucherService>();
 builder.Services.AddScoped<VoucherMapper>();
 builder.Services.AddScoped<FDAccountService>();
+builder.Services.AddScoped<RDInterestSlabService>();
+builder.Services.AddScoped<LoanSlabService>();
+builder.Services.AddScoped<RDProductService>();
+builder.Services.AddScoped<LoanProductService>();
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");
@@ -56,6 +67,7 @@ if (string.IsNullOrEmpty(jwtSettings.SecretKey) || string.IsNullOrEmpty(jwtSetti
 }
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 builder.Services.Configure<DocPaths>(builder.Configuration.GetSection("DocPaths"));
+builder.Services.Configure<ScriptPath>(builder.Configuration.GetSection("ScriptPath"));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<CommonClass>();
@@ -63,6 +75,7 @@ builder.Services.AddScoped<CommonFunctions>();
 builder.Services.AddScoped<MemberService>();
 builder.Services.AddScoped<FDInterestSlabService>();
 builder.Services.AddScoped<FDSlabService>();
+builder.Services.AddScoped<RDAccountService>();
 
 // Configure CORS with dynamic origins
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()

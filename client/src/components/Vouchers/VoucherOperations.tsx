@@ -1,44 +1,63 @@
 // src/pages/VouchersModule.tsx
-import React from 'react';
-import DashboardLayout from '../../Common/Layout';
-import VoucherOperations from './VoucherActions';
-import { 
-  Wallet, 
-  TrendingDown, 
-  PiggyBank, 
-  Calendar, 
-  RefreshCw 
-} from 'lucide-react';
+import React from "react";
+import DashboardLayout from "../../Common/Layout";
+import VoucherOperations from "./VoucherActions";
+import {
+  Wallet,
+  TrendingDown,
+  PiggyBank,
+  Calendar,
+  RefreshCw,
+  TimerOff,
+  RotateCcw,
+} from "lucide-react";
 
 const VouchersModule: React.FC = () => {
   const vouchersList = [
     {
-      VoucherType: 'Saving Deposit Voucher',
-      addPath: '/saving-deposit-voucher',
-      icon: <Wallet size={20} className="text-green-600" />
+      VoucherType: "Saving Deposit Voucher",
+      addPath: "/saving-deposit-voucher",
+      icon: <Wallet size={20} className="text-green-600" />,
     },
     {
-      VoucherType: 'Saving Withdrawal Voucher',
-      addPath: '/saving-withdrawal-voucher',
-      icon: <TrendingDown size={20} className="text-red-600" />
+      VoucherType: "Saving Withdrawal Voucher",
+      addPath: "/saving-withdrawal-voucher",
+      icon: <TrendingDown size={20} className="text-red-600" />,
     },
     {
-      VoucherType: 'Saving Account Management',
-      addPath: '/saving-acc-master',
-      modifyPath: '/saving-acc-info',
-      icon: <PiggyBank size={20} className="text-blue-600" />
+      VoucherType: "Pre-Mature Fixed Deposit (FD) Voucher",
+      addPath: "/premature-fd-account",
+      // modifyPath: "/Vouchers/fd/modify",
+      icon: <TimerOff size={20} className="text-purple-600" />, // or AlarmClockOff
     },
     {
-      VoucherType: 'Fixed Deposit (FD) Voucher',
-      addPath: '/Vouchers/fd/add',
-      modifyPath: '/Vouchers/fd/modify',
-      icon: <Calendar size={20} className="text-purple-600" />
+      VoucherType: "Mature/Renew Fixed Deposit (FD) Voucher",
+      addPath: "/mature-fd-account",
+      // modifyPath: "/Vouchers/fd/modify",
+      icon: <RotateCcw size={20} className="text-purple-600" />, // or RefreshCcw
+    },
+
+    {
+      VoucherType: "Mature Recurring Deposit (RD) Voucher",
+      addPath: "/mature-rd-account",
+      icon: <RefreshCw size={20} className="text-indigo-600" />,
     },
     {
-      VoucherType: 'Recurring Deposit (RD) Voucher',
-      addPath: '/Vouchers/rd/add',
-      modifyPath: '/Vouchers/rd/modify',
-      icon: <RefreshCw size={20} className="text-indigo-600" />
+      VoucherType: "Pre-Mature Recurring Deposit (RD) Voucher",
+      addPath: "/premature-rd-account",
+      icon: <TimerOff size={20} className="text-purple-600" />,
+    },
+    ,
+    {
+      VoucherType: "Recurring Deposit (RD) Kist Voucher",
+      addPath: "/rd-kist-voucher",
+      icon: <PiggyBank size={20} className="text-purple-600" />,
+    },
+    {
+      VoucherType: "Loan Advancement Voucher",
+      addPath: "/loan-advancement",
+      modifyPath: "/Vouchers/rd/modify",
+      icon: <RefreshCw size={20} className="text-indigo-600" />,
     },
   ];
 

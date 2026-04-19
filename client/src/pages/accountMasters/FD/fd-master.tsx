@@ -123,6 +123,7 @@ const FDAccountMaster = () => {
           const response = await fdAccountService.getFDAccountById(
             Number(accountId),
             user.branchid,
+            null
           );
 
           if (response.success && response.data) {
@@ -1458,7 +1459,7 @@ const FDAccountMaster = () => {
         voucher: {
           id: 0,
           brID: user.branchid,
-          voucherDate: commonservice.getTodaysDate(),
+          voucherDate: formData.accountMasterDTO.accountOpeningDate,
           debitAccountId:
             voucherCashGL.cashGLAccountId || voucherSaving.savingAccountId,
           totalDebit:

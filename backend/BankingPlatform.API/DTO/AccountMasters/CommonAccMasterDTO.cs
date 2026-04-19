@@ -13,6 +13,11 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public JointAccountWithdrawalInfoDTO? JointAccountWithdrawalInfoDTO { get; set; } = new();
         public List<FDAccountDetailDTO>? FDAccountDetailDTO { get; set; } = new();
         public FDVoucherDetailDTO? FDVoucherDetailDTO { get; set; } = new();
+        public MatureOrRenewFDInfo? MatureOrRenewFDInfo { get; set; } = new();
+        public MatureOrRenewRDInfo? MatureRDInfo { get; set; } = new();
+        public CreditAccountDetails? CreditAccountDetails { get; set; } = new();
+        public FDAccountDetailDTO? FDAccountDetailDTOSingle { get; set; }
+        public RDAccountDetailDTO? RDAccountDetailDTO { get; set; }
 
         public IFormFile? Picture { get; set; }
         public IFormFile? Signature { get; set; }
@@ -20,6 +25,9 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public string? OpeningBalanceType { get; set; }
         public string? ProductName { get; set; }
         public int? AccountType { get; set; }
+        public string? SavingAccountName { get; set; }
+        public decimal? PreMaturityAmount { get; set; }
+        
 
     }
     public class CreateAccountCreationRequest
@@ -42,6 +50,51 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public DateTime NomineeDate { get; set; }
         public short IsMinor { get; set; }
         public string? NameOfGuardian { get; set; }
+
+    }
+
+    public class CreditAccountDetails
+    {
+        public int? GeneralAccountId { get; set; }
+        public int? SavingAccountId { get; set; }
+        public int? LoanAccountId { get; set; }
+        public int? CashAccountId { get; set; }
+        public decimal? GeneralAmount { get; set; }
+        public decimal? SavingAmount { get; set; }
+        public decimal? LoanAmount { get; set; }
+        public decimal? CashAmount { get; set; }
+
+    }
+
+    public class MatureOrRenewFDInfo
+    {
+        public int? ProductId { get; set; }
+        public int? DetailId { get; set; }
+        public int? FDAccountId { get; set; }
+        public int? BranchId { get; set; }
+        public DateTime VoucherDate { get; set; }
+        public decimal? PostMaturityAmount { get; set; }
+        public decimal? IntPayableAmount { get; set; }
+        public bool IsRenew { get; set; }
+        public string? Narration { get; set; }
+    }
+
+    public class MatureOrRenewRDInfo
+    {
+        public int? ProductId { get; set; }
+        public int? DetailId { get; set; }
+        public int? RDAccountId { get; set; }
+        public int? BranchId { get; set; }
+        public DateTime VoucherDate { get; set; }
+        public string? Narration { get; set; }
+        public decimal IntDr { get; set; }
+        public decimal IntCr { get; set; }
+        public decimal PenalAmount { get; set; }
+        public decimal intPayableAmount { get; set; }
+        public decimal PostMaturityAmount { get; set; }
+        public int PenalAccountId { get; set; }
+        public decimal PreMaturityAmount { get; set; }
+        
 
     }
     public class AccountDocDetailsDTO

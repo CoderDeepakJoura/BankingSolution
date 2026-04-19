@@ -21,7 +21,8 @@
         {
             Member = 1,
             Saving = 2,
-            FD = 3
+            FD = 3,
+            RD = 4
         }
 
         public enum VoucherSubType
@@ -30,6 +31,10 @@
             Deposit = 2,
             Withdrawal = 3,
             InterestPosting = 4,
+            Mature = 5,
+            Renew = 6,
+            PreMature = 7,
+            Kist = 8,
         }
 
         public enum VoucherStatus
@@ -39,7 +44,9 @@
             Dr = 3,
             Cr = 4,
             FDCr = 5,
-            FDDr = 6,
+            FDDr = 6, 
+            RDCr = 5,
+            RDDr = 6,
 
         }
 
@@ -63,6 +70,14 @@
             Half_Yearly = 5,
             Yearly = 6,
             Two_Yearly = 7
+        }
+
+        public enum FDStatus
+        {
+            Open = 1,
+            Matured = 2,
+            Pre_Matured = 3,
+            Renewed = 4,
         }
     }
 }

@@ -5,11 +5,15 @@ using BankingPlatform.Infrastructure.Models.AccMasters;
 using BankingPlatform.Infrastructure.Models.BranchSessions;
 using BankingPlatform.Infrastructure.Models.BranchWiseRule;
 using BankingPlatform.Infrastructure.Models.InterestSlabs.FD;
+using BankingPlatform.Infrastructure.Models.InterestSlabs.Loan;
+using BankingPlatform.Infrastructure.Models.InterestSlabs.RD;
 using BankingPlatform.Infrastructure.Models.InterestSlabs.Saving;
 using BankingPlatform.Infrastructure.Models.Location;
 using BankingPlatform.Infrastructure.Models.member;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
 using BankingPlatform.Infrastructure.Models.ProductMasters.FD;
+using BankingPlatform.Infrastructure.Models.ProductMasters.Loan;
+using BankingPlatform.Infrastructure.Models.ProductMasters.RD;
 using BankingPlatform.Infrastructure.Models.ProductMasters.Saving;
 using BankingPlatform.Infrastructure.Models.Settings;
 using BankingPlatform.Infrastructure.Models.voucher;
@@ -81,6 +85,24 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<FDInterestSlabDetail> fdinterestslabdetail { get; set; }
     public virtual DbSet<FDAccountDetail> fdaccountdetail { get; set; }
     public virtual DbSet<VoucherFDDetail> voucherfddetail { get; set; }
+    public virtual DbSet<RDInterestSlab> rdinterestslab { get; set; }
+    public virtual DbSet<RDInterestSlabDetail> rdinterestslabdetail { get; set; }
+    public virtual DbSet<RDProduct> rdproduct { get; set; }
+    public virtual DbSet<RDProductDefinition> rdproductdefinition { get; set; }
+    public virtual DbSet<RDProductInterestRules> rdproductinterestrules { get; set; }
+    public virtual DbSet<RDProductPosting> rdproductposting { get; set; }
+    public virtual DbSet<RDProductBranchWiseRule> rdproductbranchwiserule { get; set; }
+    public virtual DbSet<RDAccountDetail> rdaccountdetail { get; set; }
+    public virtual DbSet<VoucherRDDetail> voucherrddetail { get; set; }
+    public virtual DbSet<LoanSlab> loanslab { get; set; }
+    public virtual DbSet<LoanSlabDetail> loanslabdetail { get; set; }
+    public virtual DbSet<LoanProduct> loanproduct { get; set; }
+    public virtual DbSet<LoanProductDefinition> loanproductdefinition { get; set; }
+    public virtual DbSet<LoanProductAdvancement> loanproductadvancement { get; set; }
+    public virtual DbSet<LoanProductMarginMoneyRule> loanproductmarginmoneyrule { get; set; }
+    public virtual DbSet<LoanProductPosting> loanproductposting { get; set; }
+    public virtual DbSet<LoanProductRecovery> loanproductrecovery { get; set; }
+    public virtual DbSet<LoanProductBranchWiseRule> loanproductbranchwiserule { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
