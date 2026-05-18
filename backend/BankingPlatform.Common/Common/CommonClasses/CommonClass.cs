@@ -16,5 +16,8 @@
         public string sessionInfo { get; set; } = ""!;
         public int sessionId { get; set; }
         public bool isFirstSession { get; set; }
+        public bool isSu { get; set; }
+        public string sessionFromDate { get; set; } = ""!;
+        public string sessionToDate { get; set; } = ""!;
     }
 }

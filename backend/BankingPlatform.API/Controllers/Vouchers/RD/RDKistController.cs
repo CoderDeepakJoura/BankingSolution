@@ -53,5 +53,28 @@ namespace BankingPlatform.API.Controllers.Vouchers.RD
                 });
             }
         }
+
+        [HttpPut("{voucherId}")]
+        public async Task<IActionResult> UpdateRDKistVoucher(int voucherId, [FromBody] RDKistVoucherDTO dto)
+        {
+            try
+            {
+                if (dto == null || dto.RdAccountId <= 0)
+                    return BadRequest(new { Success = false, Message = "Invalid voucher data" });
+
+                (var result, int voucherNo) = await _service.UpdateRDKistVoucher(voucherId, dto);
+
+                if (result != "Success")
+                    return BadRequest(new ResponseDto { Success = false, Message = result });
+
+                return Ok(new { Success = true, Message = "RD Kist Voucher updated successfully with voucher No. " + voucherNo, data = new { voucherNo } });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while updating RD Kist Voucher.");
+                await _commonFunctions.LogErrors(ex, nameof(UpdateRDKistVoucher), nameof(RDKistController));
+                return BadRequest(new ResponseDto { Success = false, Message = "An error occurred while updating RD Kist Voucher. Please try again later." });
+            }
+        }
     }
 }

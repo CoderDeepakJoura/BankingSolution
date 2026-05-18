@@ -47,6 +47,8 @@ export interface GSTInfoDTO {
 export interface CommonAccMasterDTO {
   accountMasterDTO: AccountMasterDTO;
   gstInfoDTO?: GSTInfoDTO;
+  openingBalance?: string;
+  openingBalanceType?: string;
 }
 
 export interface GeneralAccountsResponse {

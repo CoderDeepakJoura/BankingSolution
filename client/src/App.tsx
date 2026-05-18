@@ -86,7 +86,9 @@ import FDAccMaster from "./pages/accountMasters/FD/fd-master";
 import FDAccOperations from "./pages/accountMasters/FD/fd-operations";
 import FDAccData from "./pages/accountMasters/FD/fd-data";
 import SeleniumAutomation from "./pages/seleniumautomation/automation";
-import LoanAdvancementDemo from "./pages/vouchers/Loan/loanadvancement";
+import LoanAdvancementVoucher from "./pages/vouchers/Loan/loanadvancement";
+import LoanRecovery from "./pages/vouchers/Loan/loanrecovery";
+import LoanInterestPostingVoucher from "./pages/vouchers/Loan/loaninterestposting";
 import MatureFDPage from "./pages/FixedDeposit/MatureFD/mature-fd";
 import PreMatureFDPage from "./pages/FixedDeposit/PreMatureFD/pre-mature";
 import RDAccountMaster from "./pages/accountMasters/RD/rd-master";
@@ -102,6 +104,8 @@ import RDAccData from "./pages/accountMasters/RD/rd-data";
 import MatureRDPage from "./pages/RecurringDeposit/mature-rd";
 import PrematureRDPage from "./pages/RecurringDeposit/premature-rd";
 import RDKistVoucher from "./pages/vouchers/RD/rdkist";
+import CashPaymentReceiptVoucher from "./pages/vouchers/Cash/cashvoucher";
+import JournalTransferVoucher from "./pages/vouchers/Journal/jvoucher";
 import LoanProduct from "./pages/products/Loan/loanproduct-master";
 import LoanProductOperations from "./pages/products/Loan/loanproduct-operations";
 import LoanProductData from "./pages/products/Loan/loanproduct-data";
@@ -109,6 +113,34 @@ import LoanProductBranchWiseRule from "./pages/branchwiserule/Loan/branchwiserul
 import LoanInterestSlab from "./pages/InterestSlabs/Loan/loanslab";
 import LoanSlabModule from "./pages/InterestSlabs/Loan/loanslab-operations";
 import LoanSlabData from "./pages/InterestSlabs/Loan/loanslab-data";
+import LoanAccMaster from "./pages/accountMasters/Loan/loan-master";
+import LoanAccOperations from "./pages/accountMasters/Loan/loan-operations";
+import LoanAccData from "./pages/accountMasters/Loan/loan-data";
+import UserMasterData from "./pages/Miscalleneous/User/user-data";
+import VoucherSearch from "./pages/vouchers/VoucherSearch";
+import DayBookPage from "./pages/reports/DayBook";
+import CashBookPage from "./pages/reports/CashBook";
+import SavingLedgerPage from "./pages/reports/SavingLedger";
+import RDLedgerPage from "./pages/reports/RDLedger";
+import LoanLedgerPage from "./pages/reports/LoanLedger";
+import FDLedgerPage from "./pages/reports/FDLedger";
+import ShareMoneyLedgerPage from "./pages/reports/ShareMoneyLedger";
+import BalanceSheetPage from "./pages/reports/BalanceSheet";
+import ProfitLossPage from "./pages/reports/ProfitLoss";
+import HeadLedgerPage from "./pages/reports/HeadLedger";
+import GeneralLedgerPage from "./pages/reports/GeneralLedger";
+import LoanNPAPage from "./pages/reports/LoanNPA";
+import TrialBalancePage from "./pages/reports/TrialBalance";
+import JournalBookPage from "./pages/reports/JournalBook";
+import LoanAdvancementReportPage from "./pages/reports/LoanAdvancement";
+import LoanRecoveryReportPage from "./pages/reports/LoanRecovery";
+import FDMaturityPage from "./pages/reports/FDMaturity";
+import LoanDemandPage from "./pages/reports/LoanDemand";
+import RDKistReceivePage from "./pages/reports/RDKistReceive";
+import MemberIntCertPage from "./pages/reports/MemberIntCert";
+import LoanIntCertPage from "./pages/reports/LoanIntCert";
+import OdReservePage from "./pages/reports/OdReserve";
+import ChangeSessionPage from "./pages/Miscalleneous/ChangeSession";
 
 export default function App() {
   const user = useSelector((state: RootState) => state.user);
@@ -277,7 +309,9 @@ export default function App() {
         <Route path="/fd-acc-operations" element={<FDAccOperations />} />
         <Route path="/fd-acc-info" element={<FDAccData />} />
         <Route path="/automate-data" element={<SeleniumAutomation />} />
-        <Route path="/loan-advancement" element={<LoanAdvancementDemo />} />
+        <Route path="/loan-advancement" element={<LoanAdvancementVoucher />} />
+        <Route path="/loan-recovery" element={<LoanRecovery />} />
+        <Route path="/loan-interest-posting" element={<LoanInterestPostingVoucher />} />
         <Route path="/mature-fd-account" element={<MatureFDPage />} />
         <Route path="/premature-fd-account" element={<PreMatureFDPage />} />
         <Route path="/rd-acc-master" element={<RDAccountMaster />} />
@@ -302,6 +336,8 @@ export default function App() {
         <Route path="/mature-rd-account" element={<MatureRDPage />} />
         <Route path="/premature-rd-account" element={<PrematureRDPage />} />
         <Route path="/rd-kist-voucher" element={<RDKistVoucher />} />
+        <Route path="/cash-payment-receipt-voucher" element={<CashPaymentReceiptVoucher />} />
+        <Route path="/journal-transfer-voucher" element={<JournalTransferVoucher />} />
         <Route path="/loan-product" element={<LoanProduct />} />
         <Route path="/loan-product/:productId" element={<LoanProduct />} />
         <Route path="/loanproduct-operations" element={<LoanProductOperations />} />
@@ -311,6 +347,35 @@ export default function App() {
         <Route path="/loan-interest-slab/:slabId" element={<LoanInterestSlab />} />
         <Route path="/loan-slab-operations" element={<LoanSlabModule />} />
         <Route path="/loan-slab-info" element={<LoanSlabData />} />
+        <Route path="/loan-acc-master" element={<LoanAccMaster />} />
+        <Route path="/loan-acc-master/:accountId" element={<LoanAccMaster />} />
+        <Route path="/loan-acc-operations" element={<LoanAccOperations />} />
+        <Route path="/loan-acc-info" element={<LoanAccData />} />
+        <Route path="/user-info" element={<UserMasterData />} />
+        <Route path="/voucher-search" element={<VoucherSearch />} />
+        <Route path="/day-book" element={<DayBookPage />} />
+        <Route path="/cash-book" element={<CashBookPage />} />
+        <Route path="/saving-ledger" element={<SavingLedgerPage />} />
+        <Route path="/rd-ledger" element={<RDLedgerPage />} />
+        <Route path="/loan-ledger" element={<LoanLedgerPage />} />
+        <Route path="/fd-ledger" element={<FDLedgerPage />} />
+        <Route path="/share-money-ledger" element={<ShareMoneyLedgerPage />} />
+        <Route path="/balance-sheet" element={<BalanceSheetPage />} />
+        <Route path="/profit-loss" element={<ProfitLossPage />} />
+        <Route path="/head-ledger" element={<HeadLedgerPage />} />
+        <Route path="/general-ledger" element={<GeneralLedgerPage />} />
+        <Route path="/loan-npa-report" element={<LoanNPAPage />} />
+        <Route path="/trial-balance" element={<TrialBalancePage />} />
+        <Route path="/journal-book" element={<JournalBookPage />} />
+        <Route path="/loan-advancement-report" element={<LoanAdvancementReportPage />} />
+        <Route path="/loan-recovery-report" element={<LoanRecoveryReportPage />} />
+        <Route path="/fd-maturity-report" element={<FDMaturityPage />} />
+        <Route path="/loan-demand-report" element={<LoanDemandPage />} />
+        <Route path="/rd-kist-receive-report" element={<RDKistReceivePage />} />
+        <Route path="/member-int-cert" element={<MemberIntCertPage />} />
+        <Route path="/loan-int-cert" element={<LoanIntCertPage />} />
+        <Route path="/od-reserve" element={<OdReservePage />} />
+        <Route path="/change-session" element={<ChangeSessionPage />} />
       </Routes>
     </BrowserRouter>
   );

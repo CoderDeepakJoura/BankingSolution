@@ -40,5 +40,10 @@ namespace BankingPlatform.Infrastructure.Models.ProductMasters.Loan
 
         [Column("actonintposting")]
         public int? ActOnIntPosting { get; set; }
+
+        // 'Schedule' | 'Balance' | 'MinBalance'
+        [Column("intcalcmethod")]
+        [StringLength(12)]
+        public string? IntCalcMethod { get; set; }
     }
 }

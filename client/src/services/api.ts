@@ -27,66 +27,86 @@ export interface AuthResponse {
 
 export class ApiService {
   private baseURL: string;
+  private isRefreshing = false;
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
   }
 
-  async makeRequest<T = any>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
+  private async parseErrorMessage(response: Response): Promise<string> {
+    const contentType = response.headers.get('content-type');
+    try {
+      if (contentType?.includes('application/json')) {
+        const data = await response.json();
+        return data.message || 'Request failed';
+      }
+      return (await response.text()) || 'Request failed';
+    } catch {
+      return 'Request failed';
+    }
+  }
+
+  private async tryRefreshToken(): Promise<boolean> {
+    // Deduplicate concurrent refresh calls
+    if (this.isRefreshing) return this.refreshPromise!;
+    this.isRefreshing = true;
+    this.refreshPromise = fetch(`${this.baseURL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    }).then(r => r.ok).catch(() => false).finally(() => {
+      this.isRefreshing = false;
+      this.refreshPromise = null;
+    });
+    return this.refreshPromise;
+  }
+
+  async makeRequest<T = any>(endpoint: string, options: RequestOptions = {}, _retry = false): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     const config: RequestOptions = {
       headers: {
-       ...(!(options.body instanceof FormData) && {
-          'Content-Type': 'application/json'
-        }),
-        ...options.headers
+        ...(!(options.body instanceof FormData) && { 'Content-Type': 'application/json' }),
+        ...options.headers,
       },
       credentials: 'include',
-      ...options
+      ...options,
     };
 
     try {
       const response = await fetch(url, config);
+
       if (response.status === 401) {
-        throw new Error("Unauthorized");
-      }
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type');
-        let errorMessage = 'Request failed';
-
-        if (contentType && contentType.includes('application/json')) {
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorMessage;
-          } catch {
-            const fallback = await response.text();
-            errorMessage = fallback || errorMessage;
+        // Don't attempt refresh for auth endpoints themselves
+        const isAuthEndpoint = endpoint.includes('/auth/');
+        if (!_retry && !isAuthEndpoint) {
+          const refreshed = await this.tryRefreshToken();
+          if (refreshed) {
+            return this.makeRequest<T>(endpoint, options, true);
           }
-        } else {
-          errorMessage = await response.text() || errorMessage;
         }
-
-        throw new Error(errorMessage);
+        window.location.href = '/session-expired';
+        throw new Error('Session expired. Please log in again.');
       }
 
-      // Handle 204 No Content
-      if (response.status === 204) {
-        return {};
+      if (!response.ok) {
+        throw new Error(await this.parseErrorMessage(response));
       }
+
+      if (response.status === 204) return {};
 
       const contentType = response.headers.get('content-type');
       const text = await response.text();
 
-      if (contentType && contentType.includes('application/json') && text) {
-        return {
-          ...(JSON.parse(text) as ApiResponse<T>)
-        };
+      if (contentType?.includes('application/json') && text) {
+        return { ...(JSON.parse(text) as ApiResponse<T>) };
       }
 
       return { data: text as any };
 
     } catch (error) {
-      console.error('API Error:', error);
+      if (!(error instanceof Error && error.message.includes('Session expired'))) {
+        console.error('API Error:', error);
+      }
       throw error;
     }
   }

@@ -171,7 +171,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 {
                     int debitAccountId = (int)dto.Voucher!.DebitAccountId;
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.Voucher.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.Voucher.VoucherNarration ?? "";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.Voucher.VoucherDate, DateTimeKind.Unspecified);
@@ -222,8 +222,10 @@ namespace BankingPlatform.API.Service.AccountMasters
     int branchId,
     LocationFilterDTO filter)
         {
+            var workingDate = _commonfunctions.GetWorkingDate();
             var query = _context.accountmaster
-                .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.Saving);
+                .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.Saving
+                    && (!workingDate.HasValue || x.AccOpeningDate.Date <= workingDate.Value.Date));
 
             // ✅ CHANGE: Bring data to memory FIRST
             var allAccounts = await query.ToListAsync();
@@ -370,6 +372,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                 .FirstOrDefaultAsync(m => m.ID == dto.AccountMasterDTO!.AccId && m.BranchId == dto.AccountMasterDTO.BranchId);
 
             if (accountMaster == null) return "Account not found.";
+
+            if (!await _commonfunctions.CanModifyAccountInCurrentSession(dto.AccountMasterDTO!.BranchId, accountMaster.AccOpeningDate))
+                return "This account can only be modified in the session it was opened in.";
 
             (int headId, long headCode) = await _commonfunctions.GetSavingProductPrincipalHead(dto.AccountMasterDTO!.BranchId, (int)dto.AccountMasterDTO.GeneralProductId!);
             if (headId == 0 || headCode == 0)
@@ -611,6 +616,9 @@ namespace BankingPlatform.API.Service.AccountMasters
 
             if (accountMaster == null) return "Account not found.";
 
+            if (await _commonfunctions.AccountInUse(accountId, branchId))
+                return "This account cannot be deleted as it is already in use.";
+
             using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
@@ -655,7 +663,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 await _context.SaveChangesAsync();
                 int debitAccountId = (int)dto.DebitAccountId;
                 decimal totalDebit = (decimal)dto.TotalAmount;
-                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(dto.BranchId);
+                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(dto.BranchId, dto.VoucherDate);
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(dto.BranchId);
                 string narration = dto.Narration ?? "";
                 DateTime voucherDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Unspecified);

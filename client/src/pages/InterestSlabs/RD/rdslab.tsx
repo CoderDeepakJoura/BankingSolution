@@ -16,6 +16,7 @@ import commonservice from "../../../services/common/commonservice";
 import interestSlabService, {
   CombinedRDIntDTO,
 } from "../../../services/interestslab/rdinterestslab";
+import DatePicker from "../../../components/DatePicker";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ const RDAccountInterestSlab = () => {
   const isEditMode = !!slabId;
 
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [loading,    setLoading]    = useState(false);
   const [rdProducts, setRDProducts] = useState<RDProduct[]>([]);
@@ -91,7 +93,7 @@ const RDAccountInterestSlab = () => {
     branchId:       user.branchid,
     rdProductId:    0,
     slabName:       "",
-    applicableDate: commonservice.getTodaysDate(),
+    applicableDate: sessionDate,
   });
 
   const [interestSlabs, setInterestSlabs] = useState<InterestSlab[]>([
@@ -375,7 +377,7 @@ const RDAccountInterestSlab = () => {
       id: null, branchId: user.branchid,
       rdProductId: 0, slabName: "",
       // description removed
-      applicableDate: commonservice.getTodaysDate(),
+      applicableDate: sessionDate,
     });
     setInterestSlabs([{ slabNo: 1, fromAmount: "0", toAmount: "", kistInterval: "", periodFrom: "", periodTo: "", interestRate: "" }]);
     setFormErrors({});
@@ -557,14 +559,14 @@ const RDAccountInterestSlab = () => {
                           Applicable Date <span className="text-red-500">*</span>
                         </span>
                       </label>
-                      <input
-                        type="date"
+                      <DatePicker
                         value={formData.applicableDate}
-                        onChange={(e) => commonservice.handleDateChange(e.target.value, (val) => handleInputChange("applicableDate", val), "effectiveFrom")}
-                        onBlur={(e) => handleFieldBlur("applicableDate", e.target.value)}
-                        max={commonservice.getTodaysDate()}
-                        readOnly={isEditMode}
-                        className={`w-full px-3 py-2.5 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm ${formErrors.applicableDate ? "border-red-500 bg-red-50" : "border-gray-200"}`}
+                        onChange={(val) => handleInputChange("applicableDate", val)}
+                        onBlur={(val) => handleFieldBlur("applicableDate", val)}
+                        max={sessionDate}
+                        workingDate={sessionDate}
+                        disabled={isEditMode}
+                        className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none text-sm ${formErrors.applicableDate ? "border-red-500 bg-red-50" : "border-gray-200"}`}
                       />
                       {formErrors.applicableDate
                         ? <p className="text-red-500 text-xs flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {formErrors.applicableDate}</p>

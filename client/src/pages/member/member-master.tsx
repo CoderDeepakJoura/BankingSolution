@@ -45,6 +45,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import DashboardLayout from "../../Common/Layout";
 import ZoneApiService from "../../services/location/zone/zoneapi";
+import DatePicker from "../../components/DatePicker";
 
 interface ZoneInfo {
   zoneId: number;
@@ -242,6 +243,9 @@ const MemberMaster = () => {
   const PANref = useRef(null);
   const [membershipType, setMembershipType] = useState<string>(""); // 'P' or 'N'
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate
+    ? commonservice.splitDate(user.workingdate)
+    : commonservice.getTodaysDate();
   const { errors, validateForm, clearErrors, markFieldTouched } =
     useFormValidation();
   const [showValidationSummary, setShowValidationSummary] = useState(false);
@@ -276,6 +280,11 @@ const MemberMaster = () => {
   const [memberSignature, setMemberSignature] = useState(null);
   const [shouldLoadData, setShouldLoadData] = useState(true);
   const [zones, setZones] = useState<ZoneInfo[]>([]);
+
+  // Validation option toggles — all mandatory by default
+  const [requireAadhaarPan, setRequireAadhaarPan] = useState(true);
+  const [requireContact, setRequireContact] = useState(true);
+  const [requirePicSign, setRequirePicSign] = useState(true);
 
   useEffect(() => {
     const fetchZoneData = async () => {
@@ -437,6 +446,18 @@ const MemberMaster = () => {
             if (data.member.nominalMembershipNo != "") setMembershipType("N");
             else setMembershipType("P");
 
+            // Auto-detect which fields are missing so toggles match the member's actual data
+            const hasPan     = !!data.documentDetails?.panCardNo?.trim();
+            const hasAadhaar = !!data.documentDetails?.aadhaarCardNo?.trim();
+            setRequireAadhaarPan(hasPan && hasAadhaar);
+
+            const hasPhone = !!data.member?.phoneNo1?.trim();
+            setRequireContact(hasPhone);
+
+            const hasPic  = !!data.documentDetails?.memberPicExt?.trim();
+            const hasSign = !!data.documentDetails?.memberSignExt?.trim();
+            setRequirePicSign(hasPic && hasSign);
+
             Swal.close();
           } else {
             Swal.fire("Error", "Member not found", "error");
@@ -513,10 +534,10 @@ const MemberMaster = () => {
     relativeName: "",
     relationId: "",
     gender: "",
-    dob: commonservice.getTodaysDate(),
+    dob: sessionDate,
     casteId: "",
     age: "", // Made readonly, calculated from DOB
-    joiningDate: commonservice.getTodaysDate(),
+    joiningDate: sessionDate,
     occupationId: "",
     // Address fields
     thana: "",
@@ -643,7 +664,7 @@ const MemberMaster = () => {
       relationWithMember: 0,
       age: "", // Made readonly, calculated from DOB
       isMinor: false,
-      dob: commonservice.getTodaysDate(),
+      dob: sessionDate,
       nameOfGuardian: "",
       nameOfGuardianSL: "",
       nominationDate: commonservice.getTodaysDate(),
@@ -880,7 +901,8 @@ const MemberMaster = () => {
       memberData,
       nominees,
       voucherData,
-      [memberPhoto, memberSignature] // Pass images for validation
+      [memberPhoto, memberSignature],
+      { requireAadhaarPan, requireContact, requirePicSign }
     );
 
     if (!validation.isValid) {
@@ -896,19 +918,19 @@ const MemberMaster = () => {
       Swal.fire("Error", "Relative Name is required", "error");
       return;
     }
-    if (!memberData.phoneNo1?.trim()) {
+    if (requireContact && !memberData.phoneNo1?.trim()) {
       Swal.fire("Error", "Phone Number is required", "error");
       return;
     }
-    if (!memberData.phonePrefix1?.trim()) {
+    if (requireContact && !memberData.phonePrefix1?.trim()) {
       Swal.fire("Error", "Phone Prefix is required", "error");
       return;
     }
-    if (!memberData.panCardNo?.trim()) {
+    if (requireAadhaarPan && !memberData.panCardNo?.trim()) {
       Swal.fire("Error", "PAN Card is required", "error");
       return;
     }
-    if (!memberData.aadhaarCardNo?.trim()) {
+    if (requireAadhaarPan && !memberData.aadhaarCardNo?.trim()) {
       Swal.fire("Error", "Aadhaar Card is required", "error");
       return;
     }
@@ -916,15 +938,14 @@ const MemberMaster = () => {
       Swal.fire("Error", "Address is required", "error");
       return;
     }
-    if (!memberPhoto?.file && !isEditMode) {
+    if (requirePicSign && !memberPhoto?.file && !isEditMode) {
       Swal.fire("Error", "Member Photo is required", "error");
       return;
     }
-    if (!memberSignature?.file && !isEditMode) {
+    if (requirePicSign && !memberSignature?.file && !isEditMode) {
       Swal.fire("Error", "Member Signature is required", "error");
       return;
     }
-    debugger;
     if (memberData.aadhaarCardNo.trim() !== "") {
       const aadhaarExistsInNominees = nominees.some(
         (nominee) =>
@@ -1291,6 +1312,11 @@ const MemberMaster = () => {
 
   // Updated handleReset function
   const handleReset = () => {
+    // Reset validation toggles to mandatory defaults
+    setRequireAadhaarPan(true);
+    setRequireContact(true);
+    setRequirePicSign(true);
+
     // Reset member data
     setMembershipType("P");
     setMemberData({
@@ -1304,10 +1330,10 @@ const MemberMaster = () => {
       relativeName: "",
       relationId: "",
       gender: "",
-      dob: commonservice.getTodaysDate(),
+      dob: sessionDate,
       age: "", // Reset calculated age
       casteId: "",
-      joiningDate: commonservice.getTodaysDate(),
+      joiningDate: sessionDate,
       occupationId: "",
       thana: "",
       addressLine1: "",
@@ -1360,10 +1386,10 @@ const MemberMaster = () => {
         relationWithMember: 0,
         age: "", // Reset calculated age
         isMinor: false,
-        dob: commonservice.getTodaysDate(),
+        dob: sessionDate,
         nameOfGuardian: "",
         nameOfGuardianSL: "",
-        nominationDate: commonservice.getTodaysDate(),
+        nominationDate: sessionDate,
         aadhaarCardNo: "",
         PANCardNo: "",
         nomRelativeName: "",
@@ -1643,24 +1669,12 @@ const MemberMaster = () => {
         errors={errorsByField.dob || []}
         icon={<Calendar className="w-4 h-4 text-red-500" />}
       >
-        <input
-          type="date"
+        <DatePicker
           value={memberData.dob}
-          onChange={(e) =>commonservice.handleDateChange(
-                                        e.target.value,
-                                        (val) =>
-                                          handleInputChange(
-                                            "dob",
-                                            val
-                                          ),
-                                        "joiningDate"
-                                      )
-                                    }
-          // onChange={(e) => handleInputChange("dob", e.target.value)}
-          onBlur={() => handleFieldBlur("dob")}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          max={commonservice.getTodaysDate()} // Prevent future dates
-          required
+          onChange={(val) => { handleInputChange("dob", val); handleFieldBlur("dob"); }}
+          max={sessionDate}
+          workingDate={sessionDate}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
         />
       </FormField>
 
@@ -1689,25 +1703,12 @@ const MemberMaster = () => {
         errors={errorsByField.joiningDate || []}
         icon={<Calendar className="w-4 h-4 text-green-500" />}
       >
-        <input
-          type="date"
+        <DatePicker
           value={memberData.joiningDate}
-          onChange={(e) =>commonservice.handleDateChange(
-                                        e.target.value,
-                                        (val) =>
-                                          handleInputChange(
-                                            "joiningDate",
-                                            val
-                                          ),
-                                        "joiningDate"
-                                      )
-                                    }
-          // onChange={(e) => handleInputChange("joiningDate", e.target.value)}
-          onBlur={() => handleFieldBlur("joiningDate")}
-          readOnly
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          max={commonservice.getTodaysDate()} // Prevent future dates
-          required
+          onChange={(val) => handleInputChange("joiningDate", val)}
+          max={sessionDate}
+          workingDate={sessionDate}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
         />
       </FormField>
 
@@ -1806,7 +1807,7 @@ const MemberMaster = () => {
           <FormField
             name="panCardNo"
             label="PAN Card Number"
-            required
+            required={requireAadhaarPan}
             errors={errorsByField.panCardNo || []}
             icon={<CreditCard className="w-4 h-4 text-blue-500" />}
             description="Format: ABCDE1234F"
@@ -1831,7 +1832,7 @@ const MemberMaster = () => {
           <FormField
             name="aadhaarCardNo"
             label="Aadhaar Card Number"
-            required
+            required={requireAadhaarPan}
             errors={errorsByField.aadhaarCardNo || []}
             icon={<CreditCard className="w-4 h-4 text-green-500" />}
             description="Format: 1234 5678 9012"
@@ -1873,7 +1874,7 @@ const MemberMaster = () => {
             maxSize={5 * 1024 * 1024}
             uploadedFile={memberPhoto}
             onRemoveFile={removeMemberPhoto}
-            isRequired={true}
+            isRequired={requirePicSign}
           />
         </div>
 
@@ -1890,7 +1891,7 @@ const MemberMaster = () => {
             maxSize={5 * 1024 * 1024}
             uploadedFile={memberSignature}
             onRemoveFile={removeMemberSignature}
-            isRequired={true}
+            isRequired={requirePicSign}
           />
         </div>
       </div>
@@ -2033,24 +2034,12 @@ const MemberMaster = () => {
               required
               errors={errorsByField[`nominees[${index}].dob`] || []}
             >
-              <input
-                type="date"
+              <DatePicker
                 value={nominee.dob}
-                onChange={(e) =>commonservice.handleDateChange(
-                                        e.target.value,
-                                        (val) =>
-                                         updateNominee(nominee.id, "dob", val),
-                                        "joiningDate"
-                                      )
-                                    }
-                // onChange={(e) =>
-                //   updateNominee(nominee.id, "dob", e.target.value)
-                // }
-                
-                onBlur={() => handleFieldBlur(`nominees[${index}].dob`)}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                max={commonservice.getTodaysDate()} // Prevent future dates
-                required
+                onChange={(val) => { updateNominee(nominee.id, "dob", val); handleFieldBlur(`nominees[${index}].dob`); }}
+                max={sessionDate}
+                workingDate={sessionDate}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg outline-none"
               />
             </FormField>
 
@@ -2077,18 +2066,12 @@ const MemberMaster = () => {
               required
               errors={errorsByField[`nominees[${index}].nominationDate`] || []}
             >
-              <input
-                type="date"
+              <DatePicker
                 value={nominee.nominationDate}
-                required
-                onChange={(e) =>
-                  updateNominee(nominee.id, "nominationDate", e.target.value)
-                }
-                onBlur={() =>
-                  handleFieldBlur(`nominees[${index}].nominationDate`)
-                }
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                max={commonservice.getTodaysDate()} // Prevent future dates
+                onChange={(val) => { updateNominee(nominee.id, "nominationDate", val); handleFieldBlur(`nominees[${index}].nominationDate`); }}
+                max={sessionDate}
+                workingDate={sessionDate}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg outline-none"
               />
             </FormField>
 
@@ -2642,7 +2625,7 @@ const MemberMaster = () => {
           <FormField
             name="phoneType1"
             label="Phone Type"
-            required
+            required={requireContact}
             errors={errorsByField.phoneType1 || []}
           >
             <select
@@ -2685,7 +2668,7 @@ const MemberMaster = () => {
           <FormField
             name="phoneNo1"
             label="Phone Number"
-            required
+            required={requireContact}
             errors={errorsByField.phoneNo1 || []}
           >
             <input
@@ -2966,6 +2949,83 @@ const MemberMaster = () => {
                   <ArrowLeft className="w-4 h-4" />
                   Back to Operations
                 </button>
+              </div>
+
+              {/* Validation options */}
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <Settings className="w-4 h-4 text-gray-500" />
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Make Optional
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {/* Aadhaar & PAN toggle */}
+                  <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                    <div
+                      onClick={() => setRequireAadhaarPan((v) => !v)}
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                        requireAadhaarPan ? "bg-blue-600" : "bg-amber-400"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                          requireAadhaarPan ? "translate-x-0" : "translate-x-5"
+                        }`}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                      Aadhaar &amp; PAN
+                      <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${requireAadhaarPan ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                        {requireAadhaarPan ? "Required" : "Optional"}
+                      </span>
+                    </span>
+                  </label>
+
+                  {/* Contact details toggle */}
+                  <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                    <div
+                      onClick={() => setRequireContact((v) => !v)}
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                        requireContact ? "bg-blue-600" : "bg-amber-400"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                          requireContact ? "translate-x-0" : "translate-x-5"
+                        }`}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                      Contact Details
+                      <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${requireContact ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                        {requireContact ? "Required" : "Optional"}
+                      </span>
+                    </span>
+                  </label>
+
+                  {/* Picture & Signature toggle */}
+                  <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                    <div
+                      onClick={() => setRequirePicSign((v) => !v)}
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                        requirePicSign ? "bg-blue-600" : "bg-amber-400"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                          requirePicSign ? "translate-x-0" : "translate-x-5"
+                        }`}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                      Picture &amp; Signature
+                      <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${requirePicSign ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                        {requirePicSign ? "Required" : "Optional"}
+                      </span>
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
 

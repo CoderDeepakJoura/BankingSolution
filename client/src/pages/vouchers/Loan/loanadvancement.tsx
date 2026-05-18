@@ -1,988 +1,1016 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Save,
   X,
   FileText,
-  Info,
-  AlertCircle,
+  User,
+  Users,
+  Phone,
+  MapPin,
+  CreditCard,
+  Calendar,
+  DollarSign,
+  ArrowLeft,
   Plus,
   Trash2,
+  RotateCcw,
+  UserCheck,
+  Pencil,
 } from "lucide-react";
 import DashboardLayout from "../../../Common/Layout";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Select from "react-select";
 import Swal from "sweetalert2";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../redux";
+import commonservice from "../../../services/common/commonservice";
+import loanAdvancementApi, {
+  LoanAdvancementCreditItemDTO,
+} from "../../../services/vouchers/loan/loanAdvancementApi";
+import {
+  loanAccountApi,
+  CombinedLoanAccountDTO,
+} from "../../../services/accountMasters/loanaccount/loanaccountapi";
+import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
 
-interface Transaction {
-  id: number;
-  particular: string;
-  chequeNo: string;
-  loanAmt: string;
-  narration: string;
+const ACCOUNT_TYPES = { Loan: 1, Saving: 2, General: 3, RD: 5, FD: 6 };
+
+const creditAccountTypeOptions = [
+  { value: ACCOUNT_TYPES.General, label: "General" },
+  { value: ACCOUNT_TYPES.Saving, label: "Saving" },
+  { value: ACCOUNT_TYPES.RD, label: "RD" },
+];
+
+const selectStyles = (hasError = false) => ({
+  control: (base: any, state: any) => ({
+    ...base,
+    minHeight: "48px",
+    borderWidth: "2px",
+    borderColor: hasError ? "#ef4444" : state.isFocused ? "#3b82f6" : "#e5e7eb",
+    borderRadius: "0.5rem",
+    boxShadow: state.isFocused ? "0 0 0 2px rgba(59,130,246,0.2)" : "none",
+    cursor: state.isDisabled ? "not-allowed" : "pointer",
+    "&:hover": { borderColor: hasError ? "#ef4444" : "#3b82f6" },
+  }),
+  option: (base: any) => ({ ...base, cursor: "pointer" }),
+  dropdownIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
+  clearIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
+});
+
+const compactSelectStyles = (hasError = false) => ({
+  control: (base: any, state: any) => ({
+    ...base,
+    minHeight: "40px",
+    borderWidth: "2px",
+    borderColor: hasError ? "#ef4444" : state.isFocused ? "#3b82f6" : "#e5e7eb",
+    borderRadius: "0.5rem",
+    boxShadow: state.isFocused ? "0 0 0 2px rgba(59,130,246,0.2)" : "none",
+    cursor: state.isDisabled ? "not-allowed" : "pointer",
+    "&:hover": { borderColor: hasError ? "#ef4444" : "#3b82f6" },
+  }),
+  option: (base: any) => ({ ...base, cursor: "pointer" }),
+  dropdownIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
+  clearIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
+});
+
+interface LoanAccountOption {
+  accId: number;
+  accountName: string;
+  loanAmountPassed: number;
 }
 
-const LoanAdvancementDemo = () => {
+interface CreditRow extends LoanAdvancementCreditItemDTO {
+  rowId: number;
+  accountName: string;
+  accountTypeName: string;
+}
+
+const formatDate = (value?: string | null) => {
+  if (!value) return undefined;
+  return new Date(value).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).replace(/ /g, "-");
+};
+
+const ACCOUNT_TYPE_LABELS: Record<number, string> = { 1: "Loan", 2: "Saving", 3: "General", 5: "RD", 6: "FD" };
+
+const LoanAdvancementVoucher: React.FC = () => {
   const navigate = useNavigate();
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
-  const [saveAttempted, setSaveAttempted] = useState(false);
+  const location = useLocation();
+  const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("account-info");
+
+  const [loanProducts, setLoanProducts] = useState<{ id: number; productName: string }[]>([]);
+  const [loanAccounts, setLoanAccounts] = useState<LoanAccountOption[]>([]);
+  const [creditAccountsForRow, setCreditAccountsForRow] = useState<{ accId: number; accountName: string }[]>([]);
+  const [loanAccountData, setLoanAccountData] = useState<CombinedLoanAccountDTO | null>(null);
+  const [guarantorNames, setGuarantorNames] = useState<Record<string, string>>({});
+  const [creditItems, setCreditItems] = useState<CreditRow[]>([]);
+  const [editingRowId, setEditingRowId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
-    vrNo: "",
-    type: "Short Term - ST",
-    memberName: "",
-    chequeNo: "",
+    voucherDate: "",
+    loanProductId: 0,
+    loanAccountId: 0,
+    loanAmountPassed: 0,
+    totalAmount: "",
+    narration: "",
+  });
+
+  const [rowForm, setRowForm] = useState({
+    accountType: null as number | null,
+    accountId: null as number | null,
     amount: "",
     narration: "",
-    drAccount: "",
   });
 
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [memberDetails, setMemberDetails] = useState({
-    fatherName: "",
-    waris: "",
-    village: "",
-    accountNo: "",
-    khataNo: "",
-    idCardNo: "",
-    landHolding: "",
-    aadhaarNo: "",
-    memberDeposit: "",
-    share: "",
-    totalLimit: "",
-    availableLimit: "",
-  });
+  // Shared: load loan account details + guarantors for any account ID
+  const loadAccountDetails = async (accountId: number) => {
+    const res = await loanAccountApi.getLoanAccountById(accountId, user.branchid);
+    if (!res.success) return null;
+    const data = res.data as CombinedLoanAccountDTO;
+    setLoanAccountData(data);
 
-  // Dummy member data
-  const memberData: { [key: string]: any } = {
-    "2 - NACHTTAR SINGH S/O BAKSHI SINGH": {
-      fatherName: "BAKSHI SINGH",
-      waris: "WIFE: KULWINDER KAUR",
-      village: "KHUNAN KALAN",
-      accountNo: "1417D001030025G",
-      khataNo: "2",
-      idCardNo: "ID-2024-001",
-      landHolding: "5 Acres",
-      aadhaarNo: "1234-5678-9012",
-      memberDeposit: "15000.00 Cr",
-      share: "5000.00 Rs.",
-      totalLimit: "100000.00",
-      availableLimit: "75000.00",
-    },
-    "3 - RAM KUMAR S/O VIJAY SINGH": {
-      fatherName: "VIJAY SINGH",
-      waris: "WIFE: SUNITA DEVI",
-      village: "PUNJAB NAGAR",
-      accountNo: "1417D001030045H",
-      khataNo: "3",
-      idCardNo: "ID-2024-002",
-      landHolding: "8 Acres",
-      aadhaarNo: "9876-5432-1098",
-      memberDeposit: "25000.00 Cr",
-      share: "7500.00 Rs.",
-      totalLimit: "150000.00",
-      availableLimit: "120000.00",
-    },
-    "5 - HARJEET SINGH S/O KULDEEP SINGH": {
-      fatherName: "KULDEEP SINGH",
-      waris: "WIFE: PARAMJEET KAUR",
-      village: "MOHALI CITY",
-      accountNo: "1417D001030078K",
-      khataNo: "5",
-      idCardNo: "ID-2024-003",
-      landHolding: "3 Acres",
-      aadhaarNo: "5555-6666-7777",
-      memberDeposit: "10000.00 Cr",
-      share: "3000.00 Rs.",
-      totalLimit: "80000.00",
-      availableLimit: "60000.00",
-    },
+    const g = data.guarantor;
+    if (g) {
+      const pairs: Array<{ key: string; memberId: number; branchId: number }> = [];
+      if (g.guar1MemId) pairs.push({ key: "guar1", memberId: g.guar1MemId, branchId: g.guar1MemBrId });
+      if (g.guar2MemId) pairs.push({ key: "guar2", memberId: g.guar2MemId, branchId: g.guar2MemBrId });
+      if (g.witness1MemId) pairs.push({ key: "wit1", memberId: g.witness1MemId, branchId: g.wit1MemBrId ?? g.guar1MemBrId });
+      if (g.witness2MemId) pairs.push({ key: "wit2", memberId: g.witness2MemId, branchId: g.wit2MemBrId });
+
+      const results = await Promise.all(pairs.map((p) => commonservice.fetch_member_name(p.memberId, p.branchId)));
+      const names: Record<string, string> = {};
+      pairs.forEach((p, i) => {
+        const d = results[i]?.data;
+        names[p.key] = d?.memberName ? `${d.memberName}${d.relativeName ? ` (${d.relativeName})` : ""}` : `Member #${p.memberId}`;
+      });
+      setGuarantorNames(names);
+    }
+    return data;
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  useEffect(() => {
+    const editVoucher = (location.state as any)?.editVoucher as VoucherPreview | undefined;
 
-    // Fetch member details when member changes
-    if (field === "memberName" && value) {
-      const details = memberData[value];
-      if (details) {
-        setMemberDetails(details);
-        // Clear member name error when selected
-        setErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors["memberName"];
-          return newErrors;
+    if (editVoucher) {
+      // ── Edit mode ──────────────────────────────────────────────
+      setIsEditMode(true);
+      setEditVoucherId(editVoucher.voucherId);
+
+      const drEntry = editVoucher.entries.find((e) => e.entryType === "Dr");
+      const crEntries = editVoucher.entries.filter((e) => e.entryType === "Cr");
+
+      if (drEntry) {
+        const vDate = editVoucher.voucherDate.split("T")[0];
+        setFormData({
+          voucherDate: vDate,
+          loanProductId: drEntry.generalProductId ?? 0,
+          loanAccountId: drEntry.accountId,
+          loanAmountPassed: 0,
+          totalAmount: drEntry.amount.toFixed(2),
+          narration: editVoucher.narration ?? "",
         });
-        Swal.fire({
-          icon: "info",
-          title: "Member Loaded",
-          text: `Details loaded for ${value.split(" - ")[1]}`,
-          timer: 1500,
-          showConfirmButton: false,
+
+        setLoanAccounts([{ accId: drEntry.accountId, accountName: drEntry.accountName, loanAmountPassed: 0 }]);
+
+        setCreditItems(
+          crEntries.map((cr) => ({
+            rowId: Date.now() + Math.random(),
+            accountId: cr.accountId,
+            accountType: cr.accountType,
+            amount: cr.amount,
+            narration: cr.narration ?? "",
+            accountName: cr.accountName,
+            accountTypeName: ACCOUNT_TYPE_LABELS[cr.accountType] ?? "Unknown",
+          }))
+        );
+
+        // Load account details (guarantors, kist info, etc.)
+        loadAccountDetails(drEntry.accountId).then((data) => {
+          const loanAmountPassed = data?.kistDetail?.loanAmountPassed ?? 0;
+          setFormData((p) => ({ ...p, loanAmountPassed }));
+          setLoanAccounts([{ accId: drEntry.accountId, accountName: drEntry.accountName, loanAmountPassed }]);
         });
       }
-    }
 
-    // Clear error when user starts typing/changing value
-    if (errors[field] && value && value.toString().trim() !== "") {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
+      // Still load products list for display
+      commonservice.fetch_loan_products(user.branchid).then((res) => {
+        if (res.success) setLoanProducts(res.data ?? []);
       });
-    }
-  };
-
-  const handleBlur = (field: string) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-
-    // Only validate if field was actually interacted with
-    const value = formData[field as keyof typeof formData];
-    if (value === undefined || value === null || value === "") {
-      validateField(field, value);
-    }
-  };
-
-  const validateField = (field: string, value: any) => {
-    let error = "";
-
-    switch (field) {
-      case "vrNo":
-        if (!value || value.trim() === "") {
-          error = "Voucher number is required";
-        } else if (!/^\d+$/.test(value)) {
-          error = "Voucher number must contain only digits";
-        }
-        break;
-
-      case "memberName":
-        if (!value || value.trim() === "") {
-          error = "Member name is required";
-        }
-        break;
-
-      case "drAccount":
-        if (!value || value.trim() === "") {
-          error = "Dr Loan Account is required";
-        }
-        break;
-
-      case "chequeNo":
-        if (value && value.trim() !== "") {
-          if (value.length < 6) {
-            error = "Cheque number must be at least 6 characters";
-          } else if (!/^[A-Za-z0-9]+$/.test(value)) {
-            error = "Cheque number must be alphanumeric";
-          }
-        }
-        break;
-
-      case "amount":
-        if (value && value.trim() !== "") {
-          if (isNaN(Number(value))) {
-            error = "Amount must be a valid number";
-          } else if (Number(value) <= 0) {
-            error = "Amount must be greater than 0";
-          } else if (Number(value) > 10000000) {
-            error = "Amount cannot exceed 1 crore";
-          }
-        }
-        break;
-
-      case "narration":
-        if (value && value.trim() !== "") {
-          if (value.trim().length < 5) {
-            error = "Narration must be at least 5 characters";
-          }
-        }
-        break;
-
-      default:
-        break;
-    }
-
-    if (error) {
-      setErrors((prev) => ({ ...prev, [field]: error }));
     } else {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
+      // ── Create mode ────────────────────────────────────────────
+      setFormData((p) => ({ ...p, voucherDate: sessionDate }));
+      commonservice.fetch_loan_products(user.branchid).then((res) => {
+        if (res.success) setLoanProducts(res.data ?? []);
       });
     }
+  }, []);
 
-    return error === "";
+  const clearError = (key: string) =>
+    setErrors((p) => { const n = { ...p }; delete n[key]; return n; });
+
+  const handleProductChange = async (sel: any) => {
+    const id = sel ? sel.value : 0;
+    setFormData((p) => ({ ...p, loanProductId: id, loanAccountId: 0, loanAmountPassed: 0, totalAmount: "" }));
+    setLoanAccounts([]);
+    setLoanAccountData(null);
+    setCreditItems([]);
+    setEditingRowId(null);
+    setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
+    setCreditAccountsForRow([]);
+    clearError("loanProductId");
+    if (id && formData.voucherDate) {
+      const res = await commonservice.fetch_loan_accounts_by_product(user.branchid, id, formData.voucherDate);
+      if (res.success) setLoanAccounts(res.data ?? []);
+    }
   };
 
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-
-    // Required field validations
-    if (!formData.vrNo || formData.vrNo.trim() === "") {
-      newErrors["vrNo"] = "Voucher number is required";
-    } else if (!/^\d+$/.test(formData.vrNo)) {
-      newErrors["vrNo"] = "Voucher number must contain only digits";
+  const handleAccountChange = async (sel: any) => {
+    if (!sel) {
+      setFormData((p) => ({ ...p, loanAccountId: 0, loanAmountPassed: 0, totalAmount: "" }));
+      setLoanAccountData(null);
+      setGuarantorNames({});
+      setCreditItems([]);
+      setEditingRowId(null);
+      setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
+      setCreditAccountsForRow([]);
+      return;
     }
-
-    if (!formData.memberName || formData.memberName.trim() === "") {
-      newErrors["memberName"] = "Member name is required";
-    }
-
-    // Check if Dr account is selected
-    if (!formData.drAccount || formData.drAccount.trim() === "") {
-      newErrors["drAccount"] = "Please select a Dr Loan Account";
-    }
-
-    // Check if at least one transaction is added
-    if (transactions.length === 0) {
-      newErrors["transactions"] = "Please add at least one transaction";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const acc = loanAccounts.find((a) => a.accId === sel.value);
+    setFormData((p) => ({ ...p, loanAccountId: sel.value, loanAmountPassed: acc?.loanAmountPassed ?? 0, totalAmount: "" }));
+    setLoanAccountData(null);
+    setGuarantorNames({});
+    setCreditItems([]);
+    setEditingRowId(null);
+    setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
+    setCreditAccountsForRow([]);
+    clearError("loanAccountId");
+    await loadAccountDetails(sel.value);
   };
 
-  const addTransaction = () => {
-    // Validate amount and narration before adding
-    if (!formData.amount || formData.amount.trim() === "") {
-      setErrors((prev) => ({ ...prev, amount: "Amount is required" }));
-      setTouched((prev) => ({ ...prev, amount: true }));
-      Swal.fire({
-        icon: "warning",
-        title: "Missing Amount",
-        text: "Please enter amount to add transaction",
-        confirmButtonColor: "#F59E0B",
-      });
-      return;
+  const handleRowTypeChange = async (sel: any) => {
+    const t = sel ? sel.value : null;
+    setRowForm((p) => ({ ...p, accountType: t, accountId: null }));
+    setCreditAccountsForRow([]);
+    clearError("rowType");
+    clearError("rowAccount");
+    if (t) {
+      const res = await commonservice.fetch_accounts_by_type(user.branchid, t);
+      if (res.success) setCreditAccountsForRow(res.data ?? []);
+    }
+  };
+
+  const totalCredited = creditItems.reduce((s, r) => s + r.amount, 0);
+  const otherCredited = editingRowId !== null
+    ? creditItems.filter((r) => r.rowId !== editingRowId).reduce((s, r) => s + r.amount, 0)
+    : totalCredited;
+  const pending = Math.max(0, (Number(formData.totalAmount) || 0) - otherCredited);
+
+  const handleEditRow = async (row: CreditRow) => {
+    const res = await commonservice.fetch_accounts_by_type(user.branchid, row.accountType);
+    if (res.success) setCreditAccountsForRow(res.data ?? []);
+    setRowForm({
+      accountType: row.accountType,
+      accountId: row.accountId,
+      amount: row.amount.toFixed(2),
+      narration: row.narration ?? "",
+    });
+    setEditingRowId(row.rowId);
+    ["rowType", "rowAccount", "rowAmount"].forEach(clearError);
+  };
+
+  const handleCancelRowEdit = () => {
+    setEditingRowId(null);
+    setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
+    setCreditAccountsForRow([]);
+    ["rowType", "rowAccount", "rowAmount"].forEach(clearError);
+  };
+
+  const handleAddRow = () => {
+    const errs: Record<string, string> = {};
+    if (!rowForm.accountType) errs.rowType = "Select account type";
+    if (!rowForm.accountId) errs.rowAccount = "Select account";
+    if (!rowForm.amount || Number(rowForm.amount) <= 0) errs.rowAmount = "Enter valid amount";
+    else if (Number(rowForm.amount) > pending + 0.01) errs.rowAmount = `Exceeds available (${pending.toFixed(2)})`;
+    if (Object.keys(errs).length) { setErrors((p) => ({ ...p, ...errs })); return; }
+
+    const accOpt = creditAccountsForRow.find((a) => a.accId === rowForm.accountId);
+    const typeLabel = creditAccountTypeOptions.find((t) => t.value === rowForm.accountType)?.label ?? "";
+
+    if (editingRowId !== null) {
+      setCreditItems((p) =>
+        p.map((r) =>
+          r.rowId === editingRowId
+            ? {
+                ...r,
+                accountId: rowForm.accountId!,
+                accountType: rowForm.accountType!,
+                amount: Number(rowForm.amount),
+                narration: rowForm.narration,
+                accountName: accOpt?.accountName ?? r.accountName,
+                accountTypeName: typeLabel,
+              }
+            : r
+        )
+      );
+      setEditingRowId(null);
+    } else {
+      setCreditItems((p) => [
+        ...p,
+        {
+          rowId: Date.now(),
+          accountId: rowForm.accountId!,
+          accountType: rowForm.accountType!,
+          amount: Number(rowForm.amount),
+          narration: rowForm.narration,
+          accountName: accOpt?.accountName ?? "",
+          accountTypeName: typeLabel,
+        },
+      ]);
     }
 
-    if (!formData.narration || formData.narration.trim() === "") {
-      setErrors((prev) => ({ ...prev, narration: "Narration is required" }));
-      setTouched((prev) => ({ ...prev, narration: true }));
-      Swal.fire({
-        icon: "warning",
-        title: "Missing Narration",
-        text: "Please enter narration to add transaction",
-        confirmButtonColor: "#F59E0B",
-      });
-      return;
-    }
+    setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
+    setCreditAccountsForRow([]);
+    ["rowType", "rowAccount", "rowAmount", "creditItems"].forEach(clearError);
+  };
 
-    if (formData.narration.trim().length < 5) {
-      setErrors((prev) => ({
-        ...prev,
-        narration: "Narration must be at least 5 characters",
-      }));
-      setTouched((prev) => ({ ...prev, narration: true }));
-      Swal.fire({
-        icon: "warning",
-        title: "Invalid Narration",
-        text: "Narration must be at least 5 characters",
-        confirmButtonColor: "#F59E0B",
-      });
-      return;
-    }
-
-    const newTransaction: Transaction = {
-      id: Date.now(),
-      particular: "Loan Disbursement",
-      chequeNo: formData.chequeNo || "-",
-      loanAmt: formData.amount,
-      narration: formData.narration,
-    };
-
-    setTransactions([...transactions, newTransaction]);
-
-    // Clear form fields and errors
-    setFormData((prev) => ({
-      ...prev,
-      chequeNo: "",
-      amount: "",
+  const handleReset = () => {
+    setFormData({
+      voucherDate: sessionDate,
+      loanProductId: 0,
+      loanAccountId: 0,
+      loanAmountPassed: 0,
+      totalAmount: "",
       narration: "",
-    }));
-
-    setErrors((prev) => {
-      const newErrors = { ...prev };
-      delete newErrors["transactions"];
-      delete newErrors["amount"];
-      delete newErrors["narration"];
-      delete newErrors["chequeNo"];
-      return newErrors;
     });
-
-    setTouched((prev) => {
-      const newTouched = { ...prev };
-      delete newTouched["amount"];
-      delete newTouched["narration"];
-      delete newTouched["chequeNo"];
-      return newTouched;
-    });
-
-    Swal.fire({
-      icon: "success",
-      title: "Added!",
-      text: "Transaction added successfully",
-      timer: 1500,
-      showConfirmButton: false,
-    });
-  };
-
-  const deleteTransaction = (id: number) => {
-    Swal.fire({
-      title: "Delete Transaction?",
-      text: "Are you sure you want to remove this transaction?",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#EF4444",
-      cancelButtonColor: "#6B7280",
-      confirmButtonText: "Yes, delete it!",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        setTransactions(transactions.filter((t) => t.id !== id));
-        Swal.fire({
-          title: "Deleted!",
-          text: "Transaction has been removed",
-          icon: "success",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-      }
-    });
+    setLoanAccounts([]);
+    setLoanAccountData(null);
+    setGuarantorNames({});
+    setCreditItems([]);
+    setEditingRowId(null);
+    setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
+    setCreditAccountsForRow([]);
+    setErrors({});
+    setActiveTab("account-info");
   };
 
   const handleSave = async () => {
-    setSaveAttempted(true);
+    const errs: Record<string, string> = {};
+    if (!isEditMode && !formData.loanProductId) errs.loanProductId = "Select a loan product";
+    if (!formData.loanAccountId) errs.loanAccountId = "Select a loan account";
+    if (!formData.totalAmount || Number(formData.totalAmount) <= 0)
+      errs.totalAmount = "Enter a valid amount";
+    else if (formData.loanAmountPassed > 0 && Number(formData.totalAmount) > formData.loanAmountPassed)
+      errs.totalAmount = `Cannot exceed sanctioned amount (${formData.loanAmountPassed.toFixed(2)})`;
+    if (creditItems.length === 0)
+      errs.creditItems = "Add at least one credit account";
+    else if (Math.abs(totalCredited - Number(formData.totalAmount)) > 0.01)
+      errs.creditItems = `Credit total ${totalCredited.toFixed(2)} must equal advancement amount`;
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
 
-    if (!validateForm()) {
-      const errorMessages = Object.values(errors).filter((err) => err);
-      const errorCount = errorMessages.length;
+    const payload = {
+      brId: user.branchid,
+      voucherDate: formData.voucherDate,
+      loanAccountId: formData.loanAccountId,
+      totalAmount: Number(formData.totalAmount),
+      narration: formData.narration || undefined,
+      creditItems: creditItems.map((r) => ({
+        accountId: r.accountId,
+        accountType: r.accountType,
+        amount: r.amount,
+        narration: r.narration || undefined,
+      })),
+    };
 
-      await Swal.fire({
-        icon: "error",
-        title: "Validation Failed",
-        html: `
-          <div class="text-left">
-            <p class="mb-3 font-semibold text-red-700">Validation Error${
-              errorCount > 1 ? "s" : ""
-            }</p>
-            <p class="mt-3 text-xs text-gray-600">Please fix the above errors and try again.</p>
-          </div>
-        `,
-        confirmButtonColor: "#EF4444",
-        confirmButtonText: "Fix Errors",
-      });
-      return;
-    }
+    setLoading(true);
+    try {
+      const res = isEditMode && editVoucherId
+        ? await loanAdvancementApi.updateLoanAdvancement(editVoucherId, payload)
+        : await loanAdvancementApi.addLoanAdvancement(payload);
 
-    const totalAmount = transactions.reduce(
-      (sum, t) => sum + Number(t.loanAmt),
-      0
-    );
-
-    await Swal.fire({
-      icon: "success",
-      title: "Loan Advancement Successful!",
-      html: `
-        <div class="text-left space-y-2">
-          <p class="font-semibold text-green-700">All validations passed successfully.</p>
-          <div class="bg-blue-50 p-3 rounded-lg text-sm space-y-1">
-            <p><strong>Member:</strong> ${formData.memberName.split(" - ")[1]}</p>
-            <p><strong>Voucher No:</strong> ${formData.vrNo}</p>
-            <p><strong>Date:</strong> ${new Date(
-              formData.date
-            ).toLocaleDateString()}</p>
-            <p><strong>Total Debit Amount:</strong> ₹${totalAmount.toFixed(2)}</p>
-            <p><strong>Transactions:</strong> ${transactions.length}</p>
-            <p><strong>Dr Account:</strong> ${formData.drAccount}</p>
-          </div>
-        </div>
-      `,
-      confirmButtonColor: "#10B981",
-      confirmButtonText: "OK",
-    });
-
-    // Reset form to initial state
-    setFormData({
-      date: new Date().toISOString().split("T")[0],
-      vrNo: "",
-      type: "Short Term - ST",
-      memberName: "",
-      chequeNo: "",
-      amount: "",
-      narration: "",
-      drAccount: "",
-    });
-
-    setMemberDetails({
-      fatherName: "",
-      waris: "",
-      village: "",
-      accountNo: "",
-      khataNo: "",
-      idCardNo: "",
-      landHolding: "",
-      aadhaarNo: "",
-      memberDeposit: "",
-      share: "",
-      totalLimit: "",
-      availableLimit: "",
-    });
-
-    setTransactions([]);
-    setErrors({});
-    setTouched({});
-    setSaveAttempted(false);
-  };
-
-  const handleNumericInput = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: string,
-    allowDecimal: boolean = true
-  ) => {
-    let value = e.target.value;
-
-    if (allowDecimal) {
-      value = value.replace(/[^0-9.]/g, "");
-      const parts = value.split(".");
-      if (parts.length > 2) {
-        value = parts[0] + "." + parts.slice(1).join("");
-      }
-      if (parts[1] && parts[1].length > 2) {
-        value = parts[0] + "." + parts[1].slice(0, 2);
-      }
-    } else {
-      value = value.replace(/[^0-9]/g, "");
-    }
-
-    handleInputChange(field, value);
-  };
-
-  const handleClose = () => {
-    if (transactions.length > 0 || formData.memberName || formData.vrNo) {
-      Swal.fire({
-        title: "Close Form?",
-        text: "Any unsaved changes will be lost",
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: "#EF4444",
-        cancelButtonColor: "#6B7280",
-        confirmButtonText: "Yes, close it",
-        cancelButtonText: "Cancel",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          navigate("/voucher-operations");
+      if (res.success) {
+        await Swal.fire({
+          icon: "success",
+          title: isEditMode ? "Updated!" : "Success!",
+          text: `Loan advancement voucher ${isEditMode ? "updated" : "saved"}. Voucher No: ${res.data?.voucherNo ?? ""}`,
+          confirmButtonColor: "#3B82F6",
+        });
+        if (isEditMode) {
+          navigate("/voucher-search");
+        } else {
+          handleReset();
         }
-      });
-    } else {
-      navigate("/voucher-operations");
+      } else {
+        throw new Error(res.message || "Failed to save voucher");
+      }
+    } catch (err: any) {
+      Swal.fire({ icon: "error", title: "Error!", text: err.message || "Failed to save.", confirmButtonColor: "#EF4444" });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const typeOptions = [
-    { value: "Short Term - ST", label: "Short Term - ST" },
-    { value: "Medium Term - MT", label: "Medium Term - MT" },
-    { value: "Long Term - LT", label: "Long Term - LT" },
+  // ── Derived options ────────────────────────────────────────────────────────
+  const loanProductOptions = loanProducts.map((p) => ({ value: p.id, label: p.productName }));
+  const loanAccountOptions = loanAccounts.map((a) => ({ value: a.accId, label: a.accountName }));
+  const creditAccOptions = creditAccountsForRow.map((a) => ({ value: a.accId, label: a.accountName }));
+
+  // ── Tab helpers ────────────────────────────────────────────────────────────
+  const tabs = [
+    { id: "account-info", label: "Account Information", icon: User },
+    { id: "ledger", label: "Ledger View", icon: FileText },
+    { id: "guar-detail", label: "Guarantor Detail", icon: Users },
+    { id: "fd-pledge", label: "FD Pledge", icon: CreditCard },
+    { id: "rd-pledge", label: "RD Pledge", icon: CreditCard },
   ];
 
-  const memberOptions = [
-    {
-      value: "2 - NACHTTAR SINGH S/O BAKSHI SINGH",
-      label: "2 - NACHTTAR SINGH S/O BAKSHI SINGH",
-    },
-    {
-      value: "3 - RAM KUMAR S/O VIJAY SINGH",
-      label: "3 - RAM KUMAR S/O VIJAY SINGH",
-    },
-    {
-      value: "5 - HARJEET SINGH S/O KULDEEP SINGH",
-      label: "5 - HARJEET SINGH S/O KULDEEP SINGH",
-    },
-  ];
+  const getTabClass = (id: string) =>
+    `flex items-center gap-2 px-5 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200 cursor-pointer ${
+      activeTab === id
+        ? "border-blue-500 text-blue-600 bg-blue-50"
+        : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+    }`;
 
-  const drAccountOptions = [
-    { value: "LOAN TO MEMBER ST - 605", label: "LOAN TO MEMBER ST - 605" },
-    { value: "CB Loan Mai Bhago - 702", label: "CB Loan Mai Bhago - 702" },
-    { value: "CB LOAN MT 5 - 922", label: "CB LOAN MT 5 - 922" },
-    { value: "CB LOAN ST - 592", label: "CB LOAN ST - 592" },
-    {
-      value: "CB LONE CATTEL FEED - 920",
-      label: "CB LONE CATTEL FEED - 920",
-    },
-  ];
+  // ── Info card helper ───────────────────────────────────────────────────────
+  const InfoCard = ({
+    icon: Icon,
+    color,
+    label,
+    value,
+  }: {
+    icon: any;
+    color: string;
+    label: string;
+    value?: string | number | null;
+  }) => (
+    <div className="flex items-start gap-3">
+      <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center flex-shrink-0`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-xs text-gray-500 mb-1">{label}</p>
+        <p className="text-sm font-semibold text-gray-800">{value ?? "N/A"}</p>
+      </div>
+    </div>
+  );
 
-  const renderFieldError = (field: string) => {
-    if (
-      errors[field] &&
-      (touched[field] || field === "drAccount" || field === "transactions")
-    ) {
+  const acc = loanAccountData?.accountMasterDTO;
+  const kist = loanAccountData?.kistDetail;
+  const guarantor = loanAccountData?.guarantor;
+  const fdPledges = loanAccountData?.fDPledges ?? [];
+  const rdPledges = loanAccountData?.rDPledges ?? [];
+
+  // ── Tab content ────────────────────────────────────────────────────────────
+  const renderTabContent = () => {
+    if (!loanAccountData) {
       return (
-        <div className="flex items-center gap-1 mt-1 text-red-600 text-xs">
-          <AlertCircle className="w-3 h-3" />
-          <span>{errors[field]}</span>
+        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+          <User className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+          <p className="text-sm text-gray-500">Please select a loan account to view information</p>
         </div>
       );
     }
-    return null;
-  };
 
-  const getInputClassName = (field: string) => {
-    const baseClass =
-      "w-full px-3 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition-colors";
-    if (touched[field] && errors[field]) {
-      return `${baseClass} border-red-500 focus:border-red-500`;
+    switch (activeTab) {
+      case "account-info":
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <InfoCard icon={User} color="bg-blue-50 text-blue-600" label="Account Name" value={acc?.accountName} />
+            <InfoCard icon={Users} color="bg-purple-50 text-purple-600" label="Relative Name" value={acc?.relativeName} />
+            <InfoCard icon={CreditCard} color="bg-green-50 text-green-600" label="Account No (Khata No)" value={acc?.accountNumber} />
+            <InfoCard icon={FileText} color="bg-orange-50 text-orange-600" label="Loan No" value={kist?.loanNo} />
+            <InfoCard icon={DollarSign} color="bg-emerald-50 text-emerald-600" label="Loan Amount Passed" value={kist?.loanAmountPassed != null ? `₹${Number(kist.loanAmountPassed).toFixed(2)}` : undefined} />
+            <InfoCard icon={Calendar} color="bg-indigo-50 text-indigo-600" label="Loan Date" value={kist?.loanDate ? formatDate(kist.loanDate) : undefined} />
+            <InfoCard icon={Phone} color="bg-pink-50 text-pink-600" label="Phone No" value={acc?.phoneNo1} />
+            <InfoCard icon={DollarSign} color="bg-yellow-50 text-yellow-600" label="Kist Amount" value={kist?.kistAmount != null ? `₹${Number(kist.kistAmount).toFixed(2)}` : undefined} />
+            <InfoCard icon={Calendar} color="bg-teal-50 text-teal-600" label="Opening Date" value={acc?.accOpeningDate ? formatDate(acc.accOpeningDate) : undefined} />
+            <InfoCard icon={UserCheck} color="bg-violet-50 text-violet-600" label="Std. Interest Rate" value={kist?.standardInterestRate != null ? `${kist.standardInterestRate}%` : undefined} />
+            <InfoCard icon={MapPin} color="bg-cyan-50 text-cyan-600" label="Address" value={acc?.addressLine} />
+          </div>
+        );
+
+      case "ledger":
+        return (
+          <div className="text-center py-12 text-gray-500">
+            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm">Ledger view coming soon</p>
+          </div>
+        );
+
+      case "guar-detail":
+        return guarantor ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {guarantor.guar1MemId && (
+              <InfoCard icon={User} color="bg-blue-50 text-blue-600" label="Guarantor 1" value={guarantorNames.guar1 ?? "Loading..."} />
+            )}
+            {guarantor.guar2MemId && (
+              <InfoCard icon={User} color="bg-purple-50 text-purple-600" label="Guarantor 2" value={guarantorNames.guar2 ?? "Loading..."} />
+            )}
+            {guarantor.witness1MemId && (
+              <InfoCard icon={UserCheck} color="bg-green-50 text-green-600" label="Witness 1" value={guarantorNames.wit1 ?? "Loading..."} />
+            )}
+            {guarantor.witness2MemId && (
+              <InfoCard icon={UserCheck} color="bg-orange-50 text-orange-600" label="Witness 2" value={guarantorNames.wit2 ?? "Loading..."} />
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm text-gray-500">No guarantor information found</p>
+          </div>
+        );
+
+      case "fd-pledge":
+        return fdPledges.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <CreditCard className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm text-gray-500">No FD pledges found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                <tr>
+                  {["#", "FD Account No", "Amount", "Interest", "Date"].map((h) => (
+                    <th key={h} className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {fdPledges.map((p, i) => (
+                  <tr key={i} className="hover:bg-blue-50 transition-colors">
+                    <td className="px-6 py-4 text-sm text-gray-600">{i + 1}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-800">{p.fDAccNumber}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">₹{p.fDAmount?.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">₹{p.interest?.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{p.date ? formatDate(p.date) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+      case "rd-pledge":
+        return rdPledges.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <CreditCard className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm text-gray-500">No RD pledges found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                <tr>
+                  {["#", "RD Account No", "Amount", "Interest", "Date"].map((h) => (
+                    <th key={h} className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {rdPledges.map((p, i) => (
+                  <tr key={i} className="hover:bg-blue-50 transition-colors">
+                    <td className="px-6 py-4 text-sm text-gray-600">{i + 1}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-800">{p.rDAccNumber}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">₹{p.rDAmount?.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">₹{p.interest?.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{p.date ? formatDate(p.date) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
+      default:
+        return null;
     }
-    return `${baseClass} border-gray-300 focus:border-blue-500`;
   };
 
-  // Calculate total debit amount from all transactions
-  const totalDebitAmount = transactions.reduce(
-    (sum, t) => sum + Number(t.loanAmt),
-    0
+  // ── Label helper ───────────────────────────────────────────────────────────
+  const Label = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
+    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+      {children} {required && <span className="text-red-500">*</span>}
+    </label>
   );
 
   return (
     <DashboardLayout
+      enableScroll
       mainContent={
-        <div className="-mt-3 bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-4">
-            {/* Header Section */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                    <FileText className="text-white text-xl" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                      Loan Advancement Voucher
-                    </h1>
-                    <p className="text-sm text-gray-500">
-                      Handle All types of Loan Advancement Vouchers with ease
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Validation Summary */}
-            {saveAttempted && Object.keys(errors).length > 0 && (
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-semibold text-red-800 mb-1">
-                      {Object.keys(errors).length} Validation Error(s)
-                    </h4>
-                    <ul className="text-sm text-red-700 space-y-1">
-                      {Object.entries(errors).map(([field, error]) => (
-                        <li key={field}>• {error}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Main Form */}
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto space-y-6">
+            {/* ── Voucher Form Card ──────────────────────────────────────── */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-              {/* Top Section */}
-              <div className="p-6 border-b border-gray-200 bg-gray-50">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => handleInputChange("date", e.target.value)}
-                      className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-colors"
-                    />
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 bg-gradient-to-r ${isEditMode ? "from-amber-500 to-orange-500" : "from-blue-600 to-indigo-600"} rounded-lg flex items-center justify-center shadow-md`}>
+                      {isEditMode ? <Pencil className="w-5 h-5 text-white" /> : <FileText className="w-5 h-5 text-white" />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-bold text-gray-800">Loan Advancement Voucher</h2>
+                        {isEditMode && (
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 border border-amber-300 rounded text-xs font-semibold">
+                            Edit Mode
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {isEditMode ? "Modify credit accounts or narration, then save" : "Enter transaction details below"}
+                      </p>
+                    </div>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Vr No <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.vrNo}
-                      onChange={(e) => handleNumericInput(e, "vrNo", false)}
-                      onBlur={() => handleBlur("vrNo")}
-                      className={getInputClassName("vrNo")}
-                      placeholder="Enter voucher number"
-                      maxLength={10}
-                    />
-                    {renderFieldError("vrNo")}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Type <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                      options={typeOptions}
-                      value={typeOptions.find(
-                        (opt) => opt.value === formData.type
-                      )}
-                      onChange={(selected) => {
-                        handleInputChange("type", selected?.value || "");
-                      }}
-                      className="text-sm"
-                    />
-                  </div>
+                  <button
+                    onClick={() => navigate("/voucher-operations")}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Operations
+                  </button>
                 </div>
               </div>
 
-              {/* Middle Section */}
-              <div className="p-6 border-b border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Member Name <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                      options={memberOptions}
-                      value={memberOptions.find(
-                        (opt) => opt.value === formData.memberName
+              <div className="p-6">
+                {/* Row 1: Date, Product, Account */}
+                {/* ── Debit (Dr) Section ──────────────────────────────── */}
+                <div className="mb-6 rounded-xl border-2 border-rose-200 bg-rose-50/30 overflow-hidden">
+                  <div className="flex items-center gap-3 px-5 py-3 bg-rose-50 border-b border-rose-200">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-500 text-white text-xs font-bold shadow-sm">
+                      Dr
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-rose-700">Debit Account</p>
+                      <p className="text-xs text-rose-500">Loan account to be debited</p>
+                    </div>
+                  </div>
+
+                  <div className="p-5 space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      <div>
+                        <Label>Voucher Date</Label>
+                        <input
+                          type="text"
+                          readOnly
+                          value={formData.voucherDate}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray-700 outline-none cursor-not-allowed"
+                        />
+                      </div>
+
+                      <div>
+                        <Label required={!isEditMode}>Loan Product</Label>
+                        <Select
+                          options={loanProductOptions}
+                          value={loanProductOptions.find((o) => o.value === formData.loanProductId) ?? null}
+                          onChange={handleProductChange}
+                          placeholder={isEditMode ? "—" : "Select Loan Product"}
+                          isClearable={!isEditMode}
+                          isDisabled={isEditMode}
+                          styles={selectStyles(!!errors.loanProductId)}
+                        />
+                        {errors.loanProductId && <p className="mt-1 text-xs text-red-600">{errors.loanProductId}</p>}
+                      </div>
+
+                      <div>
+                        <Label required>Loan Account</Label>
+                        <Select
+                          options={loanAccountOptions}
+                          value={loanAccountOptions.find((o) => o.value === formData.loanAccountId) ?? null}
+                          onChange={handleAccountChange}
+                          placeholder="Select Loan Account"
+                          isClearable={!isEditMode}
+                          isDisabled={isEditMode || !formData.loanProductId}
+                          noOptionsMessage={() =>
+                            !formData.loanProductId ? "Select a product first" : "No accounts found"
+                          }
+                          styles={selectStyles(!!errors.loanAccountId)}
+                        />
+                        {errors.loanAccountId && <p className="mt-1 text-xs text-red-600">{errors.loanAccountId}</p>}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div>
+                        <Label required>
+                          Loan Advancement Amount
+                          {formData.loanAmountPassed > 0 && (
+                            <span className="ml-2 text-xs font-normal text-blue-600">
+                              (Max: ₹{formData.loanAmountPassed.toFixed(2)})
+                            </span>
+                          )}
+                        </Label>
+                        <input
+                          type="text"
+                          value={formData.totalAmount}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d{0,2}).*$/, "$1");
+                            setFormData((p) => ({ ...p, totalAmount: v }));
+                            if (!isEditMode) setCreditItems([]);
+                            clearError("totalAmount");
+                            clearError("creditItems");
+                          }}
+                          disabled={!formData.loanAccountId}
+                          placeholder="Enter Amount (e.g., 10000.00)"
+                          className={`w-full px-4 py-3 border-2 rounded-lg outline-none transition-all ${
+                            errors.totalAmount
+                              ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                              : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                          } disabled:bg-gray-50 disabled:cursor-not-allowed`}
+                        />
+                        {errors.totalAmount && <p className="mt-1 text-xs text-red-600">{errors.totalAmount}</p>}
+                      </div>
+
+                      <div>
+                        <Label>Narration</Label>
+                        <input
+                          type="text"
+                          value={formData.narration}
+                          onChange={(e) => setFormData((p) => ({ ...p, narration: e.target.value }))}
+                          placeholder="Enter Narration (auto-generated if blank)"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Credit (Cr) Section ──────────────────────────────── */}
+                <div className="mb-6 rounded-xl border-2 border-green-200 bg-green-50/40 overflow-hidden">
+                  <div className="flex items-center gap-3 px-5 py-3 bg-green-50 border-b border-green-200">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-600 text-white text-xs font-bold shadow-sm">
+                      Cr
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-green-700">Credit Accounts <span className="text-red-500">*</span></p>
+                      <p className="text-xs text-green-600">Accounts receiving the disbursed amount</p>
+                    </div>
+                  </div>
+
+                  <div className="p-5">
+                    {/* Add / Edit row form */}
+                    <div className={`bg-white border rounded-lg p-4 mb-3 ${editingRowId !== null ? "border-amber-300 ring-1 ring-amber-200" : "border-green-200"}`}>
+                      {editingRowId !== null && (
+                        <p className="text-xs font-semibold text-amber-600 mb-3 flex items-center gap-1">
+                          <Pencil className="w-3.5 h-3.5" />
+                          Editing row — modify fields and click Update, or click ✕ to cancel
+                        </p>
                       )}
-                      onChange={(selected) => {
-                        handleInputChange("memberName", selected?.value || "");
-                        setTouched((prev) => ({ ...prev, memberName: true }));
-                      }}
-                      placeholder="Select member to load details..."
-                      className="text-sm"
-                      styles={{
-                        control: (base, state) => ({
-                          ...base,
-                          borderColor:
-                            touched.memberName && errors.memberName
-                              ? "#EF4444"
-                              : state.isFocused
-                              ? "#3B82F6"
-                              : "#D1D5DB",
-                          borderWidth: "2px",
-                        }),
-                      }}
-                    />
-                    {renderFieldError("memberName")}
-                  </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                        <div>
+                          <Label required>Account Type</Label>
+                          <Select
+                            options={creditAccountTypeOptions}
+                            value={creditAccountTypeOptions.find((o) => o.value === rowForm.accountType) ?? null}
+                            onChange={handleRowTypeChange}
+                            placeholder="Type"
+                            isClearable
+                            isDisabled={!formData.loanAccountId || !formData.totalAmount || isEditMode && !formData.totalAmount}
+                            styles={compactSelectStyles(!!errors.rowType)}
+                          />
+                          {errors.rowType && <p className="mt-1 text-xs text-red-600">{errors.rowType}</p>}
+                        </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Cheque No
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.chequeNo}
-                      onChange={(e) =>
-                        handleInputChange("chequeNo", e.target.value.toUpperCase())
-                      }
-                      onBlur={() => handleBlur("chequeNo")}
-                      className={getInputClassName("chequeNo")}
-                      placeholder="Optional"
-                      maxLength={15}
-                    />
-                    {renderFieldError("chequeNo")}
-                  </div>
-                </div>
+                        <div>
+                          <Label required>Account</Label>
+                          <Select
+                            options={creditAccOptions}
+                            value={creditAccOptions.find((o) => o.value === rowForm.accountId) ?? null}
+                            onChange={(s) => { setRowForm((p) => ({ ...p, accountId: s ? s.value : null })); clearError("rowAccount"); }}
+                            placeholder="Account"
+                            isClearable
+                            isDisabled={!rowForm.accountType}
+                            noOptionsMessage={() => !rowForm.accountType ? "Select type first" : "No accounts"}
+                            styles={compactSelectStyles(!!errors.rowAccount)}
+                          />
+                          {errors.rowAccount && <p className="mt-1 text-xs text-red-600">{errors.rowAccount}</p>}
+                        </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Narration <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.narration}
-                      onChange={(e) =>
-                        handleInputChange("narration", e.target.value)
-                      }
-                      className={getInputClassName("narration")}
-                      placeholder="Enter narration (min 5 characters)"
-                      maxLength={200}
-                    />
-                    {renderFieldError("narration")}
-                    <div className="text-xs text-gray-500 mt-1">
-                      {formData.narration.length}/200 characters
+                        <div>
+                          <Label required>
+                            Amount
+                            {pending > 0 && (
+                              <span className="ml-1 text-xs font-normal text-orange-500">
+                                (Pending: ₹{pending.toFixed(2)})
+                              </span>
+                            )}
+                          </Label>
+                          <input
+                            type="text"
+                            value={rowForm.amount}
+                            onChange={(e) => { setRowForm((p) => ({ ...p, amount: e.target.value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d{0,2}).*$/, "$1") })); clearError("rowAmount"); }}
+                            placeholder="0.00"
+                            className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none transition-all text-sm ${
+                              errors.rowAmount ? "border-red-400" : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                            }`}
+                          />
+                          {errors.rowAmount && <p className="mt-1 text-xs text-red-600">{errors.rowAmount}</p>}
+                        </div>
+
+                        <div>
+                          <Label>Narration</Label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={rowForm.narration}
+                              onChange={(e) => setRowForm((p) => ({ ...p, narration: e.target.value }))}
+                              placeholder="Optional"
+                              className="flex-1 px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all text-sm"
+                            />
+                            {editingRowId !== null ? (
+                              <>
+                                <button
+                                  onClick={handleAddRow}
+                                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap cursor-pointer"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                  Update
+                                </button>
+                                <button
+                                  onClick={handleCancelRowEdit}
+                                  className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap cursor-pointer"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={handleAddRow}
+                                className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap cursor-pointer"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Add
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Amount <span className="text-red-500">*</span>
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={formData.amount}
-                        onChange={(e) => handleNumericInput(e, "amount", true)}
-                        className={getInputClassName("amount")}
-                        placeholder="0.00"
-                        maxLength={12}
-                      />
-                      <button
-                        onClick={addTransaction}
-                        className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all duration-200 hover:scale-105 shadow-md flex items-center gap-2 whitespace-nowrap"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add
-                      </button>
-                    </div>
-                    {renderFieldError("amount")}
-                  </div>
-                </div>
-              </div>
+                    {errors.creditItems && (
+                      <p className="mb-2 text-sm text-red-600">{errors.creditItems}</p>
+                    )}
 
-              {/* Two Column Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-                {/* Left Side */}
-                <div className="p-6 border-r border-gray-200">
-                  {/* Transaction Table */}
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      Transaction Details <span className="text-red-500">*</span>
-                    </h3>
-                    <div className="border border-gray-300 rounded-lg overflow-hidden">
+                    {/* Credit table */}
+                    <div className="overflow-x-auto rounded-lg border border-green-200">
                       <table className="w-full">
-                        <thead className="bg-gray-100">
+                        <thead className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200">
                           <tr>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 border-r">
-                              Particular
-                            </th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 border-r">
-                              Cheque
-                            </th>
-                            <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700 border-r">
-                              Amount
-                            </th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 border-r">
-                              Narration
-                            </th>
-                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">
-                              Action
-                            </th>
+                            {["#", "Account Type", "Account", "Amount (Cr)", "Narration", "Action"].map((h) => (
+                              <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-green-800 uppercase tracking-wider">
+                                {h}
+                              </th>
+                            ))}
                           </tr>
                         </thead>
-                        <tbody>
-                          {transactions.length === 0 ? (
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {creditItems.length === 0 ? (
                             <tr>
-                              <td
-                                colSpan={5}
-                                className="px-3 py-8 text-center text-gray-400 text-sm"
-                              >
-                                No transactions added yet
+                              <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-400">
+                                No credit accounts added yet. Use the form above to add.
                               </td>
                             </tr>
                           ) : (
-                            transactions.map((transaction) => (
-                              <tr key={transaction.id} className="border-t">
-                                <td className="px-3 py-2 text-xs text-gray-700">
-                                  {transaction.particular}
-                                </td>
-                                <td className="px-3 py-2 text-xs text-gray-700">
-                                  {transaction.chequeNo}
-                                </td>
-                                <td className="px-3 py-2 text-xs text-right text-gray-700 font-semibold">
-                                  ₹{Number(transaction.loanAmt).toFixed(2)}
-                                </td>
-                                <td className="px-3 py-2 text-xs text-gray-700">
-                                  {transaction.narration}
-                                </td>
-                                <td className="px-3 py-2 text-center">
-                                  <button
-                                    onClick={() =>
-                                      deleteTransaction(transaction.id)
-                                    }
-                                    className="text-red-600 hover:text-red-800 transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
+                            creditItems.map((row, idx) => {
+                              const isEditing = editingRowId === row.rowId;
+                              return (
+                                <tr
+                                  key={row.rowId}
+                                  className={`transition-colors ${
+                                    isEditing
+                                      ? "bg-amber-50 border-l-4 border-amber-400"
+                                      : "hover:bg-green-50"
+                                  }`}
+                                >
+                                  <td className="px-4 py-3 text-sm text-gray-600">{idx + 1}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-700">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${isEditing ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                                      {row.accountTypeName}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-sm font-medium text-gray-800">{row.accountName}</td>
+                                  <td className="px-4 py-3 text-sm font-semibold text-green-700">₹{row.amount.toFixed(2)}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-500">{row.narration || "—"}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-1">
+                                      {isEditing ? (
+                                        <span className="px-2 py-0.5 text-xs text-amber-600 font-semibold">Editing…</span>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={() => handleEditRow(row)}
+                                            disabled={editingRowId !== null}
+                                            className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                            title="Edit row"
+                                          >
+                                            <Pencil className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              if (editingRowId !== null) return;
+                                              setCreditItems((p) => p.filter((r) => r.rowId !== row.rowId));
+                                            }}
+                                            disabled={editingRowId !== null}
+                                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                            title="Delete row"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
                           )}
-                          {transactions.length > 0 && (
-                            <tr className="bg-blue-50 border-t-2 border-blue-200">
-                              <td
-                                colSpan={2}
-                                className="px-3 py-2 text-xs font-semibold text-gray-700"
-                              >
-                                Total
+                          {creditItems.length > 0 && (
+                            <tr className="bg-green-50 border-t-2 border-green-200">
+                              <td colSpan={3} className="px-4 py-3 text-sm font-semibold text-green-800">
+                                Total Credited (Cr)
                               </td>
-                              <td className="px-3 py-2 text-xs text-right font-bold text-blue-700">
-                                ₹{totalDebitAmount.toFixed(2)}
+                              <td className="px-4 py-3 text-sm font-bold text-green-700">
+                                ₹{totalCredited.toFixed(2)}
                               </td>
-                              <td colSpan={2}></td>
+                              <td colSpan={2} className="px-4 py-3 text-xs text-right pr-4">
+                                {Math.abs(totalCredited - (Number(formData.totalAmount) || 0)) <= 0.01 ? (
+                                  <span className="text-green-600 font-medium">Fully allocated</span>
+                                ) : (Number(formData.totalAmount) || 0) - totalCredited > 0.01 ? (
+                                  <span className="text-orange-600 font-medium">
+                                    Pending: ₹{((Number(formData.totalAmount) || 0) - totalCredited).toFixed(2)}
+                                  </span>
+                                ) : null}
+                              </td>
                             </tr>
                           )}
                         </tbody>
                       </table>
                     </div>
-                    {renderFieldError("transactions")}
-                  </div>
-
-                  {/* Dr Loan Account Dropdown */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Dr Loan A/C <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                      options={drAccountOptions}
-                      value={drAccountOptions.find(
-                        (opt) => opt.value === formData.drAccount
-                      )}
-                      onChange={(selected) => {
-                        handleInputChange("drAccount", selected?.value || "");
-                        setTouched((prev) => ({ ...prev, drAccount: true }));
-                      }}
-                      placeholder="Select Dr Loan Account..."
-                      className="text-sm"
-                      styles={{
-                        control: (base, state) => ({
-                          ...base,
-                          borderColor:
-                            touched.drAccount && errors.drAccount
-                              ? "#EF4444"
-                              : state.isFocused
-                              ? "#3B82F6"
-                              : "#D1D5DB",
-                          borderWidth: "2px",
-                        }),
-                      }}
-                    />
-                    {renderFieldError("drAccount")}
-                  </div>
-
-                  {/* Total Debit Amount - Placed after Dr Account */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Total Debit Amount
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={`₹${totalDebitAmount.toFixed(2)}`}
-                        readOnly
-                        className="w-full px-3 py-2.5 border-2 border-green-300 rounded-lg bg-green-50 text-green-700 font-bold text-lg outline-none cursor-not-allowed"
-                      />
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <Info className="w-4 h-4 text-green-600" />
-                      </div>
-                    </div>
-                    <p className="text-xs text-green-600 mt-1">
-                      Auto-calculated from transactions
-                    </p>
                   </div>
                 </div>
 
-                {/* Right Side - Member Details */}
-                <div className="p-6 bg-gray-50">
-                  <div className="bg-white border border-gray-300 rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <h3 className="text-sm font-semibold text-gray-700">
-                        Member Details
-                      </h3>
-                      <Info className="w-4 h-4 text-blue-600" />
-                    </div>
-
-                    {!formData.memberName ? (
-                      <div className="text-center py-8 text-gray-400">
-                        <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">
-                          Select a member to view details
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">S/O:</span>
-                          <span className="text-red-600 font-medium">
-                            {memberDetails.fatherName}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">WARIS:</span>
-                          <span className="text-gray-800">
-                            {memberDetails.waris || "-"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Village:</span>
-                          <span className="text-red-600 font-medium">
-                            {memberDetails.village}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Ac No:</span>
-                          <span className="text-red-600 font-medium text-xs">
-                            {memberDetails.accountNo} (Khata No -{" "}
-                            {memberDetails.khataNo})
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">ID Card No:</span>
-                          <span className="text-gray-800 text-xs">
-                            {memberDetails.idCardNo} ({memberDetails.landHolding})
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Aadhaar No:</span>
-                          <span className="text-gray-800">
-                            {memberDetails.aadhaarNo}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Member Deposit:</span>
-                          <span className="text-red-600 font-medium">
-                            {memberDetails.memberDeposit}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Share:</span>
-                          <span className="text-red-600 font-medium">
-                            {memberDetails.share}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Total Limit:</span>
-                          <span className="text-red-600 font-medium">
-                            ₹{memberDetails.totalLimit}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Available Limit:</span>
-                          <span className="text-green-600 font-semibold">
-                            ₹{memberDetails.availableLimit}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="border-t border-gray-200 p-6 bg-gray-50">
-                <div className="flex justify-end gap-4">
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={isEditMode ? () => navigate("/voucher-search") : handleReset}
+                    className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-all shadow-sm cursor-pointer"
+                  >
+                    {isEditMode ? <X className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                    {isEditMode ? "Cancel" : "Reset"}
+                  </button>
                   <button
                     onClick={handleSave}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold transition-all duration-200 hover:scale-105 shadow-md"
+                    disabled={loading}
+                    className={`flex items-center gap-2 px-8 py-3 text-sm font-medium text-white bg-gradient-to-r ${
+                      isEditMode
+                        ? "from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                        : "from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                    } rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-md hover:shadow-lg`}
                   >
-                    <Save className="w-4 h-4" />
-                    Save Loan Advancement
-                  </button>
-                  <button
-                    onClick={handleClose}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg font-semibold transition-all duration-200 hover:scale-105 shadow-md"
-                  >
-                    <X className="w-4 h-4" />
-                    Close
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        {isEditMode ? "Updating..." : "Saving..."}
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        {isEditMode ? "Update Voucher" : "Save Transaction"}
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* ── Details Tabs Card ──────────────────────────────────────── */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="border-b border-gray-200">
+                <nav className="flex overflow-x-auto bg-gray-50">
+                  {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    return (
+                      <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={getTabClass(tab.id)}>
+                        <Icon className="w-4 h-4" />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+              <div className="p-6 sm:p-8 bg-white">{renderTabContent()}</div>
             </div>
           </div>
         </div>
@@ -991,4 +1019,4 @@ const LoanAdvancementDemo = () => {
   );
 };
 
-export default LoanAdvancementDemo;
+export default LoanAdvancementVoucher;

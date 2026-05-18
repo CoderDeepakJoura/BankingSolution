@@ -329,6 +329,10 @@ namespace BankingPlatform.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("relativename");
 
+                    b.Property<string>("addedusing")
+                        .HasColumnType("text")
+                        .HasColumnName("addedusing");
+
                     b.HasKey("ID", "BranchId")
                         .HasName("accountmaster_pkey");
 
@@ -397,6 +401,97 @@ namespace BankingPlatform.Infrastructure.Migrations
                         .HasDatabaseName("ix_accountnomineeinfo_id_branchid");
 
                     b.ToTable("accountnomineeinfo");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.FDAccountDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accountid");
+
+                    b.Property<decimal>("FDAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("fdamount");
+
+                    b.Property<DateTime>("FDDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("fddate");
+
+                    b.Property<DateTime>("FDMaturityDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("fdmaturitydate");
+
+                    b.Property<int>("FDPeriodDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdperioddays");
+
+                    b.Property<int>("FDPeriodMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdperiodmonths");
+
+                    b.Property<int>("FDStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdstatus");
+
+                    b.Property<int>("IntCompInterval")
+                        .HasColumnType("integer")
+                        .HasColumnName("intcompinterval");
+
+                    b.Property<decimal>("IntRate")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("intrate");
+
+                    b.Property<decimal?>("InterestPaidAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("interestpaidamount");
+
+                    b.Property<int?>("InterestPaidInterval")
+                        .HasColumnType("integer")
+                        .HasColumnName("interestpaidinterval");
+
+                    b.Property<int>("LTDNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("ltdno");
+
+                    b.Property<int?>("MISAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("misaccid");
+
+                    b.Property<decimal>("MaturityAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("maturityamount");
+
+                    b.Property<int>("SerialNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("serialno");
+
+                    b.Property<int>("SlabId")
+                        .HasColumnType("integer")
+                        .HasColumnName("slabid");
+
+                    b.Property<DateTime>("VoucherDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("voucherdate");
+
+                    b.HasKey("Id", "BranchId")
+                        .HasName("fdaccountdetail_pkey");
+
+                    b.HasIndex("Id", "BranchId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fdaccountdetail_id_branchid");
+
+                    b.ToTable("fdaccountdetail");
                 });
 
             modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.GSTInfo", b =>
@@ -484,6 +579,11 @@ namespace BankingPlatform.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("relationwithaccholder");
 
+                    b.Property<string>("jointaccholderaccountnumber")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("jointaccholderaccountnumber");
+
                     b.HasKey("Id", "BranchId")
                         .HasName("jointaccountinfo_pkey");
 
@@ -527,6 +627,842 @@ namespace BankingPlatform.Infrastructure.Migrations
                         .HasDatabaseName("ix_jointaccountwithdrawalinfo_id_branchid");
 
                     b.ToTable("jointaccountwithdrawalinfo");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.AccountKistDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accountid");
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<double?>("KislIntAmt")
+                        .HasColumnType("double precision")
+                        .HasColumnName("kislintamt");
+
+                    b.Property<double?>("KistAmount")
+                        .HasColumnType("double precision")
+                        .HasColumnName("kistamount");
+
+                    b.Property<DateTime>("KistFirstDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("kistfirstdate");
+
+                    b.Property<double?>("KistIntPart")
+                        .HasColumnType("double precision")
+                        .HasColumnName("kistintpart");
+
+                    b.Property<int?>("KistInterval")
+                        .HasColumnType("integer")
+                        .HasColumnName("kistinterval");
+
+                    b.Property<int?>("KistIntervalIndays")
+                        .HasColumnType("integer")
+                        .HasColumnName("kistintervalindays");
+
+                    b.Property<double?>("KistPrinPart")
+                        .HasColumnType("double precision")
+                        .HasColumnName("kistprinpart");
+
+                    b.Property<string>("KistWithInterest")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("kistwithinterest");
+
+                    b.Property<double?>("LoanAmountPassed")
+                        .HasColumnType("double precision")
+                        .HasColumnName("loanamountpassed");
+
+                    b.Property<DateTime>("LoanDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("loandate");
+
+                    b.Property<string>("LoanNo")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("loanno");
+
+                    b.Property<int?>("LoanPeriod")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanperiod");
+
+                    b.Property<int?>("LoanPeriodIndays")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanperiodindays");
+
+                    b.Property<double?>("MarginMoney")
+                        .HasColumnType("double precision")
+                        .HasColumnName("marginmoney");
+
+                    b.Property<double?>("OverdueInterestRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("overdueinterestrate");
+
+                    b.Property<int?>("SlabId")
+                        .HasColumnType("integer")
+                        .HasColumnName("slabid");
+
+                    b.Property<double?>("StandardInterestRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("standardinterestrate");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_accountkistdetail");
+
+                    b.ToTable("accountkistdetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.AccountKistSchedule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime?>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<decimal?>("InterestAmt")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("interestamt");
+
+                    b.Property<decimal?>("KistAmount")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("kistamount");
+
+                    b.Property<int?>("KistNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("kistnumber");
+
+                    b.Property<int?>("LoanAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanaccid");
+
+                    b.Property<decimal?>("PrincipalAmt")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("principalamt");
+
+                    b.HasKey("Id")
+                        .HasName("pk_accountkistschedule");
+
+                    b.ToTable("accountkistschedule");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.AccountLimitDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accountid");
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<double>("LoanAmountPassed")
+                        .HasColumnType("double precision")
+                        .HasColumnName("loanamountpassed");
+
+                    b.Property<DateTime>("LoanDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("loandate");
+
+                    b.Property<int>("LoanLimitPeriodInDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanlimitperiodindays");
+
+                    b.Property<int>("LoanLimitPeriodInMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanlimitperiodinmonths");
+
+                    b.Property<string>("LoanNo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("loanno");
+
+                    b.Property<double>("OverdueInterestRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("overdueinterestrate");
+
+                    b.Property<int>("SlabId")
+                        .HasColumnType("integer")
+                        .HasColumnName("slabid");
+
+                    b.Property<double>("StandardInterestRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("standardinterestrate");
+
+                    b.HasKey("Id")
+                        .HasName("pk_accountlimitdetail");
+
+                    b.ToTable("accountlimitdetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanAccFDPledge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime?>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<int?>("FDAccDetId")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdaccdetid");
+
+                    b.Property<int?>("FDAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdaccid");
+
+                    b.Property<int?>("LatestStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("lateststatus");
+
+                    b.Property<int?>("LoanAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanaccid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanaccfdpledge");
+
+                    b.ToTable("loanaccfdpledge");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanAccFDPledgeDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime?>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<int?>("LAccFDPledgeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("laccfdpledgeid");
+
+                    b.Property<int?>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanaccfdpledgedetail");
+
+                    b.ToTable("loanaccfdpledgedetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanAccOpeningBalance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accid");
+
+                    b.Property<string>("BalType")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("baltype");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<long?>("HeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("headcode");
+
+                    b.Property<decimal?>("OpenInt")
+                        .HasColumnType("numeric(24,0)")
+                        .HasColumnName("openint");
+
+                    b.Property<string>("OpenIntType")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("openinttype");
+
+                    b.Property<decimal?>("OpenOverInt")
+                        .HasColumnType("numeric(24,0)")
+                        .HasColumnName("openoverint");
+
+                    b.Property<string>("OpenOverIntType")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("openoverinttype");
+
+                    b.Property<string>("OverBalType")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("overbaltype");
+
+                    b.Property<decimal?>("OverDueBal")
+                        .HasColumnType("numeric(24,0)")
+                        .HasColumnName("overduebal");
+
+                    b.Property<DateTime?>("OverDueDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("overduedate");
+
+                    b.Property<decimal?>("TotalBalance")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("totalbalance");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanaccopeningbalance");
+
+                    b.ToTable("loanaccopeningbalance");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanAccRDPledge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime?>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<int?>("LatestStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("lateststatus");
+
+                    b.Property<int?>("LoanAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanaccid");
+
+                    b.Property<int?>("RDAccDetId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdaccdetid");
+
+                    b.Property<int?>("RDAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdaccid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanaccrdpledge");
+
+                    b.ToTable("loanaccrdpledge");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanAccRDPledgeDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime?>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<short?>("IsHOUpdated")
+                        .HasColumnType("smallint")
+                        .HasColumnName("ishoupdated");
+
+                    b.Property<int?>("LAccRDPledgeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("laccrdpledgeid");
+
+                    b.Property<int?>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanaccrdpledgedetail");
+
+                    b.ToTable("loanaccrdpledgedetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanAccountBalanceDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accountid");
+
+                    b.Property<decimal>("AmountCr")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("amountcr");
+
+                    b.Property<decimal>("AmountDr")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("amountdr");
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<long?>("HeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("headcode");
+
+                    b.Property<decimal>("IntCr")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("intcr");
+
+                    b.Property<decimal>("IntDr")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("intdr");
+
+                    b.Property<int>("LoanOpenBalId")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanopenbalid");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("ValueDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("valuedate");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanaccountbalancedetail");
+
+                    b.ToTable("loanaccountbalancedetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanAccountRecoveryInterest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accid");
+
+                    b.Property<decimal>("AmountCr")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("amountcr");
+
+                    b.Property<decimal>("AmountDr")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("amountdr");
+
+                    b.Property<int>("BalDetailId")
+                        .HasColumnType("integer")
+                        .HasColumnName("baldetailid");
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime?>("EntryDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("entrydate");
+
+                    b.Property<int>("IntCategoryId")
+                        .HasColumnType("integer")
+                        .HasColumnName("intcategoryid");
+
+                    b.Property<DateTime?>("ValueDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("valuedate");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanaccountrecoveryinterest");
+
+                    b.ToTable("loanaccountrecoveryinterest");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanGuarWitness", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime?>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<int>("Guar1MemBrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("guar1membrid");
+
+                    b.Property<int?>("Guar1MemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("guar1memid");
+
+                    b.Property<int>("Guar2MemBrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("guar2membrid");
+
+                    b.Property<int?>("Guar2MemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("guar2memid");
+
+                    b.Property<int?>("LoanAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanaccid");
+
+                    b.Property<int?>("Wit1MemBrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("wit1membrid");
+
+                    b.Property<int>("Wit2MemBrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("wit2membrid");
+
+                    b.Property<int?>("Witness1MemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("witness1memid");
+
+                    b.Property<int?>("Witness2MemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("witness2memid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanguarwitness");
+
+                    b.ToTable("loanguarwitness");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.RDAccountDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<int?>("AccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accid");
+
+                    b.Property<int?>("CompoundingInterval")
+                        .HasColumnType("integer")
+                        .HasColumnName("compoundinginterval");
+
+                    b.Property<DateTime?>("FirstKistDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("firstkistdate");
+
+                    b.Property<double?>("InterestRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("interestrate");
+
+                    b.Property<decimal?>("KistAmt")
+                        .HasColumnType("numeric")
+                        .HasColumnName("kistamt");
+
+                    b.Property<int?>("KistInterval")
+                        .HasColumnType("integer")
+                        .HasColumnName("kistinterval");
+
+                    b.Property<DateTime?>("MaturedOn")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("maturedon");
+
+                    b.Property<decimal?>("MaturityAmt")
+                        .HasColumnType("numeric")
+                        .HasColumnName("maturityamt");
+
+                    b.Property<DateTime?>("MaturityDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("maturitydate");
+
+                    b.Property<int?>("NoOfDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("noofdays");
+
+                    b.Property<int?>("NoOfMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("noofmonths");
+
+                    b.Property<decimal?>("PenaltyAmt")
+                        .HasColumnType("numeric")
+                        .HasColumnName("penaltyamt");
+
+                    b.Property<DateTime?>("PreMaturedOn")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("prematuredon");
+
+                    b.Property<decimal>("RdAmount")
+                        .HasColumnType("numeric")
+                        .HasColumnName("rdamount");
+
+                    b.Property<DateTime>("RdDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("rddate");
+
+                    b.Property<int?>("RdNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdnumber");
+
+                    b.Property<int?>("RdSlabId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdslabid");
+
+                    b.Property<int?>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("rdaccountdetail_pkey");
+
+                    b.ToTable("rdaccountdetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.AccMasters.VoucherFDDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<decimal>("AmountCr")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amountcr");
+
+                    b.Property<decimal>("AmountDr")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amountdr");
+
+                    b.Property<int>("FDAccDetId")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdaccdetid");
+
+                    b.Property<int>("FDAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdaccid");
+
+                    b.Property<decimal?>("IntCr")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("intcr");
+
+                    b.Property<decimal?>("IntDr")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("intdr");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
+                        .HasColumnName("operation");
+
+                    b.Property<int>("VAccCrDrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("vacccrdrid");
+
+                    b.Property<DateTime?>("ValueDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("valuedate");
+
+                    b.Property<DateTime?>("VoucherDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("voucherdate");
+
+                    b.Property<int>("VoucherId")
+                        .HasColumnType("integer")
+                        .HasColumnName("voucherid");
+
+                    b.Property<string>("VoucherMainStatus")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("vouchermainstatus");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("voucherfddetail_pkey");
+
+                    b.HasIndex("Id", "BrId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_voucherfddetail_id_brid");
+
+                    b.ToTable("voucherfddetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.Auth.RefreshToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<string>("ClaimsSnapshot")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("claimssnapshot");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("createdat");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("expiresat");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isrevoked");
+
+                    b.Property<string>("ReplacedByToken")
+                        .HasColumnType("text")
+                        .HasColumnName("replacedbytoken");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refreshtoken");
+
+                    b.ToTable("refreshtoken");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.BranchSessions.BranchSession", b =>
+                {
+                    b.Property<int>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("id"));
+
+                    b.Property<int>("branchid")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<DateTime>("fromdate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("fromdate");
+
+                    b.Property<bool>("iscurrent")
+                        .HasColumnType("boolean")
+                        .HasColumnName("iscurrent");
+
+                    b.Property<bool>("isfirst")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isfirst");
+
+                    b.Property<int>("sessionfrom")
+                        .HasColumnType("integer")
+                        .HasColumnName("sessionfrom");
+
+                    b.Property<int>("sessionto")
+                        .HasColumnType("integer")
+                        .HasColumnName("sessionto");
+
+                    b.Property<DateTime>("todate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("todate");
+
+                    b.HasKey("id", "branchid")
+                        .HasName("branchsession_pkey");
+
+                    b.HasIndex("id", "branchid")
+                        .IsUnique()
+                        .HasDatabaseName("ix_branchsession_id_branchid");
+
+                    b.ToTable("branchsession");
                 });
 
             modelBuilder.Entity("BankingPlatform.Infrastructure.Models.BranchWiseRule.FDProductBranchWiseRule", b =>
@@ -576,6 +1512,147 @@ namespace BankingPlatform.Infrastructure.Migrations
                     b.ToTable("fdproductbranchwiserule");
                 });
 
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.BranchWiseRule.LoanProductBranchWiseRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<string>("AccNoOrNameFirst")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("accnoornamefirst");
+
+                    b.Property<int?>("ActOnExpPosting")
+                        .HasColumnType("integer")
+                        .HasColumnName("actonexpposting");
+
+                    b.Property<int?>("CurrentRecoverableIntAcc")
+                        .HasColumnType("integer")
+                        .HasColumnName("currentrecoverableintacc");
+
+                    b.Property<int?>("IntIncomeAcc")
+                        .HasColumnType("integer")
+                        .HasColumnName("intincomeacc");
+
+                    b.Property<int?>("IntwrtDepositPledge")
+                        .HasColumnType("integer")
+                        .HasColumnName("intwrtdepositpledge");
+
+                    b.Property<short>("IsApplyOverInt")
+                        .HasColumnType("smallint")
+                        .HasColumnName("isapplyoverint");
+
+                    b.Property<int?>("LegalPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("legalplanid");
+
+                    b.Property<int>("LoanProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanproductid");
+
+                    b.Property<int?>("MCLPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("mclplanid");
+
+                    b.Property<int?>("NPAPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("npaplanid");
+
+                    b.Property<short>("OVRIntFromOpendate")
+                        .HasColumnType("smallint")
+                        .HasColumnName("ovrintfromopendate");
+
+                    b.Property<int>("OVRIntProvAcc")
+                        .HasColumnType("integer")
+                        .HasColumnName("ovrintprovacc");
+
+                    b.Property<string>("OperatedBy")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("operatedby");
+
+                    b.Property<int?>("OverdueRecoverableIntAcc")
+                        .HasColumnType("integer")
+                        .HasColumnName("overduerecoverableintacc");
+
+                    b.Property<int?>("TempRecAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("temprecaccid");
+
+                    b.HasKey("Id", "BranchId")
+                        .HasName("loanproductbranchwiserule_pkey");
+
+                    b.ToTable("loanproductbranchwiserule");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.BranchWiseRule.RDProductBranchWiseRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<string>("AccNoGeneration")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("accnogeneration");
+
+                    b.Property<int?>("ClosingChargesAcc")
+                        .HasColumnType("integer")
+                        .HasColumnName("closingchargesacc");
+
+                    b.Property<int?>("IntExpAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("intexpaccid");
+
+                    b.Property<int>("IntFormula")
+                        .HasColumnType("integer")
+                        .HasColumnName("intformula");
+
+                    b.Property<short?>("KistAfterMaturity")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kistaftermaturity");
+
+                    b.Property<int?>("NoOfDayOrMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("noofdayormonth");
+
+                    b.Property<short?>("PaymentDateType")
+                        .HasColumnType("smallint")
+                        .HasColumnName("paymentdatetype");
+
+                    b.Property<int?>("PenaltyIncAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("penaltyincaccid");
+
+                    b.Property<short?>("PrintCertificate")
+                        .HasColumnType("smallint")
+                        .HasColumnName("printcertificate");
+
+                    b.Property<int>("RDProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdproductid");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("rdproductbranchwiserule_pkey");
+
+                    b.ToTable("rdproductbranchwiserule");
+                });
+
             modelBuilder.Entity("BankingPlatform.Infrastructure.Models.BranchWiseRule.SavingProductBranchWiseRule", b =>
                 {
                     b.Property<int>("Id")
@@ -609,6 +1686,290 @@ namespace BankingPlatform.Infrastructure.Migrations
                         .HasName("savingproductbranchwiserule_pkey");
 
                     b.ToTable("savingproductbranchwiserule");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.InterestSlabs.FD.FDInterestSlab", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<int>("CompoundingInterval")
+                        .HasColumnType("integer")
+                        .HasColumnName("compoundinginterval");
+
+                    b.Property<int>("FDProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdproductid");
+
+                    b.Property<int>("FromDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("fromdays");
+
+                    b.Property<string>("SlabName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("slabname");
+
+                    b.Property<int>("ToDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("todays");
+
+                    b.HasKey("Id", "BranchId")
+                        .HasName("fdinterestslab_pkey");
+
+                    b.ToTable("fdinterestslab");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.InterestSlabs.FD.FDInterestSlabDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<decimal>("AgeFrom")
+                        .HasColumnType("numeric")
+                        .HasColumnName("agefrom");
+
+                    b.Property<decimal>("AgeTo")
+                        .HasColumnType("numeric")
+                        .HasColumnName("ageto");
+
+                    b.Property<int>("FDIntSlabId")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdintslabid");
+
+                    b.Property<int>("FDIntSlabInfoId")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdintslabinfoid");
+
+                    b.Property<decimal>("InterestRate")
+                        .HasColumnType("numeric")
+                        .HasColumnName("interestrate");
+
+                    b.HasKey("Id", "BranchId")
+                        .HasName("fdinterestslabdetail_pkey");
+
+                    b.ToTable("fdinterestslabdetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.InterestSlabs.FD.FDInterestSlabInfo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<DateTime>("ApplicableDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("applicabledate");
+
+                    b.Property<int>("FDProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("fdproductid");
+
+                    b.HasKey("Id", "BranchId")
+                        .HasName("fdinterestslabinfo_pkey");
+
+                    b.ToTable("fdinterestslabinfo");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.InterestSlabs.Loan.LoanSlab", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<int>("LoanProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("loanproductid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NameSL")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("namesl");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanslab");
+
+                    b.ToTable("loanslab");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.InterestSlabs.Loan.LoanSlabDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<decimal>("FromAmount")
+                        .HasColumnType("numeric")
+                        .HasColumnName("fromamount");
+
+                    b.Property<double?>("PenalIntRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("penalintrate");
+
+                    b.Property<int?>("PeriodFrom")
+                        .HasColumnType("integer")
+                        .HasColumnName("periodfrom");
+
+                    b.Property<int?>("PeriodFromInDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("periodfromindays");
+
+                    b.Property<int?>("PeriodTo")
+                        .HasColumnType("integer")
+                        .HasColumnName("periodto");
+
+                    b.Property<int?>("PeriodToInDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("periodtoindays");
+
+                    b.Property<int>("SlabId")
+                        .HasColumnType("integer")
+                        .HasColumnName("slabid");
+
+                    b.Property<double?>("StdIntRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("stdintrate");
+
+                    b.Property<decimal>("ToAmount")
+                        .HasColumnType("numeric")
+                        .HasColumnName("toamount");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loanslabdetail");
+
+                    b.ToTable("loanslabdetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.InterestSlabs.RD.RDInterestSlab", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<DateTime>("ApplicableDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("applicabledate");
+
+                    b.Property<int>("RDProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdproductid");
+
+                    b.Property<string>("SlabName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("slabname");
+
+                    b.HasKey("Id", "BranchId")
+                        .HasName("rdinterestslab_pkey");
+
+                    b.ToTable("rdinterestslab");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.InterestSlabs.RD.RDInterestSlabDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<decimal>("FromAmount")
+                        .HasColumnType("numeric")
+                        .HasColumnName("fromamount");
+
+                    b.Property<decimal>("InterestRate")
+                        .HasColumnType("numeric")
+                        .HasColumnName("interestrate");
+
+                    b.Property<string>("KistInterval")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kistinterval");
+
+                    b.Property<int>("PeriodFrom")
+                        .HasColumnType("integer")
+                        .HasColumnName("periodfrom");
+
+                    b.Property<int>("PeriodTo")
+                        .HasColumnType("integer")
+                        .HasColumnName("periodto");
+
+                    b.Property<int>("RDIntSlabId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdintslabid");
+
+                    b.Property<int>("SlabNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("slabno");
+
+                    b.Property<decimal>("ToAmount")
+                        .HasColumnType("numeric")
+                        .HasColumnName("toamount");
+
+                    b.HasKey("Id", "BranchId")
+                        .HasName("rdinterestslabdetail_pkey");
+
+                    b.ToTable("rdinterestslabdetail");
                 });
 
             modelBuilder.Entity("BankingPlatform.Infrastructure.Models.InterestSlabs.Saving.SavingInterestSlab", b =>
@@ -937,6 +2298,74 @@ namespace BankingPlatform.Infrastructure.Migrations
                         .HasDatabaseName("ix_zone_id_zonename_zonecode");
 
                     b.ToTable("zone");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.Miscalleneous.AuditLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branchid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("createdat");
+
+                    b.Property<string>("EntityId")
+                        .HasColumnType("text")
+                        .HasColumnName("entityid");
+
+                    b.Property<string>("EntityName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("entityname");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("text")
+                        .HasColumnName("ipaddress");
+
+                    b.Property<string>("Module")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("module");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("text")
+                        .HasColumnName("newvalue");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("text")
+                        .HasColumnName("oldvalue");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("userid");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("username");
+
+                    b.Property<string>("WorkingDate")
+                        .HasColumnType("text")
+                        .HasColumnName("workingdate");
+
+                    b.HasKey("Id")
+                        .HasName("pk_auditlog");
+
+                    b.ToTable("auditlog");
                 });
 
             modelBuilder.Entity("BankingPlatform.Infrastructure.Models.Miscalleneous.Caste", b =>
@@ -1379,6 +2808,496 @@ namespace BankingPlatform.Infrastructure.Migrations
                         .HasName("fdproductrules_pkey");
 
                     b.ToTable("fdproductrules");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.Loan.LoanProduct", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("effectivefrom");
+
+                    b.Property<string>("NameSL")
+                        .HasMaxLength(75)
+                        .HasColumnType("character varying(75)")
+                        .HasColumnName("namesl");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("productname");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("loanproduct_pkey");
+
+                    b.ToTable("loanproduct");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.Loan.LoanProductAdvancement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<string>("DisbursmentMode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("disbursmentmode");
+
+                    b.Property<string>("IsShareMoneyReq")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("issharemoneyreq");
+
+                    b.Property<decimal?>("LoanAmtPerOnSecurityFD")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("loanamtperonsecurityfd");
+
+                    b.Property<decimal?>("LoanAmtPerOnSecurityRD")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("loanamtperonsecurityrd");
+
+                    b.Property<string>("LoanPeriodType")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("loanperiodtype");
+
+                    b.Property<decimal>("MaxLoanAmount")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("maxloanamount");
+
+                    b.Property<int>("MaxNoofDisbursments")
+                        .HasColumnType("integer")
+                        .HasColumnName("maxnoofdisbursments");
+
+                    b.Property<decimal>("MinLoanAmount")
+                        .HasColumnType("numeric(24,2)")
+                        .HasColumnName("minloanamount");
+
+                    b.Property<short>("OverDraftLimit")
+                        .HasColumnType("smallint")
+                        .HasColumnName("overdraftlimit");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("productid");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("loanproductadvancement_pkey");
+
+                    b.ToTable("loanproductadvancement");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.Loan.LoanProductDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<int?>("ActOnIntPosting")
+                        .HasColumnType("integer")
+                        .HasColumnName("actonintposting");
+
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("integer")
+                        .HasColumnName("categoryid");
+
+                    b.Property<int?>("DocPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("docplanid");
+
+                    b.Property<string>("IntCalcMethod")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("intcalcmethod");
+
+                    b.Property<int?>("IntFormulae")
+                        .HasColumnType("integer")
+                        .HasColumnName("intformulae");
+
+                    b.Property<int?>("IntSchedule")
+                        .HasColumnType("integer")
+                        .HasColumnName("intschedule");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("productid");
+
+                    b.Property<int>("SecReviewFreqPeriod")
+                        .HasColumnType("integer")
+                        .HasColumnName("secreviewfreqperiod");
+
+                    b.Property<string>("SecurityIds")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("securityids");
+
+                    b.Property<int>("TypeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("typeid");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("loanproductdefinition_pkey");
+
+                    b.ToTable("loanproductdefinition");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.Loan.LoanProductMarginMoneyRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<int>("AdvId")
+                        .HasColumnType("integer")
+                        .HasColumnName("advid");
+
+                    b.Property<double>("LoanProportion")
+                        .HasColumnType("double precision")
+                        .HasColumnName("loanproportion");
+
+                    b.Property<double>("MMPercentage")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mmpercentage");
+
+                    b.Property<double>("MarginProportion")
+                        .HasColumnType("double precision")
+                        .HasColumnName("marginproportion");
+
+                    b.Property<int>("RatioOrPerc")
+                        .HasColumnType("integer")
+                        .HasColumnName("ratioorperc");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("loanproductmarginmoneyrule_pkey");
+
+                    b.ToTable("loanproductmarginmoneyrule");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.Loan.LoanProductPosting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<long>("ExpHeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expheadcode");
+
+                    b.Property<long>("MinBalGivenLimitHeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("minbalgivenlimitheadcode");
+
+                    b.Property<long>("MinBalLeftLimitHeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("minballeftlimitheadcode");
+
+                    b.Property<long>("MiscIncHeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("miscincheadcode");
+
+                    b.Property<long>("PrincipalBalHeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("principalbalheadcode");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("productid");
+
+                    b.Property<long?>("RecoverableIntHeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("recoverableintheadcode");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("loanproductposting_pkey");
+
+                    b.ToTable("loanproductposting");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.Loan.LoanProductRecovery", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<string>("ApplyOvrIntOn")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
+                        .HasColumnName("applyovrinton");
+
+                    b.Property<int?>("IntPostingInterval")
+                        .HasColumnType("integer")
+                        .HasColumnName("intpostinginterval");
+
+                    b.Property<short?>("IntRecoveredInAdvance")
+                        .HasColumnType("smallint")
+                        .HasColumnName("intrecoveredinadvance");
+
+                    b.Property<double>("MinBalGivenLimit")
+                        .HasColumnType("double precision")
+                        .HasColumnName("minbalgivenlimit");
+
+                    b.Property<double>("MinBalLeftLimit")
+                        .HasColumnType("double precision")
+                        .HasColumnName("minballeftlimit");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("productid");
+
+                    b.Property<int>("RecoveryAdjustmentSeq")
+                        .HasColumnType("integer")
+                        .HasColumnName("recoveryadjustmentseq");
+
+                    b.Property<string>("RecoveryMode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("recoverymode");
+
+                    b.Property<string>("RecoverySeq")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("recoveryseq");
+
+                    b.Property<short?>("StdOverdueOnKistDate")
+                        .HasColumnType("smallint")
+                        .HasColumnName("stdoverdueonkistdate");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("loanproductrecovery_pkey");
+
+                    b.ToTable("loanproductrecovery");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.RD.RDProduct", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("effectivefrom");
+
+                    b.Property<string>("ProductCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("productcode");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("productname");
+
+                    b.Property<string>("ProductNameSL")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("productnamesl");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("rdproduct_pkey");
+
+                    b.ToTable("rdproduct");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.RD.RDProductDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<int?>("DocPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("docplanid");
+
+                    b.Property<int?>("MaxPeriodLimitMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("maxperiodlimitmonths");
+
+                    b.Property<int?>("MinPeriodLimitMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("minperiodlimitmonths");
+
+                    b.Property<int?>("RDProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdproductid");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("rdproductdefinition_pkey");
+
+                    b.ToTable("rdproductdefinition");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.RD.RDProductInterestRules", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<int?>("ActOnIntPosting")
+                        .HasColumnType("integer")
+                        .HasColumnName("actonintposting");
+
+                    b.Property<DateTime?>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<int?>("IntCompoundingInterval")
+                        .HasColumnType("integer")
+                        .HasColumnName("intcompoundinginterval");
+
+                    b.Property<int?>("IntPostingInterval")
+                        .HasColumnType("integer")
+                        .HasColumnName("intpostinginterval");
+
+                    b.Property<double?>("IntRateFrom")
+                        .HasColumnType("double precision")
+                        .HasColumnName("intratefrom");
+
+                    b.Property<double?>("IntRateOnPreMat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("intrateonpremat");
+
+                    b.Property<double?>("IntRateTo")
+                        .HasColumnType("double precision")
+                        .HasColumnName("intrateto");
+
+                    b.Property<double?>("IntVariationForAccExceed")
+                        .HasColumnType("double precision")
+                        .HasColumnName("intvariationforaccexceed");
+
+                    b.Property<double?>("IntVariationForAccLess")
+                        .HasColumnType("double precision")
+                        .HasColumnName("intvariationforaccless");
+
+                    b.Property<int?>("MinLockInPerioddays")
+                        .HasColumnType("integer")
+                        .HasColumnName("minlockinperioddays");
+
+                    b.Property<double?>("PostMaturityIntRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("postmaturityintrate");
+
+                    b.Property<int?>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("productid");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("rdproductinterestrules_pkey");
+
+                    b.ToTable("rdproductinterestrules");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.RD.RDProductPosting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<long?>("IntPayableHeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("intpayableheadcode");
+
+                    b.Property<long?>("PrincipalBalHeadCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("principalbalheadcode");
+
+                    b.Property<int?>("RDProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdproductid");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("rdproductposting_pkey");
+
+                    b.ToTable("rdproductposting");
                 });
 
             modelBuilder.Entity("BankingPlatform.Infrastructure.Models.ProductMasters.Saving.SavingProduct", b =>
@@ -2483,6 +4402,259 @@ namespace BankingPlatform.Infrastructure.Migrations
                         .HasName("pk_vouchercreditdebitdetails");
 
                     b.ToTable("vouchercreditdebitdetails");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.voucher.VoucherRDDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<double>("AmountCr")
+                        .HasColumnType("double precision")
+                        .HasColumnName("amountcr");
+
+                    b.Property<double>("AmountDr")
+                        .HasColumnType("double precision")
+                        .HasColumnName("amountdr");
+
+                    b.Property<double?>("IntCr")
+                        .HasColumnType("double precision")
+                        .HasColumnName("intcr");
+
+                    b.Property<double?>("IntDr")
+                        .HasColumnType("double precision")
+                        .HasColumnName("intdr");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("operation");
+
+                    b.Property<int?>("OthRefAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("othrefaccid");
+
+                    b.Property<int?>("PenalAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("penalaccid");
+
+                    b.Property<decimal?>("PenalAmt")
+                        .HasColumnType("numeric")
+                        .HasColumnName("penalamt");
+
+                    b.Property<int>("RdAccDetId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdaccdetid");
+
+                    b.Property<int>("RdAccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("rdaccid");
+
+                    b.Property<int>("VaccCrDrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("vacccrdrid");
+
+                    b.Property<DateTime?>("ValueDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("valuedate");
+
+                    b.Property<DateTime?>("VoucherDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("voucherdate");
+
+                    b.Property<int>("VoucherId")
+                        .HasColumnType("integer")
+                        .HasColumnName("voucherid");
+
+                    b.Property<string>("VoucherMainStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("vouchermainstatus");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("voucherrddetail_pkey");
+
+                    b.ToTable("voucherrddetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.voucher.VoucherRecIntDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<int>("AccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accid");
+
+                    b.Property<DateTime>("EntryDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("entrydate");
+
+                    b.Property<int>("IntCatId")
+                        .HasColumnType("integer")
+                        .HasColumnName("intcatid");
+
+                    b.Property<double>("IntCr")
+                        .HasColumnType("double precision")
+                        .HasColumnName("intcr");
+
+                    b.Property<double>("IntDr")
+                        .HasColumnType("double precision")
+                        .HasColumnName("intdr");
+
+                    b.Property<double?>("Pamt")
+                        .HasColumnType("double precision")
+                        .HasColumnName("pamt");
+
+                    b.Property<int>("VAccCrDrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("vacccrdrid");
+
+                    b.Property<DateTime>("ValueDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("valuedate");
+
+                    b.Property<int>("VoucherId")
+                        .HasColumnType("integer")
+                        .HasColumnName("voucherid");
+
+                    b.Property<string>("VoucherMainStatus")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("vouchermainstatus");
+
+                    b.Property<int>("VoucherNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("voucherno");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("pk_voucherrecintdetail");
+
+                    b.ToTable("voucherrecintdetail");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.voucher.VrOdReserve", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<int?>("VAccCrDrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("vacccrdrid");
+
+                    b.Property<int?>("VoucherId")
+                        .HasColumnType("integer")
+                        .HasColumnName("voucherid");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date");
+
+                    b.Property<int>("AccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accid");
+
+                    b.Property<decimal>("Debit")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("debit");
+
+                    b.Property<decimal>("Credit")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("credit");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("productid");
+
+                    b.HasKey("Id", "BrId")
+                        .HasName("pk_vrodreserve");
+
+                    b.ToTable("vrodreserve");
+                });
+
+            modelBuilder.Entity("BankingPlatform.Infrastructure.Models.voucher.VoucherSavingDetail", b =>
+                {
+                    b.Property<int?>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int?>("Id"));
+
+                    b.Property<int?>("AccId")
+                        .HasColumnType("integer")
+                        .HasColumnName("accid");
+
+                    b.Property<decimal?>("Amt")
+                        .HasColumnType("numeric")
+                        .HasColumnName("amt");
+
+                    b.Property<int>("BrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("brid");
+
+                    b.Property<int?>("ChequeBookId")
+                        .HasColumnType("integer")
+                        .HasColumnName("chequebookid");
+
+                    b.Property<int?>("ChequeNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("chequeno");
+
+                    b.Property<string>("Operation")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("operation");
+
+                    b.Property<int>("VAccCrDrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("vacccrdrid");
+
+                    b.Property<DateTime>("ValueDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("valuedate");
+
+                    b.Property<DateTime>("VoucherDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("voucherdate");
+
+                    b.Property<int>("VoucherId")
+                        .HasColumnType("integer")
+                        .HasColumnName("voucherid");
+
+                    b.Property<string>("VoucherMainStatus")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("vouchermainstatus");
+
+                    b.HasKey("Id")
+                        .HasName("pk_vouchersavingdetail");
+
+                    b.ToTable("vouchersavingdetail");
                 });
 
             modelBuilder.Entity("BankingPlatform.Infrastructure.Models.Miscalleneous.DayBeginEndInfoDetail", b =>

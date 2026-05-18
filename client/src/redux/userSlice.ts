@@ -12,15 +12,24 @@ interface UserState {
   sessionInfo: string;
   sessionId: number;
   isFirstSession: string;
-  
+  firstSessionFromDate: string;
+  firstSessionToDate: string;
+  sessionFromDate: string;
+  sessionToDate: string;
+  isSu: boolean;
 }
 
 const initialState: UserState = {
   name: "User",
-  branchid : 0,
+  branchid: 0,
   isFirstSession: "False",
+  firstSessionFromDate: "",
+  firstSessionToDate: "",
+  sessionFromDate: "",
+  sessionToDate: "",
   sessionInfo: "",
   sessionId: 0,
+  isSu: false,
 };
 
 const userSlice = createSlice({
@@ -44,6 +53,11 @@ const userSlice = createSlice({
       state.sessionInfo = "";
       state.sessionId = 0;
       state.isFirstSession = "False";
+      state.firstSessionFromDate = "";
+      state.firstSessionToDate = "";
+      state.sessionFromDate = "";
+      state.sessionToDate = "";
+      state.isSu = false;
     },
   },
 });

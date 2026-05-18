@@ -23,6 +23,7 @@ import rdAccountService from "../../services/accountMasters/rdaccount/rdaccounta
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux";
 import { SavingAccounts } from "../vouchers/saving/savingdeposit";
+import DatePicker from "../../components/DatePicker";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -558,16 +559,14 @@ const MatureRDPage: React.FC = () => {
                       <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-teal-500 rounded-full" />
                       Date <span className="text-red-500 text-xs">*</span>
                     </label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="date"
-                        value={matureRDDetail.date}
-                        readOnly
-                        max={sessionDate}
-                        className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none transition-all text-gray-700 bg-gradient-to-r from-white to-gray-50"
-                      />
-                    </div>
+                    <DatePicker
+                      value={matureRDDetail.date}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      disabled
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
+                      onChange={() => {}}
+                    />
                   </div>
 
                   {/* Product */}

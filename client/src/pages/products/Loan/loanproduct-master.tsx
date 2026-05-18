@@ -23,6 +23,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import AccountHeadApiService from "../../../services/accountHead/accountheadapi";
 import { AccountHeadWithCode } from "../../accounthead/accounthead/accounthead-master";
+import DatePicker from "../../../components/DatePicker";
 
 // ─── Lookup constants ─────────────────────────────────────────────────────────
 
@@ -81,8 +82,8 @@ const MARGIN_RATIO_OPTIONS = [
 
 // ─── Initial state factory ────────────────────────────────────────────────────
 
-const makeInitial = (branchId: number): CombinedLoanProductDTO => ({
-  loanProductDTO: { branchId, code: "", productName: "", nameSL: "", effectiveFrom: commonservice.getCurrentDate() },
+const makeInitial = (branchId: number, sessionDate: string): CombinedLoanProductDTO => ({
+  loanProductDTO: { branchId, code: "", productName: "", nameSL: "", effectiveFrom: sessionDate },
   loanProductDefinitionDTO: { branchId, typeId: 0, categoryId: 0, securityIds: "", secReviewFreqPeriod: 0, docPlanId: 0, intSchedule: 1, intFormulae: 2, actOnIntPosting: 1 },
   loanProductAdvancementDTO: { branchId, disbursmentMode: "", maxNoofDisbursments: 1, minLoanAmount: 0, maxLoanAmount: 0, isShareMoneyReq: "Y", loanPeriodType: "M", overDraftLimit: 0, loanAmtPerOnSecurityRD: 0, loanAmtPerOnSecurityFD: 0 },
   loanProductMarginMoneyRuleDTO: { branchId, ratioOrPerc: 0, loanProportion: 0, marginProportion: 0, mmPercentage: 0 },
@@ -99,13 +100,14 @@ const LoanProductMaster: React.FC = () => {
   const { productId: encryptedId } = useParams<{ productId?: string }>();
   const productId = encryptedId ? decryptId(encryptedId) : null;
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, clearErrors, markFieldTouched } = useFormValidation();
 
   const [activeTab, setActiveTab] = useState<"definition" | "recovery">("definition");
   const [loading, setLoading] = useState(false);
   const [showValidationSummary, setShowValidationSummary] = useState(false);
   const [accountHeads, setAccountHeads] = useState<AccountHeadWithCode[]>([]);
-  const [data, setData] = useState<CombinedLoanProductDTO>(() => makeInitial(user.branchid));
+  const [data, setData] = useState<CombinedLoanProductDTO>(() => makeInitial(user.branchid, sessionDate));
   const isEditMode = !!productId;
 
   // ─── Load data ──────────────────────────────────────────────────────────
@@ -127,7 +129,7 @@ const LoanProductMaster: React.FC = () => {
           ...d,
           loanProductDTO: {
             ...d.loanProductDTO!,
-            effectiveFrom: d.loanProductDTO?.effectiveFrom ? commonservice.splitDate(d.loanProductDTO.effectiveFrom) : commonservice.getCurrentDate(),
+            effectiveFrom: d.loanProductDTO?.effectiveFrom ? commonservice.splitDate(d.loanProductDTO.effectiveFrom) : sessionDate,
           },
         });
       } else throw new Error(res.message || "Failed to load");
@@ -519,7 +521,7 @@ const LoanProductMaster: React.FC = () => {
                       <input type="text" ref={productNameRef} value={prod.productName || ""} onChange={(e) => setProd("productName", e.target.value)} onBlur={(e) => onBlur("productName", e.target.value)} maxLength={50} autoFocus placeholder="Enter Loan Name" className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm" />
                     </FormField>
                     <FormField name="effectiveFrom" label="Effective From" required errors={errorsByField.effectiveFrom || []} icon={<Calendar className="w-4 h-4 text-blue-500" />}>
-                      <input type="date" value={prod.effectiveFrom || ""} onChange={(e) => commonservice.handleDateChange(e.target.value, (v) => setProd("effectiveFrom", v), "effectiveFrom")} max={commonservice.getCurrentDate()} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm" />
+                      <DatePicker value={prod.effectiveFrom || ""} onChange={(v) => setProd("effectiveFrom", v)} max={sessionDate} workingDate={sessionDate} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none text-sm" />
                     </FormField>
                     <FormField name="code" label="Loan Code" required errors={errorsByField.code || []} icon={<CreditCard className="w-4 h-4 text-purple-500" />}>
                       <input type="text" ref={codeRef} value={prod.code || ""} onChange={(e) => setProd("code", e.target.value.toUpperCase())} onBlur={(e) => onBlur("code", e.target.value)} maxLength={3} placeholder="e.g. 51" className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm" />

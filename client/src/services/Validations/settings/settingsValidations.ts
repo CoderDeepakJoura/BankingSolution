@@ -25,15 +25,14 @@ export const useFormValidation = () => {
       customMessage: "Please select a valid Admission Fee Account",
     },
     admissionFeeAmount: {
-      required: true,
-      requiredMessage: "Admission Fee Amount is required",
+      required: false,
       tab: "general",
       custom: (value: any) => {
-        if (value === "" || value === null || value === undefined) return false;
+        if (value === "" || value === null || value === undefined) return true;
         const num = parseFloat(value);
-        return !isNaN(num) && num > 0;
+        return !isNaN(num) && num >= 0;
       },
-      customMessage: "Admission Fee Amount must be greater than 0",
+      customMessage: "Admission Fee Amount must be a valid non-negative number",
     },
     defaultCashAccount: {
       required: true,

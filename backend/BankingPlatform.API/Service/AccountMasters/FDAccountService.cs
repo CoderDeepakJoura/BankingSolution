@@ -104,7 +104,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 {
                     int debitAccountId = (int)dto.Voucher!.DebitAccountId;
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.Voucher.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.Voucher.VoucherNarration ?? "";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.Voucher.VoucherDate, DateTimeKind.Unspecified);
@@ -218,8 +218,10 @@ namespace BankingPlatform.API.Service.AccountMasters
             LocationFilterDTO filter)
         {
             // ✅ Base query - FD accounts only
+            var workingDate = _commonfunctions.GetWorkingDate();
             var query = _context.accountmaster
-                .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.FD);
+                .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.FD
+                    && (!workingDate.HasValue || x.AccOpeningDate.Date <= workingDate.Value.Date));
 
             // ✅ Bring data to memory FIRST
             var allAccounts = await query.ToListAsync();
@@ -487,6 +489,9 @@ namespace BankingPlatform.API.Service.AccountMasters
 
             if (accountMaster == null) return "Account not found.";
 
+            if (!await _commonfunctions.CanModifyAccountInCurrentSession(dto.AccountMasterDTO!.BranchId, accountMaster.AccOpeningDate))
+                return "This account can only be modified in the session it was opened in.";
+
             (int headId, long headCode) = await _commonfunctions.GetFDProductPrincipalHead(dto.AccountMasterDTO!.BranchId, (int)dto.AccountMasterDTO.GeneralProductId!);
             if (headId == 0 || headCode == 0)
                 return "Principal Balance Head Code not configured properly. Kindly configure it in FD Product Master.";
@@ -662,7 +667,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                                    ?? claimsPrincipal?.FindFirst("UserId")?.Value
                                    ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     int branchId = (int)dto.MatureOrRenewFDInfo.BranchId!;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureOrRenewFDInfo!.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureOrRenewFDInfo?.Narration ?? ("FD " + (dto.MatureOrRenewFDInfo!.IsRenew ? "Renewed" : "Matured") + " .");
                     DateTime voucherDate = DateTime.SpecifyKind(dto.MatureOrRenewFDInfo!.VoucherDate, DateTimeKind.Unspecified);
@@ -778,9 +783,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                         FDAccId = accountId,
                         FDAccDetId = fdDetailInfo.Id,
                         AmountCr = 0,
-                        AmountDr = dto.FDAccountDetailDTOSingle!.FDAmount,
+                        AmountDr = dto.MatureOrRenewFDInfo!.IsRenew ? dto.FDAccountDetailDTOSingle!.FDAmount : fdDetailInfo.MaturityAmount,
                         Operation = "RP",
-                        ValueDate = DateTime.SpecifyKind(dto.FDAccountDetailDTOSingle!.FDDate, DateTimeKind.Utc),
+                        ValueDate = dto.MatureOrRenewFDInfo!.IsRenew ? DateTime.SpecifyKind(dto.FDAccountDetailDTOSingle!.FDDate, DateTimeKind.Utc) : voucherDate,
                         VoucherDate = voucherDate,
                         IntDr = 0,
                         IntCr = 0,
@@ -829,7 +834,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                                    ?? claimsPrincipal?.FindFirst("UserId")?.Value
                                    ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     int branchId = (int)dto.MatureOrRenewFDInfo.BranchId!;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureOrRenewFDInfo!.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureOrRenewFDInfo?.Narration ?? ("FD Pre-Matured") + " .";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.MatureOrRenewFDInfo!.VoucherDate, DateTimeKind.Unspecified);

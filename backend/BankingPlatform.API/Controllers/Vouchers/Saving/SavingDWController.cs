@@ -1,6 +1,5 @@
 ﻿using BankingPlatform.API.Controllers.AccountMasters;
 using BankingPlatform.API.DTO;
-using BankingPlatform.API.DTO.AccountMasters;
 using BankingPlatform.API.DTO.Voucher.Saving;
 using BankingPlatform.API.Service.AccountMasters;
 using BankingPlatform.API.Service.Vouchers.Saving;
@@ -60,23 +59,23 @@ namespace BankingPlatform.API.Controllers.Vouchers.Saving
         }
 
 
-        [HttpPut]
-        public async Task<IActionResult> UpdateSavingVoucher([FromBody] CommonAccMasterDTO dto)
+        [HttpPut("{voucherId}")]
+        public async Task<IActionResult> UpdateSavingVoucher(int voucherId, [FromBody] SavingVoucherDTO dto)
         {
             try
             {
-                //var result = await _service.UpdateGeneralAccountAsync(dto);
-                //if (result != "Success") return NotFound(new { Success = false, Message = result });
-                return Ok(new { Success = true, message = "Voucher updated successfully" });
+                if (dto == null || dto.Voucher == null)
+                    return BadRequest(new { Success = false, Message = "Invalid voucher data" });
+                (var result, int voucherNo) = await _service.UpdateSavingVoucher(voucherId, dto);
+                if (result != "Success")
+                    return BadRequest(new ResponseDto { Success = false, Message = result });
+                return Ok(new { Success = true, Message = "Voucher updated successfully with voucher No. " + voucherNo, data = new { voucherNo } });
             }
             catch (Exception ex)
             {
-                await _commonFunctions.LogErrors(ex, nameof(UpdateSavingVoucher),nameof(SavingDWController));
-                return BadRequest(new ResponseDto
-                {
-                    Success = false,
-                    Message = ex.Message
-                });
+                _logger.LogError(ex, "Error occurred while updating Saving Voucher.");
+                await _commonFunctions.LogErrors(ex, nameof(UpdateSavingVoucher), nameof(SavingDWController));
+                return BadRequest(new ResponseDto { Success = false, Message = "An error occurred while updating Voucher. Please try again later." });
             }
         }
     }

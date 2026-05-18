@@ -1,0 +1,413 @@
+import React, { useEffect, useState } from "react";
+import DashboardLayout from "../../Common/Layout";
+import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { RootState } from "../../redux";
+import Swal from "sweetalert2";
+import { BookOpen, FileSpreadsheet, FileText, Printer, Search } from "lucide-react";
+import DatePicker from "../../components/DatePicker";
+import shareMoneyLedgerApi, {
+  ShareMoneyAccountItem,
+  ShareMoneyLedger,
+} from "../../services/reports/shareMoneyLedgerApi";
+import dayBookApi from "../../services/reports/dayBookApi";
+import commonservice from "../../services/common/commonservice";
+import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+
+const fmt = (n: number) =>
+  n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const fmtBal = (n: number) => {
+  if (n === 0) return "0.00";
+  return `${fmt(Math.abs(n))} ${n > 0 ? "Cr" : "Dr"}`;
+};
+
+const isoDatePart = (iso: string) => iso.split("T")[0];
+const localDate = (iso: string) => {
+  const [y, m, d] = isoDatePart(iso).split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+const fmtDate = (iso: string) =>
+  localDate(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+const fmtShort = (iso: string) => localDate(iso).toLocaleDateString("en-GB");
+const toInputDate = (iso: string) => isoDatePart(iso);
+
+const TH = ({ children, className = "" }: { children?: React.ReactNode; className?: string }) => (
+  <th className={`bg-slate-800 text-white px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap sticky top-0 z-10 border-r border-slate-700 last:border-r-0 ${className}`}>
+    {children}
+  </th>
+);
+
+const TD = ({ children, className = "", colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) => (
+  <td colSpan={colSpan} className={`border-b border-slate-100 px-3 py-2 text-xs ${className}`}>
+    {children}
+  </td>
+);
+
+const TDF = ({ children, className = "", colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) => (
+  <td colSpan={colSpan} className={`bg-slate-100 border-t-2 border-slate-400 border-b border-slate-200 px-3 py-2.5 text-xs font-bold sticky bottom-0 z-10 ${className}`}>
+    {children}
+  </td>
+);
+
+const LedgerTable: React.FC<{ data: ShareMoneyLedger; longNar: boolean }> = ({ data, longNar }) => (
+  <table className="w-full border-collapse text-xs">
+    <thead>
+      <tr>
+        <TH className="w-10 text-center">S.No</TH>
+        <TH className="w-22 text-center">Date</TH>
+        <TH className="w-14 text-center">V.No</TH>
+        <TH className="text-left">Particulars</TH>
+        <TH className="w-28 text-right">Debit (Dr)</TH>
+        <TH className="w-28 text-right">Credit (Cr)</TH>
+        <TH className="w-28 text-right">Balance</TH>
+      </tr>
+    </thead>
+    <tbody>
+      <tr className="bg-amber-50 border-l-4 border-amber-400">
+        <TD className="text-center text-amber-800" />
+        <TD className="text-center text-amber-800 font-semibold whitespace-nowrap">{fmtShort(data.fromDate)}</TD>
+        <TD className="text-amber-800" />
+        <TD className="text-amber-800 font-semibold italic">Opening Balance</TD>
+        <TD className="text-amber-800" />
+        <TD className="text-amber-800" />
+        <TD className="text-right text-amber-900 font-bold">{fmtBal(data.openingBalance)}</TD>
+      </tr>
+      {data.entries.length === 0 ? (
+        <tr>
+          <td colSpan={7} className="text-center py-10 text-slate-400 italic text-xs">
+            No transactions found for the selected period.
+          </td>
+        </tr>
+      ) : data.entries.map((entry, i) => (
+        <tr key={i} className={`hover:bg-emerald-50/50 transition-colors duration-100 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/70"}`}>
+          <TD className="text-center text-slate-500">{i + 1}</TD>
+          <TD className="text-center whitespace-nowrap text-slate-600">{fmtShort(entry.voucherDate)}</TD>
+          <TD className="text-center text-slate-600">{entry.voucherNo}</TD>
+          <TD className="text-slate-800">
+            {entry.particulars}
+            {longNar && entry.narration && (
+              <span className="text-slate-400"> — {entry.narration}</span>
+            )}
+          </TD>
+          <TD className="text-right text-red-700 font-medium">{entry.dr != null ? fmt(entry.dr) : ""}</TD>
+          <TD className="text-right text-emerald-700 font-medium">{entry.cr != null ? fmt(entry.cr) : ""}</TD>
+          <TD className="text-right font-semibold text-slate-800">{fmtBal(entry.balance)}</TD>
+        </tr>
+      ))}
+    </tbody>
+    <tfoot>
+      <tr>
+        <TDF colSpan={4} className="text-right text-slate-700">Total</TDF>
+        <TDF className="text-right text-red-700">{fmt(data.totalDr)}</TDF>
+        <TDF className="text-right text-emerald-700">{fmt(data.totalCr)}</TDF>
+        <TDF className="text-right text-slate-800">{fmtBal(data.closingBalance)}</TDF>
+      </tr>
+    </tfoot>
+  </table>
+);
+
+const buildExportConfig = (data: ShareMoneyLedger, longNar: boolean): ExportConfig => {
+  const columns = [
+    { header: "S.No",        widthRatio: 0.05, align: "center" as const },
+    { header: "Date",        widthRatio: 0.10, align: "center" as const },
+    { header: "V.No",        widthRatio: 0.07, align: "center" as const },
+    { header: "Particulars", widthRatio: 0.40, align: "left"   as const },
+    { header: "Debit",       widthRatio: 0.13, align: "right"  as const },
+    { header: "Credit",      widthRatio: 0.13, align: "right"  as const },
+    { header: "Balance",     widthRatio: 0.12, align: "right"  as const },
+  ];
+  const rows: ExportRow[] = [];
+  rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", fmtBal(data.openingBalance)] });
+  data.entries.forEach((e, i) => {
+    const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
+    rows.push({ style: "normal", cells: [String(i + 1), fmtShort(e.voucherDate), String(e.voucherNo), par, e.dr != null ? fmt(e.dr) : "", e.cr != null ? fmt(e.cr) : "", fmtBal(e.balance)] });
+  });
+  rows.push({ style: "total", spanFirst: 4, cells: ["Closing Balance", "", "", "", fmt(data.totalDr), fmt(data.totalCr), fmtBal(data.closingBalance)] });
+  return {
+    meta: {
+      title: data.branchName, subtitle: data.branchAddress,
+      reportTitle: `Share Money Ledger — ${data.accountIdentifier} ${data.accountName} | ${fmtShort(data.fromDate)} to ${fmtShort(data.toDate)}`,
+      fileName: `ShareMoneyLedger_${data.accountIdentifier}_${isoDatePart(data.fromDate)}_${isoDatePart(data.toDate)}`,
+      landscape: true,
+    },
+    columns, rows,
+  };
+};
+
+const buildPrintHTML = (data: ShareMoneyLedger, longNar: boolean): string => {
+  let sno = 0;
+  let rows = `<tr class="ob-row"><td></td><td style="text-align:center">${fmtShort(data.fromDate)}</td><td></td><td>Opening Balance</td><td></td><td></td><td class="amt">${fmtBal(data.openingBalance)}</td></tr>`;
+  data.entries.forEach((e) => {
+    sno++;
+    const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
+    rows += `<tr class="${sno % 2 === 0 ? "even" : ""}"><td style="text-align:center">${sno}</td><td style="text-align:center;white-space:nowrap">${fmtShort(e.voucherDate)}</td><td style="text-align:center">${e.voucherNo}</td><td>${par}</td><td class="amt dr">${e.dr != null ? fmt(e.dr) : ""}</td><td class="amt cr">${e.cr != null ? fmt(e.cr) : ""}</td><td class="amt">${fmtBal(e.balance)}</td></tr>`;
+  });
+  rows += `<tr class="total-row"><td colspan="4" style="text-align:right">Total / Closing Balance</td><td class="amt dr">${fmt(data.totalDr)}</td><td class="amt cr">${fmt(data.totalCr)}</td><td class="amt">${fmtBal(data.closingBalance)}</td></tr>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Share Money Ledger</title><style>
+    *{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:12px;}
+    .report-header{text-align:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #334155;}
+    .report-header h1{font-size:15px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;color:#1e293b;}
+    .report-header p{font-size:10px;margin-top:3px;color:#64748b;}
+    .report-header h2{font-size:11px;font-weight:600;margin-top:6px;color:#475569;letter-spacing:1px;text-transform:uppercase;}
+    .acc-info{background:#f0fdf4;border:1px solid #bbf7d0;padding:6px 10px;margin-bottom:10px;font-size:10px;display:flex;gap:16px;flex-wrap:wrap;border-radius:4px;}
+    .acc-info span{display:flex;gap:5px;align-items:center;}.acc-info .lbl{color:#64748b;font-weight:500;}
+    table{width:100%;border-collapse:collapse;}
+    thead th{background:#1e293b;color:#fff;border:1px solid #334155;padding:4px 6px;text-align:center;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;}
+    tbody td{border:1px solid #e2e8f0;padding:2px 5px;vertical-align:top;font-size:10.5px;}
+    tbody tr.even td{background:#f8fafc;}
+    .ob-row td{background:#fffbeb;color:#92400e;font-weight:600;border-color:#fde68a;}
+    .total-row td{background:#f1f5f9;font-weight:700;border-top:2px solid #64748b;color:#1e293b;}
+    .amt{text-align:right;font-variant-numeric:tabular-nums;}.dr{color:#b91c1c;}.cr{color:#065f46;}
+    .summary{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+    .summary-card{border:1px solid #e2e8f0;padding:6px 12px;border-radius:4px;border-top-width:3px;}
+    .summary-card .lbl{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;}
+    .summary-card .val{font-size:12px;font-weight:700;margin-top:2px;}
+    @media print{body{padding:6px;}@page{margin:10mm;size:A4 landscape;}}
+  </style></head><body>
+  <div class="report-header">
+    <h1>${data.branchName}</h1><p>${data.branchAddress}</p><h2>Share Money Account Ledger</h2>
+  </div>
+  <div class="acc-info">
+    <span><span class="lbl">Account:</span><strong>${data.accountIdentifier} — ${data.accountName}</strong></span>
+    <span><span class="lbl">Period:</span><strong>${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}</strong></span>
+  </div>
+  <table><thead><tr>
+    <th style="width:28px">S.No</th><th style="width:72px">Date</th><th style="width:40px">V.No</th>
+    <th style="text-align:left">Particulars</th><th style="width:90px">Debit</th><th style="width:90px">Credit</th><th style="width:90px">Balance</th>
+  </tr></thead><tbody>${rows}</tbody></table>
+  <div class="summary">
+    <div class="summary-card" style="border-top-color:#3b82f6"><div class="lbl">Opening Balance</div><div class="val" style="color:#1d4ed8">₹${fmtBal(data.openingBalance)}</div></div>
+    <div class="summary-card" style="border-top-color:#10b981"><div class="lbl">Total Credit</div><div class="val" style="color:#065f46">₹${fmt(data.totalCr)}</div></div>
+    <div class="summary-card" style="border-top-color:#ef4444"><div class="lbl">Total Debit</div><div class="val" style="color:#b91c1c">₹${fmt(data.totalDr)}</div></div>
+    <div class="summary-card" style="border-top-color:#059669"><div class="lbl">Closing Balance</div><div class="val" style="color:#065f46">₹${fmtBal(data.closingBalance)}</div></div>
+  </div>
+</body></html>`;
+};
+
+const ShareMoneyLedgerPage: React.FC = () => {
+  const user = useSelector((state: RootState) => state.user);
+  const navigate = useNavigate();
+
+  const workingDate = user.workingdate
+    ? commonservice.parseWorkingDate(user.workingdate)
+    : new Date().toISOString().split("T")[0];
+
+  const [sessionMinDate, setSessionMinDate] = useState("");
+  const [sessionMaxDate, setSessionMaxDate] = useState(workingDate);
+  const [accounts, setAccounts] = useState<ShareMoneyAccountItem[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<number | "">("");
+  const [tillDateOnly, setTillDateOnly] = useState(false);
+  const [fromDate, setFromDate] = useState(workingDate);
+  const [toDate, setToDate] = useState(workingDate);
+  const [withLongNarration, setWithLongNarration] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<ShareMoneyLedger | null>(null);
+
+  useEffect(() => {
+    if (!user.branchid) return;
+    dayBookApi.getSessionDates(user.branchid).then((res) => {
+      if (res.success && res.data) {
+        const minD = toInputDate(res.data.fromDate);
+        const maxD = workingDate < toInputDate(res.data.toDate) ? workingDate : toInputDate(res.data.toDate);
+        setSessionMinDate(minD); setSessionMaxDate(maxD);
+        if (!tillDateOnly) setFromDate(minD);
+        setToDate(maxD);
+      }
+    }).catch(() => {});
+    shareMoneyLedgerApi.getShareMoneyAccounts(user.branchid).then((res) => {
+      if (res.success && res.data) setAccounts(res.data);
+    }).catch(() => {});
+  }, [user.branchid]);
+
+  useEffect(() => {
+    if (tillDateOnly && sessionMinDate) setFromDate(sessionMinDate);
+  }, [tillDateOnly, sessionMinDate]);
+
+  const effectiveFromDate = tillDateOnly ? sessionMinDate || fromDate : fromDate;
+
+  const handleShow = async () => {
+    if (selectedAccount === "") { Swal.fire("Validation", "Please select a Share Money Account.", "warning"); return; }
+    if (!effectiveFromDate || !toDate) { Swal.fire("Validation", "Please select the date range.", "warning"); return; }
+    if (effectiveFromDate > toDate) { Swal.fire("Validation", "From Date cannot be after To Date.", "warning"); return; }
+    setLoading(true); setData(null);
+    try {
+      const res = await shareMoneyLedgerApi.getShareMoneyLedger(user.branchid, selectedAccount as number, effectiveFromDate, toDate);
+      if (res.success && res.data) setData(res.data);
+      else Swal.fire("Error", res.message || "Failed to load ledger.", "error");
+    } catch (e: any) {
+      Swal.fire("Error", e?.message || "Unable to reach server.", "error");
+    } finally { setLoading(false); }
+  };
+
+  const handlePrint = () => {
+    if (!data) return;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(buildPrintHTML(data, withLongNarration));
+    win.document.close(); win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 300);
+  };
+
+  const selectClass = "w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition text-sm bg-white text-slate-800 shadow-sm disabled:bg-slate-50 disabled:text-slate-400";
+  const dateClass  = "w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition text-sm shadow-sm";
+  const labelClass = "block text-xs uppercase tracking-wide font-semibold text-slate-500 mb-1.5";
+
+  return (
+    <DashboardLayout
+      enableScroll
+      mainContent={
+        <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
+          <div className="max-w-7xl mx-auto space-y-5">
+
+            {/* ── Filter Card ── */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200">
+                <div className="w-1 self-stretch bg-emerald-600 rounded-full" />
+                <div className="w-9 h-9 bg-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-4.5 h-4.5 text-white" size={18} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-800">Share Money Account Ledger</h2>
+                  <p className="text-xs text-slate-500">Transaction history for a share money account</p>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-5">
+                {/* Account selection */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Account Selection</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className={labelClass}>Share Money Account <span className="text-red-500 normal-case">*</span></label>
+                      <select
+                        value={selectedAccount}
+                        onChange={(e) => { setSelectedAccount(e.target.value === "" ? "" : Number(e.target.value)); setData(null); }}
+                        disabled={accounts.length === 0}
+                        className={selectClass}
+                      >
+                        <option value="">— Select Account —</option>
+                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.accountIdentifier} — {a.accountName}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date range */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Date Range</p>
+                  <div className="flex flex-wrap gap-4 items-end">
+                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+                      <input type="checkbox" checked={tillDateOnly} onChange={(e) => setTillDateOnly(e.target.checked)} className="w-4 h-4 rounded accent-emerald-600" />
+                      Till Date Only
+                    </label>
+                    {!tillDateOnly && (
+                      <div className="w-44">
+                        <label className={labelClass}>From Date <span className="text-red-500 normal-case">*</span></label>
+                        <DatePicker value={fromDate} onChange={setFromDate} min={sessionMinDate || undefined} max={workingDate} workingDate={workingDate} className={dateClass} />
+                      </div>
+                    )}
+                    <div className="w-44">
+                      <label className={labelClass}>{tillDateOnly ? "Till Date" : "To Date"} <span className="text-red-500 normal-case">*</span></label>
+                      <DatePicker value={toDate} onChange={setToDate} min={tillDateOnly ? undefined : (sessionMinDate || undefined)} max={workingDate} workingDate={workingDate} className={dateClass} />
+                    </div>
+                    {sessionMinDate && (
+                      <div className="text-xs text-slate-400 pb-1">
+                        Session: <span className="text-slate-600 font-medium">{fmtDate(sessionMinDate)}</span> — <span className="text-slate-600 font-medium">{fmtDate(sessionMaxDate)}</span>
+                      </div>
+                    )}
+                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none pb-1">
+                      <input type="checkbox" checked={withLongNarration} onChange={(e) => setWithLongNarration(e.target.checked)} className="w-4 h-4 rounded accent-emerald-600" />
+                      With Long Narration
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-between flex-wrap gap-3">
+                <p className="text-xs text-slate-400">Fields marked <span className="text-red-500">*</span> are mandatory</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button onClick={handleShow} disabled={loading} className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
+                    {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
+                    {loading ? "Loading…" : "Show"}
+                  </button>
+                  {data && (
+                    <>
+                      <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                        <Printer size={15} /> Print
+                      </button>
+                      <button onClick={() => exportToPdf(buildExportConfig(data, withLongNarration))} className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                        <FileText size={15} /> PDF
+                      </button>
+                      <button onClick={() => exportToExcel(buildExportConfig(data, withLongNarration))} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                        <FileSpreadsheet size={15} /> Excel
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => navigate("/dashboard")} className="px-4 py-2 text-slate-600 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-100 transition">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Ledger Report ── */}
+            {data && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="text-center px-6 py-6 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
+                  <p className="text-xs uppercase tracking-widest text-slate-400 font-medium mb-1">Statement of Account</p>
+                  <h1 className="text-lg font-bold uppercase tracking-wider text-slate-900">{data.branchName}</h1>
+                  <p className="text-xs text-slate-500 mt-0.5">{data.branchAddress}</p>
+                  <div className="flex items-center gap-3 justify-center mt-3">
+                    <div className="h-px bg-slate-200 flex-1 max-w-16" />
+                    <span className="text-xs font-semibold uppercase tracking-widest text-slate-600 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full">Share Money Account Ledger</span>
+                    <div className="h-px bg-slate-200 flex-1 max-w-16" />
+                  </div>
+                </div>
+
+                <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap gap-2 items-center">
+                  {[
+                    { label: "Account", value: `${data.accountIdentifier} — ${data.accountName}` },
+                    { label: "Period", value: `${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}` },
+                  ].map(({ label, value }) => (
+                    <span key={label} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
+                      <span className="text-slate-400 font-medium">{label}:</span>
+                      <span className="font-semibold text-slate-800">{value}</span>
+                    </span>
+                  ))}
+                </div>
+
+                <div className="p-4 sm:p-5">
+                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm overflow-x-auto overflow-y-auto max-h-[58vh]">
+                    <LedgerTable data={data} longNar={withLongNarration} />
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-blue-500">
+                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Opening Balance</p>
+                      <p className="text-lg font-bold text-blue-700 mt-1">₹{fmtBal(data.openingBalance)}</p>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-emerald-500">
+                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Credit</p>
+                      <p className="text-lg font-bold text-emerald-700 mt-1">₹{fmt(data.totalCr)}</p>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-red-500">
+                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Debit</p>
+                      <p className="text-lg font-bold text-red-700 mt-1">₹{fmt(data.totalDr)}</p>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-emerald-600">
+                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Closing Balance</p>
+                      <p className="text-lg font-bold text-emerald-700 mt-1">₹{fmtBal(data.closingBalance)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      }
+    />
+  );
+};
+
+export default ShareMoneyLedgerPage;

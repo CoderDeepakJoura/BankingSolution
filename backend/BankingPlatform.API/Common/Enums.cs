@@ -22,7 +22,11 @@
             Member = 1,
             Saving = 2,
             FD = 3,
-            RD = 4
+            RD = 4,
+            Loan = 5,
+            Cash = 6,
+            Journal = 7,
+            OdReserve = 8,
         }
 
         public enum VoucherSubType
@@ -35,6 +39,11 @@
             Renew = 6,
             PreMature = 7,
             Kist = 8,
+            LoanAdvancement = 9,
+            LoanRecovery = 10,
+            PaymentReceipt = 11,
+            Transfer = 12,
+            OdReservePosting = 13,
         }
 
         public enum VoucherStatus
@@ -44,10 +53,19 @@
             Dr = 3,
             Cr = 4,
             FDCr = 5,
-            FDDr = 6, 
-            RDCr = 5,
-            RDDr = 6,
+            FDDr = 6,
+            LA = 7,
+            LR = 8,
+            RDCr = 9,
+            RDDr = 10,
+        }
 
+        public enum IntCategory
+        {
+            StdInterest = 1,
+            PenalInterest = 2,
+            StdRecoverable = 3,
+            OverdueRecoverable = 4,
         }
 
         public enum MemberType

@@ -23,6 +23,7 @@ import fdAccountService from "../../../services/accountMasters/fdaccount/fdaccou
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import { SavingAccounts } from "../../vouchers/saving/savingdeposit";
+import DatePicker from "../../../components/DatePicker";
 
 interface FDProduct {
   id: number;
@@ -78,6 +79,7 @@ interface AccountOption {
 const PrePreMatureFDPage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const [loading, setLoading] = useState(false);
   const [isFetchingFD, setIsFetchingFD] = useState(false);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -101,7 +103,7 @@ const PrePreMatureFDPage: React.FC = () => {
     fdDetailId: 0,
     fdAccountId: 0,
     fdAccountNo: "",
-    date: commonservice.getTodaysDate(),
+    date: user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate(),
     product: 0,
     preMaturityAmt: 0,
     postMaturityAmt: "0.00",
@@ -274,7 +276,7 @@ const PrePreMatureFDPage: React.FC = () => {
     setFdAccounts([]);
     setPreMatureFDDetail({
       fdDetailId: 0, fdAccountId: 0, fdAccountNo: "",
-      date: commonservice.getTodaysDate(), product: 0,
+      date: sessionDate, product: 0,
       preMaturityAmt: 0, postMaturityAmt: "0.00", fdDate: "",
       maturityDate: "", savingAccName: "", intRate: 0,
       receiptNo: "", deductedTDS: 0, balance: 0,
@@ -286,7 +288,7 @@ const PrePreMatureFDPage: React.FC = () => {
   const handleFDAccountChange = async (accountId: number | null) => {
     setPreMatureFDDetail({
       fdDetailId: 0, fdAccountId: 0, fdAccountNo: "",
-      date: commonservice.getTodaysDate(), product: 0,
+      date: sessionDate, product: 0,
       preMaturityAmt: 0, postMaturityAmt: "0.00", fdDate: "",
       maturityDate: "", savingAccName: "", intRate: 0,
       receiptNo: "", deductedTDS: 0, balance: 0,
@@ -306,7 +308,7 @@ const PrePreMatureFDPage: React.FC = () => {
           fdDetailId: data.fdAccountDetailDTOSingle.id || 0,
           fdAccountId: accountId,
           fdAccountNo: data.accountMasterDTO?.accountNumber || "",
-          date: commonservice.getTodaysDate(),
+          date: sessionDate,
           product: selectedProduct,
           preMaturityAmt,
           postMaturityAmt: (0.0).toString(),
@@ -333,7 +335,7 @@ const PrePreMatureFDPage: React.FC = () => {
       Swal.fire("Error", error.message || "Failed to fetch FD account details", "error");
       setPreMatureFDDetail({
         fdDetailId: 0, fdAccountId: 0, fdAccountNo: "",
-        date: commonservice.getTodaysDate(), product: 0,
+        date: sessionDate, product: 0,
         preMaturityAmt: 0, postMaturityAmt: "0.00", fdDate: "",
         maturityDate: "", savingAccName: "", intRate: 0,
         receiptNo: "", deductedTDS: 0, balance: 0,
@@ -351,7 +353,7 @@ const PrePreMatureFDPage: React.FC = () => {
     setActiveTab("cash");
     setPreMatureFDDetail({
       fdDetailId: 0, fdAccountId: 0, fdAccountNo: "",
-      date: commonservice.getTodaysDate(), product: 0,
+      date: sessionDate, product: 0,
       preMaturityAmt: 0, postMaturityAmt: "0.00", fdDate: "",
       maturityDate: "", savingAccName: "", intRate: 0,
       receiptNo: "", deductedTDS: 0, balance: 0,
@@ -507,19 +509,14 @@ const PrePreMatureFDPage: React.FC = () => {
                       <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
                       Date <span className="text-red-500 text-xs">*</span>
                     </label>
-                    <div className="relative group">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
-                        <Calendar className="text-sm w-4 h-4" />
-                      </div>
-                      <input
-                        type="date"
-                        value={preMatureFDDetail.date}
-                        onChange={(e) => setPreMatureFDDetail({ ...preMatureFDDetail, date: e.target.value })}
-                        readOnly
-                        max={commonservice.getTodaysDate()}
-                        className="w-full pl-10 pr-4 py-2.5 sm:py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-gray-700 bg-gradient-to-r from-white to-gray-50"
-                      />
-                    </div>
+                    <DatePicker
+                      value={preMatureFDDetail.date}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      disabled
+                      className="w-full px-3 py-2.5 sm:py-3 border-2 border-gray-200 rounded-lg outline-none"
+                      onChange={() => {}}
+                    />
                   </div>
 
                   {/* Product */}

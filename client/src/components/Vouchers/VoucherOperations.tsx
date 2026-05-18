@@ -2,17 +2,22 @@
 import React from "react";
 import DashboardLayout from "../../Common/Layout";
 import VoucherOperations from "./VoucherActions";
+import { useNavigate } from "react-router-dom";
 import {
   Wallet,
   TrendingDown,
   PiggyBank,
-  Calendar,
   RefreshCw,
   TimerOff,
   RotateCcw,
+  SearchCheck,
+  Banknote,
+  ArrowLeftRight,
+  TrendingUp,
 } from "lucide-react";
 
 const VouchersModule: React.FC = () => {
+  const navigate = useNavigate();
   const vouchersList = [
     {
       VoucherType: "Saving Deposit Voucher",
@@ -47,7 +52,6 @@ const VouchersModule: React.FC = () => {
       addPath: "/premature-rd-account",
       icon: <TimerOff size={20} className="text-purple-600" />,
     },
-    ,
     {
       VoucherType: "Recurring Deposit (RD) Kist Voucher",
       addPath: "/rd-kist-voucher",
@@ -56,8 +60,27 @@ const VouchersModule: React.FC = () => {
     {
       VoucherType: "Loan Advancement Voucher",
       addPath: "/loan-advancement",
-      modifyPath: "/Vouchers/rd/modify",
       icon: <RefreshCw size={20} className="text-indigo-600" />,
+    },
+    {
+      VoucherType: "Loan Recovery Voucher",
+      addPath: "/loan-recovery",
+      icon: <TrendingDown size={20} className="text-orange-600" />,
+    },
+    {
+      VoucherType: "Loan Interest Posting Voucher",
+      addPath: "/loan-interest-posting",
+      icon: <TrendingUp size={20} className="text-blue-600" />,
+    },
+    {
+      VoucherType: "Cash Payment / Receipt Voucher",
+      addPath: "/cash-payment-receipt-voucher",
+      icon: <Banknote size={20} className="text-teal-600" />,
+    },
+    {
+      VoucherType: "Journal / Transfer Voucher",
+      addPath: "/journal-transfer-voucher",
+      icon: <ArrowLeftRight size={20} className="text-violet-600" />,
     },
   ];
 
@@ -74,6 +97,29 @@ const VouchersModule: React.FC = () => {
               <p className="text-gray-600">
                 Create and manage all types of vouchers efficiently
               </p>
+            </div>
+
+            {/* Search / Modify / Delete */}
+            <div
+              onClick={() => navigate("/voucher-search")}
+              className="bg-white rounded-xl shadow-lg border-2 border-blue-200 hover:border-blue-400 hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden group"
+            >
+              <div className="flex items-center gap-5 px-6 py-5">
+                <div className="w-14 h-14 bg-blue-600 group-hover:bg-blue-700 rounded-xl flex items-center justify-center shadow-md transition-colors">
+                  <SearchCheck size={26} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-800 group-hover:text-blue-700 transition-colors">
+                    Search / Modify / Delete Voucher
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Find any voucher by date &amp; number, preview its entries, then modify or delete
+                  </p>
+                </div>
+                <div className="px-5 py-2.5 bg-blue-600 group-hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow transition-colors">
+                  Open
+                </div>
+              </div>
             </div>
 
             {/* Vouchers List */}

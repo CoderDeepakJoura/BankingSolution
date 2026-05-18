@@ -12,5 +12,6 @@ namespace BankingPlatform.Infrastructure.Settings
         public string Issuer { get; set; }
         public string Audience { get; set; }
         public int ExpiryDays { get; set; }
+        public int RefreshTokenExpiryDays { get; set; } = 7;
     }
 }

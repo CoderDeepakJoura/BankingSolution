@@ -48,6 +48,7 @@ const FDSlab = () => {
   const isEditMode = !!slabId;
 
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [loading, setLoading] = useState(false);
   const [fdProducts, setFdProducts] = useState<FDProduct[]>([]);
@@ -340,7 +341,7 @@ const FDSlab = () => {
           branchId: user.branchid,
           fdProductId: Number(formData.fdProductId),
           slabName: formData.slabName.trim(),
-          applicableDate: commonservice.getTodaysDate(),
+          applicableDate: sessionDate,
           fromDays: Number(formData.fromDays),
           toDays: Number(formData.toDays),
           compoundingInterval: Number(formData.compoundingInterval),

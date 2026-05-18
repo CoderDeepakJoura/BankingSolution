@@ -32,6 +32,8 @@ import savingAccountService, {
 import { useFormValidation } from "../../../services/Validations/accountMasters/savingaccmastervalidations";
 import { ValidationSummary } from "../../../components/Validations/ValidationSummary";
 import { FormField } from "../../../components/Validations/FormField";
+import { canEnterOpeningBalance } from "../../../utils/session";
+import DatePicker from "../../../components/DatePicker";
 
 export interface SavingProduct {
   id: number;
@@ -100,12 +102,16 @@ const SavingAccountMaster = () => {
     "account"
   );
 
+  const sessionDate = user.workingdate
+    ? commonservice.splitDate(user.workingdate)
+    : commonservice.getTodaysDate();
+
   // Form data matching CommonAccMasterDTO
   const [formData, setFormData] = useState({
     accountMasterDTO: {
       branchId: user.branchid,
       savingProductId: 0,
-      accountOpeningDate: commonservice.getTodaysDate(),
+      accountOpeningDate: sessionDate,
       memberType: 2,
       memberAccountNo: "",
       membershipNo: "",
@@ -119,6 +125,17 @@ const SavingAccountMaster = () => {
     memberDetails: null as any,
   });
 
+  const showOpeningBalance = canEnterOpeningBalance(
+    user,
+    formData.accountMasterDTO.accountOpeningDate,
+  );
+
+  const sessionMaxDate = sessionDate;
+  const isFirstSession = user.isFirstSession === "True";
+  const sessionMinDate = isFirstSession
+    ? undefined
+    : user.sessionInfo ? `${user.sessionInfo.split('-')[0]}-04-01` : undefined;
+
   const [jointHolders, setJointHolders] = useState<any[]>([]);
   const [nominees, setNominees] = useState<any[]>([]);
   const [isJointAccount, setIsJointAccount] = useState(false);
@@ -126,7 +143,7 @@ const SavingAccountMaster = () => {
 
   // Voucher data
   const [voucherData, setVoucherData] = useState({
-    voucherDate: commonservice.getTodaysDate(),
+    voucherDate: sessionDate,
     depositAmount: "",
     byCash: "",
     transferDetails: "",
@@ -540,10 +557,10 @@ const SavingAccountMaster = () => {
       {
         branchId: user.branchid,
         nomineeName: "",
-        dateOfBirth: commonservice.getTodaysDate(),
+        dateOfBirth: sessionDate,
         relationWithAccountHolder: 0,
         address: "",
-        nomineeDate: commonservice.getTodaysDate(),
+        nomineeDate: sessionDate,
         guardianName: "",
         isMinor: false,
       },
@@ -576,12 +593,15 @@ const SavingAccountMaster = () => {
     const loadExistingAccount = async () => {
       if (isEditMode && accountId) {
         try {
-          Swal.fire({
-            title: "Loading Account Data...",
-            text: "Please wait",
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading(),
-          });
+          Swal.fire({ title: "Loading Account Data...", text: "Please wait", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+          const modifyCheck = await commonservice.can_modify_account(Number(accountId), user.branchid);
+          if (!modifyCheck.success) {
+            Swal.close();
+            await Swal.fire({ icon: "error", title: "Not Allowed", text: modifyCheck.message || "This account can only be modified in the session it was opened in." });
+            navigate("/saving-acc-info");
+            return;
+          }
 
           const response = await savingAccountService.getSavingAccountById(
             Number(accountId),
@@ -598,7 +618,7 @@ const SavingAccountMaster = () => {
                 savingProductId: data.accountMasterDTO.generalProductId || 0,
                 accountOpeningDate:
                   data.accountMasterDTO.accOpeningDate?.split("T")[0] ||
-                  commonservice.getTodaysDate(),
+                  sessionDate,
                 memberType: addedUsing == "NM" ? 1 : 2,
                 memberAccountNo: data.accountMasterDTO.accountNumber || "",
                 membershipNo: data.accountMasterDTO.membershipNo || "",
@@ -686,12 +706,12 @@ const SavingAccountMaster = () => {
                   nomineeName: nominee.nomineeName,
                   dateOfBirth:
                     nominee.nomineeDob?.split("T")[0] ||
-                    commonservice.getTodaysDate(),
+                    sessionDate,
                   relationWithAccountHolder: nominee.relationWithAccHolder,
                   address: nominee.addressLine || "",
                   nomineeDate:
                     nominee.nomineeDate?.split("T")[0] ||
-                    commonservice.getTodaysDate(),
+                    sessionDate,
                   guardianName: nominee.nameOfGuardian || "",
                   isMinor: nominee.isMinor === 1,
                 }))
@@ -848,17 +868,27 @@ const SavingAccountMaster = () => {
               : "NM",
         },
 
-        voucher: {
-          id: 0,
-          brID: user.branchid,
-          voucherDate: voucherData.voucherDate,
-          debitAccountId: voucherData.debitAccountId,
-          openingAmount:
-            parseFloat(formData.accountMasterDTO.openingBalance) || 0,
-          totalDebit: parseFloat(voucherData.depositAmount) || 0,
-          voucherNarration: voucherData.narration,
-          openingBalanceType: formData.accountMasterDTO.balanceType,
-        },
+        voucher: showOpeningBalance
+          ? {
+              id: 0,
+              brID: user.branchid,
+              voucherDate: formData.accountMasterDTO.accountOpeningDate,
+              debitAccountId: 0,
+              openingAmount: parseFloat(formData.accountMasterDTO.openingBalance) || 0,
+              totalDebit: parseFloat(formData.accountMasterDTO.openingBalance) || 0,
+              voucherNarration: "Saving Account Opening",
+              openingBalanceType: formData.accountMasterDTO.balanceType,
+            }
+          : {
+              id: 0,
+              brID: user.branchid,
+              voucherDate: voucherData.voucherDate,
+              debitAccountId: voucherData.debitAccountId,
+              openingAmount: parseFloat(formData.accountMasterDTO.openingBalance) || 0,
+              totalDebit: parseFloat(voucherData.depositAmount) || 0,
+              voucherNarration: voucherData.narration,
+              openingBalanceType: formData.accountMasterDTO.balanceType,
+            },
 
         accountDocDetailsDTO: {
           branchId: user.branchid,
@@ -960,7 +990,7 @@ const SavingAccountMaster = () => {
       accountMasterDTO: {
         branchId: user.branchid,
         savingProductId: 0,
-        accountOpeningDate: commonservice.getTodaysDate(),
+        accountOpeningDate: sessionDate,
         memberType: 2,
         memberAccountNo: "",
         membershipNo: "",
@@ -975,7 +1005,7 @@ const SavingAccountMaster = () => {
     });
 
     setVoucherData({
-      voucherDate: commonservice.getTodaysDate(),
+      voucherDate: sessionDate,
       depositAmount: "",
       byCash: "",
       transferDetails: "",
@@ -1035,7 +1065,9 @@ const SavingAccountMaster = () => {
   const tabs = [
     { id: "basic", label: "Basic Info", icon: User },
     { id: "joint", label: "Joint Holders", icon: Users },
-    { id: "voucher", label: "Voucher", icon: FileText },
+    ...(!isEditMode && !showOpeningBalance
+      ? [{ id: "voucher", label: "Voucher", icon: FileText }]
+      : []),
     { id: "nominee", label: "Nominee", icon: UserPlus },
     { id: "images", label: "Images", icon: ImageIcon },
   ];
@@ -1078,22 +1110,14 @@ const SavingAccountMaster = () => {
             errors={errorsByField.accountOpeningDate || []}
             icon={<Calendar className="w-4 h-4 text-orange-500" />}
           >
-            <input
-              type="date"
+            <DatePicker
               value={formData.accountMasterDTO.accountOpeningDate}
-              onChange={(e) =>
-                commonservice.handleDateChange(
-                  e.target.value,
-                  (val) => handleFieldChange("accountOpeningDate", val),
-                  "accountOpeningDate"
-                )
-              }
-              // onChange={(e) =>
-              //   handleFieldChange("accountOpeningDate", e.target.value)
-              // }
-              readOnly={isEditMode}
-              max={commonservice.getTodaysDate()}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              onChange={(val) => handleFieldChange("accountOpeningDate", val)}
+              disabled={isEditMode}
+              min={sessionMinDate}
+              max={sessionMaxDate}
+              workingDate={sessionDate}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
             />
           </FormField>
 
@@ -1291,63 +1315,67 @@ const SavingAccountMaster = () => {
             </FormField>
           </div>
 
-          {/* Opening Balance */}
-          <FormField
-            name="openingBalance"
-            label="Opening Balance"
-            errors={errorsByField.openingBalance || []}
-            icon={<IndianRupee className="w-4 h-4 text-green-500" />}
-          >
-            <input
-              type="text"
-              value={formData.accountMasterDTO.openingBalance}
-              onChange={(e) =>
-                handleNumericChange("openingBalance", e.target.value)
-              }
-              placeholder="Enter Opening Balance"
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-            />
-          </FormField>
+          {showOpeningBalance && (
+            <>
+              {/* Opening Balance */}
+              <FormField
+                name="openingBalance"
+                label="Opening Balance"
+                errors={errorsByField.openingBalance || []}
+                icon={<IndianRupee className="w-4 h-4 text-green-500" />}
+              >
+                <input
+                  type="text"
+                  value={formData.accountMasterDTO.openingBalance}
+                  onChange={(e) =>
+                    handleNumericChange("openingBalance", e.target.value)
+                  }
+                  placeholder="Enter Opening Balance"
+                  className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                />
+              </FormField>
 
-          {/* Balance Type */}
-          <div className="space-y-2 md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Balance Type
-              <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-4 mt-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="balanceType"
-                  value="Cr"
-                  checked={formData.accountMasterDTO.balanceType === "Cr"}
-                  onChange={(e) =>
-                    handleFieldChange("balanceType", e.target.value)
-                  }
-                  className="w-4 h-4 text-blue-600"
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  Credit (Cr)
-                </span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="balanceType"
-                  value="Dr"
-                  checked={formData.accountMasterDTO.balanceType === "Dr"}
-                  onChange={(e) =>
-                    handleFieldChange("balanceType", e.target.value)
-                  }
-                  className="w-4 h-4 text-blue-600"
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  Debit (Dr)
-                </span>
-              </label>
-            </div>
-          </div>
+              {/* Balance Type */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Balance Type
+                  <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-4 mt-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="balanceType"
+                      value="Cr"
+                      checked={formData.accountMasterDTO.balanceType === "Cr"}
+                      onChange={(e) =>
+                        handleFieldChange("balanceType", e.target.value)
+                      }
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Credit (Cr)
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="balanceType"
+                      value="Dr"
+                      checked={formData.accountMasterDTO.balanceType === "Dr"}
+                      onChange={(e) =>
+                        handleFieldChange("balanceType", e.target.value)
+                      }
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Debit (Dr)
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -1449,18 +1477,15 @@ const SavingAccountMaster = () => {
                 Date of Birth
                 <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={memberDetailsData.dateOfBirth}
-                onChange={(e) =>
-                  handleMemberDetailsChange("dateOfBirth", e.target.value)
-                }
-                onBlur={() => markFieldTouched("dateOfBirth")}
-                max={commonservice.getTodaysDate()}
-                className={`w-full px-3 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition-all ${
+                onChange={(val) => { handleMemberDetailsChange("dateOfBirth", val); markFieldTouched("dateOfBirth"); }}
+                max={sessionDate}
+                workingDate={sessionDate}
+                className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none ${
                   errorsByField.dateOfBirth
-                    ? "border-red-500 focus:border-red-500 bg-red-50"
-                    : "border-gray-200 focus:border-blue-500"
+                    ? "border-red-500 bg-red-50"
+                    : "border-gray-200"
                 }`}
               />
               {errorsByField.dateOfBirth && (
@@ -1762,22 +1787,15 @@ const SavingAccountMaster = () => {
                     <label className="block text-sm font-medium text-gray-700">
                       Date of Birth
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={holder.dateOfBirth || ""}
-                      onChange={(e) =>
-                        handleJointHolderChange(
-                          index,
-                          "dateOfBirth",
-                          e.target.value || 0
-                        )
-                      }
-                      onBlur={() => markFieldTouched("dateOfBirth")}
-                      max={commonservice.getTodaysDate()}
-                      className={`w-full px-3 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition-all ${
+                      onChange={(val) => handleJointHolderChange(index, "dateOfBirth", val || 0)}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none ${
                         errorsByField.dateOfBirth
-                          ? "border-red-500 focus:border-red-500 bg-red-50"
-                          : "border-gray-200 focus:border-blue-500"
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       }`}
                     />
                     {/* <input
@@ -1882,22 +1900,13 @@ const SavingAccountMaster = () => {
                 Voucher Date
               </span>
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={voucherData.voucherDate}
-              readOnly
-              onChange={(e) =>
-                commonservice.handleDateChange(
-                  e.target.value,
-                  (val) => setVoucherData({ ...voucherData, voucherDate: val }),
-                  "accountOpeningDate"
-                )
-              }
-              // onChange={(e) =>
-              //   setVoucherData({ ...voucherData, voucherDate: e.target.value })
-              // }
-              max={commonservice.getTodaysDate()}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              disabled
+              max={sessionMaxDate}
+              workingDate={sessionDate}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
+              onChange={() => {}}
             />
           </div>
           {/* Debit Account */}
@@ -2094,24 +2103,15 @@ const SavingAccountMaster = () => {
                       Date of Birth
                       <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={nominee.dateOfBirth}
-                      onChange={(e) =>
-                        handleNomineeChange(
-                          index,
-                          "dateOfBirth",
-                          e.target.value
-                        )
-                      }
-                      onBlur={() =>
-                        markFieldTouched(`nominees[${index}].dateOfBirth`)
-                      }
-                      max={commonservice.getTodaysDate()}
-                      className={`w-full px-3 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition-all ${
+                      onChange={(val) => { handleNomineeChange(index, "dateOfBirth", val); markFieldTouched(`nominees[${index}].dateOfBirth`); }}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none ${
                         errorsByField[`nominees[${index}].dateOfBirth`]
-                          ? "border-red-500 focus:border-red-500 bg-red-50"
-                          : "border-gray-200 focus:border-blue-500"
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
                       }`}
                     />
                     {errorsByField[`nominees[${index}].dateOfBirth`] && (
@@ -2203,18 +2203,13 @@ const SavingAccountMaster = () => {
                     <label className="block text-sm font-medium text-gray-700">
                       Nominee Date
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={nominee.nomineeDate}
-                      onChange={(e) =>
-                        handleNomineeChange(
-                          index,
-                          "nomineeDate",
-                          e.target.value
-                        )
-                      }
-                      max={commonservice.getTodaysDate()}
-                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                      onChange={(val) => handleNomineeChange(index, "nomineeDate", val)}
+                      min={sessionMinDate}
+                      max={sessionMaxDate}
+                      workingDate={sessionDate}
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
                     />
                   </div>
 
@@ -2513,7 +2508,7 @@ const SavingAccountMaster = () => {
               <div className="p-6">
                 {activeTab === "basic" && renderBasicInfo()}
                 {activeTab === "joint" && renderJointHolders()}
-                {activeTab === "voucher" && !isEditMode && renderVoucher()}
+                {activeTab === "voucher" && renderVoucher()}
                 {activeTab === "nominee" && renderNominee()}
                 {activeTab === "images" && renderImages()}
               </div>

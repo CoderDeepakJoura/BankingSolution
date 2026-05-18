@@ -1,7 +1,13 @@
 ﻿
 global using Microsoft.EntityFrameworkCore;
 using BankingPlatform.Infrastructure.Models.AccHeads;
+using BankingPlatform.Infrastructure.Models.Miscalleneous;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Security.Claims;
+using System.Text.Json;
 using BankingPlatform.Infrastructure.Models.AccMasters;
+using BankingPlatform.Infrastructure.Models.AccMasters.Loan;
 using BankingPlatform.Infrastructure.Models.BranchSessions;
 using BankingPlatform.Infrastructure.Models.BranchWiseRule;
 using BankingPlatform.Infrastructure.Models.InterestSlabs.FD;
@@ -16,21 +22,26 @@ using BankingPlatform.Infrastructure.Models.ProductMasters.Loan;
 using BankingPlatform.Infrastructure.Models.ProductMasters.RD;
 using BankingPlatform.Infrastructure.Models.ProductMasters.Saving;
 using BankingPlatform.Infrastructure.Models.Settings;
+using BankingPlatform.Infrastructure.Models.Auth;
 using BankingPlatform.Infrastructure.Models.voucher;
 namespace BankingPlatform.Infrastructure.Models;
 
 public partial class BankingDbContext : DbContext
 {
+    private readonly IHttpContextAccessor? _httpContextAccessor;
+
     public BankingDbContext()
     {
     }
 
-    public BankingDbContext(DbContextOptions<BankingDbContext> options)
+    public BankingDbContext(DbContextOptions<BankingDbContext> options, IHttpContextAccessor? httpContextAccessor = null)
         : base(options)
     {
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public virtual DbSet<User> user { get; set; }
+    public virtual DbSet<RefreshToken> refreshtoken { get; set; }
     public virtual DbSet<Zone> zone { get; set; }
     public virtual DbSet<Thana> thana { get; set; }
     public virtual DbSet<PostOffice> postoffice { get; set; }
@@ -97,15 +108,188 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<LoanSlab> loanslab { get; set; }
     public virtual DbSet<LoanSlabDetail> loanslabdetail { get; set; }
     public virtual DbSet<LoanProduct> loanproduct { get; set; }
+    public virtual DbSet<AccountKistDetail> accountkistdetail { get; set; }
+    public virtual DbSet<AccountLimitDetail> accountlimitdetail { get; set; }
+    public virtual DbSet<AccountKistSchedule> accountkistschedule { get; set; }
+    public virtual DbSet<LoanAccFDPledge> loanaccfdpledge { get; set; }
+    public virtual DbSet<LoanAccFDPledgeDetail> loanaccfdpledgedetail { get; set; }
+    public virtual DbSet<LoanAccRDPledge> loanaccrdpledge { get; set; }
+    public virtual DbSet<LoanAccRDPledgeDetail> loanaccrdpledgedetail { get; set; }
+    public virtual DbSet<LoanAccOpeningBalance> loanaccopeningbalance { get; set; }
+    public virtual DbSet<LoanAccountBalanceDetail> loanaccountbalancedetail { get; set; }
+    public virtual DbSet<LoanAccountRecoveryInterest> loanaccountrecoveryinterest { get; set; }
+    public virtual DbSet<LoanGuarWitness> loanguarwitness { get; set; }
     public virtual DbSet<LoanProductDefinition> loanproductdefinition { get; set; }
     public virtual DbSet<LoanProductAdvancement> loanproductadvancement { get; set; }
     public virtual DbSet<LoanProductMarginMoneyRule> loanproductmarginmoneyrule { get; set; }
     public virtual DbSet<LoanProductPosting> loanproductposting { get; set; }
     public virtual DbSet<LoanProductRecovery> loanproductrecovery { get; set; }
     public virtual DbSet<LoanProductBranchWiseRule> loanproductbranchwiserule { get; set; }
+    public virtual DbSet<VoucherRecIntDetail> voucherrecintdetail { get; set; }
+    public virtual DbSet<VrOdReserve> vrodreserve { get; set; }
+    public virtual DbSet<AuditLog> auditlog { get; set; }
+
+    // ── Audit logging ────────────────────────────────────────────────────────────
+
+    private static readonly HashSet<string> _skipAuditEntities = new(StringComparer.OrdinalIgnoreCase)
+    {
+        nameof(AuditLog),
+        nameof(ErrorLog),
+        "RefreshToken",
+        "DayBeginEndInfo",
+        "DayBeginEndInfoDetail",
+        "BranchSession",
+    };
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        EnforceAuditLogImmutability();
+        var auditEntries = BuildAuditEntries();
+        var result = await base.SaveChangesAsync(cancellationToken);
+
+        if (auditEntries.Count > 0)
+        {
+            auditlog.AddRange(auditEntries);
+            await base.SaveChangesAsync(cancellationToken);
+        }
+
+        return result;
+    }
+
+    private void EnforceAuditLogImmutability()
+    {
+        var tampered = ChangeTracker.Entries<AuditLog>()
+            .Any(e => e.State is EntityState.Modified or EntityState.Deleted);
+
+        if (tampered)
+            throw new InvalidOperationException("Audit log records are immutable and cannot be modified or deleted.");
+    }
+
+    private List<AuditLog> BuildAuditEntries()
+    {
+        var ctx = GetAuditContext();
+        if (string.IsNullOrEmpty(ctx.UserId))
+            return new List<AuditLog>();
+
+        var entries = new List<AuditLog>();
+
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is EntityState.Detached or EntityState.Unchanged)
+                continue;
+
+            var typeName = entry.Entity.GetType().Name;
+            if (_skipAuditEntities.Contains(typeName))
+                continue;
+
+            var action = entry.State switch
+            {
+                EntityState.Added    => "CREATE",
+                EntityState.Modified => "UPDATE",
+                EntityState.Deleted  => "DELETE",
+                _                    => null
+            };
+            if (action is null) continue;
+
+            entries.Add(new AuditLog
+            {
+                BranchId   = ctx.BranchId,
+                UserId     = ctx.UserId,
+                UserName   = ctx.UserName,
+                Action     = action,
+                Module     = ResolveModule(entry.Entity.GetType().Namespace ?? ""),
+                EntityName = typeName,
+                EntityId   = GetEntityId(entry),
+                OldValue   = entry.State is EntityState.Modified or EntityState.Deleted
+                                 ? SerializeValues(entry.OriginalValues) : null,
+                NewValue   = entry.State is EntityState.Added or EntityState.Modified
+                                 ? SerializeValues(entry.CurrentValues) : null,
+                IpAddress   = ctx.IpAddress,
+                WorkingDate = ctx.WorkingDate,
+                CreatedAt   = DateTime.Now,
+            });
+        }
+
+        return entries;
+    }
+
+    private AuditContext GetAuditContext()
+    {
+        var httpContext = _httpContextAccessor?.HttpContext;
+        if (httpContext is null) return new AuditContext();
+
+        var user = httpContext.User;
+        int.TryParse(user.FindFirst("branchId")?.Value, out var branchId);
+
+        return new AuditContext
+        {
+            BranchId    = branchId,
+            UserId      = user.FindFirst("userId")?.Value ?? "",
+            UserName    = user.FindFirst(ClaimTypes.Name)?.Value ?? "",
+            WorkingDate = user.FindFirst("workingDate")?.Value ?? "",
+            IpAddress   = httpContext.Connection.RemoteIpAddress?.ToString() ?? "",
+        };
+    }
+
+    private static string? GetEntityId(EntityEntry entry)
+    {
+        var pks = entry.Metadata.FindPrimaryKey()?.Properties;
+        if (pks is null) return null;
+
+        var parts = pks.Select(pk =>
+        {
+            var val = entry.State == EntityState.Deleted
+                ? entry.OriginalValues[pk.Name]
+                : entry.CurrentValues[pk.Name];
+            return $"{pk.Name}:{val}";
+        });
+
+        return string.Join(", ", parts);
+    }
+
+    private static string SerializeValues(PropertyValues values)
+    {
+        var dict = new Dictionary<string, object?>();
+        foreach (var prop in values.Properties)
+            dict[prop.Name] = values[prop.Name];
+
+        return JsonSerializer.Serialize(dict, AuditJsonOptions);
+    }
+
+    private static readonly JsonSerializerOptions AuditJsonOptions =
+        new() { WriteIndented = false };
+
+    private static string ResolveModule(string ns) => ns switch
+    {
+        _ when ns.Contains(".member",         StringComparison.OrdinalIgnoreCase) => "Member",
+        _ when ns.Contains(".voucher",        StringComparison.OrdinalIgnoreCase) => "Voucher",
+        _ when ns.Contains(".AccMasters",     StringComparison.OrdinalIgnoreCase) => "Account Master",
+        _ when ns.Contains(".ProductMasters", StringComparison.OrdinalIgnoreCase) => "Product Master",
+        _ when ns.Contains(".InterestSlabs",  StringComparison.OrdinalIgnoreCase) => "Interest Slab",
+        _ when ns.Contains(".BranchWiseRule", StringComparison.OrdinalIgnoreCase) => "Branch Rule",
+        _ when ns.Contains(".Settings",       StringComparison.OrdinalIgnoreCase) => "Settings",
+        _ when ns.Contains(".Location",       StringComparison.OrdinalIgnoreCase) => "Location",
+        _ when ns.Contains(".AccHeads",       StringComparison.OrdinalIgnoreCase) => "Account Head",
+        _                                                                          => "General",
+    };
+
+    private sealed record AuditContext
+    {
+        public int    BranchId    { get; init; }
+        public string UserId      { get; init; } = "";
+        public string UserName    { get; init; } = "";
+        public string WorkingDate { get; init; } = "";
+        public string IpAddress   { get; init; } = "";
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<VoucherRecIntDetail>()
+            .HasKey(x => new { x.Id, x.BrId });
+
+        modelBuilder.Entity<VrOdReserve>()
+            .HasKey(x => new { x.Id, x.BrId });
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BankingDbContext).Assembly);
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {

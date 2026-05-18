@@ -12,6 +12,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import commonservice from "../../../services/common/commonservice";
 import loanSlabService, { CombinedLoanSlabDTO } from "../../../services/interestslab/loanslabservice";
+import DatePicker from "../../../components/DatePicker";
 
 const MAX_AMOUNT   = 99_999_999;
 const MAX_PERIOD   = 9999;
@@ -61,6 +62,7 @@ const LoanInterestSlab: React.FC = () => {
   const isEditMode = !!slabId;
 
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [loading,      setLoading]      = useState(false);
   const [loanProducts, setLoanProducts] = useState<LoanProduct[]>([]);
@@ -76,7 +78,7 @@ const LoanInterestSlab: React.FC = () => {
     loanProductId: 0,
     name:          "",
     nameSL:        "",
-    date:          commonservice.getTodaysDate(),
+    date:          sessionDate,
   });
 
   const [slabRows, setSlabRows] = useState<SlabRow[]>([emptyRow()]);
@@ -340,7 +342,7 @@ const LoanInterestSlab: React.FC = () => {
       Swal.fire({ icon: "error", title: "Not Allowed", text: "Reset is not allowed in modify mode." });
       return;
     }
-    setFormData({ id: null, brId: user.branchid, loanProductId: 0, name: "", nameSL: "", date: commonservice.getTodaysDate() });
+    setFormData({ id: null, brId: user.branchid, loanProductId: 0, name: "", nameSL: "", date: sessionDate });
     setSlabRows([emptyRow()]);
     setFormErrors({});
     setSlabErrors({});
@@ -527,14 +529,14 @@ const LoanInterestSlab: React.FC = () => {
                           Date <span className="text-red-500">*</span>
                         </span>
                       </label>
-                      <input
-                        type="date"
+                      <DatePicker
                         value={formData.date}
-                        onChange={(e) => commonservice.handleDateChange(e.target.value, (val) => handleInputChange("date", val), "effectiveFrom")}
-                        onBlur={(e) => handleFieldBlur("date", e.target.value)}
-                        max={commonservice.getTodaysDate()}
-                        readOnly={isEditMode}
-                        className={`w-full px-3 py-2.5 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm ${formErrors.date ? "border-red-500 bg-red-50" : "border-gray-200"}`}
+                        onChange={(val) => handleInputChange("date", val)}
+                        onBlur={(val) => handleFieldBlur("date", val)}
+                        max={sessionDate}
+                        workingDate={sessionDate}
+                        disabled={isEditMode}
+                        className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none text-sm ${formErrors.date ? "border-red-500 bg-red-50" : "border-gray-200"}`}
                       />
                       {formErrors.date
                         ? <p className="text-red-500 text-xs flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {formErrors.date}</p>

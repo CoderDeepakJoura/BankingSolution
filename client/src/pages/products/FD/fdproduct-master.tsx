@@ -34,6 +34,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import AccountHeadApiService from "../../../services/accountHead/accountheadapi";
 import { AccountHead, AccountHeadWithCode } from "../../accounthead/accounthead/accounthead-master";
+import DatePicker from "../../../components/DatePicker";
 
 const FDProductMaster = () => {
   const navigate = useNavigate();
@@ -42,6 +43,7 @@ const FDProductMaster = () => {
   const { productId: encryptedId } = useParams<{ productId?: string }>();
   const productId = encryptedId ? decryptId(encryptedId) : null;
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, clearErrors, markFieldTouched } =
     useFormValidation();
 
@@ -51,8 +53,6 @@ const FDProductMaster = () => {
   const [accountHeads, setAccountHeads] = useState<AccountHeadWithCode[]>([]);
   const isEditMode = !!productId;
 
-  // Helper function to get current date in YYYY-MM-DD format
-
   // Helper function to format all dates using commonservice.splitdate
   const formatDatesInDTO = (data: CombinedFDDTO): CombinedFDDTO => {
     return {
@@ -61,7 +61,7 @@ const FDProductMaster = () => {
         ...data.fdProductDTO!,
         effectiveFrom: data.fdProductDTO?.effectiveFrom
           ? commonservice.splitDate(data.fdProductDTO.effectiveFrom)
-          : commonservice.getCurrentDate(),
+          : sessionDate,
         effectiveTill: data.fdProductDTO?.effectiveTill
           ? commonservice.splitDate(data.fdProductDTO.effectiveTill)
           : "",
@@ -72,7 +72,7 @@ const FDProductMaster = () => {
           ? commonservice.splitDate(
               data.fdProductInterestRulesDTO.applicableDate
             )
-          : commonservice.getCurrentDate(),
+          : sessionDate,
       },
     };
   };
@@ -108,7 +108,7 @@ const FDProductMaster = () => {
       branchId: user.branchid,
       productName: "",
       productCode: "",
-      effectiveFrom: commonservice.getCurrentDate(),
+      effectiveFrom: sessionDate,
       effectiveTill: "",
       isSeparateFdAccountAllowed: false,
     },
@@ -126,7 +126,7 @@ const FDProductMaster = () => {
     },
     fdProductInterestRulesDTO: {
       branchId: user.branchid,
-      applicableDate: commonservice.getCurrentDate(),
+      applicableDate: sessionDate,
       interestApplicableOn: 0,
       interestRateMinValue: 0,
       interestRateMaxValue: 0,
@@ -430,7 +430,7 @@ const FDProductMaster = () => {
         branchId: user.branchid,
         productName: "",
         productCode: "",
-        effectiveFrom: commonservice.getCurrentDate(),
+        effectiveFrom: sessionDate,
         effectiveTill: "",
         isSeparateFdAccountAllowed: false,
       },
@@ -448,7 +448,7 @@ const FDProductMaster = () => {
       },
       fdProductInterestRulesDTO: {
         branchId: user.branchid,
-        applicableDate: commonservice.getCurrentDate(),
+        applicableDate: sessionDate,
         interestApplicableOn: 0,
         interestRateMinValue: 0,
         interestRateMaxValue: 0,
@@ -613,20 +613,13 @@ const FDProductMaster = () => {
             errors={errorsByField.effectiveFrom || []}
             icon={<Calendar className="w-4 h-4 text-blue-500" />}
           >
-            <input
-              type="date"
+            <DatePicker
               value={combinedFdData.fdProductDTO?.effectiveFrom || ""}
-              onChange={(e) =>
-                commonservice.handleDateChange(
-                  e.target.value,
-                  (val) => handleProductChange("effectiveFrom", val),
-                  "effectiveFrom"
-                )
-              }
+              onChange={(val) => handleProductChange("effectiveFrom", val)}
               onBlur={() => handleFieldBlur("effectiveFrom")}
-              max={commonservice.getCurrentDate()}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-              required
+              max={sessionDate}
+              workingDate={sessionDate}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
             />
           </FormField>
 
@@ -636,19 +629,13 @@ const FDProductMaster = () => {
             errors={errorsByField.effectiveTill || []}
             icon={<Calendar className="w-4 h-4 text-orange-500" />}
           >
-            <input
-              type="date"
+            <DatePicker
               value={combinedFdData.fdProductDTO?.effectiveTill || ""}
-              onChange={(e) =>
-                commonservice.handleDateChange(
-                  e.target.value,
-                  (val) => handleProductChange("effectiveTill", val),
-                  "effectiveTill"
-                )
-              }
+              onChange={(val) => handleProductChange("effectiveTill", val)}
               onBlur={() => handleFieldBlur("effectiveTill")}
-              max={commonservice.getCurrentDate()}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              max={sessionDate}
+              workingDate={sessionDate}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
             />
           </FormField>
 
@@ -890,22 +877,13 @@ const FDProductMaster = () => {
             required
             errors={errorsByField.applicableDate || []}
           >
-            <input
-              type="date"
-              value={
-                combinedFdData.fdProductInterestRulesDTO?.applicableDate || ""
-              }
-              onChange={(e) =>
-                commonservice.handleDateChange(
-                  e.target.value,
-                  (val) => handleInterestRulesChange("applicableDate", val),
-                  "applicableDate"
-                )
-              }
+            <DatePicker
+              value={combinedFdData.fdProductInterestRulesDTO?.applicableDate || ""}
+              onChange={(val) => handleInterestRulesChange("applicableDate", val)}
               onBlur={() => handleFieldBlur("applicableDate")}
-              max={commonservice.getCurrentDate()}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-              required
+              max={sessionDate}
+              workingDate={sessionDate}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
             />
           </FormField>
 

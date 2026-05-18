@@ -46,9 +46,10 @@ class SavingVoucherApiService extends ApiService {
    * Update existing saving voucher
    */
   async updateSavingVoucher(
+    voucherId: number,
     voucherData: SavingVoucherDTO
-  ): Promise<ApiResponse<SavingVoucherResponse>> {
-    return this.makeRequest<SavingVoucherResponse>('/voucher/saving', {
+  ): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/SavingDW/${voucherId}`, {
       method: 'PUT',
       body: JSON.stringify(voucherData),
       headers: {

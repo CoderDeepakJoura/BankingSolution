@@ -503,8 +503,17 @@ export const useFormValidation = () => {
       formData: any,
       nominees: any[],
       voucherData: any,
-      documentUploads: any[]
+      documentUploads: any[],
+      options?: {
+        requireAadhaarPan?: boolean;
+        requireContact?: boolean;
+        requirePicSign?: boolean;
+      }
     ): ValidationResult => {
+      const reqAadhaarPan = options?.requireAadhaarPan !== false;
+      const reqContact    = options?.requireContact    !== false;
+      const reqPicSign    = options?.requirePicSign    !== false;
+
       const allErrors: ValidationError[] = [];
 
       // Validate main form fields
@@ -517,20 +526,31 @@ export const useFormValidation = () => {
         }
 
         const fieldErrors = validateField(fieldName, fieldValue, formData);
-        allErrors.push(...fieldErrors);
+
+        // Drop required errors for aadhaar/pan when they are optional
+        const filtered = fieldErrors.filter((e) => {
+          if (!reqAadhaarPan && (fieldName === "aadhaarCardNo" || fieldName === "panCardNo") && e.type === "required")
+            return false;
+          return true;
+        });
+        allErrors.push(...filtered);
       });
 
       // ✅ NEW: Validate account/membership numbers (either one required)
       const accountErrors = validateAccountOrMembership(formData);
       allErrors.push(...accountErrors);
 
-      // ✅ NEW: Validate contact information (at least one required)
-      const contactErrors = validateContactInfo(formData);
-      allErrors.push(...contactErrors);
+      // ✅ NEW: Validate contact information (at least one required) — skip if contact is optional
+      if (reqContact) {
+        const contactErrors = validateContactInfo(formData);
+        allErrors.push(...contactErrors);
+      }
 
-      // ✅ NEW: Validate document uploads (mandatory)
-      const documentErrors = validateDocumentUploads(documentUploads);
-      allErrors.push(...documentErrors);
+      // ✅ NEW: Validate document uploads (mandatory) — skip if pic/sign is optional
+      if (reqPicSign) {
+        const documentErrors = validateDocumentUploads(documentUploads);
+        allErrors.push(...documentErrors);
+      }
 
       // Validate nominees
       nominees.forEach((nominee, index) => {

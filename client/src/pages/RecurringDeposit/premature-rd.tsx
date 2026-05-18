@@ -22,6 +22,7 @@ import commonservice from "../../services/common/commonservice";
 import rdAccountService from "../../services/accountMasters/rdaccount/rdaccountapi";
 import { RootState } from "../../redux";
 import { SavingAccounts } from "../vouchers/saving/savingdeposit";
+import DatePicker from "../../components/DatePicker";
 
 type Option = { value: string | number; label: string };
 type RDProduct = { id: number; productName: string };
@@ -263,7 +264,7 @@ const PrematureRDPage: React.FC = () => {
             <div className="bg-gradient-to-r from-green-50 to-teal-50 border-b border-gray-200 p-6">
               {sectionTitle(<Search className="h-5 w-5 text-sky-600" />, "Search RD Account")}
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                <div><label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"><div className="w-2 h-2 bg-gradient-to-r from-green-500 to-teal-500 rounded-full" />Date <span className="text-red-500 text-xs">*</span></label><div className="relative"><Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input type="date" readOnly value={rd.date} className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none transition-all text-gray-700 bg-gradient-to-r from-white to-gray-50" /></div></div>
+                <div><label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"><div className="w-2 h-2 bg-gradient-to-r from-green-500 to-teal-500 rounded-full" />Date <span className="text-red-500 text-xs">*</span></label><DatePicker value={rd.date} max={sessionDate} workingDate={sessionDate} disabled className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none" onChange={() => {}} /></div>
                 <div><label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"><div className="w-2 h-2 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-full" />RD Product <span className="text-red-500 text-xs">*</span></label><Select options={productOptions} value={productOptions.find((x) => x.value === selectedProduct) || null} onChange={(o) => onProductChange(Number(o?.value) || null)} isClearable styles={selectStyles} menuPortalTarget={document.body} menuPosition="fixed" /></div>
                 <div><label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"><div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full" />RD Account <span className="text-red-500 text-xs">*</span></label><Select options={accountOptions} value={accountOptions.find((x) => x.value === selectedAccount) || null} onChange={(o) => onAccountChange(Number(o?.value) || null)} isDisabled={!selectedProduct} isClearable styles={selectStyles} menuPortalTarget={document.body} menuPosition="fixed" /></div>
               </div>

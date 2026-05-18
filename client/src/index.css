@@ -1,3 +1,113 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  button,
+  select,
+  a,
+  label,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="submit"],
+  input[type="button"],
+  input[type="file"],
+  [role="button"],
+  [onclick] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  input:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* ── Print styles ────────────────────────────────────────────────────────────
+   Strategy: hide entire body, then make #mainlayoutdiv (and its children)
+   visible and absolutely positioned at the top-left of the page.
+   This hides the sidebar, header, footer, and background decorations
+   without needing to modify individual report components.
+─────────────────────────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 1.2cm 1.5cm;
+  }
+
+  html, body {
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  /* Hide everything */
+  body * {
+    visibility: hidden;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Show only the report content area */
+  #mainlayoutdiv,
+  #mainlayoutdiv * {
+    visibility: visible;
+  }
+
+  /* Pull the report to the top-left of the page */
+  #mainlayoutdiv {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+  }
+
+  /* Strip padding + min-height from the inner content wrapper */
+  #mainlayoutdiv > div {
+    padding: 0 !important;
+    min-height: unset !important;
+    background: white !important;
+  }
+
+  /* Let the max-width constrained inner container span full width */
+  #mainlayoutdiv > div > div {
+    max-width: none !important;
+  }
+
+  /* Remove gradient/color backgrounds that print badly */
+  * {
+    background-image: none !important;
+  }
+
+  /* Ensure backgrounds that carry content (e.g. table headers) still render */
+  th, .print\:bg-white {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Tables: keep rows together, repeat headers on each page */
+  table {
+    page-break-inside: auto;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+}

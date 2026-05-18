@@ -70,7 +70,20 @@ namespace BankingPlatform.API.Service.AccountMasters
                     await _context.SaveChangesAsync();
                 }
 
-                await _context.SaveChangesAsync();
+                if (!string.IsNullOrEmpty(dto.OpeningBalance) && decimal.TryParse(dto.OpeningBalance, out var obAmount) && obAmount > 0)
+                {
+                    var obEntity = new AccOpeningBalance
+                    {
+                        BranchId = dto.AccountMasterDTO!.BranchId,
+                        AccountId = accountMasterInfo.ID,
+                        OpeningAmount = obAmount,
+                        EntryType = dto.OpeningBalanceType ?? "Cr",
+                        AccTypeId = (int)Enums.AccountTypes.General,
+                    };
+                    await _context.accopeningbalance.AddAsync(obEntity);
+                    await _context.SaveChangesAsync();
+                }
+
                 await transaction.CommitAsync();
             }
             catch (Exception)
@@ -84,9 +97,11 @@ namespace BankingPlatform.API.Service.AccountMasters
 
         public async Task<(List<CommonAccMasterDTO> Items, int TotalCount)> GetAllGeneralAccountsAsync(int branchId, LocationFilterDTO filter)
         {
+            var workingDate = _commonfunctions.GetWorkingDate();
             var query = _context.accountmaster
                 .AsNoTracking()
-                .Where(x => x.BranchId == branchId);
+                .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.General
+                    && (!workingDate.HasValue || x.AccOpeningDate.Date <= workingDate.Value.Date));
 
             // Search filter
             if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
@@ -109,15 +124,21 @@ namespace BankingPlatform.API.Service.AccountMasters
             var accGstInfo = await _context.accgstinfo
                 .Where(g => accIds.Contains(g.AccId) && g.BranchId == branchId)
                 .ToListAsync();
+            var accOpeningBalances = await _context.accopeningbalance
+                .Where(o => accIds.Contains(o.AccountId) && o.BranchId == branchId && o.AccTypeId == (int)Enums.AccountTypes.General)
+                .ToListAsync();
 
             var items = accountMasterInfo.Select(m =>
             {
                 var gst = accGstInfo.FirstOrDefault(g => g.AccId == m.ID);
+                var ob = accOpeningBalances.FirstOrDefault(o => o.AccountId == m.ID);
 
                 return new CommonAccMasterDTO
                 {
                     AccountMasterDTO = MapToDTO(m),
-                    GSTInfoDTO = gst != null ? MapToDTO(gst) : null
+                    GSTInfoDTO = gst != null ? MapToDTO(gst) : null,
+                    OpeningBalance = ob != null ? ob.OpeningAmount.ToString() : null,
+                    OpeningBalanceType = ob?.EntryType,
                 };
             }).ToList();
 
@@ -128,6 +149,9 @@ namespace BankingPlatform.API.Service.AccountMasters
         {
             var accountMasterInfo = await _context.accountmaster.FirstOrDefaultAsync(m => m.ID == dto.AccountMasterDTO!.AccId && m.BranchId == dto.AccountMasterDTO.BranchId);
             if (accountMasterInfo == null) return "Account not found.";
+
+            if (!await _commonfunctions.CanModifyAccountInCurrentSession(dto.AccountMasterDTO!.BranchId, accountMasterInfo.AccOpeningDate))
+                return "This account can only be modified in the session it was opened in.";
 
             var duplicateFields = await _context.accountmaster
                                  .Where(x => x.ID != dto.AccountMasterDTO!.AccId
@@ -191,6 +215,39 @@ namespace BankingPlatform.API.Service.AccountMasters
                 }
             }
 
+            if (dto.OpeningBalance != null)
+            {
+                var existingOb = await _context.accopeningbalance
+                    .FirstOrDefaultAsync(o => o.AccountId == accountMasterInfo.ID && o.BranchId == accountMasterInfo.BranchId && o.AccTypeId == (int)Enums.AccountTypes.General);
+
+                bool hasAmount = decimal.TryParse(dto.OpeningBalance, out var obAmount) && obAmount > 0;
+
+                if (hasAmount)
+                {
+                    if (existingOb != null)
+                    {
+                        existingOb.OpeningAmount = obAmount;
+                        existingOb.EntryType = dto.OpeningBalanceType ?? "Cr";
+                        _context.accopeningbalance.Update(existingOb);
+                    }
+                    else
+                    {
+                        await _context.accopeningbalance.AddAsync(new AccOpeningBalance
+                        {
+                            BranchId = accountMasterInfo.BranchId,
+                            AccountId = accountMasterInfo.ID,
+                            OpeningAmount = obAmount,
+                            EntryType = dto.OpeningBalanceType ?? "Cr",
+                            AccTypeId = (int)Enums.AccountTypes.General,
+                        });
+                    }
+                }
+                else if (existingOb != null)
+                {
+                    _context.accopeningbalance.Remove(existingOb);
+                }
+            }
+
             await _context.SaveChangesAsync();
             return "Success";
         }
@@ -200,9 +257,17 @@ namespace BankingPlatform.API.Service.AccountMasters
             var accountMasterInfo = await _context.accountmaster.FirstOrDefaultAsync(m => m.ID == AccId && m.BranchId == branchId);
             if (accountMasterInfo == null) return "Account not found.";
 
+            if (await _commonfunctions.AccountInUse(AccId, branchId))
+                return "This account cannot be deleted as it is already in use.";
+
             var gstInfo = await _context.accgstinfo.FirstOrDefaultAsync(x=> x.AccId == AccId && x.BranchId == branchId);
             if (gstInfo != null)
                 _context.accgstinfo.Remove(gstInfo);
+
+            var openingBal = await _context.accopeningbalance
+                .FirstOrDefaultAsync(x => x.AccountId == AccId && x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.General);
+            if (openingBal != null)
+                _context.accopeningbalance.Remove(openingBal);
 
             var accMasterInfo = await _context.accountmaster.FirstOrDefaultAsync(x => x.ID == AccId && x.BranchId == branchId);
             if (accMasterInfo == null) return "Account Not Found";

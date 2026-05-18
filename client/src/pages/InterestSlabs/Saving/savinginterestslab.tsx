@@ -22,6 +22,7 @@ import commonservice from "../../../services/common/commonservice";
 import interestSlabService, {
   CombinedSavingIntDTO,
 } from "../../../services/interestslab/interestslabservice";
+import DatePicker from "../../../components/DatePicker";
 
 // Define your interfaces/types
 interface SavingProduct {
@@ -52,6 +53,7 @@ const SavingAccountInterestSlab = () => {
   const isEditMode = !!slabId;
 
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [loading, setLoading] = useState(false);
   const [savingProducts, setSavingProducts] = useState<SavingProduct[]>([]);
@@ -69,7 +71,7 @@ const SavingAccountInterestSlab = () => {
     branchId: user.branchid,
     savingProductId: 0,
     slabName: "",
-    applicableDate: commonservice.getTodaysDate(),
+    applicableDate: sessionDate,
   });
 
   // Interest slabs state
@@ -423,7 +425,7 @@ const SavingAccountInterestSlab = () => {
       branchId: user.branchid,
       savingProductId: 0,
       slabName: "",
-      applicableDate: commonservice.getTodaysDate(),
+      applicableDate: sessionDate,
     });
     setInterestSlabs([
       { slabNo: 1, fromAmount: "0", toAmount: "", interestRate: "" },
@@ -675,27 +677,17 @@ const SavingAccountInterestSlab = () => {
                             <span className="text-red-500">*</span>
                           </span>
                         </label>
-                        <input
-                          type="date"
+                        <DatePicker
                           value={formData.applicableDate}
-                          onChange={(e) =>
-                            commonservice.handleDateChange(
-                              e.target.value,
-                              (val) =>
-                                handleInputChange(
-                                  "applicableDate",
-                                  val
-                                ),
-                              "effectiveFrom"
-                            )
-                          }
-                          max={commonservice.getTodaysDate()}
-                          className={`w-full px-3 py-2.5 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none ${
+                          onChange={(val) => handleInputChange("applicableDate", val)}
+                          max={sessionDate}
+                          workingDate={sessionDate}
+                          disabled={isEditMode}
+                          className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none ${
                             validationErrors.applicableDate
                               ? "border-red-500"
                               : "border-gray-200"
                           }`}
-                          readOnly={isEditMode}
                         />
                         {validationErrors.applicableDate && (
                           <span className="text-red-500 text-xs flex items-center gap-1 mt-1">

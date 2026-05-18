@@ -5,11 +5,13 @@ using BankingPlatform.API.Controllers.ProductMasters;
 using BankingPlatform.API.DTO.WorkingDate;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
+using BankingPlatform.Infrastructure.Models.Auth;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
+using BankingPlatform.Infrastructure.Settings;
 using System.Diagnostics;
 using System.Globalization;
-using System.Net;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Transactions;
 
 namespace BankingPlatform.API.Controllers
@@ -107,51 +109,50 @@ namespace BankingPlatform.API.Controllers
                 {
                     _logger.LogWarning("Failed login attempt - user not found: {Username}, branch: {BranchCode}",
                         loginDto.Username, loginDto.BranchCode);
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = "Please enter valid User Name."
-                    });
-                }
-                else if (user.isauthorized == 0)
-                {
-                    return Unauthorized(new ResponseDto
-                    {
-                        Success = false,
-                        Message = "User is not authorized to login."
-                    });
+                    return BadRequest(new ResponseDto { Success = false, Message = "Invalid credentials." });
                 }
 
-                    
+                if (user.isauthorized == 0)
+                {
+                    _logger.LogWarning("Login attempt by unauthorised user: {Username}, branch: {BranchCode}",
+                        loginDto.Username, loginDto.BranchCode);
+                    return Unauthorized(new ResponseDto { Success = false, Message = "User is not authorized to login." });
+                }
+
                 bool isPasswordValid = PasswordHasher.VerifyPassword(loginDto.Password, user.password);
                 if (!isPasswordValid)
                 {
-                    _logger.LogWarning("Failed login attempt - invalid password for user: {Username}, branch: {BranchCode}",
+                    _logger.LogWarning("Failed login attempt - wrong password for user: {Username}, branch: {BranchCode}",
                         loginDto.Username, loginDto.BranchCode);
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = "Please enter valid Password."
-                    });
+                    return BadRequest(new ResponseDto { Success = false, Message = "Invalid credentials." });
                 }
 
-                setClaims(user.username, branchInfo.branchmaster_name, branchInfo.branchmaster_code, branchInfo.id, "", branchInfo.branchmaster_phoneno1, branchInfo.branchmaster_addressline, branchInfo.branchmaster_emailid, user.id.ToString(), "", "", 0, false);
+                setClaims(user.username, branchInfo.branchmaster_name, branchInfo.branchmaster_code, branchInfo.id, "", branchInfo.branchmaster_phoneno1, branchInfo.branchmaster_addressline, branchInfo.branchmaster_emailid, user.id.ToString(), "", "", 0, false, user.issu == 1);
 
-
-                // Generate token
+                // Short-lived JWT forces working-date selection before full session is granted
                 var tokenExpiration = DateTime.UtcNow.AddMinutes(5);
-                var token = _jwtTokenService.GenerateToken();
+                var token = _jwtTokenService.GenerateToken(tokenExpiration);
 
-                // Set cookie *before* writing response body
                 var cookieOptions = new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = true, // HTTPS in prod
-                    SameSite = SameSiteMode.None, // Strict for CSRF protection
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
                     Path = "/",
                     Expires = tokenExpiration
                 };
                 Response.Cookies.Append("AuthToken", token, cookieOptions);
+
+                // Issue refresh token (long-lived, stored in DB)
+                var refreshToken = await CreateRefreshTokenAsync(user.id, branchInfo.id);
+                Response.Cookies.Append("RefreshToken", refreshToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Path = "/api/auth",   // only sent to auth endpoints
+                    Expires = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays)
+                });
 
                 _logger.LogInformation("Successful login for user: {Username}, branch: {BranchCode}",
                     loginDto.Username, loginDto.BranchCode);
@@ -182,23 +183,30 @@ namespace BankingPlatform.API.Controllers
         {
             try
             {
-                // Check if cookie exists before deleting
+                // Revoke refresh token in DB
+                var rawRefreshToken = Request.Cookies["RefreshToken"];
+                if (!string.IsNullOrEmpty(rawRefreshToken))
+                {
+                    var stored = await _context.refreshtoken
+                        .FirstOrDefaultAsync(r => r.Token == rawRefreshToken && !r.IsRevoked);
+                    if (stored != null)
+                    {
+                        stored.IsRevoked = true;
+                        await _context.SaveChangesAsync();
+                    }
+                    Response.Cookies.Delete("RefreshToken", new CookieOptions
+                    {
+                        HttpOnly = true, Secure = true, SameSite = SameSiteMode.None, Path = "/api/auth"
+                    });
+                }
+
                 if (Request.Cookies.ContainsKey("AuthToken"))
                 {
-                    var cookieOptions = new CookieOptions
+                    Response.Cookies.Delete("AuthToken", new CookieOptions
                     {
-                        Path = "/",                  // must match
-                        HttpOnly = true,             // must match
-                        Secure = true,               // must match
-                        SameSite = SameSiteMode.None // must match
-
-                    };
-                    Response.Cookies.Delete("AuthToken", cookieOptions);
+                        Path = "/", HttpOnly = true, Secure = true, SameSite = SameSiteMode.None
+                    });
                     _logger.LogInformation("User logged out successfully");
-                }
-                else
-                {
-                    _logger.LogWarning("Logout attempted but no AuthToken cookie found");
                 }
 
                 return Ok(new ResponseDto
@@ -224,34 +232,40 @@ namespace BankingPlatform.API.Controllers
         {
             try
             {
-                GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession);
+                GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession, out bool isSu, out string _, out string __);
                 string[] sessionArry = workingDateDTO.sessionInfo.Split('-');
                 (int sessionFromYear, int sessionToYear) = (Convert.ToInt32(sessionArry[0]), Convert.ToInt32(sessionArry[1]));
                 isFirstSession = await _commonFns.IsFirstSession(sessionFromYear, sessionToYear);
-                setClaims(userName, branchName, branchCode, branchId, societyName, contact, address, email, userId, workingDateDTO.WorkingDate, workingDateDTO.sessionInfo, workingDateDTO.sessionId, isFirstSession);
+
+                var selectedSession = await _context.branchsession.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.id == workingDateDTO.sessionId && x.branchid == branchId);
+                var sessionFromDate = selectedSession?.fromdate.ToString("yyyy-MM-dd") ?? "";
+                var sessionToDate   = selectedSession?.todate.ToString("yyyy-MM-dd") ?? "";
+
+                setClaims(userName, branchName, branchCode, branchId, societyName, contact, address, email, userId, workingDateDTO.WorkingDate, workingDateDTO.sessionInfo, workingDateDTO.sessionId, isFirstSession, isSu, sessionFromDate, sessionToDate);
+
                 var tokenExpiration = DateTime.UtcNow.AddDays(_jwtSettings.ExpiryDays);
-                var token = _jwtTokenService.GenerateToken();
-                var cookieOptions = new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true, // HTTPS in prod
-                    SameSite = SameSiteMode.None, // Strict for CSRF protection
-                    Path = "/"
-                };
+                var token = _jwtTokenService.GenerateToken(tokenExpiration);
+
+                var baseCookieOpts = new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.None, Path = "/" };
                 if (Request.Cookies.ContainsKey("AuthToken"))
+                    Response.Cookies.Delete("AuthToken", baseCookieOpts);
+
+                Response.Cookies.Append("AuthToken", token, new CookieOptions
                 {
-                    Response.Cookies.Delete("AuthToken", cookieOptions);
-                    _logger.LogInformation("User logged out successfully");
-                }
-                cookieOptions = new CookieOptions
+                    HttpOnly = true, Secure = true, SameSite = SameSiteMode.None,
+                    Path = "/", Expires = tokenExpiration
+                });
+
+                // Rotate refresh token — revoke old, issue new with updated claims snapshot
+                await RotateRefreshTokenAsync(Request.Cookies["RefreshToken"], int.Parse(userId), branchId);
+                var newRefreshToken = await CreateRefreshTokenAsync(int.Parse(userId), branchId);
+                Response.Cookies.Append("RefreshToken", newRefreshToken, new CookieOptions
                 {
-                    HttpOnly = true,
-                    Secure = true, // HTTPS in prod
-                    SameSite = SameSiteMode.None, // Strict for CSRF protection
-                    Path = "/",
-                    Expires = tokenExpiration
-                };
-                Response.Cookies.Append("AuthToken", token, cookieOptions);
+                    HttpOnly = true, Secure = true, SameSite = SameSiteMode.None,
+                    Path = "/api/auth",
+                    Expires = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays)
+                });
                 var date = DateTime.ParseExact(
                     workingDateDTO.WorkingDate,
                     "dd-MMMM-yyyy",               // Matches "03-September-2025"
@@ -309,7 +323,20 @@ namespace BankingPlatform.API.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> GetLoginInfo()
         {
-            GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession);
+            GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession, out bool isSu, out string _, out string __);
+
+            // Always fetch isSu from DB — JWT may predate when the claim was added
+            if (int.TryParse(userId, out int parsedUserId) && parsedUserId > 0)
+            {
+                var user = await _context.user.FirstOrDefaultAsync(u => u.id == parsedUserId && u.branchid == branchId);
+                if (user != null)
+                    isSu = user.issu == 1;
+            }
+
+            var (firstSessionFromDate, firstSessionToDate) = await _commonFns.FirstSessionFromDateAndToDate(branchId);
+
+            var currentSession = await _context.branchsession.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.branchid == branchId && x.iscurrent);
 
             return Ok(new
             {
@@ -325,7 +352,12 @@ namespace BankingPlatform.API.Controllers
                 WorkingDate = workingDate,
                 SessionInfo = sessionInfo,
                 SessionId = sessionId,
-                IsFirstSession = isFirstSession
+                IsFirstSession = isFirstSession,
+                FirstSessionFromDate = firstSessionFromDate,
+                FirstSessionToDate = firstSessionToDate,
+                SessionFromDate = currentSession?.fromdate ?? DateTime.MinValue,
+                SessionToDate = currentSession?.todate ?? DateTime.MinValue,
+                IsSu = isSu
             });
         }
 
@@ -458,33 +490,169 @@ namespace BankingPlatform.API.Controllers
             catch (Exception ex)
             {
                 await _commonFns.LogErrors(ex, nameof(RunSeleniumScript), nameof(AuthController));
-                return StatusCode(500, new { success = false, error = ex.Message, stackTrace = ex.StackTrace });
+                _logger.LogError(ex, "Error starting loan automation script.");
+                return StatusCode(500, new { success = false, error = "Script execution failed." });
             }
         }
 
 
 
-        private void GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession)
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh()
         {
-            var user = _httpContextAccessor.HttpContext!.User!;
+            try
+            {
+                var rawToken = Request.Cookies["RefreshToken"];
+                if (string.IsNullOrEmpty(rawToken))
+                    return Unauthorized(new ResponseDto { Success = false, Message = "Refresh token not found." });
 
-            userName = user.FindFirst(ClaimTypes.Name)?.Value!;
-            branchCode = user.FindFirst("branchCode")?.Value!;
-            branchId = Int32.Parse(user.FindFirst("branchId")?.Value!);
-            branchName = user.FindFirst("branchName")?.Value!;
-            societyName = user.FindFirst("societyName")?.Value!;
-            contact = user.FindFirst("contactNo")?.Value!;
-            address = user.FindFirst("address")?.Value!;
-            email = user.FindFirst("emailaddress")?.Value!;
-            userId = user.FindFirst("userId")?.Value!;
-            workingDate = user.FindFirst("workingDate").Value! ?? "";
-            sessionInfo = user.FindFirst("sessionInfo").Value! ?? "";
-            sessionId = Int32.Parse(user.FindFirst("sessionId")!.Value);
-            isFirstSession = Convert.ToBoolean(user.FindFirst("isFirstSession")!.Value);
+                var stored = await _context.refreshtoken
+                    .FirstOrDefaultAsync(r => r.Token == rawToken && !r.IsRevoked);
 
+                if (stored == null)
+                    return Unauthorized(new ResponseDto { Success = false, Message = "Invalid or revoked refresh token." });
+
+                if (stored.ExpiresAt < DateTime.UtcNow)
+                {
+                    stored.IsRevoked = true;
+                    await _context.SaveChangesAsync();
+                    return Unauthorized(new ResponseDto { Success = false, Message = "Refresh token has expired. Please log in again." });
+                }
+
+                // Restore session claims from snapshot
+                var snapshot = JsonSerializer.Deserialize<RefreshClaimsSnapshot>(stored.ClaimsSnapshot)
+                    ?? throw new InvalidOperationException("Failed to deserialize claims snapshot.");
+
+                setClaims(snapshot.UserName, snapshot.BranchName, snapshot.BranchCode, snapshot.BranchId,
+                    snapshot.SocietyName, snapshot.ContactNo, snapshot.Address, snapshot.Email,
+                    snapshot.UserId, snapshot.WorkingDate, snapshot.SessionInfo, snapshot.SessionId, snapshot.IsFirstSession, snapshot.IsSu,
+                    snapshot.SessionFromDate, snapshot.SessionToDate);
+
+                var tokenExpiration = DateTime.UtcNow.AddDays(_jwtSettings.ExpiryDays);
+                var newJwt = _jwtTokenService.GenerateToken(tokenExpiration);
+
+                // Rotate: revoke old refresh token, issue new one
+                stored.IsRevoked = true;
+                var newRefreshRaw = JwtTokenService.GenerateRefreshToken();
+                stored.ReplacedByToken = newRefreshRaw;
+
+                await _context.refreshtoken.AddAsync(new RefreshToken
+                {
+                    Token = newRefreshRaw,
+                    UserId = stored.UserId,
+                    BranchId = stored.BranchId,
+                    ClaimsSnapshot = stored.ClaimsSnapshot,
+                    ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays),
+                    IsRevoked = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+                await _context.SaveChangesAsync();
+
+                Response.Cookies.Append("AuthToken", newJwt, new CookieOptions
+                {
+                    HttpOnly = true, Secure = true, SameSite = SameSiteMode.None,
+                    Path = "/", Expires = tokenExpiration
+                });
+                Response.Cookies.Append("RefreshToken", newRefreshRaw, new CookieOptions
+                {
+                    HttpOnly = true, Secure = true, SameSite = SameSiteMode.None,
+                    Path = "/api/auth", Expires = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays)
+                });
+
+                _logger.LogInformation("Token refreshed for user: {UserId}, branch: {BranchId}", stored.UserId, stored.BranchId);
+                return Ok(new ResponseDto { Success = true, Message = "Token refreshed successfully." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during token refresh.");
+                await _commonFns.LogErrors(ex, nameof(Refresh), "AuthController");
+                return StatusCode(500, new ResponseDto { Success = false, Message = "An unexpected error occurred." });
+            }
         }
 
-        private void setClaims(string userName, string branchName, string branchCode, int branchId, string societyName, string contact, string address, string email, string userId, string workingDate, string sessionInfo, int sessionId, bool isFirstSession)
+        private async Task<string> CreateRefreshTokenAsync(int userId, int branchId)
+        {
+            // Purge expired tokens for this user to keep the table clean
+            var expired = await _context.refreshtoken
+                .Where(r => r.UserId == userId && r.BranchId == branchId && r.ExpiresAt < DateTime.UtcNow)
+                .ToListAsync();
+            if (expired.Any())
+            {
+                _context.refreshtoken.RemoveRange(expired);
+            }
+
+            var raw = JwtTokenService.GenerateRefreshToken();
+            var snapshot = JsonSerializer.Serialize(new RefreshClaimsSnapshot
+            {
+                UserName = _commonClass.userName,
+                BranchCode = _commonClass.branchCode,
+                BranchId = _commonClass.branchId,
+                BranchName = _commonClass.branchName,
+                SocietyName = _commonClass.societyName,
+                ContactNo = _commonClass.contactno,
+                Address = _commonClass.address,
+                Email = _commonClass.email,
+                UserId = _commonClass.userId,
+                WorkingDate = _commonClass.workingDate,
+                SessionInfo = _commonClass.sessionInfo,
+                SessionId = _commonClass.sessionId,
+                IsFirstSession = _commonClass.isFirstSession,
+                IsSu = _commonClass.isSu,
+                SessionFromDate = _commonClass.sessionFromDate,
+                SessionToDate = _commonClass.sessionToDate
+            });
+
+            await _context.refreshtoken.AddAsync(new RefreshToken
+            {
+                Token = raw,
+                UserId = userId,
+                BranchId = branchId,
+                ClaimsSnapshot = snapshot,
+                ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays),
+                IsRevoked = false,
+                CreatedAt = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync();
+            return raw;
+        }
+
+        private async Task RotateRefreshTokenAsync(string? rawToken, int userId, int branchId)
+        {
+            if (string.IsNullOrEmpty(rawToken)) return;
+            var stored = await _context.refreshtoken
+                .FirstOrDefaultAsync(r => r.Token == rawToken && r.UserId == userId && r.BranchId == branchId && !r.IsRevoked);
+            if (stored != null)
+            {
+                stored.IsRevoked = true;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        private void GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession, out bool isSu, out string sessionFromDate, out string sessionToDate)
+        {
+            var principal = _httpContextAccessor.HttpContext?.User
+                ?? throw new InvalidOperationException("No authenticated user in context.");
+
+            userName     = principal.FindFirst(ClaimTypes.Name)?.Value ?? "";
+            branchCode   = principal.FindFirst("branchCode")?.Value ?? "";
+            branchName   = principal.FindFirst("branchName")?.Value ?? "";
+            societyName  = principal.FindFirst("societyName")?.Value ?? "";
+            contact      = principal.FindFirst("contactNo")?.Value ?? "";
+            address      = principal.FindFirst("address")?.Value ?? "";
+            email        = principal.FindFirst("emailaddress")?.Value ?? "";
+            userId       = principal.FindFirst("userId")?.Value ?? "";
+            workingDate  = principal.FindFirst("workingDate")?.Value ?? "";
+            sessionInfo  = principal.FindFirst("sessionInfo")?.Value ?? "";
+            sessionFromDate = principal.FindFirst("sessionFromDate")?.Value ?? "";
+            sessionToDate   = principal.FindFirst("sessionToDate")?.Value ?? "";
+
+            int.TryParse(principal.FindFirst("branchId")?.Value, out branchId);
+            int.TryParse(principal.FindFirst("sessionId")?.Value, out sessionId);
+            bool.TryParse(principal.FindFirst("isFirstSession")?.Value, out isFirstSession);
+            bool.TryParse(principal.FindFirst("isSu")?.Value, out isSu);
+        }
+
+        private void setClaims(string userName, string branchName, string branchCode, int branchId, string societyName, string contact, string address, string email, string userId, string workingDate, string sessionInfo, int sessionId, bool isFirstSession, bool isSu, string sessionFromDate = "", string sessionToDate = "")
         {
             _commonClass.branchCode = branchCode;
             _commonClass.branchId = branchId;
@@ -499,10 +667,33 @@ namespace BankingPlatform.API.Controllers
             _commonClass.sessionInfo = sessionInfo;
             _commonClass.sessionId = sessionId;
             _commonClass.isFirstSession = isFirstSession;
+            _commonClass.isSu = isSu;
+            _commonClass.sessionFromDate = sessionFromDate;
+            _commonClass.sessionToDate = sessionToDate;
         }
     }
     public class ScriptPath
     {
         public string LoanAdvancement { get; set; } = ""!;
+    }
+
+    public class RefreshClaimsSnapshot
+    {
+        public string UserName { get; set; } = "";
+        public string BranchCode { get; set; } = "";
+        public int BranchId { get; set; }
+        public string BranchName { get; set; } = "";
+        public string SocietyName { get; set; } = "";
+        public string ContactNo { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string UserId { get; set; } = "";
+        public string WorkingDate { get; set; } = "";
+        public string SessionInfo { get; set; } = "";
+        public int SessionId { get; set; }
+        public bool IsFirstSession { get; set; }
+        public bool IsSu { get; set; }
+        public string SessionFromDate { get; set; } = "";
+        public string SessionToDate { get; set; } = "";
     }
 }

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "../../../Common/Layout";
 import commonservice from "../../../services/common/commonservice";
+import DatePicker from "../../../components/DatePicker";
 import fdAccountService from "../../../services/accountMasters/fdaccount/fdaccountapi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
@@ -120,6 +121,7 @@ interface RenewValidationErrors {
 const MatureFDPage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [loading, setLoading] = useState(false);
   const [isRenewFD, setIsRenewFD] = useState(false);
@@ -149,7 +151,7 @@ const MatureFDPage: React.FC = () => {
     fdDetailId: 0,
     fdAccountId: 0,
     fdAccountNo: "",
-    date: commonservice.getTodaysDate(),
+    date: sessionDate,
     product: 0,
     maturityAmt: 0,
     postMaturityAmt: "0.00",
@@ -172,7 +174,7 @@ const MatureFDPage: React.FC = () => {
   const blankRenewDetail = (): RenewFDDetail => ({
     accountPrefix: "",
     accountSuffix: "",
-    fdDate: commonservice.getTodaysDate(),
+    fdDate: sessionDate,
     receiptNo: "",
     fdAmount: "",
     days: "",
@@ -564,7 +566,7 @@ const MatureFDPage: React.FC = () => {
           fdDetailId: data.fdAccountDetailDTOSingle.id || 0,
           fdAccountId: accountId,
           fdAccountNo: data.accountMasterDTO?.accountNumber || "",
-          date: commonservice.getTodaysDate(),
+          date: sessionDate,
           product: selectedProduct,
           maturityAmt,
           postMaturityAmt: "0.00",
@@ -591,8 +593,7 @@ const MatureFDPage: React.FC = () => {
           // Pre-fill renew amount with maturity amount (user can increase, not decrease)
           fdAmount: maturityAmt > 0 ? maturityAmt.toFixed(2) : "",
           // Pre-fill renew date with old maturity date as minimum
-          fdDate: data.fdAccountDetailDTOSingle.fdMaturityDate?.split("T")[0]
-            || commonservice.getTodaysDate(),
+          fdDate: data.fdAccountDetailDTOSingle.fdMaturityDate?.split("T")[0] || sessionDate,
         }));
 
         Swal.fire({
@@ -862,19 +863,14 @@ const MatureFDPage: React.FC = () => {
                       <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full" />
                       Date <span className="text-red-500 text-xs">*</span>
                     </label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="date"
-                        value={matureFDDetail.date}
-                        onChange={(e) =>
-                          setMatureFDDetail({ ...matureFDDetail, date: e.target.value })
-                        }
-                        readOnly
-                        max={commonservice.getTodaysDate()}
-                        className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-gray-700 bg-gradient-to-r from-white to-gray-50"
-                      />
-                    </div>
+                    <DatePicker
+                      value={matureFDDetail.date}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      disabled
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
+                      onChange={() => {}}
+                    />
                   </div>
 
                   {/* Product */}
@@ -1191,15 +1187,15 @@ const MatureFDPage: React.FC = () => {
                           <label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
                             FD Date <span className="text-red-500">*</span>
                           </label>
-                          <input
-                            type="date"
+                          <DatePicker
                             value={renewFDDetail.fdDate}
-                            onChange={(e) => handleRenewFieldChange("fdDate", e.target.value)}
-                            min={matureFDDetail.maturityDate}  // cannot renew before old maturity
-                            max={commonservice.getTodaysDate()}
+                            onChange={(val) => handleRenewFieldChange("fdDate", val)}
+                            min={matureFDDetail.maturityDate}
+                            max={sessionDate}
+                            workingDate={sessionDate}
                             className={`w-full px-3 py-2.5 border-2 ${
                               validationErrors.fdDate ? "border-red-400" : "border-gray-200"
-                            } rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none text-sm`}
+                            } rounded-lg outline-none text-sm`}
                           />
                           {validationErrors.fdDate && (
                             <p className="text-xs text-red-500 mt-1">{validationErrors.fdDate}</p>
@@ -1384,14 +1380,13 @@ const MatureFDPage: React.FC = () => {
                             <label className="text-sm font-semibold text-gray-700 mb-2">
                               Maturity Date
                             </label>
-                            <input
-                              type="date"
+                            <DatePicker
                               value={renewFDDetail.maturityDate}
-                              readOnly
                               disabled
                               className={`w-full px-3 py-2.5 border-2 ${
                                 validationErrors.maturityDate ? "border-red-300" : "border-gray-100"
-                              } rounded-lg bg-gray-50 text-gray-600 outline-none cursor-not-allowed text-sm`}
+                              } rounded-lg outline-none text-sm`}
+                              onChange={() => {}}
                             />
                             {validationErrors.maturityDate && (
                               <p className="text-xs text-red-500 mt-1">{validationErrors.maturityDate}</p>

@@ -150,7 +150,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     && dto.Voucher.TotalDebit > 0)
                 {
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.Voucher.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.Voucher.VoucherNarration ?? "";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.Voucher.VoucherDate, DateTimeKind.Unspecified);
@@ -292,8 +292,10 @@ namespace BankingPlatform.API.Service.AccountMasters
         public async Task<(List<CommonAccMasterDTO> Items, int TotalCount)> GetAllRDAccountsAsync(
             int branchId, LocationFilterDTO filter)
         {
+            var workingDate = _commonfunctions.GetWorkingDate();
             var allAccounts = await _context.accountmaster
-                .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.RD)
+                .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.RD
+                    && (!workingDate.HasValue || x.AccOpeningDate.Date <= workingDate.Value.Date))
                 .ToListAsync();
 
             if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
@@ -640,6 +642,9 @@ namespace BankingPlatform.API.Service.AccountMasters
 
             if (accountMaster == null) return "Account not found.";
 
+            if (!await _commonfunctions.CanModifyAccountInCurrentSession(dto.AccountMasterDTO!.BranchId, accountMaster.AccOpeningDate))
+                return "This account can only be modified in the session it was opened in.";
+
             (int headId, long headCode) = await _commonfunctions.GetRDProductPrincipalHead(
                 dto.AccountMasterDTO!.BranchId, (int)dto.AccountMasterDTO.GeneralProductId!);
 
@@ -891,7 +896,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                                    ?? claimsPrincipal?.FindFirst("UserId")?.Value
                                    ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     int branchId = (int)dto.MatureRDInfo.BranchId!;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureRDInfo!.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureRDInfo?.Narration ?? ("RD Matured") + " .";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.MatureRDInfo!.VoucherDate, DateTimeKind.Unspecified);
@@ -1002,7 +1007,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                                    ?? claimsPrincipal?.FindFirst("UserId")?.Value
                                    ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     int branchId = (int)dto.MatureRDInfo.BranchId!;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureRDInfo!.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureRDInfo?.Narration ?? ("RD Pre-Matured") + " .";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.MatureRDInfo!.VoucherDate, DateTimeKind.Unspecified);

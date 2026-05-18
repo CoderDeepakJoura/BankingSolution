@@ -32,11 +32,13 @@ import {
   RotateCcw,
   ImageIcon,
   X,
+  Pencil,
 } from "lucide-react";
 import DashboardLayout from "../../../Common/Layout";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
+import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
 
 // Joint Account Holder Interface
 export interface JointAccountHolder {
@@ -67,9 +69,14 @@ const urlToFile = async (
 
 const SavingDepositVoucher: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, validateField, clearErrors, markFieldTouched } =
     useFormValidation();
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
 
   const [activeTab, setActiveTab] = useState("account-info");
   const [loading, setLoading] = useState(false);
@@ -85,6 +92,8 @@ const SavingDepositVoucher: React.FC = () => {
   const [fieldErrors, setFieldErrors] = useState<ValidationError[]>([]);
   const [pictureFile, setPictureFile] = useState<any>(null);
   const [signatureFile, setSignatureFile] = useState<any>(null);
+  const [accountBalance, setAccountBalance] = useState<number | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
 
   // Voucher Data State
   const [voucherData, setVoucherData] = useState({
@@ -171,10 +180,49 @@ const SavingDepositVoucher: React.FC = () => {
   }
 
   useEffect(() => {
-    setVoucherData((prev) => ({
+    if (!(location.state as any)?.editVoucher) {
+      setVoucherData((prev) => ({
+        ...prev,
+        voucherDate: sessionDate,
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
+    const editVoucher = (location.state as any)?.editVoucher as VoucherPreview | undefined;
+    if (!editVoucher) return;
+
+    setIsEditMode(true);
+    setEditVoucherId(editVoucher.voucherId);
+
+    // For Saving Deposit (2-2): Cr = saving account, Dr = debit/cash account
+    const crEntry = editVoucher.entries.find(e => e.entryType === "Cr");
+    const drEntry = editVoucher.entries.find(e => e.entryType === "Dr");
+
+    const productId = crEntry?.generalProductId ?? 0;
+    const accountId = crEntry?.accountId ?? 0;
+    const amount = crEntry?.amount ?? 0;
+    const debitAccountId = drEntry?.accountId ?? 0;
+
+    setVoucherData(prev => ({
       ...prev,
-      voucherDate: commonservice.getTodaysDate(),
+      voucherDate: editVoucher.voucherDate.split("T")[0],
+      savingProduct: productId.toString(),
+      accountId: accountId,
+      depositAmount: amount.toFixed(2),
+      debitAccount: debitAccountId.toString(),
+      narration: editVoucher.narration ?? "",
     }));
+
+    // Pre-load the account into the dropdown (single-entry list so Select shows it)
+    if (accountId && crEntry) {
+      setSavingProductAccounts([{ accId: accountId, accountName: crEntry.accountName }]);
+    }
+
+    // Load full products list for display
+    commonservice.fetch_saving_products(user.branchid).then(res => {
+      if (res.success) setSavingProducts(res.data ?? []);
+    });
   }, []);
 
   useEffect(() => {
@@ -217,6 +265,7 @@ const SavingDepositVoucher: React.FC = () => {
     setJointHolders([]);
     setPictureFile(null);
     setSignatureFile(null);
+    setAccountBalance(null);
 
     // Clear error on change
     if (selected) {
@@ -356,29 +405,33 @@ const SavingDepositVoucher: React.FC = () => {
         },
         voucherSubType: "D", // "D" for Deposit, "W" for Withdrawal
       };
-      const response = await savingVoucherApi.addSavingVoucher(
-        savingVoucherPayload
-      );
+      const response = isEditMode && editVoucherId
+        ? await savingVoucherApi.updateSavingVoucher(editVoucherId, savingVoucherPayload)
+        : await savingVoucherApi.addSavingVoucher(savingVoucherPayload);
 
       if (response.success) {
         await Swal.fire({
           icon: "success",
-          title: "Success!",
+          title: isEditMode ? "Updated!" : "Success!",
           text:
-            response.message || "Saving Deposit Voucher saved successfully.",
+            response.message || (isEditMode ? "Saving Deposit Voucher updated successfully." : "Saving Deposit Voucher saved successfully."),
           confirmButtonColor: "#3B82F6",
         });
 
         clearErrors();
         setFieldErrors([]);
-        handleReset();
+        if (isEditMode) {
+          navigate("/voucher-search");
+        } else {
+          handleReset();
+        }
       } else {
         throw new Error(response.message || "Failed to save transaction");
       }
 
       clearErrors();
       setFieldErrors([]);
-      handleReset();
+      if (!isEditMode) handleReset();
     } catch (error: any) {
       console.error("Save Error:", error);
       await Swal.fire({
@@ -394,7 +447,7 @@ const SavingDepositVoucher: React.FC = () => {
 
   const handleReset = () => {
     setVoucherData({
-      voucherDate: commonservice.getTodaysDate(),
+      voucherDate: sessionDate,
       savingProduct: "",
       accountId: 0,
       depositAmount: "",
@@ -404,6 +457,7 @@ const SavingDepositVoucher: React.FC = () => {
     setAccountData(null);
     setJointHolders([]);
     setSavingProductAccounts([]);
+    setAccountBalance(null);
     setActiveTab("account-info");
     clearErrors();
     setPictureFile(null);
@@ -449,15 +503,22 @@ const SavingDepositVoucher: React.FC = () => {
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
-              <FileText className="w-5 h-5 text-white" />
+            <div className={`w-10 h-10 bg-gradient-to-r ${isEditMode ? "from-amber-500 to-orange-500" : "from-blue-600 to-indigo-600"} rounded-lg flex items-center justify-center shadow-md`}>
+              {isEditMode ? <Pencil className="w-5 h-5 text-white" /> : <FileText className="w-5 h-5 text-white" />}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-800">
-                Saving Deposit Voucher
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-gray-800">
+                  Saving Deposit Voucher
+                </h2>
+                {isEditMode && (
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 border border-amber-300 rounded text-xs font-semibold">
+                    Edit Mode
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-600">
-                Enter transaction details below
+                {isEditMode ? "Modify saving deposit entries and save" : "Enter transaction details below"}
               </p>
             </div>
           </div>
@@ -513,6 +574,7 @@ const SavingDepositVoucher: React.FC = () => {
               autoFocus
               placeholder="Select Saving Product"
               isClearable
+              isDisabled={isEditMode}
               styles={{
                 control: (base, state) => ({
                   ...base,
@@ -560,6 +622,18 @@ const SavingDepositVoucher: React.FC = () => {
                   setFieldErrors((prev) =>
                     prev.filter((err) => err.field !== "accountId")
                   );
+                }
+
+                // Fetch balance
+                if (accountId !== 0) {
+                  setBalanceLoading(true);
+                  setAccountBalance(null);
+                  commonservice.get_account_balance(user.branchid, accountId)
+                    .then(res => setAccountBalance(res?.data ?? null))
+                    .catch(() => setAccountBalance(null))
+                    .finally(() => setBalanceLoading(false));
+                } else {
+                  setAccountBalance(null);
                 }
 
                 // Fetch account information if valid account selected
@@ -650,8 +724,7 @@ const SavingDepositVoucher: React.FC = () => {
               placeholder="Select Saving Account"
               isClearable
               isDisabled={
-                !voucherData.savingProduct ||
-                savingProductAccountsInfo.length === 0
+                isEditMode || (!voucherData.savingProduct && savingProductAccountsInfo.length === 0)
               }
               noOptionsMessage={() =>
                 !voucherData.savingProduct
@@ -697,6 +770,13 @@ const SavingDepositVoucher: React.FC = () => {
               inputMode="decimal"
               maxLength={18}
             />
+            {balanceLoading ? (
+              <p className="text-xs text-gray-400 mt-1">Fetching balance...</p>
+            ) : accountBalance !== null ? (
+              <p className="text-xs mt-1 font-semibold text-blue-600">
+                Current Balance: ₹{accountBalance.toFixed(2)}
+              </p>
+            ) : null}
           </FormField>
 
           {/* Debit Account */}
@@ -771,26 +851,30 @@ const SavingDepositVoucher: React.FC = () => {
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
           <button
             type="button"
-            onClick={handleReset}
+            onClick={isEditMode ? () => navigate("/voucher-search") : handleReset}
             className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-all duration-200 shadow-sm hover:shadow"
           >
-            <RotateCcw className="w-4 h-4" />
-            Reset
+            {isEditMode ? <X className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+            {isEditMode ? "Cancel" : "Reset"}
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex items-center gap-2 px-8 py-3 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+            className={`flex items-center gap-2 px-8 py-3 text-sm font-medium text-white bg-gradient-to-r ${
+              isEditMode
+                ? "from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                : "from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+            } rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg`}
           >
             {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Saving...
+                {isEditMode ? "Updating..." : "Saving..."}
               </>
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                Save Transaction
+                {isEditMode ? "Update Voucher" : "Save Transaction"}
               </>
             )}
           </button>

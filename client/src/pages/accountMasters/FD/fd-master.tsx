@@ -33,6 +33,8 @@ import { ValidationSummary } from "../../../components/Validations/ValidationSum
 import { FormField } from "../../../components/Validations/FormField";
 import { SavingAccounts } from "../Saving/close-saving-account";
 import { json } from "stream/consumers";
+import { canEnterOpeningBalance } from "../../../utils/session";
+import DatePicker from "../../../components/DatePicker";
 
 export interface FDProduct {
   id: number;
@@ -80,7 +82,7 @@ const FDAccountMaster = () => {
   const isEditMode = !!accountId;
 
   const user = useSelector((state: RootState) => state.user);
-  const isOpeningEntry = user.isFirstSession;
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const [activeTab, setActiveTab] = useState("fdDetail"); // Changed to generic "detail"
   const [loading, setLoading] = useState(false);
   const [showValidationSummary, setShowValidationSummary] = useState(false);
@@ -91,7 +93,7 @@ const FDAccountMaster = () => {
   // MIS Detail Form State
   const [misDetailForm, setMisDetailForm] = useState({
     misAccountNo: "",
-    misDate: commonservice.getTodaysDate(),
+    misDate: sessionDate,
     receiptNo: "",
     misAmount: "",
     months: "",
@@ -113,12 +115,15 @@ const FDAccountMaster = () => {
     const loadExistingFDAccount = async () => {
       if (isEditMode && accountId) {
         try {
-          Swal.fire({
-            title: "Loading FD Account Data...",
-            text: "Please wait",
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading(),
-          });
+          Swal.fire({ title: "Loading FD Account Data...", text: "Please wait", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+          const modifyCheck = await commonservice.can_modify_account(Number(accountId), user.branchid);
+          if (!modifyCheck.success) {
+            Swal.close();
+            await Swal.fire({ icon: "error", title: "Not Allowed", text: modifyCheck.message || "This account can only be modified in the session it was opened in." });
+            navigate("/fd-acc-info");
+            return;
+          }
 
           const response = await fdAccountService.getFDAccountById(
             Number(accountId),
@@ -151,7 +156,7 @@ const FDAccountMaster = () => {
                 fdProductId: data.accountMasterDTO.generalProductId || 0,
                 accountOpeningDate:
                   data.accountMasterDTO.accOpeningDate?.split("T")[0] ||
-                  commonservice.getTodaysDate(),
+                  sessionDate,
                 memberType: addedUsing === "NM" ? 1 : 2,
                 memberAccountNo: data.accountMasterDTO.accountNumber || "",
                 membershipNo: data.accountMasterDTO.membershipNo || "",
@@ -199,7 +204,7 @@ const FDAccountMaster = () => {
                     misAccountNo: mis.fdAccountNo,
                     misDate:
                       mis.fdDate?.split("T")[0] ||
-                      commonservice.getTodaysDate(),
+                      sessionDate,
                     receiptNo: mis.ltdNo || "",
                     misAmount: mis.fdAmount,
                     months: mis.fdPeriodMonths,
@@ -223,7 +228,7 @@ const FDAccountMaster = () => {
                   data.fdAccountDetailDTO.map((fd: any) => ({
                     id: fd.id || Date.now(),
                     fdDate:
-                      fd.fdDate?.split("T")[0] || commonservice.getTodaysDate(),
+                      fd.fdDate?.split("T")[0] || sessionDate,
                     receiptNo: fd.ltdNo || "",
                     fdAmount: fd.fdAmount,
                     months: fd.fdPeriodMonths,
@@ -247,12 +252,12 @@ const FDAccountMaster = () => {
                   nomineeName: nominee.nomineeName,
                   dateOfBirth:
                     nominee.nomineeDob?.split("T")[0] ||
-                    commonservice.getTodaysDate(),
+                    sessionDate,
                   relationWithAccountHolder: nominee.relationWithAccHolder,
                   address: nominee.addressLine || "",
                   nomineeDate:
                     nominee.nomineeDate?.split("T")[0] ||
-                    commonservice.getTodaysDate(),
+                    sessionDate,
                   guardianName: nominee.nameOfGuardian || "",
                   isMinor: nominee.isMinor === 1,
                 })),
@@ -438,7 +443,7 @@ const FDAccountMaster = () => {
     accountMasterDTO: {
       branchId: user.branchid,
       fdProductId: 0,
-      accountOpeningDate: commonservice.getTodaysDate(),
+      accountOpeningDate: sessionDate,
       memberType: 2,
       memberAccountNo: "",
       membershipNo: "",
@@ -451,9 +456,20 @@ const FDAccountMaster = () => {
     memberDetails: null as any,
   });
 
+  const isOpeningEntry = canEnterOpeningBalance(
+    user,
+    formData.accountMasterDTO.accountOpeningDate,
+  );
+
+  const sessionMaxDate = sessionDate;
+  const isFirstSession = user.isFirstSession === "True";
+  const sessionMinDate = isFirstSession
+    ? undefined
+    : user.sessionInfo ? `${user.sessionInfo.split('-')[0]}-04-01` : undefined;
+
   // FD Detail Form State
   const [fdDetailForm, setFdDetailForm] = useState({
-    fdDate: commonservice.getTodaysDate(),
+    fdDate: sessionDate,
     receiptNo: "",
     fdAmount: "",
     months: "",
@@ -527,7 +543,7 @@ const FDAccountMaster = () => {
     setEditingFdIndex(null);
 
     setFdDetailForm({
-      fdDate: commonservice.getTodaysDate(),
+      fdDate: sessionDate,
       receiptNo: "",
       fdAmount: "",
       months: "",
@@ -545,7 +561,7 @@ const FDAccountMaster = () => {
     setEditingMisIndex(null);
     setMisDetailForm({
       misAccountNo: "",
-      misDate: commonservice.getTodaysDate(),
+      misDate: sessionDate,
       receiptNo: "",
       misAmount: "",
       months: "",
@@ -1043,7 +1059,7 @@ const FDAccountMaster = () => {
     }
 
     setFdDetailForm({
-      fdDate: commonservice.getTodaysDate(),
+      fdDate: sessionDate,
       receiptNo: "",
       fdAmount: "",
       months: "",
@@ -1248,7 +1264,7 @@ const FDAccountMaster = () => {
     // ✅ Reset form AFTER state update
     setMisDetailForm({
       misAccountNo: "",
-      misDate: commonservice.getTodaysDate(),
+      misDate: sessionDate,
       receiptNo: "",
       misAmount: "",
       months: "",
@@ -1271,7 +1287,7 @@ const FDAccountMaster = () => {
     const item = misDetailsList[index];
     setMisDetailForm({
       misAccountNo: item.misAccountNo || "",
-      misDate: item.misDate || commonservice.getTodaysDate(),
+      misDate: item.misDate || sessionDate,
       receiptNo: item.receiptNo || "",
       misAmount: (item.misAmount || 0).toString(),
       months: (item.months || 0).toString(),
@@ -1321,10 +1337,10 @@ const FDAccountMaster = () => {
       {
         branchId: user.branchid,
         nomineeName: "",
-        dateOfBirth: commonservice.getTodaysDate(),
+        dateOfBirth: sessionDate,
         relationWithAccountHolder: 0,
         address: "",
-        nomineeDate: commonservice.getTodaysDate(),
+        nomineeDate: sessionDate,
         guardianName: "",
         isMinor: false,
       },
@@ -1456,48 +1472,57 @@ const FDAccountMaster = () => {
               LTDNo: fd.receiptNo.toString()
             })),
 
-        voucher: {
-          id: 0,
-          brID: user.branchid,
-          voucherDate: formData.accountMasterDTO.accountOpeningDate,
-          debitAccountId:
-            voucherCashGL.cashGLAccountId || voucherSaving.savingAccountId,
-          totalDebit:
-            parseFloat(voucherCashGL.amount || "0") +
-            parseFloat(voucherSaving.amount || "0"),
-          voucherNarration: showMIS
-            ? "MIS Account Opening"
-            : "FD Account Opening",
-          openingBalanceType: isOpeningEntry
-            ? formData.accountMasterDTO.balanceType
-            : "Cr",
-          openingAmount: Number(formData.accountMasterDTO.openingBalance) || 0,
-        },
+        voucher: isOpeningEntry
+          ? {
+              id: 0,
+              brID: user.branchid,
+              voucherDate: formData.accountMasterDTO.accountOpeningDate,
+              debitAccountId: 0,
+              totalDebit: Number(formData.accountMasterDTO.openingBalance) || 0,
+              voucherNarration: showMIS ? "MIS Account Opening" : "FD Account Opening",
+              openingBalanceType: formData.accountMasterDTO.balanceType,
+              openingAmount: Number(formData.accountMasterDTO.openingBalance) || 0,
+            }
+          : {
+              id: 0,
+              brID: user.branchid,
+              voucherDate: formData.accountMasterDTO.accountOpeningDate,
+              debitAccountId:
+                voucherCashGL.cashGLAccountId || voucherSaving.savingAccountId,
+              totalDebit:
+                parseFloat(voucherCashGL.amount || "0") +
+                parseFloat(voucherSaving.amount || "0"),
+              voucherNarration: showMIS ? "MIS Account Opening" : "FD Account Opening",
+              openingBalanceType: "Cr",
+              openingAmount: 0,
+            },
 
-        fdVoucherDetailDTO: {
-          branchId: user.branchid,
-          paymentMode: voucherPaymentMode,
-          cashGLAccountId:
-            voucherPaymentMode === "byCashGL" || voucherPaymentMode === "both"
-              ? voucherCashGL.cashGLAccountId
-              : undefined,
-          cashGLAmount:
-            voucherPaymentMode === "byCashGL" || voucherPaymentMode === "both"
-              ? parseFloat(voucherCashGL.amount) || 0
-              : undefined,
-          savingProductId:
-            voucherPaymentMode === "bySaving" || voucherPaymentMode === "both"
-              ? voucherSaving.savingProductId
-              : undefined,
-          savingAccountId:
-            voucherPaymentMode === "bySaving" || voucherPaymentMode === "both"
-              ? voucherSaving.savingAccountId
-              : undefined,
-          savingAmount:
-            voucherPaymentMode === "bySaving" || voucherPaymentMode === "both"
-              ? parseFloat(voucherSaving.amount) || 0
-              : undefined,
-        },
+        fdVoucherDetailDTO: isOpeningEntry
+          ? undefined
+          : {
+              branchId: user.branchid,
+              paymentMode: voucherPaymentMode,
+              cashGLAccountId:
+                voucherPaymentMode === "byCashGL" || voucherPaymentMode === "both"
+                  ? voucherCashGL.cashGLAccountId
+                  : undefined,
+              cashGLAmount:
+                voucherPaymentMode === "byCashGL" || voucherPaymentMode === "both"
+                  ? parseFloat(voucherCashGL.amount) || 0
+                  : undefined,
+              savingProductId:
+                voucherPaymentMode === "bySaving" || voucherPaymentMode === "both"
+                  ? voucherSaving.savingProductId
+                  : undefined,
+              savingAccountId:
+                voucherPaymentMode === "bySaving" || voucherPaymentMode === "both"
+                  ? voucherSaving.savingAccountId
+                  : undefined,
+              savingAmount:
+                voucherPaymentMode === "bySaving" || voucherPaymentMode === "both"
+                  ? parseFloat(voucherSaving.amount) || 0
+                  : undefined,
+            },
 
         accNomineeDTO: nominees.map((nominee) => ({
           branchId: user.branchid,
@@ -1560,7 +1585,7 @@ const FDAccountMaster = () => {
       accountMasterDTO: {
         branchId: user.branchid,
         fdProductId: 0,
-        accountOpeningDate: commonservice.getTodaysDate(),
+        accountOpeningDate: sessionDate,
         memberType: 2,
         memberAccountNo: "",
         membershipNo: "",
@@ -1586,7 +1611,7 @@ const FDAccountMaster = () => {
     });
 
     setFdDetailForm({
-      fdDate: commonservice.getTodaysDate(),
+      fdDate: sessionDate,
       receiptNo: "",
       fdAmount: "",
       months: "",
@@ -1600,7 +1625,7 @@ const FDAccountMaster = () => {
 
     setMisDetailForm({
       misAccountNo: "",
-      misDate: commonservice.getTodaysDate(),
+      misDate: sessionDate,
       receiptNo: "",
       misAmount: "",
       months: "",
@@ -1694,12 +1719,12 @@ const FDAccountMaster = () => {
         { id: "misDetail", label: "MIS Detail", icon: FileText },
         { id: "nominee", label: "Nominee Information", icon: UserPlus },
         { id: "voucher", label: "Voucher Detail", icon: CreditCard },
-      ].filter((tab) => (isEditMode ? tab.id !== "voucher" : true))
+      ].filter((tab) => (isEditMode || isOpeningEntry ? tab.id !== "voucher" : true))
     : [
         { id: "fdDetail", label: "FD Detail", icon: FileText },
         { id: "nominee", label: "Nominee Information", icon: UserPlus },
         { id: "voucher", label: "Voucher Detail", icon: CreditCard },
-      ].filter((tab) => (isEditMode ? tab.id !== "voucher" : true));
+      ].filter((tab) => (isEditMode || isOpeningEntry ? tab.id !== "voucher" : true));
 
   // ===== RENDER FUNCTIONS =====
 
@@ -1742,15 +1767,14 @@ const FDAccountMaster = () => {
             errors={errorsByField.accountOpeningDate || []}
             icon={<Calendar className="w-4 h-4 text-orange-500" />}
           >
-            <input
-              type="date"
+            <DatePicker
               value={formData.accountMasterDTO.accountOpeningDate}
-              onChange={(e) =>
-                handleFieldChange("accountOpeningDate", e.target.value)
-              }
-              readOnly={isEditMode}
-              max={commonservice.getTodaysDate()}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              onChange={(val) => handleFieldChange("accountOpeningDate", val)}
+              disabled={isEditMode}
+              min={sessionMinDate}
+              max={sessionMaxDate}
+              workingDate={sessionDate}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
             />
           </FormField>
 
@@ -2081,14 +2105,12 @@ const FDAccountMaster = () => {
               <label className="block text-sm font-medium text-gray-700">
                 Date of Birth<span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={memberDetailsData.dateOfBirth}
-                onChange={(e) =>
-                  handleMemberDetailsChange("dateOfBirth", e.target.value)
-                }
-                max={commonservice.getTodaysDate()}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                onChange={(val) => handleMemberDetailsChange("dateOfBirth", val)}
+                max={sessionDate}
+                workingDate={sessionDate}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
               />
             </div>
 
@@ -2176,18 +2198,13 @@ const FDAccountMaster = () => {
                   <label className="block text-sm font-medium text-gray-700">
                     FD Date<span className="text-red-500 ml-0.5">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={fdDetailForm.fdDate}
-                    onChange={(e) =>
-                      commonservice.handleDateChange(
-                        e.target.value,
-                        async (val) => handleFdDetailChange("fdDate", val),
-                        "fdDate",
-                      )
-                    }
-                    max={commonservice.getTodaysDate()}
-                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
+                    onChange={(val) => handleFdDetailChange("fdDate", val)}
+                    min={sessionMinDate}
+                    max={sessionMaxDate}
+                    workingDate={sessionDate}
+                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg outline-none"
                   />
                 </div>
 
@@ -2306,11 +2323,11 @@ const FDAccountMaster = () => {
                   <label className="block text-sm font-medium text-gray-700">
                     Maturity Date
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={fdDetailForm.maturityDate}
-                    readOnly
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
+                    disabled
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg outline-none"
+                    onChange={() => {}}
                   />
                 </div>
 
@@ -2348,7 +2365,7 @@ const FDAccountMaster = () => {
                     onClick={() => {
                       setEditingFdIndex(null);
                       setFdDetailForm({
-                        fdDate: commonservice.getTodaysDate(),
+                        fdDate: sessionDate,
                         receiptNo: "",
                         fdAmount: "",
                         months: "",
@@ -2536,18 +2553,16 @@ const FDAccountMaster = () => {
                   <label className="block text-sm font-medium text-gray-700">
                     MIS Date<span className="text-red-500 ml-0.5">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={misDetailForm.misDate}
-                    onChange={(e) => {
-                      (setMisDetailForm((prev) => ({
-                        ...prev,
-                        misDate: e.target.value,
-                      })),
-                        handleMisDetailChange("fddate", e.target.value));
+                    onChange={(val) => {
+                      setMisDetailForm((prev) => ({ ...prev, misDate: val }));
+                      handleMisDetailChange("fddate", val);
                     }}
-                    max={commonservice.getTodaysDate()}
-                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none transition-all"
+                    min={sessionMinDate}
+                    max={sessionMaxDate}
+                    workingDate={sessionDate}
+                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg outline-none"
                   />
                 </div>
 
@@ -2680,11 +2695,11 @@ const FDAccountMaster = () => {
                   <label className="block text-sm font-medium text-gray-700">
                     Maturity Date
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={misDetailForm.maturityDate}
-                    readOnly
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
+                    disabled
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg outline-none"
+                    onChange={() => {}}
                   />
                 </div>
 
@@ -2885,7 +2900,7 @@ const FDAccountMaster = () => {
                       setEditingMisIndex(null);
                       setMisDetailForm({
                         misAccountNo: "",
-                        misDate: commonservice.getTodaysDate(),
+                        misDate: sessionDate,
                         receiptNo: "",
                         misAmount: "",
                         months: "",
@@ -3342,18 +3357,12 @@ const FDAccountMaster = () => {
                     <label className="block text-sm font-medium text-gray-700">
                       Date of Birth<span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={nominee.dateOfBirth}
-                      onChange={(e) =>
-                        handleNomineeChange(
-                          index,
-                          "dateOfBirth",
-                          e.target.value,
-                        )
-                      }
-                      max={commonservice.getTodaysDate()}
-                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none"
+                      onChange={(val) => handleNomineeChange(index, "dateOfBirth", val)}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
                     />
                   </div>
 
@@ -3398,18 +3407,13 @@ const FDAccountMaster = () => {
                     <label className="block text-sm font-medium text-gray-700">
                       Nominee Date
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={nominee.nomineeDate}
-                      onChange={(e) =>
-                        handleNomineeChange(
-                          index,
-                          "nomineeDate",
-                          e.target.value,
-                        )
-                      }
-                      max={commonservice.getTodaysDate()}
-                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none"
+                      onChange={(val) => handleNomineeChange(index, "nomineeDate", val)}
+                      min={sessionMinDate}
+                      max={sessionMaxDate}
+                      workingDate={sessionDate}
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
                     />
                   </div>
 
@@ -3539,7 +3543,7 @@ const FDAccountMaster = () => {
                 {(activeTab === "fdDetail" || activeTab === "misDetail") &&
                   renderFdDetail()}
                 {activeTab === "nominee" && renderNominee()}
-                {activeTab === "voucher" && !isOpeningEntry && renderVoucher()}
+                {activeTab === "voucher" && renderVoucher()}
               </div>
 
               {/* Action Buttons */}

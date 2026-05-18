@@ -1,4 +1,5 @@
 import React from "react";
+import { APP_VERSION, APP_VERSION_DATE } from "../constants/config";
 
 const Footer = () => {
   return (
@@ -8,6 +9,7 @@ const Footer = () => {
           {/* Left: Links */}
           <div className="flex flex-wrap justify-center md:justify-start gap-4">
             <span>© {new Date().getFullYear()} Sicswave FinCore Ltd.</span>
+            <span className="text-gray-400">v{APP_VERSION} · {APP_VERSION_DATE}</span>
             <a href="#" className="hover:text-blue-600 transition">Privacy Policy</a>
             <a href="#" className="hover:text-blue-600 transition">Terms of Service</a>
             <a href="#" className="hover:text-blue-600 transition">Security</a>

@@ -20,6 +20,8 @@ import {
   Globe,
   PenSquare,
   Heading,
+  IndianRupee,
+  Calendar,
 } from "lucide-react";
 import { AccountHead } from "../../accounthead/accounthead/accounthead-master";
 import DashboardLayout from "../../../Common/Layout";
@@ -29,12 +31,19 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import commonservice from "../../../services/common/commonservice";
 import { State } from "../../../services/common/commonservice";
+import { canEnterOpeningBalance } from "../../../utils/session";
+import DatePicker from "../../../components/DatePicker";
 
 const GeneralAccountMaster = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
   const { errors, validateForm, clearErrors, markFieldTouched } =
     useFormValidation();
+
+  const sessionDate = user.workingdate
+    ? commonservice.splitDate(user.workingdate)
+    : commonservice.getTodaysDate();
+
   useEffect(() => {
     const fetchAccountHeadsAndStates = async () => {
       try {
@@ -74,10 +83,28 @@ const GeneralAccountMaster = () => {
     gstiNo: "",
     accounthead: "",
     accountNumber: "",
+    openingDate: sessionDate,
+    openingBalance: "",
+    openingBalanceType: "Cr",
   });
+
+  const isFirstSession = user.isFirstSession === "True" || user.isFirstSession === true;
+
+  const showOpeningBalance = canEnterOpeningBalance(
+    user,
+    accMasterData.openingDate,
+  );
 
   const handleInputChange = (field: any, value: any) => {
     setAccMasterData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleNumericChange = (field: string, value: string) => {
+    let numericValue = value.replace(/[^0-9.]/g, "");
+    const parts = numericValue.split(".");
+    if (parts.length > 2) numericValue = parts[0] + "." + parts.slice(1).join("");
+    if (parts[1] && parts[1].length > 2) numericValue = parts[0] + "." + parts[1].substring(0, 2);
+    setAccMasterData((prev) => ({ ...prev, [field]: numericValue }));
   };
 
   // Enhanced handleSubmit with validation
@@ -175,12 +202,14 @@ const GeneralAccountMaster = () => {
         accountName:
           `${accMasterData.accountName.trim()}`.trim(),
         accountNameSL:
-          accMasterData.accountNameSL 
+          accMasterData.accountNameSL
             ? `${accMasterData.accountNameSL.trim()}`.trim()
             : undefined,
         memberId: 0,
         memberBranchId: 0,
-        accOpeningDate: new Date().toISOString(),
+        accOpeningDate: accMasterData.openingDate
+          ? new Date(accMasterData.openingDate).toISOString()
+          : new Date().toISOString(),
         isAccClosed: false,
       };
 
@@ -199,6 +228,12 @@ const GeneralAccountMaster = () => {
       const dto: CommonAccMasterDTO = {
         accountMasterDTO,
         gstInfoDTO,
+        openingBalance: showOpeningBalance && accMasterData.openingBalance
+          ? accMasterData.openingBalance
+          : undefined,
+        openingBalanceType: showOpeningBalance && accMasterData.openingBalance
+          ? accMasterData.openingBalanceType
+          : undefined,
       };
 
       // Call API
@@ -257,6 +292,9 @@ const GeneralAccountMaster = () => {
       stateId: 0,
       accounthead: "",
       accountNumber: "",
+      openingDate: sessionDate,
+      openingBalance: "",
+      openingBalanceType: "Cr",
     });
     setActiveTab("basic");
     setaccountHeadId("");
@@ -313,7 +351,6 @@ const GeneralAccountMaster = () => {
           }
           placeholder="Select Account Head"
           isClearable
-          autoFocus={true}
           required
           className="text-sm"
         />
@@ -372,6 +409,73 @@ const GeneralAccountMaster = () => {
           lang="hi"
         />
       </FormField>
+
+      <FormField
+        name="openingDate"
+        label="Account Opening Date"
+        required
+        errors={errorsByField.openingDate || []}
+        icon={<Calendar className="w-4 h-4 text-blue-500" />}
+      >
+        <DatePicker
+          value={accMasterData.openingDate}
+          onChange={(val) => handleInputChange("openingDate", val)}
+          max={sessionDate}
+          workingDate={sessionDate}
+          disabled={!isFirstSession}
+        />
+      </FormField>
+
+      {showOpeningBalance && (
+        <>
+          <FormField
+            name="openingBalance"
+            label="Opening Balance"
+            errors={errorsByField.openingBalance || []}
+            icon={<IndianRupee className="w-4 h-4 text-green-500" />}
+          >
+            <input
+              type="text"
+              id="openingBalance"
+              value={accMasterData.openingBalance}
+              onChange={(e) => handleNumericChange("openingBalance", e.target.value)}
+              onBlur={() => handleFieldBlur("openingBalance")}
+              placeholder="Enter Opening Balance"
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+            />
+          </FormField>
+
+          <div className="flex flex-col justify-center">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Balance Type
+            </label>
+            <div className="flex items-center gap-6 py-2.5">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="openingBalanceType"
+                  value="Cr"
+                  checked={accMasterData.openingBalanceType === "Cr"}
+                  onChange={(e) => handleInputChange("openingBalanceType", e.target.value)}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="text-sm font-medium text-green-700">Credit (Cr)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="openingBalanceType"
+                  value="Dr"
+                  checked={accMasterData.openingBalanceType === "Dr"}
+                  onChange={(e) => handleInputChange("openingBalanceType", e.target.value)}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="text-sm font-medium text-red-700">Debit (Dr)</span>
+              </label>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 
@@ -403,7 +507,6 @@ const GeneralAccountMaster = () => {
               }
               placeholder="Select State"
               isClearable
-              autoFocus={true}
               required
               className="text-sm"
             />

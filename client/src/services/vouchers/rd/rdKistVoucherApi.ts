@@ -34,6 +34,14 @@ class RDKistVoucherApiService extends ApiService {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  async updateRDKistVoucher(voucherId: number, voucherData: RDKistVoucherDTO): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/RDKist/${voucherId}`, {
+      method: 'PUT',
+      body: JSON.stringify(voucherData),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 export default new RDKistVoucherApiService();

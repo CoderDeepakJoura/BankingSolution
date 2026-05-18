@@ -792,6 +792,27 @@ namespace BankingPlatform.API.Controllers
                 });
         }
 
+        [HttpGet("account-balance/{branchId}/{accountId}")]
+        public async Task<IActionResult> GetAccountBalance([FromRoute] int branchId, int accountId)
+        {
+            if (branchId <= 0 || accountId <= 0)
+                return BadRequest(new ResponseDto { Success = false, Message = "Invalid parameters." });
+
+            decimal crTotal = await _context.vouchercreditdebitdetails
+                .Where(x => x.BrId == branchId && x.AccountId == accountId
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                         && x.VoucherEntryType == "Cr")
+                .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+
+            decimal drTotal = await _context.vouchercreditdebitdetails
+                .Where(x => x.BrId == branchId && x.AccountId == accountId
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                         && x.VoucherEntryType == "Dr")
+                .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+
+            return Ok(new { Success = true, data = crTotal - drTotal });
+        }
+
         [HttpGet("joint-acc-info/{accountId}/{branchId}")]
         public async Task<IActionResult> GetJointAccountInfoFromAccountId([FromRoute]int accountId, int branchId)
         {
@@ -945,6 +966,7 @@ namespace BankingPlatform.API.Controllers
             .Where(x => x.branchid == commonDTO.BranchId)
             .Select(x => new AccountHeadDTO
             {
+                AccountHeadId = x.id,
                 HeadCode = x.headcode.ToString(),
                 AccountHeadName = x.headcode + "-" + x.name
             })
@@ -1147,6 +1169,144 @@ namespace BankingPlatform.API.Controllers
                 data = rdAccounts
             }
             );
+        }
+
+        [HttpGet("active-members/{branchId}")]
+        public async Task<IActionResult> GetActiveMembers(int branchId)
+        {
+            var members = await _context.member.AsNoTracking()
+                .Where(x => x.BranchId == branchId && x.MemberStatus == 1)
+                .OrderBy(x => x.MemberName)
+                .Select(x => new
+                {
+                    MemberId = x.Id,
+                    MemberBrId = x.BranchId,
+                    MemberName = x.MemberName,
+                    RelativeName = x.RelativeName,
+                    PermanentMembershipNo = x.PermanentMembershipNo,
+                    NominalMembershipNo = x.NominalMembershipNo,
+                })
+                .ToListAsync();
+
+            return Ok(new { Success = true, Data = members });
+        }
+
+        [HttpGet("fd-accounts-for-pledge/{branchId}/{openingDate}")]
+        public async Task<IActionResult> GetFDAccountsForPledge(int branchId, DateTime openingDate)
+        {
+            int accType = (int)Enums.AccountTypes.FD;
+            var accounts = await _context.accountmaster.AsNoTracking()
+                .Where(x => x.BranchId == branchId && x.AccTypeId == accType
+                         && (!x.IsAccClosed || (x.IsAccClosed && x.ClosingDate > openingDate)) && x.AccOpeningDate <= openingDate)
+                .OrderBy(x => x.AccSuffix)
+                .Select(x => new { AccId = x.ID, AccountNumber = x.AccPrefix + "-" + x.AccSuffix, AccountName = x.AccountName })
+                .ToListAsync();
+            return Ok(new { Success = true, Data = accounts });
+        }
+
+        [HttpGet("rd-accounts-for-pledge/{branchId}/{openingDate}")]
+        public async Task<IActionResult> GetRDAccountsForPledge(int branchId, DateTime openingDate)
+        {
+            int accType = (int)Enums.AccountTypes.RD;
+            var accounts = await _context.accountmaster.AsNoTracking()
+                .Where(x => x.BranchId == branchId && x.AccTypeId == accType
+                         && (!x.IsAccClosed || (x.IsAccClosed && x.ClosingDate > openingDate)) && x.AccOpeningDate <= openingDate)
+                .OrderBy(x => x.AccSuffix)
+                .Select(x => new { AccId = x.ID, AccountNumber = x.AccPrefix + "-" + x.AccSuffix, AccountName = x.AccountName })
+                .ToListAsync();
+            return Ok(new { Success = true, Data = accounts });
+        }
+
+        [HttpGet("loan-accounts-by-product/{branchId}/{productId}/{currentDate}")]
+        public async Task<IActionResult> LoanAccountsByProduct([FromRoute] int branchId, int productId, DateTime currentDate)
+        {
+            int accountType = (int)Enums.AccountTypes.Loan;
+            var loanAccounts = await (from p in _context.accountmaster.AsNoTracking()
+                                      join q in _context.accountkistdetail.AsNoTracking()
+                                      on new { accId = p.ID, branchId = p.BranchId }
+                                      equals new { accId = q.AccountId, branchId = q.BrId }
+                                      where p.BranchId == branchId && p.GeneralProductId == productId
+                                      && p.AccTypeId == accountType && p.IsAccClosed == false
+                                      && p.AccOpeningDate <= currentDate
+                                      select new
+                                      {
+                                          AccId = p.ID,
+                                          AccountName = p.AccountNumber + "-" + p.AccountName,
+                                          LoanAmountPassed = q.LoanAmountPassed ?? 0
+                                      }).ToListAsync();
+            return Ok(new { Success = true, data = loanAccounts });
+        }
+
+        [HttpGet("accounts-by-type/{branchId}/{accountType}")]
+        public async Task<IActionResult> AccountsByType([FromRoute] int branchId, int accountType)
+        {
+            int generalType = (int)Enums.AccountTypes.General;
+            int loanType = (int)Enums.AccountTypes.Loan;
+            int shareMoneyType = (int)Enums.AccountTypes.ShareMoney;
+            var accounts = await _context.accountmaster.AsNoTracking()
+                .Where(x => x.BranchId == branchId && x.AccTypeId == accountType && x.IsAccClosed == false)
+                .Select(x => new
+                {
+                    AccId = x.ID,
+                    AccountName = (x.AccTypeId == generalType || x.AccTypeId == loanType || x.AccTypeId == shareMoneyType)
+                        ? x.AccountNumber + "-" + x.AccountName
+                        : x.AccPrefix + "-" + x.AccSuffix + "-" + x.AccountName
+                })
+                .ToListAsync();
+            return Ok(new { Success = true, data = accounts });
+        }
+
+        [HttpGet("member-name/{memberId}/{branchId}")]
+        public async Task<IActionResult> GetMemberName([FromRoute] int memberId, int branchId)
+        {
+            var info = await _context.member.AsNoTracking()
+                .Where(x => x.Id == memberId && x.BranchId == branchId)
+                .Select(x => new { MemberName = x.MemberName, RelativeName = x.RelativeName })
+                .FirstOrDefaultAsync();
+            return Ok(new { Success = info != null, data = info });
+        }
+
+        [HttpGet("saving-account-by-accno/{branchId}/{accountNo}")]
+        public async Task<IActionResult> GetSavingAccountByAccNo(int branchId, string accountNo)
+        {
+            int accType = (int)Enums.AccountTypes.Saving;
+            var account = await _context.accountmaster.AsNoTracking()
+                .Where(x => x.BranchId == branchId && x.AccountNumber == accountNo && x.AccTypeId == accType)
+                .Select(x => new
+                {
+                    AccId = x.ID,
+                    AccountNumber = x.AccountNumber,
+                    AccountName = x.AccountName,
+                    AccPrefix = x.AccPrefix,
+                    AccSuffix = x.AccSuffix,
+                    IsAccClosed = x.IsAccClosed,
+                    MemberId = x.MemberId,
+                })
+                .FirstOrDefaultAsync();
+
+            if (account == null)
+                return Ok(new { Success = false, Data = (object?)null, Message = "Saving account not found." });
+
+            return Ok(new { Success = true, Data = account, Message = "" });
+        }
+
+        [HttpGet("can-modify-account/{accountId}/{branchId}")]
+        public async Task<IActionResult> CanModifyAccount([FromRoute] int accountId, int branchId)
+        {
+            var accOpeningDate = await _context.accountmaster.AsNoTracking()
+                .Where(x => x.ID == accountId && x.BranchId == branchId)
+                .Select(x => x.AccOpeningDate)
+                .FirstOrDefaultAsync();
+
+            if (accOpeningDate == default(DateTime))
+                return Ok(new { Success = false, Message = "Account not found." });
+
+            var canModify = await _commonFunctions.CanModifyAccountInCurrentSession(branchId, accOpeningDate);
+            return Ok(new
+            {
+                Success = canModify,
+                Message = canModify ? "OK" : "This account can only be modified in the session it was opened in."
+            });
         }
 
     }

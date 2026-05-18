@@ -27,10 +27,12 @@ import { RootState } from "../../redux";
 import { Village } from "../../services/location/village/villageapi";
 import commonservice from "../../services/common/commonservice";
 import { State } from "../../services/location/state/stateapi";
+import DatePicker from "../../components/DatePicker";
 
 const BranchMaster: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   // Form state
   const [societyId, setSocietyId] = React.useState(1 || 0);
@@ -1026,16 +1028,15 @@ const BranchMaster: React.FC = () => {
                         <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">
                           <FaCalendar className="text-sm" />
                         </div>
-                        <input
-                          type="date"
-                          id="gstNoIssueDate"
+                        <DatePicker
                           value={gstNoIssueDate}
-                          max={commonservice.getTodaysDate()}
-                          onChange={(e) => setGstNoIssueDate(e.target.value)}
-                          className={`w-full pl-10 pr-4 py-2 sm:py-3 border-2 rounded-lg focus:ring-2 outline-none transition-all duration-300 text-gray-700 bg-gradient-to-r from-white to-gray-50 ${
+                          max={sessionDate}
+                          workingDate={sessionDate}
+                          onChange={setGstNoIssueDate}
+                          className={`w-full pl-10 py-2 sm:py-3 border-2 rounded-lg outline-none text-gray-700 ${
                             showValidation && !gstNoIssueDate.trim()
-                              ? "border-red-300 focus:border-red-500 focus:ring-red-100"
-                              : "border-gray-200 focus:border-orange-500 focus:ring-orange-100"
+                              ? "border-red-300"
+                              : "border-gray-200"
                           }`}
                         />
                       </div>

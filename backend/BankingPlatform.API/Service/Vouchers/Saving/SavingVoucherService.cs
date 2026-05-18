@@ -40,7 +40,7 @@ namespace BankingPlatform.API.Service.Vouchers.Saving
                     int debitAccountId = (int)dto.Voucher!.DebitAccountId;
                     int creditAccountId = (int)dto.Voucher!.CreditAccountId!;
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
+                    nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.Voucher.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.Voucher.VoucherNarration ?? "";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.Voucher.VoucherDate, DateTimeKind.Unspecified);
@@ -95,52 +95,69 @@ namespace BankingPlatform.API.Service.Vouchers.Saving
             return ("Success", nextVrNo);
         }
 
-        public async Task<string> UpdateSavingVoucher(SavingVoucherDTO dto)
+        public async Task<(string result, int voucherNo)> UpdateSavingVoucher(int voucherId, SavingVoucherDTO dto)
         {
-
             using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
             {
-                if (dto.Voucher!.Id > 0 && dto.Voucher!.BrID > 0)
-                {
-                    var existingVoucherInfo = await _context.voucher.FirstOrDefaultAsync(x => x.Id == dto.Voucher!.Id && x.BrID == dto.Voucher!.BrID);
-                    if (existingVoucherInfo == null) return "Voucher not found.";
+                int branchId = dto.Voucher!.BrID;
+                var voucher = await _context.voucher.FirstOrDefaultAsync(x => x.Id == voucherId && x.BrID == branchId);
+                if (voucher == null) return ("Voucher not found.", 0);
 
-                    int branchId = dto.Voucher.BrID;
-                    int debitAccountId = (int)dto.Voucher.DebitAccountId!;
-                    int creditAccountId = (int)dto.Voucher!.CreditAccountId!;
-                    decimal totalDebit = (decimal)dto.Voucher.TotalDebit!;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId);
-                    bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
-                    string narration = dto.Voucher.VoucherNarration ?? "";
-                    int row = 1;
-                    VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(debitAccountId, branchId), creditAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), narration, totalDebit, dto.Voucher.VoucherStatus, existingVoucherInfo.VoucherDate, "Cr", existingVoucherInfo.Id, row);
+                int debitAccountId = (int)dto.Voucher.DebitAccountId!;
+                int creditAccountId = (int)dto.Voucher.CreditAccountId!;
+                decimal totalDebit = (decimal)dto.Voucher.TotalDebit!;
+                string narration = dto.Voucher.VoucherNarration ?? "";
 
-                    await _context.vouchercreditdebitdetails.AddAsync(voucherCreditInfo);
-                    row++;
+                // Delete old saving detail entries
+                var oldSavingDetails = await _context.vouchersavingdetail.Where(x => x.VoucherId == voucherId).ToListAsync();
+                if (oldSavingDetails.Any()) _context.vouchersavingdetail.RemoveRange(oldSavingDetails);
 
-                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(debitAccountId, branchId), (int)debitAccountId, branchId, Enums.VoucherStatus.Dr.ToString(), narration, totalDebit, dto.Voucher.VoucherStatus, existingVoucherInfo.VoucherDate, "Dr", existingVoucherInfo.Id, row);
-                    await _context.vouchercreditdebitdetails.AddAsync(voucherDebitInfo);
-                    await _context.SaveChangesAsync();
+                // Delete old credit/debit entries
+                var oldCrDrDetails = await _context.vouchercreditdebitdetails.Where(x => x.VoucherID == voucherId).ToListAsync();
+                if (oldCrDrDetails.Any()) _context.vouchercreditdebitdetails.RemoveRange(oldCrDrDetails);
 
-                    string operation = dto.VoucherSubType == "D" ? "SD" : "SW";
-                    int savingAccountId = dto.VoucherSubType == "D" ? creditAccountId : debitAccountId;
-                    int vAccCrDrId = dto.VoucherSubType == "D" ? voucherCreditInfo.Id : voucherDebitInfo.Id;
-                    VoucherSavingDetail voucherSavingDetail = _voucherMapper.voucherSavingDetails(branchId, savingAccountId, 0, vAccCrDrId, existingVoucherInfo.Id, dto.Voucher.VoucherNarration, totalDebit, dto.Voucher.VoucherStatus, existingVoucherInfo.VoucherDate, existingVoucherInfo.VoucherDate, operation, 0);
-                    await _context.vouchersavingdetail.AddAsync(voucherSavingDetail);
-                }
+                await _context.SaveChangesAsync();
+
+                // Update voucher narration and modifier
+                voucher.VoucherNarration = narration;
+                voucher.ModifiedBy = int.Parse(_commonfunctions.GetCurrentUserId()!);
+
+                DateTime valueDate = DateTime.SpecifyKind(voucher.VoucherDate, DateTimeKind.Utc);
+                int row = 1;
+
+                VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(
+                    await _commonfunctions.GetAccountHeadCodeFromAccId(creditAccountId, branchId),
+                    creditAccountId, branchId, Enums.VoucherStatus.Cr.ToString(),
+                    narration, totalDebit, voucher.VoucherStatus, valueDate, "Cr", voucher.Id, row);
+                await _context.vouchercreditdebitdetails.AddAsync(voucherCreditInfo);
+                row++;
+
+                VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(
+                    await _commonfunctions.GetAccountHeadCodeFromAccId(debitAccountId, branchId),
+                    debitAccountId, branchId, Enums.VoucherStatus.Dr.ToString(),
+                    narration, totalDebit, voucher.VoucherStatus, valueDate, "Dr", voucher.Id, row);
+                await _context.vouchercreditdebitdetails.AddAsync(voucherDebitInfo);
+                await _context.SaveChangesAsync();
+
+                string operation = dto.VoucherSubType == "D" ? "SD" : "SW";
+                int savingAccountId = dto.VoucherSubType == "D" ? creditAccountId : debitAccountId;
+                int vAccCrDrId = dto.VoucherSubType == "D" ? voucherCreditInfo.Id : voucherDebitInfo.Id;
+                VoucherSavingDetail voucherSavingDetail = _voucherMapper.voucherSavingDetails(
+                    branchId, savingAccountId, 0, vAccCrDrId, voucher.Id,
+                    narration, totalDebit, voucher.VoucherStatus, voucher.VoucherDate, valueDate, operation, 0);
+                await _context.vouchersavingdetail.AddAsync(voucherSavingDetail);
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+                return ("Success", voucher.VoucherNo);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return "Error";
+                return (ex.Message ?? "An error occurred while updating the voucher.", 0);
             }
-
-            return "Success";
         }
     }
 }

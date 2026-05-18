@@ -127,7 +127,7 @@ namespace BankingPlatform.API.Services
                 await _context.SaveChangesAsync();
 
                 string narration = dto.Voucher.VoucherNarration!;
-                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(member.BranchId);
+                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(member.BranchId, member.JoiningDate);
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(member.BranchId);
                 decimal smAmount = dto.Voucher.smAmount ?? 0;
                 int admissionFeeAccountId = dto.Voucher.admissionFeesAccountId ?? 0;
@@ -693,10 +693,10 @@ namespace BankingPlatform.API.Services
             entity.JoiningDate = dto.JoiningDate;
             entity.OccupationId = dto.OccupationId;
 
-            // Contact information
-            entity.PhonePrefix1 = dto.PhonePrefix1;
-            entity.PhoneType1 = dto.PhoneType1;
-            entity.PhoneNo1 = dto.PhoneNo1;
+            // Contact information — null-coalesce to safe defaults for NOT NULL columns
+            entity.PhonePrefix1 = dto.PhonePrefix1 ?? "+91";
+            entity.PhoneType1 = dto.PhoneType1 ?? 0;
+            entity.PhoneNo1 = dto.PhoneNo1 ?? string.Empty;
             entity.PhonePrefix2 = dto.PhonePrefix2;
             entity.PhoneType2 = dto.PhoneType2;
             entity.PhoneNo2 = dto.PhoneNo2;
@@ -738,13 +738,13 @@ namespace BankingPlatform.API.Services
             JoiningDate = entity.JoiningDate,
             OccupationId = entity.OccupationId,
 
-            // Contact information
-            PhonePrefix1 = entity.PhonePrefix1,
-            PhoneType1 = entity.PhoneType1,
-            PhoneNo1 = entity.PhoneNo1,
+            // Contact information — entity columns are NOT NULL so empty string is valid
+            PhonePrefix1 = string.IsNullOrEmpty(entity.PhonePrefix1) ? null : entity.PhonePrefix1,
+            PhoneType1   = entity.PhoneType1 == 0 ? null : entity.PhoneType1,
+            PhoneNo1     = string.IsNullOrEmpty(entity.PhoneNo1) ? null : entity.PhoneNo1,
             PhonePrefix2 = entity.PhonePrefix2,
-            PhoneType2 = entity.PhoneType2,
-            PhoneNo2 = entity.PhoneNo2,
+            PhoneType2   = entity.PhoneType2,
+            PhoneNo2     = entity.PhoneNo2,
 
             // Status fields (corrected naming)
             MemberStatus = entity.MemberStatus,
@@ -763,11 +763,11 @@ namespace BankingPlatform.API.Services
             entity.BranchId = dto.BranchId;
             entity.MemberId = dto.MemberId;
 
-            // Document details
-            entity.PanCardNo = dto.PanCardNo;
-            entity.AadhaarCardNo = dto.AadhaarCardNo;
-            entity.MemberPicExt = dto.MemberPicExt;
-            entity.MemberSignExt = dto.MemberSignExt;
+            // Document details — null-coalesce to empty string for NOT NULL columns
+            entity.PanCardNo = dto.PanCardNo ?? string.Empty;
+            entity.AadhaarCardNo = dto.AadhaarCardNo ?? string.Empty;
+            entity.MemberPicExt = dto.MemberPicExt ?? string.Empty;
+            entity.MemberSignExt = dto.MemberSignExt ?? string.Empty;
 
             return entity;
         }

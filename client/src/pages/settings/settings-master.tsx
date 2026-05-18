@@ -417,7 +417,6 @@ const SettingsMaster = () => {
           <FormField
             name="admissionFeeAmount"
             label="Admission Fee Amount"
-            required
             errors={errorsByField.admissionFeeAmount || []}
             icon={<DollarSign className="w-4 h-4 text-green-500" />}
           >

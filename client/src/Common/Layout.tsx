@@ -1,27 +1,21 @@
 import React, { useState } from "react";
-import { useDispatch } from "react-redux";
-import { setUser, clearUser } from "../redux/userSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { setUser } from "../redux/userSlice";
+import type { RootState } from "../redux/index";
 import {
   ChevronDown,
   ChevronRight,
   Menu,
   X,
   Calculator,
-  Users,
-  Building,
-  DollarSign,
-  Heart,
-  FileText,
-  MessageCircle,
   LayoutDashboard,
+  BarChart2,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Header from "../components/HeaderLandingPage";
 import Footer from "../components/Footer";
 import ApiService from "../services/api";
 import { useEffect } from "react";
-import { debug } from "console";
-import Swal from "sweetalert2";
 
 interface Transaction {
   id: number;
@@ -56,7 +50,6 @@ interface DashboardLayoutProps {
 }
 
 export const useBrowserNavigationControl = (shouldDisable: boolean = true) => {
-  const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
@@ -94,6 +87,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
+  const isSu = useSelector((state: RootState) => state.user.isSu);
   useBrowserNavigationControl(true);
   useEffect(() => {
     const init = async () => {
@@ -106,7 +100,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         // }
 
         // only run this if token is valid
-        const data = await ApiService.get_login_info();
+        const data = await ApiService.get_login_info() as any;
         if (data.success) {
           dispatch(
             setUser({
@@ -120,6 +114,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               sessionInfo: data.sessionInfo,
               sessionId: data.sessionId,
               isFirstSession: data.isFirstSession,
+              firstSessionFromDate: data.firstSessionFromDate,
+              firstSessionToDate: data.firstSessionToDate,
+              sessionFromDate: data.sessionFromDate,
+              sessionToDate: data.sessionToDate,
+              isSu: data.isSu ?? false,
             }),
           );
         } else {
@@ -142,17 +141,17 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       if (item.path === currentPath) {
         setExpandedItems((prev) => ({ ...prev, [item.label]: false }));
       } else if (item.hasSubItems && item.subItems) {
-        item.subItems.forEach((subItem) => {
+        item.subItems.forEach((subItem: SubMenuItem) => {
           if (
             subItem.path === currentPath ||
             subItem.subItems?.some(
-              (thirdItem) => thirdItem.path === currentPath,
+              (thirdItem: SubMenuItem) => thirdItem.path === currentPath,
             )
           ) {
             setExpandedItems((prev) => ({ ...prev, [item.label]: true }));
           }
           if (subItem.subItems) {
-            subItem.subItems.forEach((thirdItem) => {
+            subItem.subItems.forEach((thirdItem: SubMenuItem) => {
               if (thirdItem.path === currentPath) {
                 setExpandedItems((prev) => ({
                   ...prev,
@@ -189,7 +188,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     }
   };
 
-  const menuItems = [
+  const allMenuItems = [
     {
       icon: <LayoutDashboard size={18} />,
       label: "Dashboard",
@@ -205,17 +204,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: "Miscellaneous Masters",
           path: "",
           subItems: [
-            {
-              label: "Account Head Type Master",
-              path: "/accountheadtype-operations",
-            },
+            { label: "Account Head Type Master", path: "/accountheadtype-operations" },
             { label: "Account Head Master", path: "/accounthead-operations" },
-            { label: "Branch Master", path: "/branchmaster-operations" },
+            { label: "Branch Master", path: "/branchmaster-operations", suOnly: true },
             { label: "Caste Master", path: "/caste-operations" },
             { label: "Category Master", path: "/category-operations" },
             { label: "Occupation Master", path: "/occupation-operations" },
             { label: "Relation Master", path: "/relation-operations" },
             { label: "State Master", path: "/state-operations" },
+            { label: "User Master", path: "/user-info", suOnly: true },
+            { label: "Change Session / Working Date", path: "/change-session" },
           ],
         },
         {
@@ -236,39 +234,23 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           subItems: [
             { label: "Account Masters", path: "/account-operations" },
             { label: "Member Master", path: "/member-operations" },
-            { label: "Product Masters", path: "/product-operations" },
+            { label: "Product Masters", path: "/product-operations", suOnly: true },
             { label: "Product Interest Slabs", path: "/slab-operations" },
             { label: "Product Slabs", path: "/fd-slab-operations" },
             { label: "Settings Master", path: "/settings" },
-            { label: "Data Automation", path: "/automate-data" },
-
-            // { label: "Zone Master", path: "/zone-operations" },
-            // { label: "Village Master", path: "/village-operations" },
+            { label: "Data Automation", path: "/automate-data", suOnly: true },
           ],
         },
         {
           label: "Branch Wise Rules",
           path: "",
           subItems: [
-            {
-              label: "Saving Product BranchWise Rule",
-              path: "/saving-productbranchwise-rule",
-            },
-            {
-              label: "FD Product BranchWise Rule",
-              path: "/fd-productbranchwise-rule",
-            },
-            {
-              label: "RD Product BranchWise Rule",
-              path: "/rd-productbranchwise-rule",
-            },
-            {
-              label: "Loan Product BranchWise Rule",
-              path: "/loan-productbranchwise-rule",
-            },
+            { label: "Saving Product BranchWise Rule", path: "/saving-productbranchwise-rule" },
+            { label: "FD Product BranchWise Rule", path: "/fd-productbranchwise-rule" },
+            { label: "RD Product BranchWise Rule", path: "/rd-productbranchwise-rule" },
+            { label: "Loan Product BranchWise Rule", path: "/loan-productbranchwise-rule" },
           ],
         },
-        ,
         {
           label: "Vouchers",
           path: "",
@@ -276,20 +258,102 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Voucher Operations", path: "/voucher-operations" },
           ],
         },
-        // { label: "Sales", path: "/modules/sales" },
-        // { label: "CRM", path: "/modules/crm" },
-        // { label: "Stock", path: "/modules/stock" },
-        // { label: "Manufacturing", path: "/modules/manufacturing" },
-        // { label: "Projects", path: "/modules/projects" },
-        // { label: "Assets", path: "/modules/assets" },
-        // { label: "Point of Sale", path: "/modules/pos" },
-        // { label: "Quality", path: "/modules/quality" },
-        // { label: "Support", path: "/modules/support" },
-        // { label: "HR & Payroll", path: "/modules/hr-payroll" },
-        // { label: "No-Code Builder", path: "/modules/no-code-builder" },
+      ],
+    },
+    {
+      icon: <BarChart2 size={18} />,
+      label: "Reports",
+      hasSubItems: true,
+      subItems: [
+        {
+          label: "Daily Reports",
+          path: "",
+          subItems: [
+            { label: "Day Book",      path: "/day-book"      },
+            { label: "Cash Book",     path: "/cash-book"     },
+            { label: "Profit & Loss", path: "/profit-loss"   },
+            { label: "Balance Sheet", path: "/balance-sheet" },
+          ],
+        },
+        {
+          label: "Ledgers",
+          path: "",
+          subItems: [
+            { label: "Saving Ledger",      path: "/saving-ledger"      },
+            { label: "RD Ledger",          path: "/rd-ledger"          },
+            { label: "Loan Ledger",        path: "/loan-ledger"        },
+            { label: "FD Ledger",          path: "/fd-ledger"          },
+            { label: "Share Money Ledger", path: "/share-money-ledger" },
+            { label: "Head Ledger",        path: "/head-ledger"        },
+            { label: "General Ledger",     path: "/general-ledger"     },
+          ],
+        },
+        {
+          label: "Financial Reports",
+          path: "",
+          subItems: [
+            { label: "Trial Balance",  path: "/trial-balance" },
+            { label: "Journal Book",   path: "/journal-book"  },
+          ],
+        },
+        {
+          label: "Loan Reports",
+          path: "",
+          subItems: [
+            { label: "Loan NPA Report",        path: "/loan-npa-report"         },
+            { label: "Loan Advancement Report", path: "/loan-advancement-report" },
+            { label: "Loan Recovery Report",    path: "/loan-recovery-report"    },
+            { label: "Loan Demand (Kist)",      path: "/loan-demand-report"      },
+          ],
+        },
+        {
+          label: "RD Reports",
+          path: "",
+          subItems: [
+            { label: "RD Kist Receive", path: "/rd-kist-receive-report" },
+          ],
+        },
+        {
+          label: "FD Reports",
+          path: "",
+          subItems: [
+            { label: "FD Maturity Report", path: "/fd-maturity-report" },
+          ],
+        },
+        {
+          label: "Member Reports",
+          path: "",
+          subItems: [
+            { label: "Interest Certificate", path: "/member-int-cert" },
+          ],
+        },
+        {
+          label: "Loan Certificates",
+          path: "",
+          subItems: [
+            { label: "Loan Interest Certificate", path: "/loan-int-cert" },
+          ],
+        },
+        {
+          label: "Loan Reports",
+          path: "",
+          subItems: [
+            { label: "OD Reserve", path: "/od-reserve" },
+          ],
+        },
       ],
     },
   ];
+
+  const filterByRole = (items: any[]): any[] =>
+    items
+      .filter((item) => !item.suOnly || isSu)
+      .map((item) => ({
+        ...item,
+        subItems: item.subItems ? filterByRole(item.subItems) : undefined,
+      }));
+
+  const menuItems = filterByRole(allMenuItems);
 
   const MenuItem: React.FC<MenuItemProps> = ({
     icon,
@@ -444,10 +508,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     activePath === item.path ||
                     (item.hasSubItems &&
                       item.subItems?.some(
-                        (subItem) =>
+                        (subItem: SubMenuItem) =>
                           activePath === subItem.path ||
                           subItem.subItems?.some(
-                            (thirdItem) => activePath === thirdItem.path,
+                            (thirdItem: SubMenuItem) => activePath === thirdItem.path,
                           ),
                       ));
                   return (

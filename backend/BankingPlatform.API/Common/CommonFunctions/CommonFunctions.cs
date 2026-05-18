@@ -130,13 +130,79 @@ namespace BankingPlatform.API.Common.CommonFunctions
         public async Task<bool> CheckIfLocationDataInUse(int branchId, int zoneId = 0 , int thanaId = 0, int postOfficeId = 0, int tehsilId = 0 ) => await _appcontext.village
             .Where(x => x.branchid == branchId && ((x.zoneid > 0 && x.zoneid == zoneId) || (x.thanaid > 0 && x.thanaid == thanaId) || (x.postofficeid > 0 && x.postofficeid == postOfficeId) || (x.tehsilid > 0 && x.tehsilid == tehsilId))).AnyAsync();
 
-        public async Task<int> GetLatestVoucherNo(int branchId)
+        public async Task<int> GetLatestVoucherNo(int branchId, DateTime? voucherDate = null)
         {
-            var maxVoucherNo = await _appcontext.voucher
-                               .Where(x => x.BrID == branchId)
-                               .MaxAsync(x => (int?)x.VoucherNo); // Cast to nullable int (int?)
-            int nextVoucherNo = (maxVoucherNo ?? 0) + 1;
-            return nextVoucherNo;
+            int voucherNoSetting = await _appcontext.vouchersettings
+                .Where(x => x.branchid == branchId)
+                .Select(x => x.voucherNumberSetting)
+                .FirstOrDefaultAsync(); // 1 = Day Wise, 2 = Financial Year Wise, 0 = not configured
+
+            int? maxVoucherNo;
+
+            if (voucherNoSetting == 1) // Day Wise — reset each working day
+            {
+                DateTime referenceDate;
+                if (voucherDate.HasValue)
+                {
+                    referenceDate = voucherDate.Value.Date;
+                }
+                else
+                {
+                    DateTime workingDate = await _appcontext.daybeginendinfo
+                        .Where(x => x.branchid == branchId)
+                        .OrderByDescending(x => x.workingdate)
+                        .Select(x => x.workingdate)
+                        .FirstOrDefaultAsync();
+                    referenceDate = workingDate.Date;
+                }
+
+                maxVoucherNo = await _appcontext.voucher
+                    .Where(x => x.BrID == branchId
+                             && x.VoucherDate >= referenceDate
+                             && x.VoucherDate < referenceDate.AddDays(1))
+                    .MaxAsync(x => (int?)x.VoucherNo);
+            }
+            else if (voucherNoSetting == 2) // Financial Year / Session Wise — reset each session
+            {
+                // Use the session that contains the voucher date; fall back to current session
+                var session = voucherDate.HasValue
+                    ? await _appcontext.branchsession
+                        .Where(x => x.branchid == branchId
+                                 && x.fromdate <= voucherDate.Value.Date
+                                 && x.todate >= voucherDate.Value.Date)
+                        .FirstOrDefaultAsync()
+                    : await _appcontext.branchsession
+                        .Where(x => x.branchid == branchId && x.iscurrent)
+                        .FirstOrDefaultAsync();
+
+                if (session != null)
+                {
+                    DateTime sessionStart = session.fromdate.Date;
+                    DateTime sessionEnd = session.todate.Date.AddDays(1); // exclusive upper bound
+
+                    maxVoucherNo = await _appcontext.voucher
+                        .Where(x => x.BrID == branchId
+                                 && x.VoucherDate >= sessionStart
+                                 && x.VoucherDate < sessionEnd)
+                        .MaxAsync(x => (int?)x.VoucherNo);
+                }
+                else
+                {
+                    // No matching session found — fall back to global max for this branch
+                    maxVoucherNo = await _appcontext.voucher
+                        .Where(x => x.BrID == branchId)
+                        .MaxAsync(x => (int?)x.VoucherNo);
+                }
+            }
+            else
+            {
+                // Setting not configured — global max for the branch (original behaviour)
+                maxVoucherNo = await _appcontext.voucher
+                    .Where(x => x.BrID == branchId)
+                    .MaxAsync(x => (int?)x.VoucherNo);
+            }
+
+            return (maxVoucherNo ?? 0) + 1;
         }
 
         public async Task<int> GetHeadIdFromHeadCode(int branchId, long headCode) => await _appcontext.accounthead.Where(x => x.branchid == branchId && x.headcode == headCode).Select(x => x.id > 0 ? x.id : 0).FirstOrDefaultAsync();
@@ -496,6 +562,66 @@ namespace BankingPlatform.API.Common.CommonFunctions
                 result = await _appcontext.vouchercreditdebitdetails.Where(x => x.AccountId == accountId && x.BrId == branchId).AnyAsync();
             }
             return result;
+        }
+
+        // Reads workingDate from the current JWT claims.
+        // Returns null if the token has no working date (e.g., user not yet logged into a session).
+        public DateTime? GetWorkingDate()
+        {
+            var raw = _httpContextAccessor.HttpContext?.User?.FindFirst("workingDate")?.Value;
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            return DateTime.TryParseExact(raw, "dd-MMMM-yyyy",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var d) ? d : null;
+        }
+
+        // Reads sessionFromDate and sessionToDate from the current JWT claims.
+        // Returns (fromDate, toDate) as nullable DateTime — both null if no session is in the token.
+        public (DateTime? From, DateTime? To) GetCurrentSessionDates()
+        {
+            var principal = _httpContextAccessor.HttpContext?.User;
+            if (principal == null) return (null, null);
+
+            var fromStr = principal.FindFirst("sessionFromDate")?.Value;
+            var toStr   = principal.FindFirst("sessionToDate")?.Value;
+
+            DateTime? from = DateTime.TryParse(fromStr, out var f) ? f : null;
+            DateTime? to   = DateTime.TryParse(toStr,   out var t) ? t : null;
+
+            return (from, to);
+        }
+
+        // Returns true if the account may be edited in the current session.
+        // Rule: an account can only be modified in the session whose date range contains
+        // the account's opening date — UNLESS that session is the first session (isfirst=true),
+        // in which case the account is always editable.
+        public async Task<bool> CanModifyAccountInCurrentSession(int branchId, DateTime accOpeningDate)
+        {
+            var (sessionFrom, sessionTo) = GetCurrentSessionDates();
+
+            // No session in token — fall back to DB lookup
+            if (sessionFrom == null || sessionTo == null)
+            {
+                var currentSession = await _appcontext.branchsession.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.branchid == branchId && x.iscurrent);
+                if (currentSession == null) return true;
+                sessionFrom = currentSession.fromdate;
+                sessionTo   = currentSession.todate;
+            }
+
+            // Account opened within the current session → editable
+            if (accOpeningDate.Date >= sessionFrom.Value.Date && accOpeningDate.Date <= sessionTo.Value.Date)
+                return true;
+
+            // Account belongs to the first session → always editable
+            var accountSession = await _appcontext.branchsession.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.branchid == branchId
+                    && x.fromdate.Date <= accOpeningDate.Date
+                    && x.todate.Date >= accOpeningDate.Date);
+
+            if (accountSession?.isfirst == true) return true;
+
+            return false;
         }
         public async Task<string> GetSavingAccInfoFromMemberIDandBranchID(int memberId, int memberBranchID, int accTypeId)
      => await _appcontext.accountmaster

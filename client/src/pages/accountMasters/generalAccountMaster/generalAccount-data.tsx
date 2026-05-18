@@ -14,6 +14,7 @@ import GeneralAccountApiService, {
 import AccountHeadApiService from "../../../services/accountHead/accountheadapi";
 import commonservice from "../../../services/common/commonservice";
 import { State } from "../../../services/common/commonservice";
+import { canEnterOpeningBalance } from "../../../utils/session";
 
 // Enhanced Fetch General Accounts function with proper data transformation
 const fetchGeneralAccounts = async (
@@ -55,8 +56,11 @@ const convertDTOToFormData = (dto: CommonAccMasterDTO) => {
     headCode: dto.accountMasterDTO?.headCode,
     branchId: dto.accountMasterDTO?.branchId,
     isAccClosed: dto.accountMasterDTO?.isAccClosed,
+    accOpeningDate: dto.accountMasterDTO?.accOpeningDate,
     gstInNo: dto.gstInfoDTO?.gstInNo,
     stateId: dto.gstInfoDTO?.stateId,
+    openingBalance: dto.openingBalance || "",
+    openingBalanceType: dto.openingBalanceType || "Cr",
   };
 };
 
@@ -65,10 +69,33 @@ const addOrModifyAccountMaster = async (
   accountMasterDTO: CommonAccMasterDTO | null = null,
   branchId: number,
   accountHeads: any[],
-  states: State[]
+  states: State[],
+  user: any
 ) => {
   const isEdit = !!accountMasterDTO;
   const formData = isEdit ? convertDTOToFormData(accountMasterDTO) : null;
+  const existingOpeningDate = formData?.accOpeningDate ? formData.accOpeningDate.split("T")[0] : "";
+
+  if (isEdit && formData?.accId) {
+    const modifyCheck = await commonservice.can_modify_account(formData.accId, branchId);
+    if (!modifyCheck.success) {
+      await Swal.fire({ icon: "error", title: "Not Allowed", text: modifyCheck.message || "This account can only be modified in the session it was opened in." });
+      return false;
+    }
+  }
+
+  const isFirstSession = user.isFirstSession === "True" || user.isFirstSession === true;
+  const firstSessionFromDateRaw = user.firstSessionFromDate
+    ? user.firstSessionFromDate.split("T")[0]
+    : user.sessionInfo
+    ? `${user.sessionInfo.split("-")[0]}-04-01`
+    : "";
+  const workingDateStr = user.workingdate
+    ? commonservice.splitDate(user.workingdate)
+    : commonservice.getTodaysDate();
+
+  // For edit: statically decide; for add: JS handles it dynamically
+  const editShowOb = isEdit && canEnterOpeningBalance(user, existingOpeningDate);
   
   // Account Head Options
   const accountHeadOptions = accountHeads
@@ -193,16 +220,71 @@ const addOrModifyAccountMaster = async (
                     <span class="text-emerald-600 text-xs font-medium">Optional</span>
                   </label>
                   <div class="relative">
-                    <input 
-                      id="accountNameSL" 
+                    <input
+                      id="accountNameSL"
                       type="text"
-                      class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50" 
-                      placeholder="हिंदी में खाता नाम" 
+                      class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-slate-700 placeholder-slate-400 bg-gradient-to-r from-white to-slate-50"
+                      placeholder="हिंदी में खाता नाम"
                       value="${isEdit ? (formData?.accountNameSL || "") : ""}"
                       lang="hi"
                       maxLength="100"
                     />
                     <div class="absolute inset-0 border-2 border-transparent rounded-lg pointer-events-none transition-all duration-300 hover:border-emerald-200"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Opening Date (shown for add; readonly for edit) -->
+              ${isFirstSession ? `
+              <div class="mb-6">
+                <div class="swal2-input-group">
+                  <label for="openingDate" class="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                    <div class="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
+                    Account Opening Date
+                  </label>
+                  <input
+                    id="openingDate"
+                    type="date"
+                    class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all duration-300 text-slate-700 bg-gradient-to-r from-white to-slate-50 ${isEdit ? "bg-slate-100 cursor-not-allowed" : ""}"
+                    value="${isEdit ? existingOpeningDate : workingDateStr}"
+                    max="${workingDateStr}"
+                    ${isEdit ? "disabled" : ""}
+                  />
+                </div>
+              </div>
+              ` : ""}
+
+              <!-- Opening Balance Section (shown dynamically) -->
+              <div id="ob-section" class="border-t border-slate-200 pt-6 mt-2" style="display:${editShowOb ? "block" : "none"};">
+                <h4 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                  <div class="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"></div>
+                  Opening Balance
+                  <span class="text-emerald-600 text-xs font-medium">First Session</span>
+                </h4>
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="swal2-input-group">
+                    <label for="openingBalance" class="block text-sm font-semibold text-slate-700 mb-2">Amount</label>
+                    <input
+                      id="openingBalance"
+                      type="text"
+                      class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none transition-all duration-300 text-slate-700 bg-gradient-to-r from-white to-slate-50"
+                      placeholder="0.00"
+                      value="${formData?.openingBalance || ""}"
+                      oninput="this.value=this.value.replace(/[^0-9.]/g,'').replace(/(\\..{2}).*/,'$1')"
+                    />
+                  </div>
+                  <div class="swal2-input-group">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Type</label>
+                    <div class="flex items-center gap-6 py-3">
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="obType" value="Cr" ${(formData?.openingBalanceType || "Cr") === "Cr" ? "checked" : ""} class="w-4 h-4 text-green-600" />
+                        <span class="text-sm font-medium text-green-700">Credit (Cr)</span>
+                      </label>
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="obType" value="Dr" ${(formData?.openingBalanceType || "Cr") === "Dr" ? "checked" : ""} class="w-4 h-4 text-red-600" />
+                        <span class="text-sm font-medium text-red-700">Debit (Dr)</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -413,6 +495,20 @@ const addOrModifyAccountMaster = async (
           target.value = target.value.toUpperCase();
         });
       }
+
+      // Dynamic opening balance show/hide for add mode
+      if (!isEdit && isFirstSession && firstSessionFromDateRaw) {
+        const openingDateInput = document.getElementById('openingDate') as HTMLInputElement | null;
+        const obSection = document.getElementById('ob-section');
+        if (openingDateInput && obSection) {
+          const updateObVisibility = () => {
+            const val = openingDateInput.value;
+            obSection.style.display = (val && val < firstSessionFromDateRaw) ? 'block' : 'none';
+          };
+          openingDateInput.addEventListener('change', updateObVisibility);
+          updateObVisibility();
+        }
+      }
     },
     preConfirm: () => {
       const accounthead = (document.getElementById("accounthead") as HTMLSelectElement).value;
@@ -421,6 +517,14 @@ const addOrModifyAccountMaster = async (
       const accountNameSL = (document.getElementById("accountNameSL") as HTMLInputElement).value.trim();
       const stateId = (document.getElementById("stateId") as HTMLSelectElement).value;
       const gstInNo = (document.getElementById("gstInNo") as HTMLInputElement).value.trim();
+      const openingDateEl = document.getElementById("openingDate") as HTMLInputElement | null;
+      const openingDate = openingDateEl ? openingDateEl.value.trim() : (existingOpeningDate || "");
+      const obSection = document.getElementById("ob-section");
+      const obVisible = obSection ? obSection.style.display !== "none" : false;
+      const openingBalanceEl = document.getElementById("openingBalance") as HTMLInputElement | null;
+      const openingBalance = (obVisible && openingBalanceEl) ? openingBalanceEl.value.trim() : "";
+      const obTypeEl = document.querySelector('input[name="obType"]:checked') as HTMLInputElement | null;
+      const openingBalanceType = obTypeEl ? obTypeEl.value : "Cr";
 
       // Validation
       if (!accounthead) {
@@ -452,12 +556,16 @@ const addOrModifyAccountMaster = async (
 
       return {
         id: isEdit ? formData?.accId : null,
-        accounthead: accounthead,
+        accounthead,
         accountNumber,
         accountName,
         accountNameSL,
         stateId: stateId ? parseInt(stateId) : null,
         gstInNo,
+        openingDate,
+        openingBalance,
+        openingBalanceType,
+        obVisible,
       };
     },
   });
@@ -483,7 +591,7 @@ const addOrModifyAccountMaster = async (
             accountNameSL: formValues.accountNameSL || undefined,
             memberId: 0,
             memberBranchId: 0,
-            accOpeningDate: new Date().toISOString(),
+            accOpeningDate: formData?.accOpeningDate || new Date().toISOString(),
             isAccClosed: false
           },
           gstInfoDTO: formValues.gstInNo || formValues.stateId ? {
@@ -492,6 +600,8 @@ const addOrModifyAccountMaster = async (
             stateId: formValues.stateId || 0,
             gstInNo: formValues.gstInNo,
           } : undefined,
+          openingBalance: editShowOb ? (formValues.openingBalance || "") : undefined,
+          openingBalanceType: editShowOb ? (formValues.openingBalanceType || "Cr") : undefined,
         };
         
         await GeneralAccountApiService.updateGeneralAccount(updateDTO);
@@ -508,14 +618,18 @@ const addOrModifyAccountMaster = async (
             accountNameSL: formValues.accountNameSL || undefined,
             memberId: 0,
             memberBranchId: 0,
-            accOpeningDate: new Date().toISOString()
+            accOpeningDate: formValues.openingDate
+              ? new Date(formValues.openingDate).toISOString()
+              : new Date().toISOString(),
           },
           gstInfoDTO: formValues.gstInNo || formValues.stateId ? {
             branchId: branchId,
-            accId: 0, // Will be set by backend
+            accId: 0,
             stateId: formValues.stateId || 0,
             gstInNo: formValues.gstInNo,
           } : undefined,
+          openingBalance: formValues.obVisible ? (formValues.openingBalance || "") : undefined,
+          openingBalanceType: formValues.obVisible ? (formValues.openingBalanceType || "Cr") : undefined,
         };
 
         await GeneralAccountApiService.createGeneralAccount(createDTO);
@@ -614,8 +728,8 @@ const GeneralAccountMasterCRUD: React.FC = () => {
   return (
     <CRUDMaster<CommonAccMasterDTO>
       fetchData={fetchAccountsWithBranch}
-      addEntry={() => addOrModifyAccountMaster(null, user.branchid, accountHeads, states)}
-      modifyEntry={(dto) => addOrModifyAccountMaster(dto, user.branchid, accountHeads, states)}
+      addEntry={() => addOrModifyAccountMaster(null, user.branchid, accountHeads, states, user)}
+      modifyEntry={(dto) => addOrModifyAccountMaster(dto, user.branchid, accountHeads, states, user)}
       deleteEntry={(dto) => deleteGeneralAccount(dto, user.branchid)}
       pageTitle="General Account Master Operations"
       addLabel="Add General Account Master"

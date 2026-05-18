@@ -11,21 +11,17 @@
         [Required]
         public int MemberId { get; set; }
 
-        // Document Details
-        [Required]
+        // Document Details — all optional when the UI toggles permit
         [StringLength(20)]
-        public string PanCardNo { get; set; } = string.Empty;
+        public string? PanCardNo { get; set; }
 
-        [Required]
         [StringLength(20)]
-        public string AadhaarCardNo { get; set; } = string.Empty;
+        public string? AadhaarCardNo { get; set; }
 
-        [Required]
         [StringLength(10)]
-        public string MemberPicExt { get; set; } = string.Empty;
+        public string? MemberPicExt { get; set; }
 
-        [Required]
         [StringLength(10)]
-        public string MemberSignExt { get; set; } = string.Empty;
+        public string? MemberSignExt { get; set; }
     }
 }

@@ -71,6 +71,7 @@ const urlToFile = async (
 const CloseSavingAccount: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, validateField, clearErrors, markFieldTouched } =
     useFormValidation();
 
@@ -180,7 +181,7 @@ const CloseSavingAccount: React.FC = () => {
   useEffect(() => {
     setVoucherData((prev) => ({
       ...prev,
-      voucherDate: commonservice.getTodaysDate(),
+      voucherDate: sessionDate,
     }));
   }, []);
 
@@ -381,7 +382,7 @@ const CloseSavingAccount: React.FC = () => {
 
   const handleReset = () => {
     setVoucherData({
-      voucherDate: commonservice.getTodaysDate(),
+      voucherDate: sessionDate,
       savingProduct: "",
       accountId: 0,
       balance: "",

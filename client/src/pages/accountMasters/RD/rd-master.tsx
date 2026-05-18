@@ -30,6 +30,8 @@ import rdAccountService, {
 } from "../../../services/accountMasters/rdaccount/rdaccountapi";
 import { FormField } from "../../../components/Validations/FormField";
 import { ValidationSummary } from "../../../components/Validations/ValidationSummary";
+import { canEnterOpeningBalance } from "../../../utils/session";
+import DatePicker from "../../../components/DatePicker";
 
 export interface RDProduct {
   id: number;
@@ -107,7 +109,6 @@ const RDAccountMaster = () => {
   const accountId = encryptedId ? decryptId(encryptedId) : null;
   const isEditMode = !!accountId;
   const user = useSelector((state: RootState) => state.user);
-  const isOpeningEntry = user.isFirstSession;
   const sessionDate = user.workingdate
     ? commonservice.splitDate(user.workingdate)
     : commonservice.getTodaysDate();
@@ -150,6 +151,17 @@ const RDAccountMaster = () => {
     memberDetails: null as any,
   });
 
+  const isOpeningEntry = canEnterOpeningBalance(
+    user,
+    formData.accountMasterDTO.accountOpeningDate,
+  );
+
+  const sessionMaxDate = sessionDate;
+  const isFirstSession = user.isFirstSession === "True";
+  const sessionMinDate = isFirstSession
+    ? undefined
+    : user.sessionInfo ? `${user.sessionInfo.split('-')[0]}-04-01` : undefined;
+
   // ─── RD Specific Fields ──────────────────────────────────────────────────────
   const [rdDetailForm, setRdDetailForm] = useState({
     rdDate: sessionDate,
@@ -159,9 +171,9 @@ const RDAccountMaster = () => {
     periodMonths: "",
     amount: "",
     interestRate: "",
-    firstKistDate: commonservice.getTodaysDate(),
+    firstKistDate: sessionDate,
     matDate: "",
-    paymentDate: commonservice.getTodaysDate(),
+    paymentDate: sessionDate,
     matAmount: "",
     penaltyAmount: "",
     slabName: "",
@@ -171,7 +183,7 @@ const RDAccountMaster = () => {
 
   // ─── Voucher Data ────────────────────────────────────────────────────────────
   const [voucherData, setVoucherData] = useState({
-    voucherDate: commonservice.getTodaysDate(),
+    voucherDate: sessionDate,
     depositAmount: "",
     narration: "",
   });
@@ -287,12 +299,15 @@ const RDAccountMaster = () => {
 useEffect(() => {
   const loadExistingAccount = async () => {
     try {
-      Swal.fire({
-        title: "Loading RD Account Data...",
-        text: "Please wait",
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading(),
-      });
+      Swal.fire({ title: "Loading RD Account Data...", text: "Please wait", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+      const modifyCheck = await commonservice.can_modify_account(Number(accountId), user.branchid);
+      if (!modifyCheck.success) {
+        Swal.close();
+        await Swal.fire({ icon: "error", title: "Not Allowed", text: modifyCheck.message || "This account can only be modified in the session it was opened in." });
+        navigate("/rd-acc-info");
+        return;
+      }
 
       const response = await rdAccountService.getRDAccountById(
         Number(accountId),
@@ -379,9 +394,9 @@ useEffect(() => {
             periodMonths: rd.noOfMonths?.toString() || "",
             amount: rd.rdAmount?.toString() || "",
             interestRate: rd.interestRate?.toString() || "",
-            firstKistDate: rd.firstKistDate?.split("T")[0] || commonservice.getTodaysDate(),
+            firstKistDate: rd.firstKistDate?.split("T")[0] || sessionDate,
             matDate: rd.maturityDate?.split("T")[0] || "",
-            paymentDate: rd.maturityDate?.split("T")[0] || commonservice.getTodaysDate(),
+            paymentDate: rd.maturityDate?.split("T")[0] || sessionDate,
             matAmount: rd.maturityAmt?.toString() || "",
             penaltyAmount: rd.penaltyAmt?.toString() || "",
             slabName: rd.slabName?.toString() || "", // you may want slab name from a lookup
@@ -434,12 +449,12 @@ useEffect(() => {
               nomineeName: nominee.nomineeName,
               dateOfBirth:
                 nominee.nomineeDob?.split("T")[0] ||
-                commonservice.getTodaysDate(),
+                sessionDate,
               relationWithAccountHolder: nominee.relationWithAccHolder,
               address: nominee.addressLine || "",
               nomineeDate:
                 nominee.nomineeDate?.split("T")[0] ||
-                commonservice.getTodaysDate(),
+                sessionDate,
               guardianName: nominee.nameOfGuardian || "",
               isMinor: nominee.isMinor === 1,
             }))
@@ -876,10 +891,10 @@ useEffect(() => {
       {
         branchId: user.branchid,
         nomineeName: "",
-        dateOfBirth: commonservice.getTodaysDate(),
+        dateOfBirth: sessionDate,
         relationWithAccountHolder: 0,
         address: "",
-        nomineeDate: commonservice.getTodaysDate(),
+        nomineeDate: sessionDate,
         guardianName: "",
         isMinor: false,
       },
@@ -948,9 +963,9 @@ useEffect(() => {
       periodMonths: "",
       amount: "",
       interestRate: "",
-      firstKistDate: commonservice.getTodaysDate(),
+      firstKistDate: sessionDate,
       matDate: "",
-      paymentDate: commonservice.getTodaysDate(),
+      paymentDate: sessionDate,
       matAmount: "",
       penaltyAmount: "",
       slabName: "",
@@ -958,7 +973,7 @@ useEffect(() => {
       slabId: "",
     });
     setVoucherData({
-      voucherDate: commonservice.getTodaysDate(),
+      voucherDate: sessionDate,
       depositAmount: "",
       narration: "",
     });
@@ -1064,16 +1079,16 @@ useEffect(() => {
         formData.accountMasterDTO.openingNoOfKist?.trim() &&
         !/^\d+$/.test(formData.accountMasterDTO.openingNoOfKist)
       ) {
-        add("openingNoOfKist", "Opening No. of Kists must be a whole number", "voucher");
+        add("openingNoOfKist", "Opening No. of Kists must be a whole number", "rdDetail");
       }
       if (
         formData.accountMasterDTO.openingBalance?.trim() &&
         parseFloat(formData.accountMasterDTO.openingBalance) < 0
       ) {
-        add("openingBalance", "Opening Balance cannot be negative", "voucher");
+        add("openingBalance", "Opening Balance cannot be negative", "rdDetail");
       }
       if (!formData.accountMasterDTO.balanceType?.trim())
-        add("balanceType", "Balance Type is required", "voucher");
+        add("balanceType", "Balance Type is required", "rdDetail");
     } else if(!isEditMode)
        {
       if (!voucherData.voucherDate)
@@ -1357,8 +1372,8 @@ useEffect(() => {
  const tabs = [
   { id: "rdDetail", label: "RD Detail", icon: FileText },
   { id: "nominee", label: "Nominee Information", icon: UserPlus },
-  ...(!isEditMode
-    ? [{ id: "voucher", label: "Opening Voucher Details", icon: CreditCard }]
+  ...(!isEditMode && !isOpeningEntry
+    ? [{ id: "voucher", label: "Voucher Details", icon: CreditCard }]
     : []),
   { id: "joint", label: "Joint Account", icon: Users },
 ];
@@ -1409,22 +1424,17 @@ useEffect(() => {
             errors={errorsByField.accountOpeningDate || []}
             icon={<Calendar className="w-4 h-4 text-orange-500" />}
           >
-            <input
-              type="date"
+            <DatePicker
               value={formData.accountMasterDTO.accountOpeningDate}
-              onChange={(e) =>
-                commonservice.handleDateChange(
-                  e.target.value,
-                  (val) => handleFieldChange("accountOpeningDate", val),
-                  "accountOpeningDate"
-                )
-              }
-              readOnly={isEditMode}
-              max={commonservice.getTodaysDate()}
-              className={`w-full px-3 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition-all ${
+              onChange={(val) => handleFieldChange("accountOpeningDate", val)}
+              disabled={isEditMode}
+              min={sessionMinDate}
+              max={sessionMaxDate}
+              workingDate={sessionDate}
+              className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none ${
                 errorsByField.accountOpeningDate
                   ? "border-red-500 bg-red-50"
-                  : "border-gray-200 focus:border-blue-500"
+                  : "border-gray-200"
               }`}
             />
           </FormField>
@@ -1570,6 +1580,85 @@ useEffect(() => {
               }`}
             />
           </FormField>
+
+          {isOpeningEntry && (
+            <>
+              <FormField
+                name="openingNoOfKist"
+                label="Opening No. of Kists"
+                errors={errorsByField.openingNoOfKist || []}
+                icon={<FileText className="w-4 h-4 text-green-500" />}
+              >
+                <input
+                  type="text"
+                  value={formData.accountMasterDTO.openingNoOfKist || ""}
+                  onChange={(e) =>
+                    handleFieldChange(
+                      "openingNoOfKist",
+                      e.target.value.replace(/\D/g, "")
+                    )
+                  }
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={MAX.openingNoOfKist}
+                  placeholder="Enter No. of Kists"
+                  className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                />
+              </FormField>
+
+              <FormField
+                name="openingBalance"
+                label="Opening Balance"
+                errors={errorsByField.openingBalance || []}
+                icon={<IndianRupee className="w-4 h-4 text-green-500" />}
+              >
+                <input
+                  type="text"
+                  value={formData.accountMasterDTO.openingBalance || ""}
+                  onChange={(e) => handleNumericChange("openingBalance", e.target.value)}
+                  maxLength={MAX.depositAmount}
+                  placeholder="Enter Opening Balance"
+                  className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                />
+              </FormField>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Balance Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-4 mt-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="balanceType"
+                      value="Cr"
+                      checked={formData.accountMasterDTO.balanceType === "Cr"}
+                      onChange={(e) => handleFieldChange("balanceType", e.target.value)}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Credit (Cr)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="balanceType"
+                      value="Dr"
+                      checked={formData.accountMasterDTO.balanceType === "Dr"}
+                      onChange={(e) => handleFieldChange("balanceType", e.target.value)}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Debit (Dr)</span>
+                  </label>
+                </div>
+                {errorsByField.balanceType && (
+                  <p className="text-red-500 text-xs flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errorsByField.balanceType[0]?.message}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -1647,13 +1736,13 @@ useEffect(() => {
                 <label className="block text-sm font-medium text-gray-700">
                   Date of Birth <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={memberDetailsData.dateOfBirth}
-                  onChange={(e) => handleMemberDetailsChange("dateOfBirth", e.target.value)}
-                  max={commonservice.getTodaysDate()}
-                  className={`w-full px-3 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition-all cursor-pointer ${
-                    errorsByField.dateOfBirth ? "border-red-500 bg-red-50" : "border-gray-200 focus:border-blue-500"
+                  onChange={(val) => handleMemberDetailsChange("dateOfBirth", val)}
+                  max={sessionDate}
+                  workingDate={sessionDate}
+                  className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none ${
+                    errorsByField.dateOfBirth ? "border-red-500 bg-red-50" : "border-gray-200"
                   }`}
                 />
                 {errorsByField.dateOfBirth && (
@@ -1882,13 +1971,14 @@ useEffect(() => {
                   <label className="block text-sm font-medium text-gray-700">
                     First Kist Date <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={rdDetailForm.firstKistDate}
-                    readOnly
-                    className={`w-full px-3 py-2.5 text-sm border rounded-lg outline-none transition-all bg-gray-50 text-gray-600 cursor-not-allowed ${
+                    disabled
+                    workingDate={sessionDate}
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg outline-none ${
                       errorsByField.firstKistDate ? "border-red-500 bg-red-50" : "border-gray-200"
                     }`}
+                    onChange={() => {}}
                   />
                   {errorsByField.firstKistDate && (
                     <p className="text-red-500 text-xs flex items-center gap-1">
@@ -1900,11 +1990,11 @@ useEffect(() => {
                 {/* Mat Date (read-only) */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700">Mat Date</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={rdDetailForm.matDate}
-                    readOnly
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
+                    disabled
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg outline-none"
+                    onChange={() => {}}
                   />
                 </div>
 
@@ -1913,12 +2003,13 @@ useEffect(() => {
                   <label className="block text-sm font-medium text-gray-700">
                     Payment Date <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={rdDetailForm.paymentDate}
-                    onChange={(e) => handleRdDetailChange("paymentDate", e.target.value)}
-                    className={`w-full px-3 py-2.5 text-sm border rounded-lg outline-none transition-all ${
-                      errorsByField.paymentDate ? "border-red-500 bg-red-50" : "border-gray-300 focus:border-blue-500"
+                    onChange={(val) => handleRdDetailChange("paymentDate", val)}
+                    max={sessionDate}
+                    workingDate={sessionDate}
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg outline-none ${
+                      errorsByField.paymentDate ? "border-red-500 bg-red-50" : "border-gray-300"
                     }`}
                   />
                   {errorsByField.paymentDate && (
@@ -2062,15 +2153,15 @@ useEffect(() => {
                     <label className="block text-sm font-medium text-gray-700">
                       Date of Birth <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={nominee.dateOfBirth}
-                      onChange={(e) => handleNomineeChange(index, "dateOfBirth", e.target.value)}
-                      max={commonservice.getTodaysDate()}
-                      className={`w-full px-3 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-green-100 outline-none transition-all ${
+                      onChange={(val) => handleNomineeChange(index, "dateOfBirth", val)}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none ${
                         errorsByField[`nominees[${index}].dateOfBirth`]
                           ? "border-red-500 bg-red-50"
-                          : "border-gray-200 focus:border-green-500"
+                          : "border-gray-200"
                       }`}
                     />
                     {errorsByField[`nominees[${index}].dateOfBirth`] && (
@@ -2114,12 +2205,12 @@ useEffect(() => {
                   {/* Nominee Date */}
                   <div className="space-y-1">
                     <label className="block text-sm font-medium text-gray-700">Nominee Date</label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={nominee.nomineeDate}
-                      onChange={(e) => handleNomineeChange(index, "nomineeDate", e.target.value)}
-                      max={commonservice.getTodaysDate()}
-                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none"
+                      onChange={(val) => handleNomineeChange(index, "nomineeDate", val)}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
                     />
                   </div>
 
@@ -2193,88 +2284,10 @@ useEffect(() => {
         <div className="bg-gradient-to-r from-green-600 to-teal-600 px-6 py-4">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">
             <IndianRupee className="w-5 h-5" />
-            Opening / Voucher Details
+            Voucher Details
           </h3>
         </div>
         <div className="p-6">
-          {isOpeningEntry ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <FormField
-                name="openingNoOfKist"
-                label="Opening No. of Kists"
-                errors={errorsByField.openingNoOfKist || []}
-                icon={<FileText className="w-4 h-4 text-green-500" />}
-              >
-                <input
-                  type="text"
-                  value={formData.accountMasterDTO.openingNoOfKist || ""}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      "openingNoOfKist",
-                      e.target.value.replace(/\D/g, "")
-                    )
-                  }
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={MAX.openingNoOfKist}
-                  placeholder="Enter No. of Kists"
-                  className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                />
-              </FormField>
-
-              <FormField
-                name="openingBalance"
-                label="Opening Balance"
-                errors={errorsByField.openingBalance || []}
-                icon={<IndianRupee className="w-4 h-4 text-green-500" />}
-              >
-                <input
-                  type="text"
-                  value={formData.accountMasterDTO.openingBalance || ""}
-                  onChange={(e) => handleNumericChange("openingBalance", e.target.value)}
-                  maxLength={MAX.depositAmount}
-                  placeholder="Enter Opening Balance"
-                  className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                />
-              </FormField>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Balance Type <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-4 mt-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="balanceType"
-                      value="Cr"
-                      checked={formData.accountMasterDTO.balanceType === "Cr"}
-                      onChange={(e) => handleFieldChange("balanceType", e.target.value)}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Credit (Cr)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="balanceType"
-                      value="Dr"
-                      checked={formData.accountMasterDTO.balanceType === "Dr"}
-                      onChange={(e) => handleFieldChange("balanceType", e.target.value)}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Debit (Dr)</span>
-                  </label>
-                </div>
-                {errorsByField.balanceType && (
-                  <p className="text-red-500 text-xs flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    {errorsByField.balanceType[0]?.message}
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : (
             <div className="space-y-6">
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <h4 className="text-sm font-medium text-gray-700 mb-3">Payment Type</h4>
@@ -2323,14 +2336,15 @@ useEffect(() => {
                   <label className="block text-sm font-medium text-gray-700">
                     Voucher Date <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={voucherData.voucherDate}
-                    readOnly
-                    max={commonservice.getTodaysDate()}
-                    className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none transition-all bg-gray-50 text-gray-600 cursor-not-allowed ${
+                    disabled
+                    max={sessionMaxDate}
+                    workingDate={sessionDate}
+                    className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none ${
                       errorsByField.voucherDate ? "border-red-500 bg-red-50" : "border-gray-200"
                     }`}
+                    onChange={() => {}}
                   />
                   {errorsByField.voucherDate && (
                     <p className="text-red-500 text-xs flex items-center gap-1">
@@ -2521,7 +2535,6 @@ useEffect(() => {
                 />
               </div>
             </div>
-          )}
         </div>
       </div>
     </div>
@@ -2728,12 +2741,12 @@ useEffect(() => {
                   {/* DOB */}
                   <div className="space-y-1">
                     <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={holder.dateOfBirth}
-                      onChange={(e) => handleJointHolderChange(index, "dateOfBirth", e.target.value)}
-                      max={commonservice.getTodaysDate()}
-                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                      onChange={(val) => handleJointHolderChange(index, "dateOfBirth", val)}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
                     />
                   </div>
 
@@ -2881,7 +2894,7 @@ useEffect(() => {
               <div className="p-6">
                 {activeTab === "rdDetail" && renderRdDetail()}
                 {activeTab === "nominee" && renderNominee()}
-                {activeTab === "voucher" && !isEditMode && renderVoucher()}
+                {activeTab === "voucher" && renderVoucher()}
                 {activeTab === "joint" && renderJointAccount()}
               </div>
 

@@ -21,6 +21,7 @@ import commonservice from "../../../services/common/commonservice";
 import fdInterestSlabService, {
   CombinedFDIntInfoDTO, FDSlabs
 } from "../../../services/interestslab/fdinterestslabservice";
+import DatePicker from "../../../components/DatePicker";
 
 // Define your interfaces/types
 interface FDProduct {
@@ -51,6 +52,7 @@ const FDInterestSlab = () => {
   const isEditMode = !!slabId;
 
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [loading, setLoading] = useState(false);
   const [fdProducts, setFdProducts] = useState<FDProduct[]>([]);
@@ -67,7 +69,7 @@ const FDInterestSlab = () => {
     id: null as number | null,
     branchId: user.branchid,
     fdProductId: 0,
-    applicableDate: commonservice.getTodaysDate(),
+    applicableDate: sessionDate,
   });
 
   // Interest slabs state (Age-based) - ✅ Removed applicableDate
@@ -512,7 +514,7 @@ const FDInterestSlab = () => {
       id: null,
       branchId: user.branchid,
       fdProductId: 0,
-      applicableDate: commonservice.getTodaysDate(),
+      applicableDate: sessionDate,
     });
     setInterestSlabs([
       {
@@ -733,23 +735,17 @@ const FDInterestSlab = () => {
                             <span className="text-red-500">*</span>
                           </span>
                         </label>
-                        <input
-                          type="date"
+                        <DatePicker
                           value={formData.applicableDate}
-                          onChange={(e) =>
-                            commonservice.handleDateChange(
-                              e.target.value,
-                              (val) => handleInputChange("applicableDate", val),
-                              "applicableDate"
-                            )
-                          }
-                          max={commonservice.getTodaysDate()}
-                          className={`w-full px-4 py-2.5 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none ${
+                          onChange={(val) => handleInputChange("applicableDate", val)}
+                          max={sessionDate}
+                          workingDate={sessionDate}
+                          disabled={isEditMode}
+                          className={`w-full px-4 py-2.5 border-2 rounded-lg outline-none ${
                             validationErrors.applicableDate
                               ? "border-red-500"
                               : "border-gray-200"
                           }`}
-                          readOnly={isEditMode}
                         />
                         {validationErrors.applicableDate && (
                           <span className="text-red-500 text-xs flex items-center gap-1 mt-2">

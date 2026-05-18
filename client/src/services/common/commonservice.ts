@@ -363,7 +363,7 @@ class commonService extends ApiService {
   handleDateChange = (
     value: string,
     callback: (value: string) => void,
-    fieldName: string
+    _fieldName: string
   ) => {
     if (!value) {
       callback("");
@@ -551,6 +551,18 @@ class commonService extends ApiService {
     );
   }
 
+  async accounts_by_type(branchId: number, accountType: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<AuthResponse>(
+      `/fetchdata/accounts-by-type/${branchId}/${accountType}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
   async fd_account_type_from_fd_product(productId : Number, branchId: number): Promise<ApiResponse<any>> {
     return this.makeRequest<AuthResponse>(
       `/fetchdata/fd-account-type-from-fdproduct/${productId}/${branchId}`,
@@ -685,7 +697,38 @@ class commonService extends ApiService {
       }
     );
   }
-async fetch_rd_related_info(rdDate : string, periodInMonths: Number, productId: Number, amount: Number, branchId: Number, compoundingInterval: string): Promise<ApiResponse<any>> {
+  async fetch_fd_accounts_for_pledge(branchId: number, openingDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/fd-accounts-for-pledge/${branchId}/${openingDate}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async fetch_rd_accounts_for_pledge(branchId: number, openingDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/rd-accounts-for-pledge/${branchId}/${openingDate}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async fetch_active_members(branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/active-members/${branchId}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async fetch_saving_account_by_accno(branchId: number, accountNo: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/saving-account-by-accno/${branchId}/${accountNo}`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  async fetch_rd_related_info(rdDate : string, periodInMonths: Number, productId: Number, amount: Number, branchId: Number, compoundingInterval: string): Promise<ApiResponse<any>> {
     return this.makeRequest<AuthResponse>(
       `/fetchdata/fetch-rd-related-info/${rdDate}/${periodInMonths}/${productId}/${amount}/${branchId}/${compoundingInterval}`,
       {
@@ -696,7 +739,42 @@ async fetch_rd_related_info(rdDate : string, periodInMonths: Number, productId: 
       }
     );
   }
-  
+
+  async fetch_loan_accounts_by_product(branchId: number, productId: number, currentDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/loan-accounts-by-product/${branchId}/${productId}/${currentDate}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async fetch_accounts_by_type(branchId: number, accountType: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/accounts-by-type/${branchId}/${accountType}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async get_account_balance(branchId: number, accountId: number): Promise<ApiResponse<number>> {
+    return this.makeRequest<number>(
+      `/fetchdata/account-balance/${branchId}/${accountId}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async fetch_member_name(memberId: number, branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/member-name/${memberId}/${branchId}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async can_modify_account(accountId: number, branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/can-modify-account/${accountId}/${branchId}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
 }
 
 

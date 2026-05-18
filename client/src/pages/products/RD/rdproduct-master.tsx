@@ -36,6 +36,7 @@ import { RootState } from "../../../redux";
 import AccountHeadApiService from "../../../services/accountHead/accountheadapi";
 import { AccountHeadWithCode } from "../../accounthead/accounthead/accounthead-master";
 import { json } from "stream/consumers";
+import DatePicker from "../../../components/DatePicker";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 export enum DocumentPlan {
@@ -92,6 +93,7 @@ const RDProductMaster = () => {
   const isEditMode = !!productId;
 
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, clearErrors, markFieldTouched } = useFormValidation();
 
   const [showValidationSummary, setShowValidationSummary] = useState(false);
@@ -106,7 +108,7 @@ const RDProductMaster = () => {
       productName:     "",
       productNameInSL: "",
       productCode:     "",
-      effectiveFrom:   commonservice.getCurrentDate(),
+      effectiveFrom:   sessionDate,
     },
     rdProductRulesDTO: {
       branchId:       user.branchid,
@@ -131,13 +133,13 @@ const RDProductMaster = () => {
       ...data.rdProductDTO!,
       effectiveFrom: data.rdProductDTO?.effectiveFrom
         ? commonservice.splitDate(data.rdProductDTO.effectiveFrom)
-        : commonservice.getCurrentDate(),
+        : sessionDate,
     },
     rdProductInterestRulesDetails: (data.rdProductInterestRulesDetails || []).map((r) => ({
       ...r,
       applicableDate: r.applicableDate
         ? commonservice.splitDate(r.applicableDate)
-        : commonservice.getCurrentDate(),
+        : sessionDate,
     })),
   });
 
@@ -206,7 +208,7 @@ const RDProductMaster = () => {
   // ── Interest rule rows ────────────────────────────────────────────────────────
   const emptyInterestRow = (): RdProductInterestRuleDetailDTO => ({
     branchId:             user.branchid,   // ✅ always stamped at creation time
-    applicableDate:       commonservice.getCurrentDate(),
+    applicableDate:       sessionDate,
     postingInterval:      0,
     compoundingInterval:  0,
     interestRateFrom:     0,
@@ -419,13 +421,13 @@ const RDProductMaster = () => {
           </FormField>
 
           <FormField name="effectiveFrom" label="Effective From" required errors={errorsByField.effectiveFrom || []} icon={<Calendar className="w-4 h-4 text-orange-500" />}>
-            <input
-              type="date"
+            <DatePicker
               value={combinedRdData.rdProductDTO?.effectiveFrom || ""}
-              onChange={(e) => commonservice.handleDateChange(e.target.value, (val) => handleProductChange("effectiveFrom", val), "effectiveFrom")}
+              onChange={(val) => handleProductChange("effectiveFrom", val)}
               onBlur={() => handleFieldBlur("effectiveFrom")}
-              max={commonservice.getCurrentDate()}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              max={sessionDate}
+              workingDate={sessionDate}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
             />
           </FormField>
 
@@ -579,12 +581,12 @@ const RDProductMaster = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
 
                   <FormField name={`applicableDate_${index}`} label="Date" required errors={errorsByField[`applicableDate_${index}`] || []}>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={row.applicableDate || ""}
-                      onChange={(e) => commonservice.handleDateChange(e.target.value, (val) => handleInterestRowChange(index, "applicableDate", val), "applicableDate")}
-                      max={commonservice.getCurrentDate()}
-                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
+                      onChange={(val) => handleInterestRowChange(index, "applicableDate", val)}
+                      max={sessionDate}
+                      workingDate={sessionDate}
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none text-sm"
                     />
                   </FormField>
 

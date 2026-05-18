@@ -62,8 +62,8 @@ const AccountsModule: React.FC = () => {
               />
                <AccountOperations
                 accountType="Loan Account(s)"
-                addPath="/accounts/savings/add"
-                modifyPath="/accounts/savings/modify"
+                addPath="/loan-acc-master"
+                modifyPath="/loan-acc-info"
               />
               <AccountOperations
                 accountType="Saving Account(s)"

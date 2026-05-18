@@ -13,6 +13,8 @@ using BankingPlatform.API.Service.ProductMasters.Loan;
 using BankingPlatform.API.Service.ProductMasters.RD;
 using BankingPlatform.API.Service.ProductMasters.Savings;
 using BankingPlatform.API.Service.Slabs.FD;
+using BankingPlatform.API.Service.Vouchers;
+using BankingPlatform.API.Service.Vouchers.Loan;
 using BankingPlatform.API.Service.Vouchers.RD;
 using BankingPlatform.API.Service.Vouchers.Saving;
 using BankingPlatform.API.Services;
@@ -46,12 +48,42 @@ builder.Services.AddScoped<SavingAccountService>();
 builder.Services.AddScoped<BranchMasterService>();
 builder.Services.AddScoped<SavingVoucherService>();
 builder.Services.AddScoped<RDKistVoucherService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Cash.CashPaymentReceiptService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Journal.JournalVoucherService>();
 builder.Services.AddScoped<VoucherMapper>();
 builder.Services.AddScoped<FDAccountService>();
 builder.Services.AddScoped<RDInterestSlabService>();
 builder.Services.AddScoped<LoanSlabService>();
+builder.Services.AddScoped<LoanAccountService>();
 builder.Services.AddScoped<RDProductService>();
 builder.Services.AddScoped<LoanProductService>();
+builder.Services.AddScoped<LoanAdvancementVoucherService>();
+builder.Services.AddScoped<VoucherOperationsService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.DayBookService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.CashBookService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.SavingLedgerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.RDLedgerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanLedgerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.FDLedgerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.ShareMoneyLedgerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.BalanceSheetService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.ProfitLossService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.HeadLedgerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.GeneralLedgerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanNPAService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.TrialBalanceService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.JournalBookService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanAdvancementService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanRecoveryService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.FDMaturityService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanDemandService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.RDKistReceiveService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.MemberIntCertService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanIntCertService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.OdReserveService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.AuditLog.AuditLogService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Loan.LoanRecoveryVoucherService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Loan.LoanInterestPostingService>();
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");
@@ -79,7 +111,7 @@ builder.Services.AddScoped<RDAccountService>();
 
 // Configure CORS with dynamic origins
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "https://localhost:5173", "http://127.0.0.1:5173", "https://app.sicswave.com" };
+    ?? new[] { "https://localhost:5173", "http://127.0.0.1:5173", "https://app.sicswave.com", "https://hindusociety.sicswave.com" };
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("_myAllowSpecificOrigins", policy =>
@@ -156,21 +188,6 @@ builder.Services.AddAuthentication(options =>
             if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
             {
                 context.Token = authHeader.Substring("Bearer ".Length).Trim();
-                try
-                {
-                    var parts = context.Token.Split('.');
-                    if (parts.Length == 3)
-                    {
-                        var headerJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[0].Replace('-', '+').Replace('_', '/').PadRight((parts[0].Length + 3) & ~3, '=')));
-                        var payloadJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[1].Replace('-', '+').Replace('_', '/').PadRight((parts[1].Length + 3) & ~3, '=')));
-                        logger.LogInformation("Token extracted from Authorization header. Length: {Length}, Parts: {PartsCount}, Header: {Header}, Payload: {Payload}",
-                            context.Token.Length, parts.Length, headerJson, payloadJson);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Failed to decode token header/payload from Authorization header.");
-                }
                 return Task.CompletedTask;
             }
 
@@ -182,18 +199,6 @@ builder.Services.AddAuthentication(options =>
                 if (IsValidJwtFormat(cookieToken))
                 {
                     context.Token = cookieToken;
-                    try
-                    {
-                        var parts = cookieToken.Split('.');
-                        var headerJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[0]
-                            .Replace('-', '+').Replace('_', '/').PadRight((parts[0].Length + 3) & ~3, '=')));
-                        var payloadJson = Encoding.UTF8.GetString(Convert.FromBase64String(parts[1]
-                            .Replace('-', '+').Replace('_', '/').PadRight((parts[1].Length + 3) & ~3, '=')));
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Failed to decode token header/payload from AuthToken cookie.");
-                    }
                 }
                 else
                 {
@@ -331,6 +336,7 @@ app.Use(async (context, next) =>
 
         var allowedOrigins = new[] {
             "https://app.sicswave.com",
+            "https://hindusociety.sicswave.com",
             "https://localhost:5173",
             "http://127.0.0.1:5173"
         };
@@ -371,8 +377,7 @@ else
 
 //app.UseHttpsRedirection();
 app.UseRouting();
-//app.UseCors("_myAllowSpecificOrigins");
-//app.UseRateLimiter();
+app.UseRateLimiter();
 app.UseAuthentication();
 
 app.UseAuthorization();

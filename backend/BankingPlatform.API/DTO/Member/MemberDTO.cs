@@ -62,15 +62,14 @@ namespace BankingPlatform.API.DTO.Member
         [Required]
         public DateTime JoiningDate { get; set; }
 
-        // Contact Details (Database Fields)
-        [Required, StringLength(5)]
-        public string PhonePrefix1 { get; set; } = string.Empty;
+        // Contact Details — primary contact is optional when the UI toggle permits
+        [StringLength(5)]
+        public string? PhonePrefix1 { get; set; }
 
-        [Required]
-        public int PhoneType1 { get; set; }
+        public int? PhoneType1 { get; set; }
 
-        [Required, StringLength(20)]
-        public string PhoneNo1 { get; set; } = string.Empty;
+        [StringLength(20)]
+        public string? PhoneNo1 { get; set; }
 
         [StringLength(5)]
         public string? PhonePrefix2 { get; set; }

@@ -34,6 +34,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import AccountHeadApiService from "../../../services/accountHead/accountheadapi";
 import { AccountHead } from "../../accounthead/accounthead/accounthead-master";
+import DatePicker from "../../../components/DatePicker";
 
 const SavingsProductMaster = () => {
   const navigate = useNavigate();
@@ -42,6 +43,7 @@ const SavingsProductMaster = () => {
   const productCoderef = useRef(null);
   const productId = encryptedId ? decryptId(encryptedId) : null;
   const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, clearErrors, markFieldTouched } =
     useFormValidation();
 
@@ -51,18 +53,13 @@ const SavingsProductMaster = () => {
   const [accountHeads, setAccountHeads] = useState<AccountHead[]>([]);
   const isEditMode = !!productId;
 
-  const getCurrentDate = (): string => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
-  };
-
   const formatDatesInDTO = (data: CombinedSavingsDTO): CombinedSavingsDTO => {
     return {
       savingsProductDTO: {
         ...data.savingsProductDTO!,
         effectiveFrom: data.savingsProductDTO?.effectiveFrom
           ? commonservice.splitDate(data.savingsProductDTO.effectiveFrom)
-          : getCurrentDate(),
+          : sessionDate,
         effectiveTill: data.savingsProductDTO?.effectiveTill
           ? commonservice.splitDate(data.savingsProductDTO.effectiveTill)
           : "",
@@ -79,13 +76,13 @@ const SavingsProductMaster = () => {
           ? commonservice.splitDate(
               data.savingsProductInterestRulesDTO.applicableDate
             )
-          : getCurrentDate(),
+          : sessionDate,
         intApplicableDate: data.savingsProductInterestRulesDTO
           ?.intApplicableDate
           ? commonservice.splitDate(
               data.savingsProductInterestRulesDTO.intApplicableDate
             )
-          : getCurrentDate(),
+          : sessionDate,
       },
     };
   };
@@ -115,43 +112,13 @@ const SavingsProductMaster = () => {
     }
   };
 
-  const handleDateChange = (
-    value: string,
-    callback: (value: string) => void,
-    fieldName: string
-  ) => {
-    if (!value) {
-      callback("");
-      return;
-    }
-
-    const selectedDate = new Date(value);
-    const today = new Date();
-
-    today.setHours(0, 0, 0, 0);
-    selectedDate.setHours(0, 0, 0, 0);
-
-    if (selectedDate <= today) {
-      callback(value);
-    } else {
-      Swal.fire({
-        icon: "warning",
-        title: "Invalid Date",
-        text: "Cannot select a future date.",
-        timer: 2000,
-        showConfirmButton: false,
-      });
-      callback(getCurrentDate());
-    }
-  };
-
   const [combinedSavingsData, setCombinedSavingsData] =
     useState<CombinedSavingsDTO>({
       savingsProductDTO: {
         branchId: user.branchid,
         productName: "",
         productCode: "",
-        effectiveFrom: getCurrentDate(),
+        effectiveFrom: sessionDate,
         effectiveTill: "",
         isNomineeMandatoryInAccMasters: false
       },
@@ -169,9 +136,9 @@ const SavingsProductMaster = () => {
       },
       savingsProductInterestRulesDTO: {
         branchId: user.branchid,
-        applicableDate: getCurrentDate(),
+        applicableDate: sessionDate,
         rateAppliedMethod: 0,
-        intApplicableDate: getCurrentDate(),
+        intApplicableDate: sessionDate,
         calculationMethod: 0,
         interestRateMinValue: 0,
         interestRateMaxValue: 0,
@@ -472,7 +439,7 @@ const SavingsProductMaster = () => {
         branchId: user.branchid,
         productName: "",
         productCode: "",
-        effectiveFrom: getCurrentDate(),
+        effectiveFrom: sessionDate,
         effectiveTill: "",
         isNomineeMandatoryInAccMasters: false
       },
@@ -490,9 +457,9 @@ const SavingsProductMaster = () => {
       },
       savingsProductInterestRulesDTO: {
         branchId: user.branchid,
-        applicableDate: getCurrentDate(),
+        applicableDate: sessionDate,
         rateAppliedMethod: 0,
-        intApplicableDate: getCurrentDate(),
+        intApplicableDate: sessionDate,
         calculationMethod: 0,
         interestRateMinValue: 0,
         interestRateMaxValue: 0,
@@ -648,20 +615,13 @@ const SavingsProductMaster = () => {
             errors={errorsByField.effectiveFrom || []}
             icon={<Calendar className="w-4 h-4 text-blue-500" />}
           >
-            <input
-              type="date"
+            <DatePicker
               value={combinedSavingsData.savingsProductDTO?.effectiveFrom || ""}
-              onChange={(e) =>
-                handleDateChange(
-                  e.target.value,
-                  (val) => handleProductChange("effectiveFrom", val),
-                  "effectiveFrom"
-                )
-              }
+              onChange={(val) => handleProductChange("effectiveFrom", val)}
               onBlur={() => handleFieldBlur("effectiveFrom")}
-              max={getCurrentDate()}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-              required
+              max={sessionDate}
+              workingDate={sessionDate}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
             />
           </FormField>
 
@@ -671,18 +631,13 @@ const SavingsProductMaster = () => {
             errors={errorsByField.effectiveTill || []}
             icon={<Calendar className="w-4 h-4 text-orange-500" />}
           >
-            <input
-              type="date"
+            <DatePicker
               value={combinedSavingsData.savingsProductDTO?.effectiveTill || ""}
-              onChange={(e) =>
-                handleDateChange(
-                  e.target.value,
-                  (val) => handleProductChange("effectiveTill", val),
-                  "effectiveTill"
-                )
-              }
+              onChange={(val) => handleProductChange("effectiveTill", val)}
               onBlur={() => handleFieldBlur("effectiveTill")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              max={sessionDate}
+              workingDate={sessionDate}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
             />
           </FormField>
           <FormField
@@ -965,23 +920,13 @@ const SavingsProductMaster = () => {
               required
               errors={errorsByField.applicableDate || []}
             >
-              <input
-                type="date"
-                value={
-                  combinedSavingsData.savingsProductInterestRulesDTO
-                    ?.applicableDate || ""
-                }
-                onChange={(e) =>
-                  handleDateChange(
-                    e.target.value,
-                    (val) => handleInterestRulesChange("applicableDate", val),
-                    "applicableDate"
-                  )
-                }
+              <DatePicker
+                value={combinedSavingsData.savingsProductInterestRulesDTO?.applicableDate || ""}
+                onChange={(val) => handleInterestRulesChange("applicableDate", val)}
                 onBlur={() => handleFieldBlur("applicableDate")}
-                max={getCurrentDate()}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                required
+                max={sessionDate}
+                workingDate={sessionDate}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
               />
             </FormField>
 
@@ -1025,24 +970,13 @@ const SavingsProductMaster = () => {
               required
               errors={errorsByField.intApplicableDate || []}
             >
-              <input
-                type="date"
-                value={
-                  combinedSavingsData.savingsProductInterestRulesDTO
-                    ?.intApplicableDate || ""
-                }
-                onChange={(e) =>
-                  handleDateChange(
-                    e.target.value,
-                    (val) =>
-                      handleInterestRulesChange("intApplicableDate", val),
-                    "intApplicableDate"
-                  )
-                }
+              <DatePicker
+                value={combinedSavingsData.savingsProductInterestRulesDTO?.intApplicableDate || ""}
+                onChange={(val) => handleInterestRulesChange("intApplicableDate", val)}
                 onBlur={() => handleFieldBlur("intApplicableDate")}
-                max={getCurrentDate()}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                required
+                max={sessionDate}
+                workingDate={sessionDate}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
               />
             </FormField>
 
