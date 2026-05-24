@@ -475,8 +475,10 @@ export const useFormValidation = () => {
 
   // Validate images
   const validateImages = useCallback(
-    (picturePreview: string, pictureFile: any, signaturePreview: string, signatureFile: any): ValidationError[] => {
+    (picturePreview: string, pictureFile: any, signaturePreview: string, signatureFile: any, requirePicSign: boolean = true): ValidationError[] => {
       const errors: ValidationError[] = [];
+
+      if (!requirePicSign) return errors;
 
       if (!picturePreview && !pictureFile) {
         errors.push({
@@ -516,7 +518,8 @@ export const useFormValidation = () => {
       picturePreview: string,
       pictureFile: any,
       signaturePreview: string,
-      signatureFile: any
+      signatureFile: any,
+      requirePicSign: boolean = true
     ): ValidationResult => {
       const allErrors: ValidationError[] = [];
 
@@ -561,7 +564,8 @@ export const useFormValidation = () => {
         picturePreview,
         pictureFile,
         signaturePreview,
-        signatureFile
+        signatureFile,
+        requirePicSign
       );
       allErrors.push(...imageErrors);
 

@@ -30,6 +30,11 @@ export interface ShareMoneyLedger {
   totalDr: number;
   totalCr: number;
   closingBalance: number;
+  relativeName?: string;
+  contactNo?: string;
+  address?: string;
+  accOpeningDate?: string;
+  membershipNo?: string;
 }
 
 class ShareMoneyLedgerApiService extends ApiService {

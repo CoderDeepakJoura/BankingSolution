@@ -112,7 +112,7 @@ const runSeleniumScript = async () => {
     <DashboardLayout
       mainContent={
         <div className="-mt-3 bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="w-full space-y-6">
             {/* Header Section */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -142,7 +142,7 @@ const runSeleniumScript = async () => {
             {/* Main Content Section */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="p-8 sm:p-12">
-                <div className="max-w-2xl mx-auto text-center space-y-8">
+                <div className="w-full text-center space-y-8">
                   {/* Icon */}
                   <div className="flex justify-center">
                     <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">

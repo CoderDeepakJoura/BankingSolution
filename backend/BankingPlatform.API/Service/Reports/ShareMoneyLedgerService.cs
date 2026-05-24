@@ -36,6 +36,12 @@ namespace BankingPlatform.API.Service.Reports
         public decimal TotalDr { get; set; }
         public decimal TotalCr { get; set; }
         public decimal ClosingBalance { get; set; }
+        // Account detail fields
+        public string? RelativeName { get; set; }
+        public string? ContactNo { get; set; }
+        public string? Address { get; set; }
+        public DateTime? AccOpeningDate { get; set; }
+        public string? MembershipNo { get; set; }
     }
 
     public class ShareMoneyLedgerService
@@ -83,6 +89,15 @@ namespace BankingPlatform.API.Service.Reports
 
             string accountIdentifier = account.AccountNumber ?? accountId.ToString();
 
+            string membershipNo = "";
+            if (account.MemberId.HasValue && account.MemberBranchID.HasValue)
+            {
+                membershipNo = await _context.member.AsNoTracking()
+                    .Where(x => x.Id == account.MemberId && x.BranchId == account.MemberBranchID)
+                    .Select(x => x.PermanentMembershipNo ?? x.NominalMembershipNo ?? "")
+                    .FirstOrDefaultAsync() ?? "";
+            }
+
             decimal openingBalance = await CalculateOpeningBalanceAsync(branchId, accountId, fromDate.Date);
 
             DateTime toExclusive = toDate.Date.AddDays(1);
@@ -98,7 +113,12 @@ namespace BankingPlatform.API.Service.Reports
                 SessionFromDate = session?.fromdate ?? fromDate,
                 SessionToDate = session?.todate ?? toDate,
                 OpeningBalance = openingBalance,
-                ClosingBalance = openingBalance
+                ClosingBalance = openingBalance,
+                RelativeName   = account.RelativeName,
+                ContactNo      = account.PhoneNo1,
+                Address        = account.AddressLine,
+                AccOpeningDate = account.AccOpeningDate,
+                MembershipNo   = membershipNo,
             };
 
             var voucherData = await _context.voucher.AsNoTracking()
@@ -195,7 +215,12 @@ namespace BankingPlatform.API.Service.Reports
                 Entries = entries,
                 TotalDr = totalDr,
                 TotalCr = totalCr,
-                ClosingBalance = runningBalance
+                ClosingBalance = runningBalance,
+                RelativeName   = account.RelativeName,
+                ContactNo      = account.PhoneNo1,
+                Address        = account.AddressLine,
+                AccOpeningDate = account.AccOpeningDate,
+                MembershipNo   = membershipNo,
             });
         }
 

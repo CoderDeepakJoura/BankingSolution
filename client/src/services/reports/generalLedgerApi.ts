@@ -40,10 +40,12 @@ class GeneralLedgerApiService extends ApiService {
     branchId: number,
     accountId: number,
     fromDate: string,
-    toDate: string
+    toDate: string,
+    consolidate = false,
+    nonZero = false
   ): Promise<ApiResponse<GeneralLedger>> {
     return this.makeRequest(
-      `/GeneralLedger?branchId=${branchId}&accountId=${accountId}&fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}`
+      `/GeneralLedger?branchId=${branchId}&accountId=${accountId}&fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}&consolidate=${consolidate}&nonZero=${nonZero}`
     );
   }
 }

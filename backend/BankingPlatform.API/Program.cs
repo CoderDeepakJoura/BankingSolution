@@ -11,6 +11,7 @@ using BankingPlatform.API.Service.InterestSlabs.Saving;
 using BankingPlatform.API.Service.ProductMasters.FD;
 using BankingPlatform.API.Service.ProductMasters.Loan;
 using BankingPlatform.API.Service.ProductMasters.RD;
+using BankingPlatform.API.Service.NPA;
 using BankingPlatform.API.Service.ProductMasters.Savings;
 using BankingPlatform.API.Service.Slabs.FD;
 using BankingPlatform.API.Service.Vouchers;
@@ -84,6 +85,21 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Reports.OdReserveService>
 builder.Services.AddScoped<BankingPlatform.API.Service.AuditLog.AuditLogService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Loan.LoanRecoveryVoucherService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Loan.LoanInterestPostingService>();
+builder.Services.AddScoped<NPAPlanMasterService>();
+builder.Services.AddScoped<NPAPlanCategoryService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Loan.ExpenseCategoryService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.GST.TaxTypeService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.GST.TaxGroupService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.GST.TaxService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.GST.BillBookService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.GST.GSTSettingService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Services.ServiceMasterService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Services.AccServiceDetailService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.NpaLedgerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.MemberReportService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.MemberAccountsService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.FDOpeningService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.RDMaturityService>();
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");

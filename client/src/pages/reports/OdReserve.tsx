@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
+import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux";
 import Swal from "sweetalert2";
@@ -101,6 +102,7 @@ td{border:1px solid #e2e8f0;padding:2px 4px;font-size:9.5px;}
 
 const OdReservePage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
+  const navigate = useNavigate();
   const workingDate = user.workingdate
     ? isoDate(commonservice.splitDate(user.workingdate))
     : isoDate(new Date().toISOString());
@@ -173,7 +175,7 @@ const OdReservePage: React.FC = () => {
   return (
     <DashboardLayout enableScroll mainContent={
       <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto space-y-5">
+        <div className="w-full space-y-5">
 
           {/* Filter Panel */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -255,6 +257,10 @@ const OdReservePage: React.FC = () => {
                   <FileSpreadsheet size={15} /> Excel
                 </button>
               </>}
+              <button onClick={() => navigate("/dashboard")}
+                className="px-4 py-2 text-slate-600 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-100 transition">
+                Close
+              </button>
             </div>
           </div>
 

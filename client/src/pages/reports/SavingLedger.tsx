@@ -119,6 +119,17 @@ const buildExportConfig = (data: SavingLedger, longNar: boolean): ExportConfig =
     { header: "Balance",     widthRatio: 0.12, align: "right"  as const },
   ];
   const rows: ExportRow[] = [];
+  const info1 = [
+    `Name: ${data.accountName}`,
+    `Acc No: ${data.accountIdentifier}`,
+    data.membershipNo && `Membership No: ${data.membershipNo}`,
+    data.relativeName && `Relative: ${data.relativeName}`,
+    data.contactNo && `Contact: ${data.contactNo}`,
+    data.address && `Address: ${data.address}`,
+    data.accOpeningDate && `Opening Date: ${fmtShort(data.accOpeningDate)}`,
+    data.occupation && `Occupation: ${data.occupation}`,
+  ].filter(Boolean).join("  |  ");
+  if (info1) rows.push({ style: "info", spanFirst: 7, cells: [info1] });
   rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", fmtBal(data.openingBalance)] });
   data.entries.forEach((e, i) => {
     const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
@@ -170,8 +181,15 @@ const buildPrintHTML = (data: SavingLedger, longNar: boolean): string => {
     <h1>${data.branchName}</h1><p>${data.branchAddress}</p><h2>Saving Account Ledger</h2>
   </div>
   <div class="acc-info">
+    <span><span class="lbl">Name:</span><strong>${data.accountName}</strong></span>
+    <span><span class="lbl">Acc No:</span><strong>${data.accountIdentifier}</strong></span>
     <span><span class="lbl">Product:</span><strong>${data.productName}</strong></span>
-    <span><span class="lbl">Account:</span><strong>${data.accountIdentifier} — ${data.accountName}</strong></span>
+    ${data.membershipNo ? `<span><span class="lbl">Membership No:</span><strong>${data.membershipNo}</strong></span>` : ""}
+    ${data.relativeName ? `<span><span class="lbl">Relative:</span><strong>${data.relativeName}</strong></span>` : ""}
+    ${data.contactNo ? `<span><span class="lbl">Contact:</span><strong>${data.contactNo}</strong></span>` : ""}
+    ${data.address ? `<span><span class="lbl">Address:</span><strong>${data.address}</strong></span>` : ""}
+    ${data.accOpeningDate ? `<span><span class="lbl">Opening Date:</span><strong>${fmtShort(data.accOpeningDate)}</strong></span>` : ""}
+    ${data.occupation ? `<span><span class="lbl">Occupation:</span><strong>${data.occupation}</strong></span>` : ""}
     <span><span class="lbl">Period:</span><strong>${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}</strong></span>
   </div>
   <table><thead><tr>
@@ -271,7 +289,7 @@ const SavingLedgerPage: React.FC = () => {
       enableScroll
       mainContent={
         <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-5">
+          <div className="w-full space-y-5">
 
             {/* ── Filter Card ── */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -384,18 +402,27 @@ const SavingLedgerPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Account meta chips */}
-                <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap gap-2 items-center">
-                  {[
-                    { label: "Product", value: data.productName },
-                    { label: "Account", value: `${data.accountIdentifier} — ${data.accountName}` },
-                    { label: "Period", value: `${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}` },
-                  ].map(({ label, value }) => (
-                    <span key={label} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                      <span className="text-slate-400 font-medium">{label}:</span>
-                      <span className="font-semibold text-slate-800">{value}</span>
-                    </span>
-                  ))}
+                {/* Account info panel */}
+                <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                    {[
+                      { label: "Name",           value: data.accountName },
+                      { label: "Acc. No.",        value: data.accountIdentifier },
+                      { label: "Product",         value: data.productName },
+                      { label: "Membership No.",  value: data.membershipNo },
+                      { label: "Relative Name",   value: data.relativeName },
+                      { label: "Contact No.",     value: data.contactNo },
+                      { label: "Address",         value: data.address },
+                      { label: "Opening Date",    value: data.accOpeningDate ? fmtShort(data.accOpeningDate) : undefined },
+                      { label: "Occupation",      value: data.occupation },
+                      { label: "Period",          value: `${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}` },
+                    ].filter(f => f.value).map(({ label, value }) => (
+                      <div key={label} className="flex gap-1 min-w-0">
+                        <span className="text-slate-400 font-medium shrink-0">{label}:</span>
+                        <span className="font-semibold text-slate-800 truncate">{value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="p-4 sm:p-5">

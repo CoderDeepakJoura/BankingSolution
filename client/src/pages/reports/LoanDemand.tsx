@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { RootState } from "../../redux";
 import Swal from "sweetalert2";
 import { ClipboardList, Search, Printer, FileText, FileSpreadsheet } from "lucide-react";
@@ -91,6 +92,7 @@ td{border:1px solid #e2e8f0;padding:2px 4px;font-size:9.5px;}.total-row td{backg
 
 const LoanDemandPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
+  const navigate = useNavigate();
   const workingDate = user.workingdate ? toInput(commonservice.splitDate(user.workingdate)) : toInput(new Date().toISOString());
   const [fromDate, setFromDate]   = useState(workingDate);
   const [toDate, setToDate]       = useState(workingDate);
@@ -134,7 +136,7 @@ const LoanDemandPage: React.FC = () => {
   return (
     <DashboardLayout enableScroll mainContent={
       <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto space-y-5">
+        <div className="w-full space-y-5">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200">
               <div className="w-9 h-9 bg-violet-600 rounded-lg flex items-center justify-center"><ClipboardList className="w-5 h-5 text-white" /></div>
@@ -163,6 +165,9 @@ const LoanDemandPage: React.FC = () => {
                 <button onClick={() => exportToPdf(buildExportConfig(report, pendingOnly))} className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition shadow-sm"><FileText size={15} /> PDF</button>
                 <button onClick={() => exportToExcel(buildExportConfig(report, pendingOnly))} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-sm"><FileSpreadsheet size={15} /> Excel</button>
               </>}
+              <button onClick={() => navigate("/dashboard")} className="px-4 py-2 text-slate-600 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-100 transition">
+                Close
+              </button>
             </div>
           </div>
 

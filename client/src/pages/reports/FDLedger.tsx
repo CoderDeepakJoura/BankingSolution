@@ -128,6 +128,24 @@ const buildExportConfig = (data: FDLedger, longNar: boolean): ExportConfig => {
     { header: "Balance",     widthRatio: 0.12, align: "right"  as const },
   ];
   const rows: ExportRow[] = [];
+  const info1 = [
+    `Name: ${data.accountName}`,
+    `Acc No: ${data.accountIdentifier}`,
+    data.relativeName && `Relative: ${data.relativeName}`,
+    data.contactNo && `Contact: ${data.contactNo}`,
+    data.address && `Address: ${data.address}`,
+  ].filter(Boolean).join("  |  ");
+  const info2 = [
+    data.detailLtdNo != null && `Receipt No: ${data.detailLtdNo}`,
+    data.detailFDDate && `FD Date: ${fmtShort(data.detailFDDate)}`,
+    data.detailFDAmount != null && `FD Amt: ${fmt(data.detailFDAmount)}`,
+    data.detailIntRate != null && `Int Rate: ${data.detailIntRate}%`,
+    (data.detailPeriodMonths != null || data.detailPeriodDays != null) && `FD Period: ${data.detailPeriodMonths ?? 0}M/${data.detailPeriodDays ?? 0}D`,
+    data.detailMaturityDate && `Maturity: ${fmtShort(data.detailMaturityDate)}`,
+    data.detailMaturityAmount != null && `Mat Amt: ${fmt(data.detailMaturityAmount)}`,
+  ].filter(Boolean).join("  |  ");
+  if (info1) rows.push({ style: "info", spanFirst: 7, cells: [info1] });
+  if (info2) rows.push({ style: "info", spanFirst: 7, cells: [info2] });
   rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", fmtBal(data.openingBalance)] });
   data.entries.forEach((e, i) => {
     const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
@@ -182,9 +200,17 @@ const buildPrintHTML = (data: FDLedger, longNar: boolean): string => {
     <h1>${data.branchName}</h1><p>${data.branchAddress}</p><h2>Fixed Deposit Account Ledger</h2>
   </div>
   <div class="acc-info">
+    <span><span class="lbl">Name:</span> <strong>${data.accountName}</strong></span>
+    <span><span class="lbl">Acc No:</span> <strong>${data.accountIdentifier}</strong></span>
     <span><span class="lbl">Product:</span> <strong>${data.productName}</strong></span>
-    <span><span class="lbl">Account:</span> <strong>${data.accountIdentifier} — ${data.accountName}</strong></span>
+    ${data.relativeName ? `<span><span class="lbl">Relative:</span> <strong>${data.relativeName}</strong></span>` : ""}
+    ${data.contactNo ? `<span><span class="lbl">Contact:</span> <strong>${data.contactNo}</strong></span>` : ""}
+    ${data.address ? `<span><span class="lbl">Address:</span> <strong>${data.address}</strong></span>` : ""}
     ${detailInfo}
+    ${data.detailLtdNo != null ? `<span><span class="lbl">Receipt No:</span> <strong>${data.detailLtdNo}</strong></span>` : ""}
+    ${data.detailIntRate != null ? `<span><span class="lbl">Int Rate:</span> <strong>${data.detailIntRate}%</strong></span>` : ""}
+    ${(data.detailPeriodMonths != null || data.detailPeriodDays != null) ? `<span><span class="lbl">FD Period:</span> <strong>${data.detailPeriodMonths ?? 0}M / ${data.detailPeriodDays ?? 0}D</strong></span>` : ""}
+    ${data.detailMaturityAmount != null ? `<span><span class="lbl">Mat Amt:</span> <strong>&#8377;${fmt(data.detailMaturityAmount)}</strong></span>` : ""}
     <span><span class="lbl">Period:</span> <strong>${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}</strong></span>
   </div>
   <table><thead><tr>
@@ -309,7 +335,7 @@ const FDLedgerPage: React.FC = () => {
       enableScroll
       mainContent={
         <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-5">
+          <div className="w-full space-y-5">
 
             {/* ── Filter Card ── */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -460,39 +486,41 @@ const FDLedgerPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap gap-2 items-center">
-                  <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                    <span className="text-slate-400 font-medium">Product:</span>
-                    <span className="font-semibold text-slate-800">{data.productName}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                    <span className="text-slate-400 font-medium">Account:</span>
-                    <span className="font-semibold text-slate-800">{data.accountIdentifier} — {data.accountName}</span>
-                  </span>
-                  {data.selectedDetailLabel ? (
-                    <>
-                      <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                        <span className="text-slate-400 font-medium">Detail:</span>
-                        <span className="font-semibold text-slate-800">{data.selectedDetailLabel}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                        <span className="text-slate-400 font-medium">FD Period:</span>
-                        <span className="font-semibold text-slate-800">{fmtDate(data.detailFDDate!)} → {fmtDate(data.detailMaturityDate!)}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                        <span className="text-slate-400 font-medium">Amount:</span>
-                        <span className="font-semibold text-slate-800">₹{fmt(data.detailFDAmount!)}</span>
-                      </span>
-                    </>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                      <span className="text-slate-500 font-medium">All FD Details</span>
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                    <span className="text-slate-400 font-medium">Period:</span>
-                    <span className="font-semibold text-slate-800">{fmtDate(data.fromDate)} to {fmtDate(data.toDate)}</span>
-                  </span>
+                {/* Account info panel */}
+                <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                    {[
+                      { label: "Name",           value: data.accountName },
+                      { label: "Acc. No.",        value: data.accountIdentifier },
+                      { label: "Address",         value: data.address },
+                      { label: "Relative Name",   value: data.relativeName },
+                      { label: "Contact No.",     value: data.contactNo },
+                      { label: "Product",         value: data.productName },
+                      { label: "Period",          value: `${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}` },
+                    ].filter(f => f.value).map(({ label, value }) => (
+                      <div key={label} className="flex gap-1 min-w-0">
+                        <span className="text-slate-400 font-medium shrink-0">{label}:</span>
+                        <span className="font-semibold text-slate-800 truncate">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                    {[
+                      { label: "Receipt No.",     value: data.detailLtdNo != null ? String(data.detailLtdNo) : null },
+                      { label: "FD Date",         value: data.detailFDDate ? fmtShort(data.detailFDDate) : null },
+                      { label: "FD Amount",       value: data.detailFDAmount != null ? `₹${fmt(data.detailFDAmount)}` : null },
+                      { label: "Int. Rate",       value: data.detailIntRate != null ? `${data.detailIntRate}%` : null },
+                      { label: "Period",          value: data.detailPeriodMonths != null ? `${data.detailPeriodMonths} M / ${data.detailPeriodDays ?? 0} D` : null },
+                      { label: "Maturity Date",   value: data.detailMaturityDate ? fmtShort(data.detailMaturityDate) : null },
+                      { label: "Maturity Amt.",   value: data.detailMaturityAmount != null ? `₹${fmt(data.detailMaturityAmount)}` : null },
+                      { label: "Detail",          value: data.selectedDetailLabel ?? "All FD Details" },
+                    ].filter(f => f.value).map(({ label, value }) => (
+                      <div key={label} className="flex gap-1 min-w-0">
+                        <span className="text-slate-400 font-medium shrink-0">{label}:</span>
+                        <span className="font-semibold text-slate-800">{value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="p-4 sm:p-5">

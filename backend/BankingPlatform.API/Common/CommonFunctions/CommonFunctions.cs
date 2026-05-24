@@ -593,10 +593,18 @@ namespace BankingPlatform.API.Common.CommonFunctions
 
         // Returns true if the account may be edited in the current session.
         // Rule: an account can only be modified in the session whose date range contains
-        // the account's opening date — UNLESS that session is the first session (isfirst=true),
-        // in which case the account is always editable.
+        // the account's opening date — UNLESS the current session is the first session
+        // (isfirst=true), in which case all accounts are always editable.
         public async Task<bool> CanModifyAccountInCurrentSession(int branchId, DateTime accOpeningDate)
         {
+            var principal = _httpContextAccessor.HttpContext?.User;
+
+            // If the logged-in session is the first session, always allow modification
+            if (principal != null &&
+                bool.TryParse(principal.FindFirst("isFirstSession")?.Value, out var isFirst) &&
+                isFirst)
+                return true;
+
             var (sessionFrom, sessionTo) = GetCurrentSessionDates();
 
             // No session in token — fall back to DB lookup
@@ -605,6 +613,7 @@ namespace BankingPlatform.API.Common.CommonFunctions
                 var currentSession = await _appcontext.branchsession.AsNoTracking()
                     .FirstOrDefaultAsync(x => x.branchid == branchId && x.iscurrent);
                 if (currentSession == null) return true;
+                if (currentSession.isfirst) return true;
                 sessionFrom = currentSession.fromdate;
                 sessionTo   = currentSession.todate;
             }

@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
+import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux";
 import Swal from "sweetalert2";
-import { FileText, Printer, Search } from "lucide-react";
+import { FileText, FileSpreadsheet, Printer, Search } from "lucide-react";
 import memberIntCertApi, { MemberIntCert, MemberSearchResult } from "../../services/reports/memberIntCertApi";
 import commonservice from "../../services/common/commonservice";
+import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isoDate = (iso: string) => iso.split("T")[0];
@@ -110,8 +112,64 @@ td{border:1px solid #cbd5e1;padding:4px 8px;}
 </body></html>`;
 };
 
+const buildExportConfig = (c: MemberIntCert): ExportConfig => {
+  const address = [
+    c.addressLine1,
+    c.addressLine2,
+    c.villageName,
+    c.pincode ? `PIN: ${c.pincode}` : "",
+  ].filter(Boolean).join(", ");
+
+  const rows: ExportRow[] = [
+    {
+      style: "info",
+      cells: [
+        `Member: ${c.memberName}`,
+        `Relative: ${c.relativeName}${c.relationName ? ` (${c.relationName})` : ""}`,
+        `Membership No: ${c.membershipNo}`,
+        `Cust. Id: ${c.memberId}`,
+        `Financial Year: ${c.financialYear}`,
+        `Period: ${fmtShort(c.fromDate)} to ${fmtShort(c.toDate)}`,
+        `Address: ${address || "-"}`,
+      ],
+    },
+    ...c.rows.map((row, idx) => ({
+      cells: [
+        String(idx + 1),
+        row.accountNo,
+        row.accountType,
+        fmt(row.interestAmount),
+        row.tdsAmount > 0 ? fmt(row.tdsAmount) : "",
+      ],
+    })),
+    {
+      style: "total",
+      cells: ["Total", "", "", fmt(c.totalInterest), c.totalTDS > 0 ? fmt(c.totalTDS) : ""],
+    },
+  ];
+
+  return {
+    meta: {
+      title: c.branchName,
+      subtitle: c.branchAddress,
+      reportTitle: "Member Interest Cum TDS Certificate",
+      fileName: `member-interest-certificate-${c.memberId}-${isoDate(c.fromDate)}-to-${isoDate(c.toDate)}`,
+      landscape: true,
+    },
+    columns: [
+      { header: "Sr. No.", widthRatio: 0.08, align: "center" },
+      { header: "Account No.", widthRatio: 0.2, align: "center" },
+      { header: "Type", widthRatio: 0.2, align: "center" },
+      { header: "Interest Credited", widthRatio: 0.26, align: "right" },
+      { header: "TDS Deducted", widthRatio: 0.26, align: "right" },
+    ],
+    rows,
+  };
+};
+
 const MemberIntCertPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
+  const navigate = useNavigate();
   const workingDate = user.workingdate ? toInput(commonservice.splitDate(user.workingdate)) : toInput(new Date().toISOString());
 
   const [members, setMembers]           = useState<MemberSearchResult[]>([]);
@@ -161,7 +219,7 @@ const MemberIntCertPage: React.FC = () => {
   return (
     <DashboardLayout enableScroll mainContent={
       <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-        <div className="max-w-4xl mx-auto space-y-5">
+        <div className="w-full space-y-5">
 
           {/* Filter card */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -214,11 +272,25 @@ const MemberIntCertPage: React.FC = () => {
               </button>
 
               {cert && (
-                <button onClick={handlePrint}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm">
-                  <Printer size={15} /> Print
-                </button>
+                <>
+                  <button onClick={handlePrint}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                    <Printer size={15} /> Print
+                  </button>
+                  <button onClick={() => exportToPdf(buildExportConfig(cert))}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                    <FileText size={15} /> PDF
+                  </button>
+                  <button onClick={() => exportToExcel(buildExportConfig(cert))}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                    <FileSpreadsheet size={15} /> Excel
+                  </button>
+                </>
               )}
+              <button onClick={() => navigate("/dashboard")}
+                className="px-4 py-2 text-slate-600 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-100 transition">
+                Close
+              </button>
             </div>
           </div>
 

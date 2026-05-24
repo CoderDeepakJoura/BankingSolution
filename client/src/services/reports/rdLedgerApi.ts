@@ -37,6 +37,17 @@ export interface RDLedger {
   totalDr: number;
   totalCr: number;
   closingBalance: number;
+  relativeName?: string;
+  contactNo?: string;
+  address?: string;
+  kistAmount?: number;
+  rdDate?: string;
+  firstKistDate?: string;
+  kistInterval?: number;
+  periodMonths?: number;
+  interestRate?: number;
+  maturityDate?: string;
+  maturityAmount?: number;
 }
 
 class RDLedgerApiService extends ApiService {

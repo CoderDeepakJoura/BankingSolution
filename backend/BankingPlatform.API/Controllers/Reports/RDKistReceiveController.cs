@@ -25,9 +25,10 @@ namespace BankingPlatform.API.Controllers.Reports
             [FromQuery] int branchId,
             [FromQuery] DateTime fromDate,
             [FromQuery] DateTime toDate,
-            [FromQuery] int productId = 0)
+            [FromQuery] int productId = 0,
+            [FromQuery] bool showDatewise = false)
         {
-            var (success, message, data) = await _service.GetRDKistReceiveAsync(branchId, fromDate, toDate, productId);
+            var (success, message, data) = await _service.GetRDKistReceiveAsync(branchId, fromDate, toDate, productId, showDatewise);
             if (!success) return BadRequest(new { success, message });
             return Ok(new { success, message, data });
         }

@@ -238,7 +238,41 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Product Interest Slabs", path: "/slab-operations" },
             { label: "Product Slabs", path: "/fd-slab-operations" },
             { label: "Settings Master", path: "/settings" },
-            { label: "Data Automation", path: "/automate-data", suOnly: true },
+            // { label: "Data Automation", path: "/automate-data", suOnly: true },
+            {
+              label: "NPA",
+              path: "",
+              subItems: [
+                { label: "NPA Plan Master", path: "/npaplanmaster-operations" },
+                { label: "NPA Plan Category", path: "/npaplancategory-operations" },
+              ],
+            },
+            {
+              label: "Loan Masters",
+              path: "",
+              subItems: [
+                { label: "Loan Expense Category", path: "/expense-category-operations" },
+              ],
+            },
+          ],
+        },
+        {
+          label: "GST Masters",
+          path: "",
+          subItems: [
+            { label: "Tax Type", path: "/taxtype-operations" },
+            { label: "Tax Group", path: "/taxgroup-operations" },
+            { label: "Tax", path: "/tax-operations" },
+            { label: "Bill Book", path: "/billbook-operations" },
+            { label: "GST Settings", path: "/gst-settings" },
+          ],
+        },
+        {
+          label: "Service Masters",
+          path: "",
+          subItems: [
+            { label: "Service", path: "/service-operations" },
+            { label: "Update Account Service", path: "/acc-service" },
           ],
         },
         {
@@ -269,10 +303,18 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: "Daily Reports",
           path: "",
           subItems: [
-            { label: "Day Book",      path: "/day-book"      },
-            { label: "Cash Book",     path: "/cash-book"     },
+            { label: "Day Book",  path: "/day-book"  },
+            { label: "Cash Book", path: "/cash-book" },
+          ],
+        },
+        {
+          label: "Financial Reports",
+          path: "",
+          subItems: [
             { label: "Profit & Loss", path: "/profit-loss"   },
             { label: "Balance Sheet", path: "/balance-sheet" },
+            { label: "Trial Balance", path: "/trial-balance" },
+            { label: "Journal Book",  path: "/journal-book"  },
           ],
         },
         {
@@ -284,47 +326,19 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Loan Ledger",        path: "/loan-ledger"        },
             { label: "FD Ledger",          path: "/fd-ledger"          },
             { label: "Share Money Ledger", path: "/share-money-ledger" },
-            { label: "Head Ledger",        path: "/head-ledger"        },
             { label: "General Ledger",     path: "/general-ledger"     },
-          ],
-        },
-        {
-          label: "Financial Reports",
-          path: "",
-          subItems: [
-            { label: "Trial Balance",  path: "/trial-balance" },
-            { label: "Journal Book",   path: "/journal-book"  },
           ],
         },
         {
           label: "Loan Reports",
           path: "",
           subItems: [
-            { label: "Loan NPA Report",        path: "/loan-npa-report"         },
-            { label: "Loan Advancement Report", path: "/loan-advancement-report" },
-            { label: "Loan Recovery Report",    path: "/loan-recovery-report"    },
-            { label: "Loan Demand (Kist)",      path: "/loan-demand-report"      },
-          ],
-        },
-        {
-          label: "RD Reports",
-          path: "",
-          subItems: [
-            { label: "RD Kist Receive", path: "/rd-kist-receive-report" },
-          ],
-        },
-        {
-          label: "FD Reports",
-          path: "",
-          subItems: [
-            { label: "FD Maturity Report", path: "/fd-maturity-report" },
-          ],
-        },
-        {
-          label: "Member Reports",
-          path: "",
-          subItems: [
-            { label: "Interest Certificate", path: "/member-int-cert" },
+            { label: "Loan NPA Report",         path: "/loan-npa-report"         },
+            { label: "NPA Ledger",              path: "/npa-ledger"              },
+            { label: "Loan Advancement Report",  path: "/loan-advancement-report" },
+            { label: "Loan Recovery Report",     path: "/loan-recovery-report"    },
+            { label: "Loan Demand (Kist)",       path: "/loan-demand-report"      },
+            { label: "OD Reserve",               path: "/od-reserve"              },
           ],
         },
         {
@@ -335,10 +349,28 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           ],
         },
         {
-          label: "Loan Reports",
+          label: "RD Reports",
           path: "",
           subItems: [
-            { label: "OD Reserve", path: "/od-reserve" },
+            { label: "RD Kist Receive",   path: "/rd-kist-receive-report" },
+            { label: "RD Maturity Report", path: "/rd-maturity-report" },
+          ],
+        },
+        {
+          label: "FD Reports",
+          path: "",
+          subItems: [
+            { label: "FD Maturity Report", path: "/fd-maturity-report" },
+            { label: "FD Opening Report",  path: "/fd-opening-report" },
+          ],
+        },
+        {
+          label: "Member Reports",
+          path: "",
+          subItems: [
+            { label: "Member Report", path: "/member-report" },
+            { label: "Accounts Detail", path: "/member-accounts" },
+            { label: "Interest Certificate", path: "/member-int-cert" },
           ],
         },
       ],

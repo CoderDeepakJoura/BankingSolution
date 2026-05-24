@@ -127,7 +127,6 @@ import FDLedgerPage from "./pages/reports/FDLedger";
 import ShareMoneyLedgerPage from "./pages/reports/ShareMoneyLedger";
 import BalanceSheetPage from "./pages/reports/BalanceSheet";
 import ProfitLossPage from "./pages/reports/ProfitLoss";
-import HeadLedgerPage from "./pages/reports/HeadLedger";
 import GeneralLedgerPage from "./pages/reports/GeneralLedger";
 import LoanNPAPage from "./pages/reports/LoanNPA";
 import TrialBalancePage from "./pages/reports/TrialBalance";
@@ -135,12 +134,43 @@ import JournalBookPage from "./pages/reports/JournalBook";
 import LoanAdvancementReportPage from "./pages/reports/LoanAdvancement";
 import LoanRecoveryReportPage from "./pages/reports/LoanRecovery";
 import FDMaturityPage from "./pages/reports/FDMaturity";
+import FDOpeningPage from "./pages/reports/FDOpening";
+import RDMaturityPage from "./pages/reports/RDMaturity";
 import LoanDemandPage from "./pages/reports/LoanDemand";
 import RDKistReceivePage from "./pages/reports/RDKistReceive";
 import MemberIntCertPage from "./pages/reports/MemberIntCert";
 import LoanIntCertPage from "./pages/reports/LoanIntCert";
 import OdReservePage from "./pages/reports/OdReserve";
 import ChangeSessionPage from "./pages/Miscalleneous/ChangeSession";
+import NPAPlanMasterPage from "./pages/npa/npaplanmaster/npaplanmaster-master";
+import NPAPlanMasterOperations from "./pages/npa/npaplanmaster/npaplanmaster-operations";
+import NPAPlanMasterCRUD from "./pages/npa/npaplanmaster/npaplanmaster-data";
+import NPAPlanCategoryPage from "./pages/npa/npaplancategory/npaplancategory-master";
+import NPAPlanCategoryOperations from "./pages/npa/npaplancategory/npaplancategory-operations";
+import NPAPlanCategoryCRUD from "./pages/npa/npaplancategory/npaplancategory-data";
+import NpaLedgerPage from "./pages/reports/NpaLedger";
+import MemberReportPage from "./pages/reports/MemberReport";
+import MemberAccountsPage from "./pages/reports/MemberAccounts";
+import ExpenseCategoryMaster from "./pages/loan/expensecategory/expensecategory-master";
+import ExpenseCategoryOperations from "./pages/loan/expensecategory/expensecategory-operations";
+import ExpenseCategoryData from "./pages/loan/expensecategory/expensecategory-data";
+import TaxTypeMaster from "./pages/gst/taxtype/taxtype-master";
+import TaxTypeOperations from "./pages/gst/taxtype/taxtype-operations";
+import TaxTypeData from "./pages/gst/taxtype/taxtype-data";
+import TaxGroupMaster from "./pages/gst/taxgroup/taxgroup-master";
+import TaxGroupOperations from "./pages/gst/taxgroup/taxgroup-operations";
+import TaxGroupData from "./pages/gst/taxgroup/taxgroup-data";
+import TaxMaster from "./pages/gst/tax/tax-master";
+import TaxOperations from "./pages/gst/tax/tax-operations";
+import TaxData from "./pages/gst/tax/tax-data";
+import BillBookMaster from "./pages/gst/billbook/billbook-master";
+import BillBookOperations from "./pages/gst/billbook/billbook-operations";
+import BillBookData from "./pages/gst/billbook/billbook-data";
+import GSTSettings from "./pages/gst/gstsetting/gstsetting";
+import ServiceMaster from "./pages/services/service/service-master";
+import ServiceOperations from "./pages/services/service/service-operations";
+import ServiceData from "./pages/services/service/service-data";
+import AccService from "./pages/services/accservice/accservice";
 
 export default function App() {
   const user = useSelector((state: RootState) => state.user);
@@ -362,7 +392,6 @@ export default function App() {
         <Route path="/share-money-ledger" element={<ShareMoneyLedgerPage />} />
         <Route path="/balance-sheet" element={<BalanceSheetPage />} />
         <Route path="/profit-loss" element={<ProfitLossPage />} />
-        <Route path="/head-ledger" element={<HeadLedgerPage />} />
         <Route path="/general-ledger" element={<GeneralLedgerPage />} />
         <Route path="/loan-npa-report" element={<LoanNPAPage />} />
         <Route path="/trial-balance" element={<TrialBalancePage />} />
@@ -370,12 +399,60 @@ export default function App() {
         <Route path="/loan-advancement-report" element={<LoanAdvancementReportPage />} />
         <Route path="/loan-recovery-report" element={<LoanRecoveryReportPage />} />
         <Route path="/fd-maturity-report" element={<FDMaturityPage />} />
+        <Route path="/fd-opening-report" element={<FDOpeningPage />} />
+        <Route path="/rd-maturity-report" element={<RDMaturityPage />} />
         <Route path="/loan-demand-report" element={<LoanDemandPage />} />
         <Route path="/rd-kist-receive-report" element={<RDKistReceivePage />} />
         <Route path="/member-int-cert" element={<MemberIntCertPage />} />
         <Route path="/loan-int-cert" element={<LoanIntCertPage />} />
         <Route path="/od-reserve" element={<OdReservePage />} />
         <Route path="/change-session" element={<ChangeSessionPage />} />
+        {/* NPA Plan Master */}
+        <Route path="/npaplanmaster" element={<NPAPlanMasterPage />} />
+        <Route path="/npaplanmaster/:planId" element={<NPAPlanMasterPage />} />
+        <Route path="/npaplanmaster-operations" element={<NPAPlanMasterOperations />} />
+        <Route path="/npaplanmaster-info" element={<NPAPlanMasterCRUD />} />
+        {/* NPA Plan Category */}
+        <Route path="/npaplancategory" element={<NPAPlanCategoryPage />} />
+        <Route path="/npaplancategory/:categoryId" element={<NPAPlanCategoryPage />} />
+        <Route path="/npaplancategory-operations" element={<NPAPlanCategoryOperations />} />
+        <Route path="/npaplancategory-info" element={<NPAPlanCategoryCRUD />} />
+        {/* NPA Ledger Report */}
+        <Route path="/npa-ledger" element={<NpaLedgerPage />} />
+        <Route path="/member-report" element={<MemberReportPage />} />
+        <Route path="/member-accounts" element={<MemberAccountsPage />} />
+        {/* Loan Expense Category */}
+        <Route path="/expense-category" element={<ExpenseCategoryMaster />} />
+        <Route path="/expense-category/:categoryId" element={<ExpenseCategoryMaster />} />
+        <Route path="/expense-category-operations" element={<ExpenseCategoryOperations />} />
+        <Route path="/expense-category-info" element={<ExpenseCategoryData />} />
+        {/* GST Tax Type */}
+        <Route path="/taxtype" element={<TaxTypeMaster />} />
+        <Route path="/taxtype/:taxTypeId" element={<TaxTypeMaster />} />
+        <Route path="/taxtype-operations" element={<TaxTypeOperations />} />
+        <Route path="/taxtype-info" element={<TaxTypeData />} />
+        {/* GST Tax Group */}
+        <Route path="/taxgroup" element={<TaxGroupMaster />} />
+        <Route path="/taxgroup/:taxGroupId" element={<TaxGroupMaster />} />
+        <Route path="/taxgroup-operations" element={<TaxGroupOperations />} />
+        <Route path="/taxgroup-info" element={<TaxGroupData />} />
+        {/* GST Tax */}
+        <Route path="/tax" element={<TaxMaster />} />
+        <Route path="/tax/:taxId" element={<TaxMaster />} />
+        <Route path="/tax-operations" element={<TaxOperations />} />
+        <Route path="/tax-info" element={<TaxData />} />
+        {/* GST Bill Book */}
+        <Route path="/billbook" element={<BillBookMaster />} />
+        <Route path="/billbook/:billBookId" element={<BillBookMaster />} />
+        <Route path="/billbook-operations" element={<BillBookOperations />} />
+        <Route path="/billbook-info" element={<BillBookData />} />
+        <Route path="/gst-settings" element={<GSTSettings />} />
+        {/* Service Masters */}
+        <Route path="/service" element={<ServiceMaster />} />
+        <Route path="/service/:serviceId" element={<ServiceMaster />} />
+        <Route path="/service-operations" element={<ServiceOperations />} />
+        <Route path="/service-info" element={<ServiceData />} />
+        <Route path="/acc-service" element={<AccService />} />
       </Routes>
     </BrowserRouter>
   );

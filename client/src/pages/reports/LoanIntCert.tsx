@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
+import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux";
 import Swal from "sweetalert2";
-import { FileText, Printer, Search } from "lucide-react";
+import { FileText, FileSpreadsheet, Printer, Search } from "lucide-react";
 import loanIntCertApi, { LoanIntCert, LoanIntCertAccount, LoanIntCertProduct } from "../../services/reports/loanIntCertApi";
 import commonservice from "../../services/common/commonservice";
+import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isoDate = (iso: string) => iso.split("T")[0];
@@ -120,8 +122,54 @@ body{font-family:Arial,sans-serif;font-size:11px;padding:20px 30px;color:#111;}
 </body></html>`;
 };
 
+const buildExportConfig = (c: LoanIntCert): ExportConfig => {
+  const address = [
+    c.villageName ? `Vill. ${c.villageName}` : "",
+    c.addressLine1,
+    c.addressLine2,
+    c.pincode ? `PIN: ${c.pincode}` : "",
+  ].filter(Boolean).join(", ");
+
+  const rows: ExportRow[] = [
+    {
+      style: "info",
+      cells: [
+        `Member: ${c.memberName}`,
+        `Relative: ${c.relativeName}${c.relationName ? ` (${c.relationName})` : ""}`,
+        `Address: ${address || "-"}`,
+        `Period: ${fmtLong(c.fromDate)} to ${fmtLong(c.toDate)}`,
+      ],
+    },
+    { cells: ["Product", c.productName || "Loan"] },
+    { cells: ["Account No", c.accountNo] },
+    { cells: ["Limit Sanctioned", fmt(c.limitSanctioned)] },
+    { cells: ["Present Rate Of Interest", `${c.interestRate} p.a.`] },
+    { cells: ["Interest Debited During The Year", fmt(c.interestDebited)] },
+    { cells: ["Principal Repaid", fmt(c.principalRepaid)] },
+    { cells: ["Interest Repaid", fmt(c.interestRepaid)] },
+    { cells: ["Charges Repaid", fmt(c.chargesRepaid)] },
+    { style: "total", cells: ["Total Repayment", fmt(c.totalRepaid)] },
+    { style: "info", cells: [`Amount In Words: ${numberToWords(Number(c.totalRepaid))}`] },
+  ];
+
+  return {
+    meta: {
+      title: c.branchName,
+      subtitle: c.branchAddress,
+      reportTitle: "Loan Interest Certificate",
+      fileName: `loan-interest-certificate-${c.accountNo}-${isoDate(c.fromDate)}-to-${isoDate(c.toDate)}`,
+    },
+    columns: [
+      { header: "Particulars", widthRatio: 0.42, align: "left" },
+      { header: "Value", widthRatio: 0.58, align: "left" },
+    ],
+    rows,
+  };
+};
+
 const LoanIntCertPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
+  const navigate = useNavigate();
   const workingDate = user.workingdate ? toInput(commonservice.splitDate(user.workingdate)) : toInput(new Date().toISOString());
 
   const [products, setProducts] = useState<LoanIntCertProduct[]>([]);
@@ -178,7 +226,7 @@ const LoanIntCertPage: React.FC = () => {
   return (
     <DashboardLayout enableScroll mainContent={
       <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-        <div className="max-w-3xl mx-auto space-y-5">
+        <div className="w-full space-y-5">
 
           {/* Filter card */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -218,11 +266,25 @@ const LoanIntCertPage: React.FC = () => {
                 {loading ? "Loading…" : "Show"}
               </button>
               {cert && (
-                <button onClick={handlePrint}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm">
-                  <Printer size={15} /> Print
-                </button>
+                <>
+                  <button onClick={handlePrint}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                    <Printer size={15} /> Print
+                  </button>
+                  <button onClick={() => exportToPdf(buildExportConfig(cert))}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                    <FileText size={15} /> PDF
+                  </button>
+                  <button onClick={() => exportToExcel(buildExportConfig(cert))}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                    <FileSpreadsheet size={15} /> Excel
+                  </button>
+                </>
               )}
+              <button onClick={() => navigate("/dashboard")}
+                className="px-4 py-2 text-slate-600 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-100 transition">
+                Close
+              </button>
             </div>
           </div>
 

@@ -341,7 +341,7 @@ const ChangeSessionPage: React.FC = () => {
   return (
     <DashboardLayout enableScroll mainContent={
       <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-        <div className="max-w-2xl mx-auto space-y-5">
+        <div className="w-full space-y-5">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="flex items-center gap-3 px-5 py-4">
               <div className="w-9 h-9 bg-violet-600 rounded-lg flex items-center justify-center">

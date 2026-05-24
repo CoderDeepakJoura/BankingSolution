@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
+import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux";
 import Swal from "sweetalert2";
 import Select from "react-select";
-import { BookOpen, Search, Printer } from "lucide-react";
+import { BookOpen, Search, Printer, FileText, FileSpreadsheet } from "lucide-react";
 import headLedgerApi, { AccountHeadItem, HeadLedger } from "../../services/reports/headLedgerApi";
 import commonservice from "../../services/common/commonservice";
+import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -28,10 +30,67 @@ const toInputDate = (iso: string) => isoDatePart(iso);
 const balanceClass = (n: number) =>
   n >= 0 ? "text-blue-700" : "text-red-600";
 
+const buildExportConfig = (data: HeadLedger): ExportConfig => {
+  const rows: ExportRow[] = [
+    {
+      style: "info",
+      cells: [
+        `Head: ${data.headName}`,
+        `Type: ${data.typeName}`,
+        `Period: ${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}`,
+      ],
+    },
+    ...data.accounts.map((acc, idx) => ({
+      cells: [
+        String(idx + 1),
+        acc.accountName,
+        acc.accountNo,
+        fmt(acc.openingBalance),
+        acc.periodDr !== 0 ? fmt(acc.periodDr) : "",
+        acc.periodCr !== 0 ? fmt(acc.periodCr) : "",
+        fmt(acc.closingBalance),
+      ],
+    })),
+    {
+      style: "total",
+      cells: [
+        "Total",
+        "",
+        "",
+        fmt(data.totalOpeningBalance),
+        fmt(data.totalPeriodDr),
+        fmt(data.totalPeriodCr),
+        fmt(data.totalClosingBalance),
+      ],
+    },
+  ];
+
+  return {
+    meta: {
+      title: data.branchName,
+      subtitle: data.branchAddress,
+      reportTitle: `Head Ledger - ${data.headName}`,
+      fileName: `head-ledger-${data.headCode}-${isoDatePart(data.fromDate)}-to-${isoDatePart(data.toDate)}`,
+      landscape: true,
+    },
+    columns: [
+      { header: "#", widthRatio: 0.05, align: "center" },
+      { header: "Account Name", widthRatio: 0.25, align: "left" },
+      { header: "Account No", widthRatio: 0.14, align: "left" },
+      { header: "Opening Balance", widthRatio: 0.14, align: "right" },
+      { header: "Dr", widthRatio: 0.12, align: "right" },
+      { header: "Cr", widthRatio: 0.12, align: "right" },
+      { header: "Closing Balance", widthRatio: 0.14, align: "right" },
+    ],
+    rows,
+  };
+};
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 const HeadLedgerPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
+  const navigate = useNavigate();
   const workingDate = user.workingdate
     ? toInputDate(commonservice.splitDate(user.workingdate))
     : toInputDate(new Date().toISOString());
@@ -88,7 +147,7 @@ const HeadLedgerPage: React.FC = () => {
       enableScroll
       mainContent={
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-5">
+          <div className="w-full space-y-5">
 
             {/* ── Filter Card ─────────────────────────────────────────────── */}
             <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden print:hidden">
@@ -144,13 +203,33 @@ const HeadLedgerPage: React.FC = () => {
                 </button>
 
                 {report && (
-                  <button
-                    onClick={() => window.print()}
-                    className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg cursor-pointer shadow-sm transition-all"
-                  >
-                    <Printer className="w-4 h-4" /> Print
-                  </button>
+                  <>
+                    <button
+                      onClick={() => window.print()}
+                      className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg cursor-pointer shadow-sm transition-all"
+                    >
+                      <Printer className="w-4 h-4" /> Print
+                    </button>
+                    <button
+                      onClick={() => exportToPdf(buildExportConfig(report))}
+                      className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg cursor-pointer shadow-sm transition-all"
+                    >
+                      <FileText className="w-4 h-4" /> PDF
+                    </button>
+                    <button
+                      onClick={() => exportToExcel(buildExportConfig(report))}
+                      className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer shadow-sm transition-all"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" /> Excel
+                    </button>
+                  </>
                 )}
+                <button
+                  onClick={() => navigate("/dashboard")}
+                  className="px-5 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg cursor-pointer shadow-sm transition-all"
+                >
+                  Close
+                </button>
               </div>
             </div>
 

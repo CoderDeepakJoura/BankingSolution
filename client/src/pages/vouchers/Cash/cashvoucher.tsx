@@ -480,7 +480,7 @@ const CashPaymentReceiptVoucher: React.FC = () => {
       enableScroll={true}
       mainContent={
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="w-full space-y-6">
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               {/* ── Header ── */}
               <div className={`bg-gradient-to-r ${isEditMode ? "from-amber-50 to-orange-50" : "from-blue-50 to-indigo-50"} border-b border-gray-200 px-6 py-4`}>

@@ -157,7 +157,7 @@ const RDAccountMaster = () => {
   );
 
   const sessionMaxDate = sessionDate;
-  const isFirstSession = user.isFirstSession === "True";
+  const isFirstSession = user.isFirstSession === "True" || user.isFirstSession === true;
   const sessionMinDate = isFirstSession
     ? undefined
     : user.sessionInfo ? `${user.sessionInfo.split('-')[0]}-04-01` : undefined;
@@ -2827,7 +2827,7 @@ useEffect(() => {
     <DashboardLayout
       mainContent={
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full">
 
             {/* Header */}
             <div className="bg-white rounded-xl shadow-lg p-6 mb-6">

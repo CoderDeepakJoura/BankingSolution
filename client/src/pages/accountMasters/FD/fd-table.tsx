@@ -2,6 +2,7 @@
 import React from "react";
 import { FaEdit, FaTrash, FaEye, FaCalendarAlt, FaMoneyBillWave } from "react-icons/fa";
 import { CommonAccMasterDTO } from "../../../services/accountMasters/fdaccount/fdaccountapi";
+import { formatDate } from "../../../utils/dateFormat";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
 
 interface FDAccountTableProps {
@@ -79,9 +80,7 @@ const FDAccountTable: React.FC<FDAccountTableProps> = ({
             {row.accountNumber}
           </span>
           <span className="text-xs text-gray-500">
-            {row.accountOpeningDate
-              ? new Date(row.accountOpeningDate).toLocaleDateString("en-IN")
-              : "N/A"}
+            {formatDate(row.accountOpeningDate)}
           </span>
         </div>
       ),

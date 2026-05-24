@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { RootState } from "../../redux";
 import Swal from "sweetalert2";
 import { BookOpen, FileSpreadsheet, FileText, Printer, Search } from "lucide-react";
@@ -630,6 +631,7 @@ const buildPrintHTML = (
 // ── Main Component ────────────────────────────────────────────────────────────
 const DayBookPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
+  const navigate = useNavigate();
 
   const workingDate = user.workingdate
     ? commonservice.parseWorkingDate(user.workingdate)
@@ -718,7 +720,7 @@ const DayBookPage: React.FC = () => {
       enableScroll
       mainContent={
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="w-full space-y-6">
 
             {/* ── Form Card ── */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
@@ -846,7 +848,7 @@ const DayBookPage: React.FC = () => {
                       </>
                     )}
                     <button
-                      onClick={() => setData(null)}
+                      onClick={() => navigate("/dashboard")}
                       className="px-5 py-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg border border-gray-300 transition-all"
                     >
                       Close

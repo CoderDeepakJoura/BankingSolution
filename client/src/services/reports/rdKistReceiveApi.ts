@@ -2,15 +2,29 @@ import { ApiService, ApiResponse } from '../api';
 
 export interface RDKistProductItem { id: number; productName: string; }
 
-export interface RDKistReceiveRow {
-  voucherDate: string;
-  voucherNo: number;
-  accountNumber: string;
+// Non-datewise
+export interface RDKistSummaryRow {
+  sNo: number;
   accountName: string;
-  productName: string;
-  kistAmount: number;
-  penaltyAmount: number;
-  totalAmount: number;
+  accountNumber: string;
+  creditAmount: number;
+  noOfKist: number;
+}
+
+// Datewise
+export interface RDKistDatewiseRow {
+  sNo: number;
+  accountName: string;
+  accountNumber: string;
+  creditAmount: number;
+  voucherNo: number;
+  noOfKist: number;
+}
+
+export interface RDKistDateGroup {
+  date: string;
+  rows: RDKistDatewiseRow[];
+  dateTotal: number;
 }
 
 export interface RDKistReceive {
@@ -19,9 +33,9 @@ export interface RDKistReceive {
   fromDate: string;
   toDate: string;
   productName: string;
-  rows: RDKistReceiveRow[];
-  totalKistAmount: number;
-  totalPenaltyAmount: number;
+  showDatewise: boolean;
+  summaryRows: RDKistSummaryRow[];
+  dateGroups: RDKistDateGroup[];
   grandTotal: number;
   totalCount: number;
 }
@@ -30,8 +44,17 @@ class RDKistReceiveApiService extends ApiService {
   async getRDProducts(branchId: number): Promise<ApiResponse<RDKistProductItem[]>> {
     return this.makeRequest(`/RDKistReceive/products?branchId=${branchId}`);
   }
-  async getRDKistReceive(branchId: number, fromDate: string, toDate: string, productId: number): Promise<ApiResponse<RDKistReceive>> {
-    return this.makeRequest(`/RDKistReceive?branchId=${branchId}&fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}&productId=${productId}`);
+
+  async getRDKistReceive(
+    branchId: number,
+    fromDate: string,
+    toDate: string,
+    productId: number,
+    showDatewise: boolean
+  ): Promise<ApiResponse<RDKistReceive>> {
+    return this.makeRequest(
+      `/RDKistReceive?branchId=${branchId}&fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}&productId=${productId}&showDatewise=${showDatewise}`
+    );
   }
 }
 

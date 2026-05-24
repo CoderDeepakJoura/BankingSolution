@@ -221,6 +221,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             var workingDate = _commonfunctions.GetWorkingDate();
             var query = _context.accountmaster
                 .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.FD
+                    && !x.IsAccClosed
                     && (!workingDate.HasValue || x.AccOpeningDate.Date <= workingDate.Value.Date));
 
             // ✅ Bring data to memory FIRST

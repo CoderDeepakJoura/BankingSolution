@@ -2,6 +2,7 @@
 global using Microsoft.EntityFrameworkCore;
 using BankingPlatform.Infrastructure.Models.AccHeads;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
+using BankingPlatform.Infrastructure.Models.NPA;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System.Security.Claims;
@@ -24,6 +25,8 @@ using BankingPlatform.Infrastructure.Models.ProductMasters.Saving;
 using BankingPlatform.Infrastructure.Models.Settings;
 using BankingPlatform.Infrastructure.Models.Auth;
 using BankingPlatform.Infrastructure.Models.voucher;
+using BankingPlatform.Infrastructure.Models.GST;
+using BankingPlatform.Infrastructure.Models.Services;
 namespace BankingPlatform.Infrastructure.Models;
 
 public partial class BankingDbContext : DbContext
@@ -128,6 +131,20 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<VoucherRecIntDetail> voucherrecintdetail { get; set; }
     public virtual DbSet<VrOdReserve> vrodreserve { get; set; }
     public virtual DbSet<AuditLog> auditlog { get; set; }
+    public virtual DbSet<NPAPlanMaster> npaplanmaster { get; set; }
+    public virtual DbSet<NPAPlanCategory> npaplancategory { get; set; }
+    public virtual DbSet<ExpenseCategory> expensecategory { get; set; }
+    public virtual DbSet<TaxType> taxtype { get; set; }
+    public virtual DbSet<TaxGroup> taxgroup { get; set; }
+    public virtual DbSet<TaxGroupType> taxgrouptype { get; set; }
+    public virtual DbSet<Tax> tax { get; set; }
+    public virtual DbSet<TaxDetail> taxdetail { get; set; }
+    public virtual DbSet<BillBook> billbook { get; set; }
+    public virtual DbSet<GSTSetting> gstsetting { get; set; }
+    public virtual DbSet<ServiceMaster> service { get; set; }
+    public virtual DbSet<ServiceTaxRule> servicetaxrule { get; set; }
+    public virtual DbSet<ServiceTaxTypeDet> servicetaxtypedet { get; set; }
+    public virtual DbSet<AccServiceDetail> accservicedetail { get; set; }
 
     // ── Audit logging ────────────────────────────────────────────────────────────
 
@@ -288,6 +305,12 @@ public partial class BankingDbContext : DbContext
             .HasKey(x => new { x.Id, x.BrId });
 
         modelBuilder.Entity<VrOdReserve>()
+            .HasKey(x => new { x.Id, x.BrId });
+
+        modelBuilder.Entity<NPAPlanMaster>()
+            .HasKey(x => new { x.Id, x.BrId });
+
+        modelBuilder.Entity<NPAPlanCategory>()
             .HasKey(x => new { x.Id, x.BrId });
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BankingDbContext).Assembly);

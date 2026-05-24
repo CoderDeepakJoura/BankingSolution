@@ -1,4 +1,5 @@
 using BankingPlatform.API.Common;
+using BankingPlatform.Infrastructure.Models.AccMasters;
 using Microsoft.EntityFrameworkCore;
 
 namespace BankingPlatform.API.Service.Reports
@@ -59,6 +60,15 @@ namespace BankingPlatform.API.Service.Reports
         public decimal TotalDr { get; set; }
         public decimal TotalCr { get; set; }
         public decimal ClosingBalance { get; set; }
+        // Account detail fields
+        public string? RelativeName { get; set; }
+        public string? ContactNo { get; set; }
+        public string? Address { get; set; }
+        public int? DetailLtdNo { get; set; }
+        public int? DetailPeriodMonths { get; set; }
+        public int? DetailPeriodDays { get; set; }
+        public decimal? DetailIntRate { get; set; }
+        public decimal? DetailMaturityAmount { get; set; }
     }
 
     public class FDLedgerService
@@ -192,6 +202,21 @@ namespace BankingPlatform.API.Service.Reports
                     .ToListAsync();
             }
 
+            // Extra FD detail fields from the raw record
+            FDAccountDetail? rawDetail = null;
+            if (detailId.HasValue)
+            {
+                rawDetail = await _context.fdaccountdetail.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == detailId.Value && x.BranchId == branchId);
+            }
+            else
+            {
+                rawDetail = await _context.fdaccountdetail.AsNoTracking()
+                    .Where(x => x.AccountId == accountId && x.BranchId == branchId)
+                    .OrderByDescending(x => x.FDDate)
+                    .FirstOrDefaultAsync();
+            }
+
             decimal openingBalance = await CalculateOpeningBalanceAsync(branchId, accountId, fromDate.Date);
 
             DateTime toExclusive = toDate.Date.AddDays(1);
@@ -213,7 +238,15 @@ namespace BankingPlatform.API.Service.Reports
                 SessionFromDate = session?.fromdate ?? fromDate,
                 SessionToDate = session?.todate ?? toDate,
                 OpeningBalance = openingBalance,
-                ClosingBalance = openingBalance
+                ClosingBalance = openingBalance,
+                RelativeName        = account.RelativeName,
+                ContactNo           = account.PhoneNo1,
+                Address             = account.AddressLine,
+                DetailLtdNo         = rawDetail?.LTDNo,
+                DetailPeriodMonths  = rawDetail?.FDPeriodMonths,
+                DetailPeriodDays    = rawDetail?.FDPeriodDays,
+                DetailIntRate       = rawDetail?.IntRate,
+                DetailMaturityAmount= rawDetail?.MaturityAmount,
             };
 
             // ── Fetch vouchers in the effective date range ─────────────────────
@@ -327,7 +360,15 @@ namespace BankingPlatform.API.Service.Reports
                 Entries = entries,
                 TotalDr = totalDr,
                 TotalCr = totalCr,
-                ClosingBalance = runningBalance
+                ClosingBalance = runningBalance,
+                RelativeName        = account.RelativeName,
+                ContactNo           = account.PhoneNo1,
+                Address             = account.AddressLine,
+                DetailLtdNo         = rawDetail?.LTDNo,
+                DetailPeriodMonths  = rawDetail?.FDPeriodMonths,
+                DetailPeriodDays    = rawDetail?.FDPeriodDays,
+                DetailIntRate       = rawDetail?.IntRate,
+                DetailMaturityAmount= rawDetail?.MaturityAmount,
             });
         }
 

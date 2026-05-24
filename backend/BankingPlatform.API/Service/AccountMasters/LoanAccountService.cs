@@ -658,6 +658,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             var workingDate = _commonFunctions.GetWorkingDate();
             var query = _context.accountmaster.AsNoTracking()
                 .Where(x => x.BranchId == brId && x.AccTypeId == accType
+                    && !x.IsAccClosed
                     && (!workingDate.HasValue || x.AccOpeningDate.Date <= workingDate.Value.Date));
 
             if (!string.IsNullOrWhiteSpace(searchTerm))

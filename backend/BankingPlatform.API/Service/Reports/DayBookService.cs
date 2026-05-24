@@ -93,7 +93,8 @@ namespace BankingPlatform.API.Service.Reports
             var voucherData = await _context.voucher.AsNoTracking()
                 .Where(x => x.BrID == branchId
                     && x.VoucherDate >= fromDate.Date
-                    && x.VoucherDate < toExclusive)
+                    && x.VoucherDate < toExclusive
+                    && x.VoucherStatus == "V")
                 .Select(x => new { x.Id, x.VoucherNo, x.VoucherDate })
                 .ToListAsync();
 
@@ -136,15 +137,24 @@ namespace BankingPlatform.API.Service.Reports
                 .ToListAsync();
 
             var headCodes = entries.Select(e => e.AccHeadCode).Distinct().ToList();
-            var headNameMap = await _context.accounthead.AsNoTracking()
-                .Where(x => headCodes.Contains(x.headcode) && x.branchid == branchId)
-                .ToDictionaryAsync(x => x.headcode, x => x.name);
+            var headRows = await _context.accounthead.AsNoTracking()
+                .Where(x => headCodes.Contains(x.headcode))
+                .Select(x => new { x.headcode, x.name, x.branchid })
+                .ToListAsync();
+            // Prefer branch-specific entry; fall back to any matching head code
+            var headNameMap = headRows
+                .GroupBy(x => x.headcode)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (g.FirstOrDefault(x => x.branchid == branchId) ?? g.First()).name);
 
             int generalType = (int)Enums.AccountTypes.General;
             int loanType = (int)Enums.AccountTypes.Loan;
 
-            var crEntries = entries.Where(e => e.VoucherEntryType == "Cr").ToList();
-            var drEntries = entries.Where(e => e.VoucherEntryType == "Dr").ToList();
+            // Exclude cash head entries (head code starting with 110) — same as SP logic
+            // LEFT(AccHeadCode, 3) <> 110 in the stored procedures
+            var crEntries = entries.Where(e => e.VoucherEntryType == "Cr" && !e.AccHeadCode.ToString().StartsWith("110")).ToList();
+            var drEntries = entries.Where(e => e.VoucherEntryType == "Dr" && !e.AccHeadCode.ToString().StartsWith("110")).ToList();
 
             var receiptGroups = BuildGroups(crEntries, accounts, voucherInfoMap, headNameMap, generalType, loanType);
             var paymentGroups = BuildGroups(drEntries, accounts, voucherInfoMap, headNameMap, generalType, loanType);
@@ -249,7 +259,8 @@ namespace BankingPlatform.API.Service.Reports
                 .Where(x => x.e.AccountId == cashAccountId
                     && x.e.VoucherEntryType == "Dr"
                     && x.v.BrID == branchId
-                    && x.v.VoucherDate < fromDate)
+                    && x.v.VoucherDate < fromDate
+                    && x.v.VoucherStatus == "V")
                 .SumAsync(x => (decimal?)x.e.VoucherAmount) ?? 0;
 
             var crSum = await _context.vouchercreditdebitdetails
@@ -257,7 +268,8 @@ namespace BankingPlatform.API.Service.Reports
                 .Where(x => x.e.AccountId == cashAccountId
                     && x.e.VoucherEntryType == "Cr"
                     && x.v.BrID == branchId
-                    && x.v.VoucherDate < fromDate)
+                    && x.v.VoucherDate < fromDate
+                    && x.v.VoucherStatus == "V")
                 .SumAsync(x => (decimal?)x.e.VoucherAmount) ?? 0;
 
             return initial + drSum - crSum;

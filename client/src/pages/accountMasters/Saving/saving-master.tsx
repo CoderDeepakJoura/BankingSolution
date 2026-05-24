@@ -20,6 +20,7 @@ import {
   IndianRupee,
   UserPlus,
   AlertCircle,
+  Settings,
 } from "lucide-react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate, useParams } from "react-router-dom";
@@ -131,7 +132,7 @@ const SavingAccountMaster = () => {
   );
 
   const sessionMaxDate = sessionDate;
-  const isFirstSession = user.isFirstSession === "True";
+  const isFirstSession = user.isFirstSession === "True" || user.isFirstSession === true;
   const sessionMinDate = isFirstSession
     ? undefined
     : user.sessionInfo ? `${user.sessionInfo.split('-')[0]}-04-01` : undefined;
@@ -160,6 +161,7 @@ const SavingAccountMaster = () => {
   // Picture and signature states
   const [pictureFile, setPictureFile] = useState<any>(null);
   const [signatureFile, setSignatureFile] = useState<any>(null);
+  const [requirePicSign, setRequirePicSign] = useState(true);
 
   // Refs
   const memberAccountNoRef = useRef<HTMLInputElement>(null);
@@ -720,12 +722,17 @@ const SavingAccountMaster = () => {
 
             // Load images
             if (data.accountDocDetailsDTO) {
+              const hasPic  = !!data.accountDocDetailsDTO.pictureUrl;
+              const hasSign = !!data.accountDocDetailsDTO.signatureUrl;
+              setRequirePicSign(hasPic && hasSign);
+
+
               const fileName = `account_${accountId}_picture${data.accountDocDetailsDTO.picExt}`;
               const cacheBuster = `?t=${Date.now()}`; // Cache-busting query parameter
               const photoUrl =
                 commonservice.getAccountImageUrl(fileName, "Pictures") +
                 cacheBuster;
-              if (data.accountDocDetailsDTO.pictureUrl) {
+              if (hasPic) {
                 setPictureFile({
                   id: Date.now(),
                   name: "picture",
@@ -733,12 +740,12 @@ const SavingAccountMaster = () => {
                   file: null,
                 });
               }
-              if (data.accountDocDetailsDTO.signatureUrl) {
-                const fileName = `account_${accountId}_signature${data.accountDocDetailsDTO.signExt}`;
-                const cacheBuster = `?t=${Date.now()}`; // Cache-busting query parameter
+              if (hasSign) {
+                const signFileName = `account_${accountId}_signature${data.accountDocDetailsDTO.signExt}`;
+                const signCacheBuster = `?t=${Date.now()}`;
                 const signUrl =
-                  commonservice.getAccountImageUrl(fileName, "Signatures") +
-                  cacheBuster;
+                  commonservice.getAccountImageUrl(signFileName, "Signatures") +
+                  signCacheBuster;
                 setSignatureFile({
                   id: Date.now() + 1,
                   name: "signature",
@@ -746,6 +753,8 @@ const SavingAccountMaster = () => {
                   file: null,
                 });
               }
+            } else {
+              setRequirePicSign(false);
             }
             Swal.close();
           } else {
@@ -803,7 +812,8 @@ const SavingAccountMaster = () => {
       pictureFile?.preview || "",
       pictureFile?.file || null,
       signatureFile?.preview || "",
-      signatureFile?.file || null
+      signatureFile?.file || null,
+      requirePicSign
     );
 
     if (!validation.isValid) {
@@ -1017,6 +1027,7 @@ const SavingAccountMaster = () => {
     setNominees([]);
     setPictureFile(null);
     setSignatureFile(null);
+    setRequirePicSign(true);
     setIsJointAccount(false);
     setIsNomineeRequired(false);
     setInputMode("account");
@@ -1305,9 +1316,10 @@ const SavingAccountMaster = () => {
               <input
                 type="text"
                 value={formData.accountMasterDTO.suffix}
-                onChange={(e) => {
-                  handleNumericChange("suffix", e.target.value),
-                    handleSuffixChange(Number(e.target.value));
+                onChange={(e) => handleNumericChange("suffix", e.target.value)}
+                onBlur={(e) => {
+                  const val = Number(e.target.value);
+                  if (val > 0) handleSuffixChange(val);
                 }}
                 placeholder="Enter Suffix"
                 className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
@@ -2280,7 +2292,7 @@ const SavingAccountMaster = () => {
     </div>
   );
 
-  // Render Images Tab - OLD DESIGN PRESERVED
+  // Render Images Tab
   const renderImages = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2289,7 +2301,7 @@ const SavingAccountMaster = () => {
           <h4 className="text-md font-semibold text-blue-800 mb-4 flex items-center gap-2">
             <ImageIcon className="w-5 h-5" />
             Picture
-            <span className="text-red-500">*</span>
+            {requirePicSign && <span className="text-red-500">*</span>}
           </h4>
           {pictureFile?.preview ? (
             <div>
@@ -2314,7 +2326,7 @@ const SavingAccountMaster = () => {
               </div>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <div className={`border-2 border-dashed rounded-lg p-8 text-center ${errorsByField.picture?.length ? "border-red-400 bg-red-50" : "border-gray-300"}`}>
               <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-4">No picture available</p>
               <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all">
@@ -2357,7 +2369,7 @@ const SavingAccountMaster = () => {
           <h4 className="text-md font-semibold text-purple-800 mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5" />
             Signature
-            <span className="text-red-500">*</span>
+            {requirePicSign && <span className="text-red-500">*</span>}
           </h4>
           {signatureFile?.preview ? (
             <div>
@@ -2382,7 +2394,7 @@ const SavingAccountMaster = () => {
               </div>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <div className={`border-2 border-dashed rounded-lg p-8 text-center ${errorsByField.signature?.length ? "border-red-400 bg-red-50" : "border-gray-300"}`}>
               <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-4">No signature available</p>
               <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all">
@@ -2421,13 +2433,44 @@ const SavingAccountMaster = () => {
         </div>
       </div>
 
-      {/* Note */}
-      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+      {/* Toggle + Note */}
+      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 space-y-3">
         <p className="text-sm text-yellow-800">
-          <strong>Note:</strong> Images will auto-fill from Member Master if
-          available. You can upload new images if needed. Both Picture and
-          Signature are mandatory.
+          <strong>Note:</strong> Images will auto-fill from Member Master if available.
+          You can upload new images if needed.
+          {requirePicSign
+            ? " Both Picture and Signature are currently mandatory."
+            : " Picture and Signature are currently optional."}
         </p>
+
+        <div className="pt-2 border-t border-yellow-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Settings className="w-4 h-4 text-yellow-600" />
+            <span className="text-xs font-semibold text-yellow-700 uppercase tracking-wide">Make Optional</span>
+          </div>
+          <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+            <div
+              onClick={() => setRequirePicSign((v) => !v)}
+              className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                requirePicSign ? "bg-blue-600" : "bg-amber-400"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                  requirePicSign ? "translate-x-0" : "translate-x-5"
+                }`}
+              />
+            </div>
+            <span className="text-sm text-gray-700 group-hover:text-gray-900">
+              Picture &amp; Signature
+              <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${
+                requirePicSign ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"
+              }`}>
+                {requirePicSign ? "Required" : "Optional"}
+              </span>
+            </span>
+          </label>
+        </div>
       </div>
     </div>
   );
@@ -2436,7 +2479,7 @@ const SavingAccountMaster = () => {
     <DashboardLayout
       mainContent={
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full">
             {/* Header */}
             <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
               <div className="flex justify-between items-center">

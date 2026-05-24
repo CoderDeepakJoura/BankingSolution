@@ -69,10 +69,13 @@ namespace BankingPlatform.API.Service.Reports
 
             var raw = await (
                 from fd in _db.fdaccountdetail.AsNoTracking()
-                join a in _db.accountmaster.AsNoTracking() on fd.AccountId equals a.ID
+                join a in _db.accountmaster.AsNoTracking()
+                    on new { AccountId = fd.AccountId, BranchId = fd.BranchId }
+                    equals new { AccountId = a.ID, a.BranchId }
                 join fp in _db.fdproduct.AsNoTracking() on a.GeneralProductId equals fp.Id into fpj
                 from fp in fpj.DefaultIfEmpty()
                 where fd.BranchId == branchId
+                    && fd.FDStatus == 1
                     && fd.FDMaturityDate >= fromDate.Date
                     && fd.FDMaturityDate < nextDay
                     && (productId == 0 || a.GeneralProductId == productId)
@@ -81,6 +84,8 @@ namespace BankingPlatform.API.Service.Reports
                 {
                     AccountId     = a.ID,
                     AccountNumber = a.AccountNumber ?? "",
+                    AccPrefix     = a.AccPrefix ?? "",
+                    AccSuffix     = a.AccSuffix,
                     AccountName   = a.AccountName ?? "",
                     ProductName   = fp != null ? fp.ProductName : "",
                     fd.FDDate,
@@ -97,7 +102,9 @@ namespace BankingPlatform.API.Service.Reports
             var rows = raw.Select(fd => new FDMaturityRowDTO
             {
                 AccountId     = fd.AccountId,
-                AccountNumber = fd.AccountNumber,
+                AccountNumber = !string.IsNullOrWhiteSpace(fd.AccountNumber)
+                                    ? fd.AccountNumber
+                                    : $"{fd.AccPrefix}-{fd.AccSuffix}",
                 AccountName   = fd.AccountName,
                 ProductName   = fd.ProductName,
                 FDDate        = fd.FDDate,

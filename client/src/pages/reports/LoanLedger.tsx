@@ -118,6 +118,25 @@ const buildExportConfig = (data: LoanLedger, longNar: boolean): ExportConfig => 
     { header: "Balance",                   widthRatio: 0.14, align: "right"  as const },
   ];
   const rows: ExportRow[] = [];
+  const info1 = [
+    `Name: ${data.accountName}`,
+    `Acc No: ${data.accountNumber}`,
+    data.relativeName && `Relative: ${data.relativeName}`,
+    data.contactNo && `Contact: ${data.contactNo}`,
+    data.shareAccNo && `Share Acc: ${data.shareAccNo}`,
+    data.address && `Address: ${data.address}`,
+  ].filter(Boolean).join("  |  ");
+  const info2 = [
+    data.loanAmount != null && `Loan Amt: ${fmt(data.loanAmount)}`,
+    data.loanDate && `Loan Date: ${fmtShort(data.loanDate)}`,
+    data.loanPeriodMonths != null && `Period: ${data.loanPeriodMonths}M/${data.loanPeriodDays ?? 0}D`,
+    data.kistInterval != null && `Kist: ${data.kistInterval}M/${data.kistIntervalDays ?? 0}D`,
+    data.standardIntRate != null && `Std Rate: ${data.standardIntRate}%`,
+    data.overdueIntRate != null && `OD Rate: ${data.overdueIntRate}%`,
+    data.guarantors && `Guarantors: ${data.guarantors}`,
+  ].filter(Boolean).join("  |  ");
+  if (info1) rows.push({ style: "info", spanFirst: 7, cells: [info1] });
+  if (info2) rows.push({ style: "info", spanFirst: 7, cells: [info2] });
   rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", fmtBal(data.openingBalance)] });
   data.entries.forEach((e, i) => {
     const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
@@ -169,8 +188,20 @@ const buildPrintHTML = (data: LoanLedger, longNar: boolean): string => {
     <h1>${data.branchName}</h1><p>${data.branchAddress}</p><h2>Loan Account Ledger</h2>
   </div>
   <div class="acc-info">
+    <span><span class="lbl">Name:</span> <strong>${data.accountName}</strong></span>
+    <span><span class="lbl">Acc No:</span> <strong>${data.accountNumber}</strong></span>
     <span><span class="lbl">Product:</span> <strong>${data.productName}</strong></span>
-    <span><span class="lbl">Account:</span> <strong>${data.accountNumber} — ${data.accountName}</strong></span>
+    ${data.relativeName ? `<span><span class="lbl">Relative:</span> <strong>${data.relativeName}</strong></span>` : ""}
+    ${data.contactNo ? `<span><span class="lbl">Contact:</span> <strong>${data.contactNo}</strong></span>` : ""}
+    ${data.shareAccNo ? `<span><span class="lbl">Share Acc:</span> <strong>${data.shareAccNo}</strong></span>` : ""}
+    ${data.address ? `<span><span class="lbl">Address:</span> <strong>${data.address}</strong></span>` : ""}
+    ${data.loanAmount != null ? `<span><span class="lbl">Loan Amt:</span> <strong>&#8377;${fmt(data.loanAmount)}</strong></span>` : ""}
+    ${data.loanDate ? `<span><span class="lbl">Loan Date:</span> <strong>${fmtShort(data.loanDate)}</strong></span>` : ""}
+    ${data.loanPeriodMonths != null ? `<span><span class="lbl">Period:</span> <strong>${data.loanPeriodMonths}M / ${data.loanPeriodDays ?? 0}D</strong></span>` : ""}
+    ${data.kistInterval != null ? `<span><span class="lbl">Kist:</span> <strong>${data.kistInterval}M / ${data.kistIntervalDays ?? 0}D</strong></span>` : ""}
+    ${data.standardIntRate != null ? `<span><span class="lbl">Std Rate:</span> <strong>${data.standardIntRate}%</strong></span>` : ""}
+    ${data.overdueIntRate != null ? `<span><span class="lbl">OD Rate:</span> <strong>${data.overdueIntRate}%</strong></span>` : ""}
+    ${data.guarantors ? `<span><span class="lbl">Guarantors:</span> <strong>${data.guarantors}</strong></span>` : ""}
     <span><span class="lbl">Period:</span> <strong>${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}</strong></span>
   </div>
   <table><thead><tr>
@@ -270,7 +301,7 @@ const LoanLedgerPage: React.FC = () => {
       enableScroll
       mainContent={
         <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-5">
+          <div className="w-full space-y-5">
 
             {/* ── Filter Card ── */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -377,17 +408,48 @@ const LoanLedgerPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap gap-2 items-center">
-                  {[
-                    { label: "Product", value: data.productName },
-                    { label: "Account", value: `${data.accountNumber} — ${data.accountName}` },
-                    { label: "Period",  value: `${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}` },
-                  ].map(({ label, value }) => (
-                    <span key={label} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                      <span className="text-slate-400 font-medium">{label}:</span>
-                      <span className="font-semibold text-slate-800">{value}</span>
-                    </span>
-                  ))}
+                {/* Account info panel */}
+                <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                    {[
+                      { label: "Name",           value: data.accountName },
+                      { label: "Acc. No.",        value: data.accountNumber },
+                      { label: "Address",         value: data.address },
+                      { label: "Relative Name",   value: data.relativeName },
+                      { label: "Contact No.",     value: data.contactNo },
+                      { label: "Share Acc. No.",  value: data.shareAccNo },
+                      { label: "Product",         value: data.productName },
+                      { label: "Period",          value: `${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}` },
+                    ].filter(f => f.value).map(({ label, value }) => (
+                      <div key={label} className="flex gap-1 min-w-0">
+                        <span className="text-slate-400 font-medium shrink-0">{label}:</span>
+                        <span className="font-semibold text-slate-800 truncate">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {(data.loanAmount != null || data.loanDate || data.loanPeriodMonths != null || data.standardIntRate != null) && (
+                    <div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                      {[
+                        { label: "Loan Amount",      value: data.loanAmount != null ? `₹${data.loanAmount.toLocaleString("en-IN")}` : null },
+                        { label: "Loan Date",        value: data.loanDate ? fmtShort(data.loanDate) : null },
+                        { label: "Loan Period",      value: data.loanPeriodMonths != null ? `${data.loanPeriodMonths} M / ${data.loanPeriodDays ?? 0} D` : null },
+                        { label: "Kist Period",      value: data.kistInterval != null ? `${data.kistInterval} M / ${data.kistIntervalDays ?? 0} D` : null },
+                        { label: "Stand Int. Rate",  value: data.standardIntRate != null ? `${data.standardIntRate}%` : null },
+                        { label: "Over Int. Rate",   value: data.overdueIntRate != null ? `${data.overdueIntRate}%` : null },
+                      ].filter(f => f.value).map(({ label, value }) => (
+                        <div key={label} className="flex gap-1 min-w-0">
+                          <span className="text-slate-400 font-medium shrink-0">{label}:</span>
+                          <span className="font-semibold text-slate-800">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {data.guarantors && (
+                    <div className="mt-2 pt-2 border-t border-slate-200 text-xs">
+                      <span className="text-slate-400 font-medium">Guarantors: </span>
+                      <span className="font-semibold text-slate-800">{data.guarantors}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-4 sm:p-5">

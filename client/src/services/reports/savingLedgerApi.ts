@@ -37,6 +37,12 @@ export interface SavingLedger {
   totalDr: number;
   totalCr: number;
   closingBalance: number;
+  relativeName?: string;
+  contactNo?: string;
+  address?: string;
+  membershipNo?: string;
+  accOpeningDate?: string;
+  occupation?: string;
 }
 
 class SavingLedgerApiService extends ApiService {

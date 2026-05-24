@@ -37,6 +37,19 @@ export interface LoanLedger {
   totalDr: number;
   totalCr: number;
   closingBalance: number;
+  relativeName?: string;
+  contactNo?: string;
+  address?: string;
+  loanAmount?: number;
+  loanDate?: string;
+  loanPeriodMonths?: number;
+  loanPeriodDays?: number;
+  standardIntRate?: number;
+  overdueIntRate?: number;
+  kistInterval?: number;
+  kistIntervalDays?: number;
+  guarantors?: string;
+  shareAccNo?: string;
 }
 
 class LoanLedgerApiService extends ApiService {

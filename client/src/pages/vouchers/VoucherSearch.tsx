@@ -213,7 +213,7 @@ const VoucherSearch: React.FC = () => {
       enableScroll
       mainContent={
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-6xl mx-auto space-y-6">
+          <div className="w-full space-y-6">
             {/* Header card */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 px-6 py-4">

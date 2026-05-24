@@ -295,6 +295,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             var workingDate = _commonfunctions.GetWorkingDate();
             var allAccounts = await _context.accountmaster
                 .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.RD
+                    && !x.IsAccClosed
                     && (!workingDate.HasValue || x.AccOpeningDate.Date <= workingDate.Value.Date))
                 .ToListAsync();
 

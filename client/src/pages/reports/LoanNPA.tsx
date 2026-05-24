@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
+import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux";
 import Swal from "sweetalert2";
@@ -215,6 +216,7 @@ const buildPrintHTML = (report: LoanNPA): string => {
 
 const LoanNPAPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
+  const navigate = useNavigate();
   const workingDate = user.workingdate
     ? toInputDate(commonservice.splitDate(user.workingdate))
     : toInputDate(new Date().toISOString());
@@ -278,7 +280,7 @@ const LoanNPAPage: React.FC = () => {
       enableScroll
       mainContent={
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-red-50 p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-5">
+          <div className="w-full space-y-5">
 
             {/* ── Filter Card ─────────────────────────────────────────────── */}
             <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden print:hidden">
@@ -357,6 +359,12 @@ const LoanNPAPage: React.FC = () => {
                     </button>
                   </>
                 )}
+                <button
+                  onClick={() => navigate("/dashboard")}
+                  className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg cursor-pointer shadow-sm transition-all"
+                >
+                  Close
+                </button>
               </div>
             </div>
 

@@ -1,4 +1,5 @@
 using BankingPlatform.API.Common;
+using BankingPlatform.Infrastructure.Models.member;
 using Microsoft.EntityFrameworkCore;
 
 namespace BankingPlatform.API.Service.Reports
@@ -44,6 +45,13 @@ namespace BankingPlatform.API.Service.Reports
         public decimal TotalDr { get; set; }
         public decimal TotalCr { get; set; }
         public decimal ClosingBalance { get; set; }
+        // Account detail fields
+        public string? RelativeName { get; set; }
+        public string? ContactNo { get; set; }
+        public string? Address { get; set; }
+        public string? MembershipNo { get; set; }
+        public DateTime? AccOpeningDate { get; set; }
+        public string? Occupation { get; set; }
     }
 
     public class SavingLedgerService
@@ -113,6 +121,22 @@ namespace BankingPlatform.API.Service.Reports
 
             string accountIdentifier = $"{account.AccPrefix}-{account.AccSuffix}";
 
+            // ── Member info ────────────────────────────────────────────────────
+            string membershipNo = "";
+            string occupation = "";
+            if (account.MemberId.HasValue && account.MemberBranchID.HasValue)
+            {
+                var member = await _context.member.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == account.MemberId.Value && x.BranchId == account.MemberBranchID.Value);
+                if (member != null)
+                {
+                    membershipNo = member.PermanentMembershipNo ?? member.NominalMembershipNo ?? "";
+                    var occ = await _context.occupation.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.id == member.OccupationId);
+                    occupation = occ?.description ?? "";
+                }
+            }
+
             decimal openingBalance = await CalculateOpeningBalanceAsync(branchId, accountId, fromDate.Date);
 
             DateTime toExclusive = toDate.Date.AddDays(1);
@@ -129,7 +153,13 @@ namespace BankingPlatform.API.Service.Reports
                 SessionFromDate = session?.fromdate ?? fromDate,
                 SessionToDate = session?.todate ?? toDate,
                 OpeningBalance = openingBalance,
-                ClosingBalance = openingBalance
+                ClosingBalance = openingBalance,
+                RelativeName   = account.RelativeName,
+                ContactNo      = account.PhoneNo1,
+                Address        = account.AddressLine,
+                MembershipNo   = membershipNo,
+                AccOpeningDate = account.AccOpeningDate,
+                Occupation     = occupation,
             };
 
             // Get vouchers in date range for this branch
@@ -232,7 +262,13 @@ namespace BankingPlatform.API.Service.Reports
                 Entries = entries,
                 TotalDr = totalDr,
                 TotalCr = totalCr,
-                ClosingBalance = runningBalance
+                ClosingBalance = runningBalance,
+                RelativeName   = account.RelativeName,
+                ContactNo      = account.PhoneNo1,
+                Address        = account.AddressLine,
+                MembershipNo   = membershipNo,
+                AccOpeningDate = account.AccOpeningDate,
+                Occupation     = occupation,
             });
         }
 

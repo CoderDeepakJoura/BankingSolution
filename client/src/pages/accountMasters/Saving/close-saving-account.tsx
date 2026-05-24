@@ -1178,7 +1178,7 @@ const CloseSavingAccount: React.FC = () => {
       enableScroll={true}
       mainContent={
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-red-50 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="w-full space-y-6">
             {renderVoucherForm()}
 
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">

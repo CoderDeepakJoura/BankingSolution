@@ -702,7 +702,7 @@ const LoanRecovery: React.FC = () => {
       enableScroll
       mainContent={
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="w-full space-y-6">
 
             {/* ── Voucher Form Card ──────────────────────────────────────── */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">

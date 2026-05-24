@@ -39,11 +39,11 @@ export class ApiService {
     try {
       if (contentType?.includes('application/json')) {
         const data = await response.json();
-        return data.message || 'Request failed';
+        return data.message || data.Message || data.error || data.Error || 'An unexpected error occurred.';
       }
-      return (await response.text()) || 'Request failed';
+      return (await response.text()) || 'An unexpected error occurred.';
     } catch {
-      return 'Request failed';
+      return 'An unexpected error occurred.';
     }
   }
 
@@ -98,7 +98,11 @@ export class ApiService {
       const text = await response.text();
 
       if (contentType?.includes('application/json') && text) {
-        return { ...(JSON.parse(text) as ApiResponse<T>) };
+        const parsed = JSON.parse(text) as any;
+        // Normalize PascalCase Success/Message from backend anonymous types
+        if (parsed.Success !== undefined && parsed.success === undefined) parsed.success = parsed.Success;
+        if (parsed.Message !== undefined && parsed.message === undefined) parsed.message = parsed.Message;
+        return { ...(parsed as ApiResponse<T>) };
       }
 
       return { data: text as any };

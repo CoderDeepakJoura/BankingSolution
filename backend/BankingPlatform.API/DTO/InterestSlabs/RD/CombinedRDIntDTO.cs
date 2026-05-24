@@ -41,7 +41,7 @@ namespace BankingPlatform.API.DTO.InterestSlabs.RD
         public decimal FromAmount { get; set; }
 
         [Required]
-        [Range(1, 10000)]
+        [Range(1, 100000)]
         public decimal ToAmount { get; set; }
 
         [Required]

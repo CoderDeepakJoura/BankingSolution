@@ -44,6 +44,20 @@ namespace BankingPlatform.API.Service.Reports
         public decimal TotalDr { get; set; }
         public decimal TotalCr { get; set; }
         public decimal ClosingBalance { get; set; }
+        // Account detail fields
+        public string? RelativeName { get; set; }
+        public string? ContactNo { get; set; }
+        public string? Address { get; set; }
+        public decimal? LoanAmount { get; set; }
+        public DateTime? LoanDate { get; set; }
+        public int? LoanPeriodMonths { get; set; }
+        public int? LoanPeriodDays { get; set; }
+        public double? StandardIntRate { get; set; }
+        public double? OverdueIntRate { get; set; }
+        public int? KistInterval { get; set; }
+        public int? KistIntervalDays { get; set; }
+        public string? Guarantors { get; set; }
+        public string? ShareAccNo { get; set; }
     }
 
     public class LoanLedgerService
@@ -111,9 +125,64 @@ namespace BankingPlatform.API.Service.Reports
             var session = await _context.branchsession.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.branchid == branchId && x.iscurrent);
 
+            // ── Account detail info ───────────────────────────────────────────
+            var kistDetail = await _context.accountkistdetail.AsNoTracking()
+                .Where(x => x.AccountId == accountId && x.BrId == branchId)
+                .OrderByDescending(x => x.LoanDate)
+                .FirstOrDefaultAsync();
+
+            var guarRec = await _context.loanguarwitness.AsNoTracking()
+                .Where(x => x.LoanAccId == accountId && x.BrId == branchId)
+                .FirstOrDefaultAsync();
+
+            var guarNames = new List<string>();
+            if (guarRec != null)
+            {
+                if (guarRec.Guar1MemId.HasValue)
+                {
+                    var gn = await _context.member.AsNoTracking()
+                        .Where(x => x.Id == guarRec.Guar1MemId && x.BranchId == guarRec.Guar1MemBrId)
+                        .Select(x => x.MemberName).FirstOrDefaultAsync();
+                    if (!string.IsNullOrEmpty(gn)) guarNames.Add(gn);
+                }
+                if (guarRec.Guar2MemId.HasValue)
+                {
+                    var gn = await _context.member.AsNoTracking()
+                        .Where(x => x.Id == guarRec.Guar2MemId && x.BranchId == guarRec.Guar2MemBrId)
+                        .Select(x => x.MemberName).FirstOrDefaultAsync();
+                    if (!string.IsNullOrEmpty(gn)) guarNames.Add(gn);
+                }
+            }
+
+            string shareAccNo = "";
+            if (account.MemberId.HasValue && account.MemberBranchID.HasValue)
+            {
+                shareAccNo = await _context.accountmaster.AsNoTracking()
+                    .Where(x => x.MemberId == account.MemberId && x.MemberBranchID == account.MemberBranchID
+                        && x.AccTypeId == (int)Enums.AccountTypes.ShareMoney && x.BranchId == branchId)
+                    .Select(x => x.AccountNumber ?? "").FirstOrDefaultAsync() ?? "";
+            }
+
             decimal openingBalance = await CalculateOpeningBalanceAsync(branchId, accountId, fromDate.Date);
 
             DateTime toExclusive = toDate.Date.AddDays(1);
+
+            var acctDetail = new
+            {
+                RelativeName  = account.RelativeName,
+                ContactNo     = account.PhoneNo1,
+                Address       = account.AddressLine,
+                LoanAmount    = kistDetail != null ? (decimal?)kistDetail.LoanAmountPassed : null,
+                LoanDate      = kistDetail?.LoanDate,
+                LoanPeriodMonths = kistDetail?.LoanPeriod,
+                LoanPeriodDays   = kistDetail?.LoanPeriodIndays,
+                StandardIntRate  = kistDetail?.StandardInterestRate,
+                OverdueIntRate   = kistDetail?.OverdueInterestRate,
+                KistInterval     = kistDetail?.KistInterval,
+                KistIntervalDays = kistDetail?.KistIntervalIndays,
+                Guarantors    = guarNames.Count > 0 ? string.Join(", ", guarNames) : null as string,
+                ShareAccNo    = shareAccNo,
+            };
 
             var emptyResult = new LoanLedgerDTO
             {
@@ -127,7 +196,20 @@ namespace BankingPlatform.API.Service.Reports
                 SessionFromDate = session?.fromdate ?? fromDate,
                 SessionToDate = session?.todate ?? toDate,
                 OpeningBalance = openingBalance,
-                ClosingBalance = openingBalance
+                ClosingBalance = openingBalance,
+                RelativeName  = acctDetail.RelativeName,
+                ContactNo     = acctDetail.ContactNo,
+                Address       = acctDetail.Address,
+                LoanAmount    = acctDetail.LoanAmount,
+                LoanDate      = acctDetail.LoanDate,
+                LoanPeriodMonths = acctDetail.LoanPeriodMonths,
+                LoanPeriodDays   = acctDetail.LoanPeriodDays,
+                StandardIntRate  = acctDetail.StandardIntRate,
+                OverdueIntRate   = acctDetail.OverdueIntRate,
+                KistInterval     = acctDetail.KistInterval,
+                KistIntervalDays = acctDetail.KistIntervalDays,
+                Guarantors    = acctDetail.Guarantors,
+                ShareAccNo    = acctDetail.ShareAccNo,
             };
 
             var voucherData = await _context.voucher.AsNoTracking()
@@ -227,7 +309,20 @@ namespace BankingPlatform.API.Service.Reports
                 Entries = entries,
                 TotalDr = totalDr,
                 TotalCr = totalCr,
-                ClosingBalance = runningBalance
+                ClosingBalance = runningBalance,
+                RelativeName  = acctDetail.RelativeName,
+                ContactNo     = acctDetail.ContactNo,
+                Address       = acctDetail.Address,
+                LoanAmount    = acctDetail.LoanAmount,
+                LoanDate      = acctDetail.LoanDate,
+                LoanPeriodMonths = acctDetail.LoanPeriodMonths,
+                LoanPeriodDays   = acctDetail.LoanPeriodDays,
+                StandardIntRate  = acctDetail.StandardIntRate,
+                OverdueIntRate   = acctDetail.OverdueIntRate,
+                KistInterval     = acctDetail.KistInterval,
+                KistIntervalDays = acctDetail.KistIntervalDays,
+                Guarantors    = acctDetail.Guarantors,
+                ShareAccNo    = acctDetail.ShareAccNo,
             });
         }
 

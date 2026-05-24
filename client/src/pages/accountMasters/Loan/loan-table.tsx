@@ -1,6 +1,7 @@
 import React from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
+import { formatDate } from "../../../utils/dateFormat";
 
 export interface LoanAccListItemDTO {
   accId: number;
@@ -38,9 +39,7 @@ const LoanAccountTable: React.FC<LoanAccountTableProps> = ({
             {row.accountNumber}
           </span>
           <span className="text-xs text-gray-500">
-            {row.accOpeningDate
-              ? new Date(row.accOpeningDate).toLocaleDateString()
-              : "N/A"}
+            {formatDate(row.accOpeningDate)}
           </span>
         </div>
       ),

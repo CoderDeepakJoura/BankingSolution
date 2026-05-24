@@ -526,7 +526,7 @@ const LoanAccountMaster: React.FC = () => {
   const sessionMaxDate = (sessionTo && sessionTo < sessionDate)
     ? sessionTo
     : sessionDate;
-  const isFirstSession = user.isFirstSession === "True";
+  const isFirstSession = user.isFirstSession === "True" || user.isFirstSession === true;
   const sessionMinDate = isFirstSession
     ? undefined
     : sessionParts.length >= 1 ? `${sessionParts[0]}-04-01` : undefined;
@@ -838,7 +838,7 @@ const LoanAccountMaster: React.FC = () => {
   return (
     <DashboardLayout mainContent={
       <div className="bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 min-h-screen">
-        <div className="max-w-7xl mx-auto space-y-4">
+        <div className="w-full space-y-4">
 
           {/* Header */}
           <div className="bg-white rounded-xl shadow border border-gray-200 p-5">

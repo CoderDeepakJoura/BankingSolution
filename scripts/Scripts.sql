@@ -652,6 +652,210 @@ CREATE TABLE IF NOT EXISTS vrodreserve (
 
 
 -- =============================================================================
+-- SECTION 6b : NPA TABLES
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS npaplanmaster (
+    id                   INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid                 INT             NOT NULL,
+    code                 VARCHAR(50)     NOT NULL,
+    description          VARCHAR(500)    NULL,
+    ishoupdated          SMALLINT        NULL,
+    calnpadate           INT             NOT NULL DEFAULT 0,
+    ovrduePeriodorinst   INT             NOT NULL DEFAULT 1,
+    calnpafromloandate   SMALLINT        NOT NULL DEFAULT 0,
+    CONSTRAINT pk_npaplanmaster PRIMARY KEY (id, brid)
+);
+
+CREATE TABLE IF NOT EXISTS npaplancategory (
+    id               INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid             INT             NOT NULL,
+    parentid         INT             NULL,
+    isgroup          VARCHAR(2)      NULL,
+    planid           INT             NULL,
+    periodfrom       INT             NULL,
+    periodto         INT             NULL,
+    provisioningperc FLOAT           NULL,
+    intmaxperiod     INT             NULL,
+    description      VARCHAR(100)    NULL,
+    descriptionsl    VARCHAR(100)    NULL,
+    seqno            INT             NULL,
+    ishoupdated      SMALLINT        NULL,
+    allprinoverdue   SMALLINT        NOT NULL DEFAULT 0,
+    CONSTRAINT pk_npaplancategory PRIMARY KEY (id, brid)
+);
+
+-- =============================================================================
+-- SECTION 6c : LOAN EXPENSE CATEGORY
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS expensecategory (
+    id            INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid          INT           NOT NULL,
+    code          VARCHAR(20)   NULL,
+    description   VARCHAR(100)  NULL,
+    descriptionsl VARCHAR(200)  NULL,
+    CONSTRAINT expensecategory_pkey PRIMARY KEY (id, brid),
+    CONSTRAINT uq_expensecategory_code        UNIQUE (brid, code),
+    CONSTRAINT uq_expensecategory_description UNIQUE (brid, description)
+);
+
+-- =============================================================================
+-- SECTION 6d : GST TAX TYPE
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS taxtype (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT           NOT NULL,
+    description     VARCHAR(50)   NULL,
+    descriptionsl   VARCHAR(100)  NULL,
+    code            VARCHAR(10)   NULL,
+    appliedin       INT           NULL,
+    isut            SMALLINT      NULL,
+    calculatedfrom  INT           NOT NULL DEFAULT 1,
+    seqno           INT           NOT NULL DEFAULT 1,
+    inaccid         INT           NOT NULL DEFAULT 0,
+    outaccid        INT           NOT NULL DEFAULT 0,
+    CONSTRAINT taxtype_pkey PRIMARY KEY (id, brid),
+    CONSTRAINT uq_taxtype_code        UNIQUE (brid, code),
+    CONSTRAINT uq_taxtype_description UNIQUE (brid, description)
+);
+
+-- =============================================================================
+-- SECTION 6e : GST TAX GROUP
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS taxgroup (
+    id                  INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid                INT           NOT NULL,
+    description         VARCHAR(50)   NOT NULL,
+    descriptionsl       VARCHAR(50)   NULL,
+    code                VARCHAR(10)   NULL,
+    printingformat      INT           NULL,
+    isstatmandatory     BOOLEAN       NOT NULL DEFAULT FALSE,
+    isshippingmandatory BOOLEAN       NOT NULL DEFAULT FALSE,
+    isbillingmandatory  BOOLEAN       NOT NULL DEFAULT FALSE,
+    CONSTRAINT taxgroup_pkey PRIMARY KEY (id, brid),
+    CONSTRAINT uq_taxgroup_code        UNIQUE (brid, code),
+    CONSTRAINT uq_taxgroup_description UNIQUE (brid, description)
+);
+
+CREATE TABLE IF NOT EXISTS taxgrouptype (
+    id          INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid        INT NOT NULL,
+    taxgroupid  INT NOT NULL,
+    taxtypeid   INT NOT NULL,
+    CONSTRAINT taxgrouptype_pkey PRIMARY KEY (id, brid)
+);
+
+-- =============================================================================
+-- SECTION 6f : GST TAX MASTER
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS tax (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT           NOT NULL,
+    name            VARCHAR(100)  NOT NULL,
+    namesl          VARCHAR(100)  NULL,
+    taxcode         INT           NOT NULL DEFAULT 0,
+    introductiondate DATE         NOT NULL,
+    taxaccountid    INT           NOT NULL DEFAULT 0,
+    alias           VARCHAR(30)   NOT NULL,
+    aliassl         VARCHAR(50)   NULL,
+    taxpercentage   FLOAT         NOT NULL DEFAULT 0,
+    parenttaxid     INT           NOT NULL DEFAULT 0,
+    evaluatedon     INT           NOT NULL DEFAULT 1,
+    oldtaxid        INT           NOT NULL DEFAULT 0,
+    tcid            INT           NOT NULL DEFAULT 0,
+    taxgroupid      INT           NULL,
+    CONSTRAINT tax_pkey PRIMARY KEY (id, brid),
+    CONSTRAINT uq_tax_name  UNIQUE (brid, name),
+    CONSTRAINT uq_tax_alias UNIQUE (brid, alias)
+);
+
+CREATE TABLE IF NOT EXISTS taxdetail (
+    id          INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid        INT   NOT NULL,
+    taxid       INT   NOT NULL,
+    detaildate  DATE  NOT NULL,
+    taxtypeid   INT   NOT NULL,
+    nratio      FLOAT NOT NULL DEFAULT 1,
+    dratio      FLOAT NOT NULL DEFAULT 1,
+    evaluatedon INT   NOT NULL DEFAULT 1,
+    percentage  FLOAT NOT NULL DEFAULT 0,
+    CONSTRAINT taxdetail_pkey PRIMARY KEY (id, brid)
+);
+
+-- =============================================================================
+-- SECTION 6g : GST BILL BOOK
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS billbook (
+    id                INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid              INT          NOT NULL,
+    description       VARCHAR(100) NOT NULL,
+    billnoprefix      VARCHAR(5)   NULL,
+    billnofrom        INT          NOT NULL DEFAULT 1,
+    billnogeneration  SMALLINT     NOT NULL DEFAULT 1,
+    CONSTRAINT billbook_pkey PRIMARY KEY (id, brid),
+    CONSTRAINT uq_billbook_description UNIQUE (brid, description)
+);
+
+-- Section 6h: GST Setting
+CREATE TABLE IF NOT EXISTS gstsetting (
+    brid               INT NOT NULL,
+    roundoffexpaccid   INT NOT NULL,
+    roundoffincaccid   INT NOT NULL,
+    CONSTRAINT gstsetting_pkey PRIMARY KEY (brid),
+    CONSTRAINT chk_gstsetting_diff_accounts CHECK (roundoffexpaccid <> roundoffincaccid)
+);
+
+-- =============================================================================
+-- SECTION 6i: SERVICE MASTER TABLES
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS service (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT             NOT NULL,
+    name            VARCHAR(100)    NOT NULL,
+    sac             VARCHAR(20)     NOT NULL,
+    otherreceipts   DECIMAL(18,2)   NOT NULL DEFAULT 0,
+    deductrefunds   DECIMAL(18,2)   NOT NULL DEFAULT 0,
+    penalties       DECIMAL(18,2)   NOT NULL DEFAULT 0,
+    isincludetax    BOOLEAN         NOT NULL DEFAULT FALSE,
+    purchaseaccid   INT             NOT NULL,
+    CONSTRAINT service_pkey PRIMARY KEY (id, brid),
+    CONSTRAINT uq_service_name UNIQUE (brid, name)
+);
+
+CREATE TABLE IF NOT EXISTS servicetaxrule (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT             NOT NULL,
+    serviceid       INT             NOT NULL,
+    applicabledate  TIMESTAMP(3)    NOT NULL,
+    taxid           INT             NOT NULL,
+    CONSTRAINT servicetaxrule_pkey PRIMARY KEY (id, brid)
+);
+
+CREATE TABLE IF NOT EXISTS accservicedetail (
+    id          INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid        INT NOT NULL,
+    accid       INT NOT NULL,
+    serviceid   INT NOT NULL,
+    CONSTRAINT accservicedetail_pkey PRIMARY KEY (id, brid)
+);
+
+CREATE TABLE IF NOT EXISTS servicetaxtypedet (
+    id          INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid        INT             NOT NULL,
+    serviceid   INT             NOT NULL,
+    date        TIMESTAMP(3)    NOT NULL,
+    taxtypeid   INT             NOT NULL,
+    perc        DECIMAL(18,2)   NOT NULL DEFAULT 0,
+    CONSTRAINT servicetaxtypedet_pkey PRIMARY KEY (id, brid)
+);
+
+-- =============================================================================
 -- SECTION 7 : SAVING PRODUCT TABLES
 -- =============================================================================
 

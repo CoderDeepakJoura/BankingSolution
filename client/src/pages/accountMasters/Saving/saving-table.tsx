@@ -2,6 +2,7 @@
 import React from "react";
 import { FaEdit, FaTrash, FaEye, FaUsers, FaUser } from "react-icons/fa";
 import { CompleteSavingAccountDTO } from "../../../services/accountMasters/savingaccount/savingaccountapi";
+import { formatDate } from "../../../utils/dateFormat";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
 
 interface SavingAccountTableProps {
@@ -74,9 +75,7 @@ const SavingAccountTable: React.FC<SavingAccountTableProps> = ({
             {row.accountNumber}
           </span>
           <span className="text-xs text-gray-500">
-            {row.accountOpeningDate
-              ? new Date(row.accountOpeningDate).toLocaleDateString()
-              : "N/A"}
+            {formatDate(row.accountOpeningDate)}
           </span>
         </div>
       ),

@@ -51,6 +51,14 @@ export interface FDLedger {
   totalDr: number;
   totalCr: number;
   closingBalance: number;
+  relativeName?: string;
+  contactNo?: string;
+  address?: string;
+  detailLtdNo?: number;
+  detailPeriodMonths?: number;
+  detailPeriodDays?: number;
+  detailIntRate?: number;
+  detailMaturityAmount?: number;
 }
 
 export const FD_STATUS_LABELS: Record<number, string> = {

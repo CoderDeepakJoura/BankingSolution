@@ -492,7 +492,7 @@ const LoanProductMaster: React.FC = () => {
     <DashboardLayout
       mainContent={
         <div className="-mt-3 bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-4">
+          <div className="w-full space-y-4">
             {/* Header */}
             <div className="bg-white rounded-xl shadow border border-gray-200 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">

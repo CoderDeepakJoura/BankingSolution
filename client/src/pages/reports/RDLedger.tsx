@@ -117,6 +117,25 @@ const buildExportConfig = (data: RDLedger, longNar: boolean): ExportConfig => {
     { header: "Balance",       widthRatio: 0.12, align: "right"  as const },
   ];
   const rows: ExportRow[] = [];
+  const info1 = [
+    `Name: ${data.accountName}`,
+    `Acc No: ${data.accountIdentifier}`,
+    data.relativeName && `Relative: ${data.relativeName}`,
+    data.contactNo && `Contact: ${data.contactNo}`,
+    data.address && `Address: ${data.address}`,
+  ].filter(Boolean).join("  |  ");
+  const info2 = [
+    data.kistAmount != null && `Kist Amt: ${fmt(data.kistAmount)}`,
+    data.rdDate && `RD Date: ${fmtShort(data.rdDate)}`,
+    data.firstKistDate && `1st Kist: ${fmtShort(data.firstKistDate)}`,
+    data.kistInterval && `Kist Interval: ${data.kistInterval}`,
+    data.periodMonths != null && `Period: ${data.periodMonths}M`,
+    data.interestRate != null && `Int Rate: ${data.interestRate}%`,
+    data.maturityDate && `Maturity: ${fmtShort(data.maturityDate)}`,
+    data.maturityAmount != null && `Mat Amt: ${fmt(data.maturityAmount)}`,
+  ].filter(Boolean).join("  |  ");
+  if (info1) rows.push({ style: "info", spanFirst: 7, cells: [info1] });
+  if (info2) rows.push({ style: "info", spanFirst: 7, cells: [info2] });
   rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", fmtBal(data.openingBalance)] });
   data.entries.forEach((e, i) => {
     const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
@@ -168,8 +187,20 @@ const buildPrintHTML = (data: RDLedger, longNar: boolean): string => {
     <h1>${data.branchName}</h1><p>${data.branchAddress}</p><h2>Recurring Deposit (RD) Account Ledger</h2>
   </div>
   <div class="acc-info">
+    <span><span class="lbl">Name:</span> <strong>${data.accountName}</strong></span>
+    <span><span class="lbl">Acc No:</span> <strong>${data.accountIdentifier}</strong></span>
     <span><span class="lbl">Product:</span> <strong>${data.productName}</strong></span>
-    <span><span class="lbl">Account:</span> <strong>${data.accountIdentifier} — ${data.accountName}</strong></span>
+    ${data.relativeName ? `<span><span class="lbl">Relative:</span> <strong>${data.relativeName}</strong></span>` : ""}
+    ${data.contactNo ? `<span><span class="lbl">Contact:</span> <strong>${data.contactNo}</strong></span>` : ""}
+    ${data.address ? `<span><span class="lbl">Address:</span> <strong>${data.address}</strong></span>` : ""}
+    ${data.kistAmount != null ? `<span><span class="lbl">Kist Amt:</span> <strong>&#8377;${fmt(data.kistAmount)}</strong></span>` : ""}
+    ${data.rdDate ? `<span><span class="lbl">RD Date:</span> <strong>${fmtShort(data.rdDate)}</strong></span>` : ""}
+    ${data.firstKistDate ? `<span><span class="lbl">1st Kist:</span> <strong>${fmtShort(data.firstKistDate)}</strong></span>` : ""}
+    ${data.kistInterval ? `<span><span class="lbl">Kist Interval:</span> <strong>${data.kistInterval}</strong></span>` : ""}
+    ${data.periodMonths != null ? `<span><span class="lbl">Period:</span> <strong>${data.periodMonths}M</strong></span>` : ""}
+    ${data.interestRate != null ? `<span><span class="lbl">Int Rate:</span> <strong>${data.interestRate}%</strong></span>` : ""}
+    ${data.maturityDate ? `<span><span class="lbl">Maturity:</span> <strong>${fmtShort(data.maturityDate)}</strong></span>` : ""}
+    ${data.maturityAmount != null ? `<span><span class="lbl">Mat Amt:</span> <strong>&#8377;${fmt(data.maturityAmount)}</strong></span>` : ""}
     <span><span class="lbl">Period:</span> <strong>${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}</strong></span>
   </div>
   <table><thead><tr>
@@ -269,7 +300,7 @@ const RDLedgerPage: React.FC = () => {
       enableScroll
       mainContent={
         <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-5">
+          <div className="w-full space-y-5">
 
             {/* ── Filter Card ── */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -376,17 +407,43 @@ const RDLedgerPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap gap-2 items-center">
-                  {[
-                    { label: "Product", value: data.productName },
-                    { label: "Account", value: `${data.accountIdentifier} — ${data.accountName}` },
-                    { label: "Period",  value: `${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}` },
-                  ].map(({ label, value }) => (
-                    <span key={label} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
-                      <span className="text-slate-400 font-medium">{label}:</span>
-                      <span className="font-semibold text-slate-800">{value}</span>
-                    </span>
-                  ))}
+                {/* Account info panel */}
+                <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                    {[
+                      { label: "Name",           value: data.accountName },
+                      { label: "Acc. No.",        value: data.accountIdentifier },
+                      { label: "Address",         value: data.address },
+                      { label: "Relative Name",   value: data.relativeName },
+                      { label: "Contact No.",     value: data.contactNo },
+                      { label: "Product",         value: data.productName },
+                      { label: "Period",          value: `${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}` },
+                    ].filter(f => f.value).map(({ label, value }) => (
+                      <div key={label} className="flex gap-1 min-w-0">
+                        <span className="text-slate-400 font-medium shrink-0">{label}:</span>
+                        <span className="font-semibold text-slate-800 truncate">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {(data.kistAmount != null || data.rdDate || data.periodMonths != null || data.interestRate != null) && (
+                    <div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                      {[
+                        { label: "Kist Amount",     value: data.kistAmount != null ? `₹${data.kistAmount.toLocaleString("en-IN")}` : null },
+                        { label: "RD Date",         value: data.rdDate ? fmtShort(data.rdDate) : null },
+                        { label: "First Kist Date", value: data.firstKistDate ? fmtShort(data.firstKistDate) : null },
+                        { label: "Kist Interval",   value: data.kistInterval != null ? `${data.kistInterval} Month(s)` : null },
+                        { label: "Period",          value: data.periodMonths != null ? `${data.periodMonths} Months` : null },
+                        { label: "Int. Rate",       value: data.interestRate != null ? `${data.interestRate}%` : null },
+                        { label: "Maturity Date",   value: data.maturityDate ? fmtShort(data.maturityDate) : null },
+                        { label: "Maturity Amt.",   value: data.maturityAmount != null ? `₹${data.maturityAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : null },
+                      ].filter(f => f.value).map(({ label, value }) => (
+                        <div key={label} className="flex gap-1 min-w-0">
+                          <span className="text-slate-400 font-medium shrink-0">{label}:</span>
+                          <span className="font-semibold text-slate-800">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-4 sm:p-5">

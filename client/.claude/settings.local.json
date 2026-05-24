@@ -7,7 +7,21 @@
       "Bash(xargs grep *)",
       "Read(//e/Codes/AHDSolution/BankingPlatform/backend/**)",
       "Read(//e/Codes/AHDSolution/BankingPlatform/backend/BankingPlatform.API/Mappers/Voucher/**)",
-      "Read(//e/Codes/AHDSolution/BankingPlatform/**)"
+      "Read(//e/Codes/AHDSolution/BankingPlatform/**)",
+      "Bash(dotnet ef *)",
+      "Bash(dotnet build *)",
+      "Bash(npx tsc *)",
+      "Bash(xargs ls *)",
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Bash(Get-ChildItem -Path \"e:\\\\Codes\\\\AHDSolution\\\\BankingPlatform\\\\backend\\\\BankingPlatform.Infrastructure\\\\Models\\\\AccMasters\\\\Loan\" -Recurse -Filter \"*.cs\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(dir -Recurse -Filter \"*FDAccountDetail*\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object FullName)",
+      "Read(//c//**)",
+      "Read(//e/Codes/AHDSolution/BankingPlatform.API/Service/Reports/**)",
+      "Bash(git -C \"e:\\\\Codes\\\\AHDSolution\\\\BankingPlatform\\\\client\" status)",
+      "Bash(git -C \"e:\\\\Codes\\\\AHDSolution\\\\BankingPlatform\\\\backend\" status)"
     ],
     "additionalDirectories": [
       "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API\\Common",
@@ -15,7 +29,16 @@
       "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API\\Service\\Vouchers",
       "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API\\Controllers\\Vouchers",
       "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API",
-      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\DbContexts"
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\DbContexts",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Settings",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Services",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Common\\Common\\CommonClasses",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\scripts",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Models\\voucher",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Migrations",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Models\\NPA",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Models\\GST",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Models\\Services"
     ]
   }
 }

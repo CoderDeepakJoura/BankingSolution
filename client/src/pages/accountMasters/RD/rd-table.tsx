@@ -2,6 +2,7 @@
 import React from "react";
 import { FaEdit, FaTrash, FaUsers, FaUser } from "react-icons/fa";
 import { CommonAccMasterDTO } from "../../../services/accountMasters/rdaccount/rdaccountapi";
+import { formatDate } from "../../../utils/dateFormat";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
 
 interface RDAccountTableProps {
@@ -108,9 +109,7 @@ const RDAccountTable: React.FC<RDAccountTableProps> = ({
             {row.accountNumber}
           </span>
           <span className="text-xs text-gray-500">
-            {row.accountOpeningDate
-              ? new Date(row.accountOpeningDate).toLocaleDateString()
-              : "N/A"}
+            {formatDate(row.accountOpeningDate)}
           </span>
         </div>
       ),
@@ -178,9 +177,7 @@ const RDAccountTable: React.FC<RDAccountTableProps> = ({
       render: (row) => (
         <div className="flex flex-col">
           <span className="text-sm text-gray-800 font-medium">
-            {row.maturityDate
-              ? new Date(row.maturityDate).toLocaleDateString()
-              : "-"}
+            {row.maturityDate ? formatDate(row.maturityDate) : "-"}
           </span>
           {row.maturityAmt != null && (
             <span className="text-xs text-green-700 font-semibold">

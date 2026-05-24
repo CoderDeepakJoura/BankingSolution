@@ -67,7 +67,8 @@ namespace BankingPlatform.API.Service.Reports
         }
 
         public async Task<(bool success, string message, GeneralLedgerDTO? data)> GetGeneralLedgerAsync(
-            int branchId, int accountId, DateTime fromDate, DateTime toDate)
+            int branchId, int accountId, DateTime fromDate, DateTime toDate,
+            bool consolidate = false, bool nonZero = false)
         {
             var branch = await _db.branchmaster.AsNoTracking()
                 .FirstOrDefaultAsync(b => b.id == branchId);
@@ -124,21 +125,51 @@ namespace BankingPlatform.API.Service.Reports
             decimal runningBalance = openingBalance;
             var rows = new List<GeneralLedgerRowDTO>();
 
-            foreach (var e in periodEntries)
+            if (consolidate)
             {
-                decimal? dr = e.VoucherEntryType == "Dr" ? e.VoucherAmount : (decimal?)null;
-                decimal? cr = e.VoucherEntryType == "Cr" ? e.VoucherAmount : (decimal?)null;
-                runningBalance += (dr ?? 0m) - (cr ?? 0m);
+                var dateGroups = periodEntries
+                    .GroupBy(e => e.ValueDate.Date)
+                    .OrderBy(g => g.Key);
 
-                rows.Add(new GeneralLedgerRowDTO
+                foreach (var grp in dateGroups)
                 {
-                    ValueDate      = e.ValueDate,
-                    VoucherNo      = e.VoucherNo,
-                    Narration      = e.Narration,
-                    Dr             = dr,
-                    Cr             = cr,
-                    RunningBalance = runningBalance,
-                });
+                    decimal dayDr = grp.Where(e => e.VoucherEntryType == "Dr").Sum(e => e.VoucherAmount);
+                    decimal dayCr = grp.Where(e => e.VoucherEntryType == "Cr").Sum(e => e.VoucherAmount);
+                    runningBalance += dayDr - dayCr;
+
+                    if (nonZero && dayDr == 0m && dayCr == 0m) continue;
+
+                    rows.Add(new GeneralLedgerRowDTO
+                    {
+                        ValueDate      = grp.Key,
+                        VoucherNo      = 0,
+                        Narration      = null,
+                        Dr             = dayDr > 0m ? dayDr : (decimal?)null,
+                        Cr             = dayCr > 0m ? dayCr : (decimal?)null,
+                        RunningBalance = runningBalance,
+                    });
+                }
+            }
+            else
+            {
+                foreach (var e in periodEntries)
+                {
+                    decimal? dr = e.VoucherEntryType == "Dr" ? e.VoucherAmount : (decimal?)null;
+                    decimal? cr = e.VoucherEntryType == "Cr" ? e.VoucherAmount : (decimal?)null;
+                    runningBalance += (dr ?? 0m) - (cr ?? 0m);
+
+                    if (nonZero && dr == null && cr == null) continue;
+
+                    rows.Add(new GeneralLedgerRowDTO
+                    {
+                        ValueDate      = e.ValueDate,
+                        VoucherNo      = e.VoucherNo,
+                        Narration      = e.Narration,
+                        Dr             = dr,
+                        Cr             = cr,
+                        RunningBalance = runningBalance,
+                    });
+                }
             }
 
             string accNo = !string.IsNullOrWhiteSpace(account.AccountNumber)

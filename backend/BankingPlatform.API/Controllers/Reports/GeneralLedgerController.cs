@@ -42,7 +42,9 @@ namespace BankingPlatform.API.Controllers.Reports
             [FromQuery] int branchId,
             [FromQuery] int accountId,
             [FromQuery] string fromDate,
-            [FromQuery] string toDate)
+            [FromQuery] string toDate,
+            [FromQuery] bool consolidate = false,
+            [FromQuery] bool nonZero = false)
         {
             try
             {
@@ -55,7 +57,7 @@ namespace BankingPlatform.API.Controllers.Reports
                 if (from > to)
                     return BadRequest(new { Success = false, Message = "fromDate must be on or before toDate." });
 
-                var (success, message, data) = await _service.GetGeneralLedgerAsync(branchId, accountId, from, to);
+                var (success, message, data) = await _service.GetGeneralLedgerAsync(branchId, accountId, from, to, consolidate, nonZero);
                 if (!success)
                     return BadRequest(new { Success = false, Message = message });
 

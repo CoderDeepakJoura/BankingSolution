@@ -100,33 +100,32 @@ namespace BankingPlatform.API.Service.AccountMasters
                         await _context.accountnomineeinfo.AddAsync(nominee);
                     }
                 }
-                AccountDocDetails accountdocdetails = new();
-                if (picture != null)
+                if (picture != null || signature != null)
                 {
-                    var (fileName, extension) = await _imageService.SaveAccountImageAsync(
-                        picture,
-                        accountId,
-                        "picture",
-                        "Account_Images",
-                        "Pictures"
-                    );
-                    accountdocdetails.PicExt = extension;
-                }
+                    AccountDocDetails accountdocdetails = new()
+                    {
+                        AccountId = accountId,
+                        BranchId = branchId,
+                        PicExt = "",
+                        SignExt = "",
+                    };
 
-                if (signature != null)
-                {
-                    var (fileName, extension) = await _imageService.SaveAccountImageAsync(
-                        signature,
-                        accountId,
-                        "signature",
-                        "Account_Images",
-                        "Signatures"
-                    );
-                    accountdocdetails.SignExt = extension;
+                    if (picture != null)
+                    {
+                        var (_, extension) = await _imageService.SaveAccountImageAsync(
+                            picture, accountId, "picture", "Account_Images", "Pictures");
+                        accountdocdetails.PicExt = extension;
+                    }
+
+                    if (signature != null)
+                    {
+                        var (_, extension) = await _imageService.SaveAccountImageAsync(
+                            signature, accountId, "signature", "Account_Images", "Signatures");
+                        accountdocdetails.SignExt = extension;
+                    }
+
+                    await _context.accountdocdetails.AddAsync(accountdocdetails);
                 }
-                accountdocdetails.AccountId = accountId;
-                accountdocdetails.BranchId = branchId;
-                await _context.accountdocdetails.AddAsync(accountdocdetails);
 
                 // 4. Save Joint Account Holders (if operation type is Joint)
                 if (dto.JointAccountInfoDTO != null && dto.JointAccountInfoDTO.Any())
@@ -225,6 +224,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             var workingDate = _commonfunctions.GetWorkingDate();
             var query = _context.accountmaster
                 .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.Saving
+                    && !x.IsAccClosed
                     && (!workingDate.HasValue || x.AccOpeningDate.Date <= workingDate.Value.Date));
 
             // ✅ CHANGE: Bring data to memory FIRST
@@ -458,38 +458,30 @@ namespace BankingPlatform.API.Service.AccountMasters
                             existingDocs.SignExt = dto.AccountDocDetailsDTO.SignExt;
                         }
                     }
-                    else
+                    else if (picture != null || signature != null)
                     {
-                        if (picture != null)
-                        {
-                            var (fileName, extension) = await _imageService.SaveAccountImageAsync(
-                                picture,
-                                accountId,
-                                "picture",
-                                "Account_Images",
-                                "Pictures"
-                            );
-                            dto.AccountDocDetailsDTO.PicExt = extension;
-                        }
-
-                        if (signature != null)
-                        {
-                            var (fileName, extension) = await _imageService.SaveAccountImageAsync(
-                                signature,
-                                accountId,
-                                "signature",
-                                "Account_Images",
-                                "Signatures"
-                            );
-                            dto.AccountDocDetailsDTO.SignExt = extension;
-                        }
                         var newDocs = new AccountDocDetails
                         {
                             BranchId = branchId,
                             AccountId = accountId,
-                            PicExt = dto.AccountDocDetailsDTO.PicExt,
-                            SignExt = dto.AccountDocDetailsDTO.SignExt
+                            PicExt = "",
+                            SignExt = "",
                         };
+
+                        if (picture != null)
+                        {
+                            var (_, extension) = await _imageService.SaveAccountImageAsync(
+                                picture, accountId, "picture", "Account_Images", "Pictures");
+                            newDocs.PicExt = extension;
+                        }
+
+                        if (signature != null)
+                        {
+                            var (_, extension) = await _imageService.SaveAccountImageAsync(
+                                signature, accountId, "signature", "Account_Images", "Signatures");
+                            newDocs.SignExt = extension;
+                        }
+
                         await _context.accountdocdetails.AddAsync(newDocs);
                     }
                 }
