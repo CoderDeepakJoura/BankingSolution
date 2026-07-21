@@ -1,5 +1,15 @@
 import { ApiService, ApiResponse } from '../../api';
 
+export interface IntRecDetailRowDTO {
+  id: number;
+  entryDate: string;
+  intCatId: number;
+  intCatName: string;
+  intDr: number;
+  intCr: number;
+  voucherNo: number;
+}
+
 export interface LoanRecoveryDebitItemDTO {
   accountId: number;
   accountType: number;
@@ -44,6 +54,10 @@ export interface LoanRecoveryBalanceDTO {
   interestCalcFromDate?: string;
   interestCalcToDate?: string;
   intCalcMethod: string;
+  // 1=AddInBalance (interest embedded in principal), 2=Stand (tracked via voucherrecintdetail)
+  actOnIntPosting?: number;
+  // Stand loans only: full voucherrecintdetail history
+  intRecDetail: IntRecDetailRowDTO[];
 }
 
 export interface LoanAccountSearchDTO {

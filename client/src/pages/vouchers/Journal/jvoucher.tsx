@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import Swal from "sweetalert2";
 import Select from "react-select";
 import {
@@ -14,6 +14,8 @@ import {
   IndianRupee,
   CheckCircle2,
   ArrowLeftRight,
+  CheckCircle,
+  X,
 } from "lucide-react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -22,10 +24,13 @@ import { RootState } from "../../../redux";
 import commonservice from "../../../services/common/commonservice";
 import journalVoucherApi, {
   JournalVoucherDTO,
+  GSTDetailDTO,
+  JournalVoucherGSTRestoreItemDTO,
 } from "../../../services/vouchers/journal/journalVoucherApi";
 import { getFirstSessionFromDate } from "../../../utils/session";
 import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
-import { Pencil, X } from "lucide-react";
+import { Pencil } from "lucide-react";
+import GSTDetailPanel from "../../../components/GST/GSTDetailPanel";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +50,10 @@ interface GridEntry {
   balanceLoading: boolean;
   accounts: AccountOption[];
   accountsLoading: boolean;
+  gstDetail: GSTDetailDTO | null;
+  totalTax: number;
+  hasGstService: boolean;
+  gstModalOpen: boolean;
 }
 
 const ACCOUNT_TYPES = [
@@ -72,6 +81,10 @@ function newEntry(): GridEntry {
     balanceLoading: false,
     accounts: [],
     accountsLoading: false,
+    gstDetail: null,
+    totalTax: 0,
+    hasGstService: false,
+    gstModalOpen: false,
   };
 }
 
@@ -103,10 +116,16 @@ const JournalTransferVoucher: React.FC = () => {
 
   // ─── computed ────────────────────────────────────────────────────────────────
 
-  const totalCr = entries.reduce(
+  const totalGstTax = entries
+    .filter((e) => e.entryType === "Cr")
+    .reduce((s, e) => s + e.totalTax, 0);
+
+  const totalCrBase = entries.reduce(
     (s, e) => (e.entryType === "Cr" ? s + parseFloat(e.amount || "0") : s),
     0
   );
+  const totalCr = totalCrBase + totalGstTax;
+
   const totalDr = entries.reduce(
     (s, e) => (e.entryType === "Dr" ? s + parseFloat(e.amount || "0") : s),
     0
@@ -144,11 +163,48 @@ const JournalTransferVoucher: React.FC = () => {
             balanceLoading: false,
             accounts,
             accountsLoading: false,
+            gstDetail: null,
+            totalTax: 0,
+            hasGstService: false,
+            gstModalOpen: false,
           };
         })
       );
 
-      setEntries(restored.length > 0 ? restored : [newEntry(), newEntry()]);
+      const baseEntries = restored.length > 0 ? restored : [newEntry(), newEntry()];
+      let entriesToSet = baseEntries;
+
+      // Restore GST details and strip out auto-generated tax Cr entries
+      try {
+        const gstRes = await journalVoucherApi.getGstRestoreDetails(editVoucher.voucherId, user.branchid);
+        if (gstRes.success && gstRes.data && gstRes.data.length > 0) {
+          const gstMap = new Map<number, JournalVoucherGSTRestoreItemDTO>(
+            gstRes.data.map((g) => [g.crAccountId, g])
+          );
+
+          // Collect all tax account IDs — these Cr entries were auto-created by the backend
+          // and must not appear as editable rows (they're embedded in gstDetail)
+          const taxAccIds = new Set<number>(
+            gstRes.data.flatMap((g) => g.gstDetail.taxLines.map((tl) => tl.accId).filter((id) => id > 0))
+          );
+
+          const patched = baseEntries
+            .filter((e) => !(e.entryType === "Cr" && taxAccIds.has(e.accountId)))
+            .map((e) => {
+              if (e.entryType === "Cr" && e.accountType === 3) {
+                const gstItem = gstMap.get(e.accountId);
+                if (gstItem)
+                  return { ...e, gstDetail: gstItem.gstDetail, totalTax: gstItem.totalTax, hasGstService: true };
+              }
+              return e;
+            });
+
+          while (patched.length < 2) patched.push(newEntry());
+          entriesToSet = patched;
+        }
+      } catch { /* GST restore is non-critical; entries still load */ }
+
+      setEntries(entriesToSet);
     })();
   }, []);
 
@@ -210,6 +266,10 @@ const JournalTransferVoucher: React.FC = () => {
       accountName: "",
       balance: null,
       accounts: [],
+      gstDetail: null,
+      totalTax: 0,
+      hasGstService: false,
+      gstModalOpen: false,
     });
     if (type > 0) loadAccounts(id, type);
     clearError(`acc_type_${id}`);
@@ -235,7 +295,13 @@ const JournalTransferVoucher: React.FC = () => {
       });
       return;
     }
-    updateEntry(id, { accountId: accId, balance: null });
+    updateEntry(id, {
+      accountId: accId,
+      balance: null,
+      gstDetail: null,
+      totalTax: 0,
+      hasGstService: false,
+    });
     if (accId > 0 && [2, 4, 5, 6].includes(accountType)) fetchBalance(id, accId, accountType);
     clearError(`acc_id_${id}`);
   };
@@ -246,7 +312,10 @@ const JournalTransferVoucher: React.FC = () => {
     accountId: number,
     accountType: number
   ) => {
-    updateEntry(id, { entryType: type });
+    const gstReset = type === "Dr"
+      ? { gstDetail: null as GSTDetailDTO | null, totalTax: 0, hasGstService: false, gstModalOpen: false }
+      : {};
+    updateEntry(id, { entryType: type, ...gstReset });
     if (accountId > 0 && [2, 4, 5, 6].includes(accountType)) {
       setEntries((prev) => {
         const entry = prev.find((e) => e.id === id);
@@ -261,6 +330,17 @@ const JournalTransferVoucher: React.FC = () => {
       updateEntry(id, { amount: value });
       clearError(`amt_${id}`);
     }
+  };
+
+  const handleGstChange = (id: string, v: GSTDetailDTO | null, tax: number) => {
+    updateEntry(id, { gstDetail: v, totalTax: tax });
+  };
+
+  const handleHasService = (id: string, has: boolean) => {
+    updateEntry(id, {
+      hasGstService: has,
+      ...(has ? {} : { gstDetail: null, totalTax: 0 }),
+    });
   };
 
   const addEntry = () => setEntries((prev) => [...prev, newEntry()]);
@@ -305,7 +385,9 @@ const JournalTransferVoucher: React.FC = () => {
     if (totalCr === 0 && totalDr === 0)
       errs.balance = "Enter at least one valid amount.";
     else if (Math.abs(totalCr - totalDr) >= 0.001)
-      errs.balance = "Journal voucher is not balanced. Total Credits must equal Total Debits.";
+      errs.balance = totalGstTax > 0
+        ? `Journal voucher is not balanced. Total Credits (base ₹${totalCrBase.toFixed(2)} + GST ₹${totalGstTax.toFixed(2)} = ₹${totalCr.toFixed(2)}) must equal Total Debits (₹${totalDr.toFixed(2)}).`
+        : "Journal voucher is not balanced. Total Credits must equal Total Debits.";
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -325,6 +407,8 @@ const JournalTransferVoucher: React.FC = () => {
         accountType: e.accountType,
         entryType: e.entryType,
         amount: parseFloat(e.amount),
+        totalTax: e.totalTax || 0,
+        gstDetail: e.gstDetail ?? undefined,
       })),
     };
 
@@ -369,6 +453,9 @@ const JournalTransferVoucher: React.FC = () => {
   };
 
   // ─── render ───────────────────────────────────────────────────────────────────
+
+  // Determine which entry's modal is open
+  const gstModalEntry = entries.find((e) => e.gstModalOpen) ?? null;
 
   return (
     <DashboardLayout
@@ -504,9 +591,27 @@ const JournalTransferVoucher: React.FC = () => {
                         onAmountChange={handleAmountChange}
                         onRemove={removeEntry}
                         canRemove={entries.length > 2}
+                        onOpenGstModal={(id) => updateEntry(id, { gstModalOpen: true })}
                       />
                     ))}
                   </div>
+                </div>
+
+                {/* Hidden GST panels — one per Cr+General entry, always mounted for reactivity */}
+                <div className="hidden" aria-hidden="true">
+                  {entries
+                    .filter((e) => e.accountType === 3 && e.entryType === "Cr" && e.accountId > 0)
+                    .map((e) => (
+                      <GSTDetailPanel
+                        key={`gst-hidden-${e.id}`}
+                        date={voucherDate}
+                        crAccountId={e.accountId}
+                        expenseAmount={parseFloat(e.amount) || 0}
+                        value={e.gstDetail}
+                        onChange={(v, tax) => handleGstChange(e.id, v, tax)}
+                        onHasService={(has) => handleHasService(e.id, has)}
+                      />
+                    ))}
                 </div>
 
                 {/* ── Balance Summary ── */}
@@ -526,6 +631,11 @@ const JournalTransferVoucher: React.FC = () => {
                         <TrendingUp className="w-4 h-4 text-green-600" />
                         <p className="text-xl font-bold text-green-700">₹{totalCr.toFixed(2)}</p>
                       </div>
+                      {totalGstTax > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          Base ₹{totalCrBase.toFixed(2)} + GST ₹{totalGstTax.toFixed(2)}
+                        </p>
+                      )}
                     </div>
 
                     {/* Total Dr */}
@@ -603,6 +713,44 @@ const JournalTransferVoucher: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* ── GST Modal ── */}
+          {gstModalEntry && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 bg-violet-700">
+                  <div className="flex items-center gap-3">
+                    <FileText size={20} className="text-white" />
+                    <h2 className="text-lg font-bold text-white">GST Detail</h2>
+                  </div>
+                  <button
+                    onClick={() => updateEntry(gstModalEntry.id, { gstModalOpen: false })}
+                    className="p-1.5 rounded-lg hover:bg-violet-600 transition-colors text-white"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="px-6 py-5">
+                  <GSTDetailPanel
+                    date={voucherDate}
+                    crAccountId={gstModalEntry.accountId}
+                    expenseAmount={parseFloat(gstModalEntry.amount) || 0}
+                    value={gstModalEntry.gstDetail}
+                    onChange={(v, tax) => handleGstChange(gstModalEntry.id, v, tax)}
+                    onHasService={(has) => handleHasService(gstModalEntry.id, has)}
+                  />
+                </div>
+                <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <button
+                    onClick={() => updateEntry(gstModalEntry.id, { gstModalOpen: false })}
+                    className="px-5 py-2 text-sm bg-violet-600 text-white rounded-lg font-medium hover:bg-violet-700 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       }
     />
@@ -621,6 +769,7 @@ interface JVEntryRowProps {
   onAmountChange: (id: string, value: string) => void;
   onRemove: (id: string) => void;
   canRemove: boolean;
+  onOpenGstModal: (id: string) => void;
 }
 
 const JVEntryRow: React.FC<JVEntryRowProps> = ({
@@ -633,6 +782,7 @@ const JVEntryRow: React.FC<JVEntryRowProps> = ({
   onAmountChange,
   onRemove,
   canRemove,
+  onOpenGstModal,
 }) => {
   const accountOptions = entry.accounts.map((a) => ({
     value: a.accId,
@@ -646,6 +796,12 @@ const JVEntryRow: React.FC<JVEntryRowProps> = ({
   const hasAccTypeErr = !!errors[`acc_type_${entry.id}`];
   const hasAccIdErr = !!errors[`acc_id_${entry.id}`];
   const hasAmtErr = !!errors[`amt_${entry.id}`];
+
+  const showGstButton =
+    entry.hasGstService &&
+    entry.entryType === "Cr" &&
+    entry.accountType === 3 &&
+    entry.accountId > 0;
 
   return (
     <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-4 hover:border-violet-200 transition-colors">
@@ -667,7 +823,7 @@ const JVEntryRow: React.FC<JVEntryRowProps> = ({
               value={selectedAccType ? { value: selectedAccType.value, label: selectedAccType.label } : null}
               onChange={(sel) => sel && onAccountTypeChange(entry.id, sel.value)}
               placeholder="Select type..."
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "42px",
@@ -707,7 +863,7 @@ const JVEntryRow: React.FC<JVEntryRowProps> = ({
                   : "Select account..."
               }
               noOptionsMessage={() => "No accounts found"}
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "42px",
@@ -754,6 +910,7 @@ const JVEntryRow: React.FC<JVEntryRowProps> = ({
                 {errors[`amt_${entry.id}`]}
               </p>
             )}
+            {/* Balance display */}
             {[2, 4, 5, 6].includes(entry.accountType) && (
               <p className="text-xs mt-0.5">
                 {entry.balanceLoading ? (
@@ -774,6 +931,27 @@ const JVEntryRow: React.FC<JVEntryRowProps> = ({
                 ) : null}
               </p>
             )}
+            {/* GST summary below amount */}
+            {entry.totalTax > 0 && (
+              <p className="text-xs mt-0.5 text-orange-600 font-medium">
+                + GST ₹{entry.totalTax.toFixed(2)} → Net ₹{(parseFloat(entry.amount || "0") + entry.totalTax).toFixed(2)}
+              </p>
+            )}
+            {/* GST button */}
+            {showGstButton && (
+              <button
+                type="button"
+                onClick={() => onOpenGstModal(entry.id)}
+                className={`mt-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium transition-colors ${
+                  entry.gstDetail
+                    ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
+                    : "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                }`}
+              >
+                {entry.gstDetail ? <CheckCircle size={12} /> : <FileText size={12} />}
+                {entry.gstDetail ? "GST Applied" : "View GST Detail"}
+              </button>
+            )}
           </div>
 
           {/* Entry Type */}
@@ -785,7 +963,7 @@ const JVEntryRow: React.FC<JVEntryRowProps> = ({
               options={ENTRY_TYPES.map((t) => ({ value: t.value, label: t.label }))}
               value={{ value: selectedEntryType.value, label: selectedEntryType.label }}
               onChange={(sel) => sel && onEntryTypeChange(entry.id, sel.value, entry.accountId, entry.accountType)}
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "42px",

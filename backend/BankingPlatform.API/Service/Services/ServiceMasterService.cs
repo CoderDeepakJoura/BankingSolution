@@ -20,7 +20,6 @@ namespace BankingPlatform.API.Service.Services
             if (string.IsNullOrWhiteSpace(dto.SAC)) return "SAC(TC) is required.";
             if (dto.PurchaseAccId == 0) return "Purchase Account is required.";
             if (dto.TaxRules.Count == 0) return "At least one Tax Detail is required.";
-            if (dto.TaxTypeDets.Count == 0) return "At least one Tax Type Detail is required.";
 
             if (await _context.service.AnyAsync(x => x.BrId == dto.BranchId && x.Name != null && x.Name.ToLower() == name.ToLower()))
                 return "Service with this name already exists.";

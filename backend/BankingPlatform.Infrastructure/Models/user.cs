@@ -21,4 +21,5 @@ public partial class User
     public int issu { get; set; }
     public int isbranchsu { get; set; }
     public int usertype { get; set; }
+    public string lastseenversion { get; set; } = "0.0.0";
 }

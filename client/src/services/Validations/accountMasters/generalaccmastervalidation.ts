@@ -18,7 +18,6 @@ export const useFormValidation = () => {
     },
     accountNumber: {
       required: true,
-      minLength: 2,
       maxLength: 20,
       pattern: /^\d+$/,
       requiredMessage: "Account Number is required.",

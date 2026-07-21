@@ -505,6 +505,25 @@ namespace BankingPlatform.API.Controllers
             });
         }
 
+        // intAccountType: 1 = SameAccount (cumulative FD), 2 = OtherAccount (MIS)
+        [HttpGet("fd-products-by-type/{branchId}/{intAccountType}")]
+        public async Task<IActionResult> FDProductsByType([FromRoute] int branchId, int intAccountType)
+        {
+            var productInfo = await (
+                from p in _context.fdproduct.AsNoTracking()
+                join r in _context.fdproductrules.AsNoTracking()
+                    on new { p.Id, p.BranchId } equals new { Id = r.ProductId, r.BranchId }
+                where p.BranchId == branchId && r.IntAccountType == intAccountType
+                select new SavingsProductDTO
+                {
+                    ProductName = p.ProductCode + "-" + p.ProductName,
+                    Id = p.Id
+                }
+            ).ToListAsync();
+
+            return Ok(new { Success = true, data = productInfo });
+        }
+
         [HttpGet("slabname-exists/{slabName}/{branchId}/{slabId}")]
         public async Task<IActionResult> IfSlabNameExists([FromRoute] string slabName, int branchId, int slabId)
         {
@@ -664,14 +683,21 @@ namespace BankingPlatform.API.Controllers
                                             join l in _context.savingproductrules.AsNoTracking()
                                                 on new { productId = q.Id, branchId = q.BranchId }
                                                 equals new { productId = l.SavingsProductId, branchId = l.BranchId }
-                                            join h in _context.memberdocdetails.AsNoTracking()
-                                                on new { memberId = k.Id, memberBranchId = k.BranchId }
-                                                equals new { memberId = h.MemberId, memberBranchId = h.BranchId }
                                             join m in _context.memberlocationdetails.AsNoTracking()
                                                 on new { memberId = k.Id, memberBranchId = k.BranchId }
                                                 equals new { memberId = m.MemberId, memberBranchId = m.BranchId }
-                                            join accdocdet in _context.accountdocdetails on new { accountId = p.ID, accountBranchId = p.BranchId }
-                                            equals new { accountId = accdocdet.AccountId, accountBranchId = accdocdet.BranchId }
+                                            // LEFT JOIN for member doc details (optional)
+                                            join hJoin in _context.memberdocdetails.AsNoTracking()
+                                                on new { memberId = k.Id, memberBranchId = k.BranchId }
+                                                equals new { memberId = hJoin.MemberId, memberBranchId = hJoin.BranchId }
+                                                into memberDocGroup
+                                            from h in memberDocGroup.DefaultIfEmpty()
+                                            // LEFT JOIN for account doc details (optional)
+                                            join accdocdetJoin in _context.accountdocdetails.AsNoTracking()
+                                                on new { accountId = p.ID, accountBranchId = p.BranchId }
+                                                equals new { accountId = accdocdetJoin.AccountId, accountBranchId = accdocdetJoin.BranchId }
+                                                into accDocGroup
+                                            from accdocdet in accDocGroup.DefaultIfEmpty()
                                             // LEFT JOIN for nominee details
                                             join f in _context.membernomineedetails.AsNoTracking()
                                                 on new { memberId = k.Id, memberBranchId = k.BranchId }
@@ -694,16 +720,16 @@ namespace BankingPlatform.API.Controllers
                                                 Address = m.AddressLine1 ?? "",
                                                 ContactNo = k.PhoneNo1,
                                                 EmailId = k.Email1,
-                                                AadhaarNo = h.AadhaarCardNo,
-                                                PANCardNo = h.PanCardNo,
+                                                AadhaarNo = h != null ? h.AadhaarCardNo : "",
+                                                PANCardNo = h != null ? h.PanCardNo : "",
                                                 nomineeDetails = nominee != null ? new
                                                 {
                                                     NomineeName = nominee.NomineeName,
                                                 } : null,
                                                 MemberId = k.Id,
                                                 MemberBrId = k.BranchId,
-                                                AccountPicExt = accdocdet.PicExt,
-                                                AccountSignExt = accdocdet.SignExt
+                                                AccountPicExt = accdocdet != null ? accdocdet.PicExt : "",
+                                                AccountSignExt = accdocdet != null ? accdocdet.SignExt : ""
                                             }).FirstOrDefaultAsync();
 
                     return Ok(new
@@ -810,7 +836,27 @@ namespace BankingPlatform.API.Controllers
                          && x.VoucherEntryType == "Dr")
                 .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
 
-            return Ok(new { Success = true, data = crTotal - drTotal });
+            // Add per-detail opening balance for FD accounts
+            var accType = await _context.accountmaster
+                .Where(x => x.ID == accountId && x.BranchId == branchId)
+                .Select(x => x.AccTypeId)
+                .FirstOrDefaultAsync();
+
+            decimal fdOpeningBal = 0;
+            if (accType == (int)Enums.AccountTypes.FD)
+            {
+                var details = await _context.fdaccountdetail
+                    .Where(x => x.AccountId == accountId && x.BranchId == branchId && x.OpeningBalance != null)
+                    .Select(x => new { x.OpeningBalance, x.OpeningBalanceType })
+                    .ToListAsync();
+
+                fdOpeningBal = details.Sum(x =>
+                    x.OpeningBalanceType?.ToUpper() == "CR"
+                        ? (x.OpeningBalance ?? 0)
+                        : -(x.OpeningBalance ?? 0));
+            }
+
+            return Ok(new { Success = true, data = crTotal - drTotal + fdOpeningBal });
         }
 
         [HttpGet("joint-acc-info/{accountId}/{branchId}")]
@@ -892,6 +938,12 @@ namespace BankingPlatform.API.Controllers
             (decimal intRate, string slabName, string compoundingInterval, int intCompoundingInterval, int slabId) = await _fdAccountService.SlabInfo(dob, amount, periodInMonths, periodInDays, fdDate, productId);
             decimal maturityAmount = await _fdAccountService.CalculateMaturityAmount(amount, intRate, fdDate, maturityDate, productId, branchId, intCompoundingInterval);
 
+            int daysInAYear = await _context.fdproductbranchwiserule
+                .Where(x => x.BranchId == branchId && x.FDProductId == productId)
+                .Select(x => x.DaysInAYear)
+                .FirstOrDefaultAsync();
+            if (daysInAYear <= 0) daysInAYear = 360;
+
             return Ok(new
             {
                 Success = true,
@@ -902,21 +954,22 @@ namespace BankingPlatform.API.Controllers
                     slabName = slabName,
                     compoundingInterval = compoundingInterval,
                     maturityAmount = maturityAmount,
-                    slabId = slabId
+                    slabId = slabId,
+                    daysInAYear = daysInAYear
                 }
             });
         }
 
-        [HttpGet("calculate-fd-maturity-amount/{fdDate}/{periodInMonths}/{periodInDays}/{interestRate}")]
-        public async Task<IActionResult> CalculateMaturityAmount([FromRoute] DateTime fdDate, int periodInMonths, int periodInDays)
+        [HttpPost("calculate-fd-maturity-amount-custom")]
+        public async Task<IActionResult> CalculateMaturityAmountCustom([FromBody] CalculateFDMaturityDTO dto)
         {
-            DateTime maturityDate = await _fdAccountService.CalculateMaturityDate(fdDate, periodInMonths, periodInDays);
-
-            return Ok(new
-            {
-                Success = true,
-                data = maturityDate
-            });
+            int intCompInterval = _commonFunctions.CompoundingIntervalFromString(dto.CompoundingInterval ?? "Quarterly");
+            decimal maturityAmount = await _fdAccountService.CalculateMaturityAmount(
+                dto.Amount, dto.InterestRate,
+                DateTime.SpecifyKind(dto.FdDate, DateTimeKind.Unspecified),
+                DateTime.SpecifyKind(dto.MaturityDate, DateTimeKind.Unspecified),
+                dto.ProductId, dto.BranchId, intCompInterval);
+            return Ok(new { Success = true, data = maturityAmount });
         }
 
         [HttpGet("fetch-mis-accounts/{memberId}/{memberBranchId}")]
@@ -1145,6 +1198,32 @@ namespace BankingPlatform.API.Controllers
             );
         }
 
+        [HttpGet("rd-accounts-for-kist/{branchId}/{rdProductId}")]
+        public async Task<IActionResult> RDAccountsForKist([FromRoute] int branchId, int rdProductId)
+        {
+            var accounts = await (
+                from p in _context.accountmaster.AsNoTracking()
+                join q in _context.rdaccountdetail.AsNoTracking()
+                    on new { p.ID, p.BranchId } equals new { ID = (int)q.AccId!, BranchId = q.BrId }
+                where p.BranchId == branchId && p.GeneralProductId == rdProductId
+                    && p.AccTypeId == (int)Enums.AccountTypes.RD && q.Status == 1 && !p.IsAccClosed
+                orderby p.AccSuffix
+                select new
+                {
+                    AccId = p.ID,
+                    AccNo = p.AccPrefix + "-" + p.AccSuffix,
+                    AccountName = p.AccountName,
+                    KistAmt = (decimal?)(q.KistAmt ?? 0),
+                    RdNumber = q.RdNumber,
+                    InterestRate = q.InterestRate,
+                    MaturityDate = q.MaturityDate,
+                    RdAmount = q.RdAmount,
+                    FirstKistDate = q.FirstKistDate,
+                }
+            ).ToListAsync();
+            return Ok(new { Success = true, data = accounts });
+        }
+
         [HttpGet("open-rd-accounts-for-premature/{branchId}/{rdProductId}/{currentDate}")]
         public async Task<IActionResult> OpenRDAccountsForPreMature([FromRoute] int branchId, int rdProductId, DateTime currentDate)
         {
@@ -1195,12 +1274,24 @@ namespace BankingPlatform.API.Controllers
         public async Task<IActionResult> GetFDAccountsForPledge(int branchId, DateTime openingDate)
         {
             int accType = (int)Enums.AccountTypes.FD;
-            var accounts = await _context.accountmaster.AsNoTracking()
-                .Where(x => x.BranchId == branchId && x.AccTypeId == accType
-                         && (!x.IsAccClosed || (x.IsAccClosed && x.ClosingDate > openingDate)) && x.AccOpeningDate <= openingDate)
-                .OrderBy(x => x.AccSuffix)
-                .Select(x => new { AccId = x.ID, AccountNumber = x.AccPrefix + "-" + x.AccSuffix, AccountName = x.AccountName })
-                .ToListAsync();
+            int openStatus = (int)Enums.FDStatus.Open;
+            var accounts = await (
+                from acc in _context.accountmaster.AsNoTracking()
+                join det in _context.fdaccountdetail.AsNoTracking()
+                    on acc.ID equals det.AccountId
+                where acc.BranchId == branchId && acc.AccTypeId == accType
+                   && det.BranchId == branchId && det.FDStatus == openStatus
+                   && (!acc.IsAccClosed || (acc.IsAccClosed && acc.ClosingDate > openingDate))
+                   && acc.AccOpeningDate <= openingDate
+                orderby acc.AccSuffix
+                select new
+                {
+                    AccId = acc.ID,
+                    FdAccDetId = det.Id,
+                    AccountNumber = acc.AccPrefix + "-" + acc.AccSuffix,
+                    AccountName = acc.AccountName,
+                }
+            ).ToListAsync();
             return Ok(new { Success = true, Data = accounts });
         }
 
@@ -1215,6 +1306,50 @@ namespace BankingPlatform.API.Controllers
                 .Select(x => new { AccId = x.ID, AccountNumber = x.AccPrefix + "-" + x.AccSuffix, AccountName = x.AccountName })
                 .ToListAsync();
             return Ok(new { Success = true, Data = accounts });
+        }
+
+        [HttpGet("fd-pledge-balance/{branchId}/{accId}")]
+        public async Task<IActionResult> GetFDPledgeBalance(int branchId, int accId)
+        {
+            // Balance: same logic as GetAccountBalance — authoritative Cr-Dr from general voucher entries
+            decimal crTotal = await _context.vouchercreditdebitdetails
+                .Where(x => x.BrId == branchId && x.AccountId == accId
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                         && x.VoucherEntryType == "Cr")
+                .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+
+            decimal drTotal = await _context.vouchercreditdebitdetails
+                .Where(x => x.BrId == branchId && x.AccountId == accId
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                         && x.VoucherEntryType == "Dr")
+                .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+
+            decimal balance = crTotal - drTotal;
+
+            int openStatus = (int)Enums.FDStatus.Open;
+            var fdDetail = await _context.fdaccountdetail.AsNoTracking()
+                .Where(x => x.AccountId == accId && x.BranchId == branchId && x.FDStatus == openStatus)
+                .FirstOrDefaultAsync();
+            decimal intRate = fdDetail != null ? fdDetail.IntRate : 0;
+
+            return Ok(new { Success = true, Data = new { FdAmount = balance < 0 ? 0m : balance, IntRate = intRate } });
+        }
+
+        [HttpGet("rd-pledge-balance/{branchId}/{accId}")]
+        public async Task<IActionResult> GetRDPledgeBalance(int branchId, int accId)
+        {
+            var rows = await _context.voucherrddetail.AsNoTracking()
+                .Where(x => x.BrId == branchId && x.RdAccId == accId && x.VoucherMainStatus != "D")
+                .ToListAsync();
+            var balance = rows.Sum(x => (decimal)x.AmountCr) - rows.Sum(x => (decimal)x.AmountDr);
+
+            var rdDetail = await _context.rdaccountdetail.AsNoTracking()
+                .Where(x => x.AccId == accId && x.BrId == branchId)
+                .OrderByDescending(x => x.Id)
+                .FirstOrDefaultAsync();
+            double intRate = rdDetail?.InterestRate ?? 0;
+
+            return Ok(new { Success = true, Data = new { RdAmount = balance < 0 ? 0m : balance, IntRate = intRate } });
         }
 
         [HttpGet("loan-accounts-by-product/{branchId}/{productId}/{currentDate}")]
@@ -1288,6 +1423,66 @@ namespace BankingPlatform.API.Controllers
                 return Ok(new { Success = false, Data = (object?)null, Message = "Saving account not found." });
 
             return Ok(new { Success = true, Data = account, Message = "" });
+        }
+
+        [HttpGet("fd-accounts-pledged-locked/{branchId}/{fromDate}")]
+        public async Task<IActionResult> GetFDAccountsPledgedLocked(int branchId, DateTime fromDate)
+        {
+            int pledgeStatus = (int)Enums.PledgeStatus.Pledge;
+            int lockStatus = (int)Enums.PledgeStatus.Lock;
+
+            var results = await (
+                from pledge in _context.loanaccfdpledge.AsNoTracking()
+                join acc in _context.accountmaster.AsNoTracking()
+                    on pledge.FDAccId equals acc.ID
+                where pledge.BrId == branchId
+                   && (pledge.LatestStatus == pledgeStatus || pledge.LatestStatus == lockStatus)
+                   && pledge.Date >= fromDate
+                orderby acc.AccSuffix
+                select new
+                {
+                    PledgeId = pledge.Id,
+                    FdAccId = acc.ID,
+                    FdAccDetId = pledge.FDAccDetId,
+                    AccountNumber = acc.AccPrefix + "-" + acc.AccSuffix,
+                    AccountName = acc.AccountName,
+                    Status = pledge.LatestStatus,
+                    LoanAccId = pledge.LoanAccId,
+                    Date = pledge.Date,
+                }
+            ).ToListAsync();
+
+            return Ok(new { Success = true, Data = results });
+        }
+
+        [HttpGet("rd-accounts-pledged-locked/{branchId}/{fromDate}")]
+        public async Task<IActionResult> GetRDAccountsPledgedLocked(int branchId, DateTime fromDate)
+        {
+            int pledgeStatus = (int)Enums.PledgeStatus.Pledge;
+            int lockStatus = (int)Enums.PledgeStatus.Lock;
+
+            var results = await (
+                from pledge in _context.loanaccrdpledge.AsNoTracking()
+                join acc in _context.accountmaster.AsNoTracking()
+                    on pledge.RDAccId equals acc.ID
+                where pledge.BrId == branchId
+                   && (pledge.LatestStatus == pledgeStatus || pledge.LatestStatus == lockStatus)
+                   && pledge.Date >= fromDate
+                orderby acc.AccSuffix
+                select new
+                {
+                    PledgeId = pledge.Id,
+                    RdAccId = acc.ID,
+                    RdAccDetId = pledge.RDAccDetId,
+                    AccountNumber = acc.AccPrefix + "-" + acc.AccSuffix,
+                    AccountName = acc.AccountName,
+                    Status = pledge.LatestStatus,
+                    LoanAccId = pledge.LoanAccId,
+                    Date = pledge.Date,
+                }
+            ).ToListAsync();
+
+            return Ok(new { Success = true, Data = results });
         }
 
         [HttpGet("can-modify-account/{accountId}/{branchId}")]

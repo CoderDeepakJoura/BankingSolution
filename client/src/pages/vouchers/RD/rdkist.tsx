@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useFormValidation } from "../../../services/Validations/voucher/rd/rdkist";
 import { FormField } from "../../../components/Validations/FormField";
 import Swal from "sweetalert2";
@@ -682,7 +682,7 @@ const RDKistVoucher: React.FC = () => {
               placeholder="Select RD Product"
               isClearable
               isDisabled={isEditMode}
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",
@@ -843,7 +843,7 @@ const RDKistVoucher: React.FC = () => {
                   ? "Please select an RD product first"
                   : "No RD accounts found"
               }
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",
@@ -956,7 +956,7 @@ const RDKistVoucher: React.FC = () => {
               onBlur={() => handleFieldBlur("debitAccount")}
               placeholder="Select Debit Account"
               isClearable
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",
@@ -1022,7 +1022,7 @@ const RDKistVoucher: React.FC = () => {
               placeholder="Select Saving Product"
               isClearable
               isDisabled={isEditMode}
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base, minHeight: "48px", borderWidth: "2px",
                   borderColor: state.isFocused ? "#059669" : "#e5e7eb",
@@ -1066,7 +1066,7 @@ const RDKistVoucher: React.FC = () => {
               isClearable
               isDisabled={isEditMode || (!voucherData.savingProduct || savingAccounts.length === 0)}
               noOptionsMessage={() => !voucherData.savingProduct ? "Select saving product first" : "No accounts found"}
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base, minHeight: "48px", borderWidth: "2px",
                   borderColor: state.isFocused ? "#059669" : "#e5e7eb",

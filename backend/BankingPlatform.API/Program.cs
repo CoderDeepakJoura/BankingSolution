@@ -49,6 +49,7 @@ builder.Services.AddScoped<SavingAccountService>();
 builder.Services.AddScoped<BranchMasterService>();
 builder.Services.AddScoped<SavingVoucherService>();
 builder.Services.AddScoped<RDKistVoucherService>();
+builder.Services.AddScoped<RDMultipleKistVoucherService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Cash.CashPaymentReceiptService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Journal.JournalVoucherService>();
 builder.Services.AddScoped<VoucherMapper>();
@@ -59,6 +60,7 @@ builder.Services.AddScoped<LoanAccountService>();
 builder.Services.AddScoped<RDProductService>();
 builder.Services.AddScoped<LoanProductService>();
 builder.Services.AddScoped<LoanAdvancementVoucherService>();
+builder.Services.AddScoped<LoanExpenseService>();
 builder.Services.AddScoped<VoucherOperationsService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.DayBookService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.CashBookService>();
@@ -97,6 +99,9 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Services.ServiceMasterSer
 builder.Services.AddScoped<BankingPlatform.API.Service.Services.AccServiceDetailService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.NpaLedgerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.MemberReportService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.AccountMasters.SavingInterestPostingService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.AccountMasters.FDInterestPostingService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.AccountMasters.RDInterestPostingService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.MemberAccountsService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.FDOpeningService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.RDMaturityService>();
@@ -124,6 +129,8 @@ builder.Services.AddScoped<MemberService>();
 builder.Services.AddScoped<FDInterestSlabService>();
 builder.Services.AddScoped<FDSlabService>();
 builder.Services.AddScoped<RDAccountService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.OtherBranchAccountService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.IBSavingDepositService>();
 
 // Configure CORS with dynamic origins
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
@@ -361,7 +368,7 @@ app.Use(async (context, next) =>
         {
             context.Response.Headers.Add("Access-Control-Allow-Origin", origin);
             context.Response.Headers.Add("Access-Control-Allow-Credentials", "true");
-            context.Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            context.Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
             context.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
             context.Response.StatusCode = 200;
             Console.WriteLine($"✅ Preflight handled manually for: {origin}");

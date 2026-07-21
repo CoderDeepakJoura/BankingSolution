@@ -218,8 +218,6 @@ const addCaste = async (
 
   if (formValues) {
     try {
-      console.log("Adding caste with payload:", formValues);
-      
       const response = await CasteApiService.add_new_caste(
         formValues.casteDescription,
         formValues.casteDescriptionSL,
@@ -416,8 +414,6 @@ const modifyCaste = async (
 
   if (formValues) {
     try {
-      console.log("Updating caste with values:", formValues);
-      
       const response = await CasteApiService.modify_caste(
         formValues.id,
         formValues.casteDescription,

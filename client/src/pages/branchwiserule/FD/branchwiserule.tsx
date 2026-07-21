@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import Select from "react-select";
 import branchwiserule, {
@@ -356,7 +356,7 @@ const FDProductBranchwiserule = () => {
         IntPayableAccount: Number(formData.intPayableAccount),
       };
 
-      console.log("Submitting DTO:", dto);
+
 
       // TODO: Replace with your actual API service call
       const res = await branchwiserule.insert_fd_product_branchwise_rule(dto);
@@ -476,7 +476,6 @@ const FDProductBranchwiserule = () => {
                           className={`text-sm ${
                             validationErrors.fdProductId ? "border-red-500" : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({
@@ -540,7 +539,6 @@ const FDProductBranchwiserule = () => {
                               ? "border-red-500"
                               : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({
@@ -589,7 +587,6 @@ const FDProductBranchwiserule = () => {
                           className={`text-sm ${
                             validationErrors.DaysInAYear ? "border-red-500" : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({
@@ -643,7 +640,6 @@ const FDProductBranchwiserule = () => {
                               ? "border-red-500"
                               : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({
@@ -707,7 +703,6 @@ const FDProductBranchwiserule = () => {
                               ? "border-red-500"
                               : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({
@@ -760,7 +755,6 @@ const FDProductBranchwiserule = () => {
                           className={`text-sm ${
                             validationErrors.closingChargesAccount ? "border-red-500" : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({
@@ -815,7 +809,6 @@ const FDProductBranchwiserule = () => {
                               ? "border-red-500"
                               : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({

@@ -92,7 +92,7 @@ class SavingProductApiService extends ApiService {
   async createSavingProduct(
     combinedSavingDTO: CombinedSavingsDTO
   ): Promise<ApiResponse<ResponseDto>> {
-    console.log(JSON.stringify(combinedSavingDTO));
+
     
     return this.makeRequest<ResponseDto>("/savingsproduct", {
       method: "POST",

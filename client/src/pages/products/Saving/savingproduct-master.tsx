@@ -1,4 +1,4 @@
-// pages/productmasters/Savings/savings-product-master.tsx
+﻿// pages/productmasters/Savings/savings-product-master.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { useFormValidation } from "../../../services/Validations/ProductMasters/Saving/useFormValidation";
 import { ValidationSummary } from "../../../components/Validations/ValidationSummary";
@@ -716,8 +716,7 @@ const SavingsProductMaster = () => {
               placeholder="Select Statement Frequency"
               isClearable
               className="text-sm"
-              menuPortalTarget={document.body}
-              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
             />
           </FormField>
 
@@ -823,8 +822,7 @@ const SavingsProductMaster = () => {
               placeholder="Select Principal Balance Head (e.g., Saving)"
               isClearable
               className="text-sm"
-              menuPortalTarget={document.body}
-              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
             />
           </FormField>
 
@@ -857,8 +855,7 @@ const SavingsProductMaster = () => {
               placeholder="Select Suspended Balance Head (e.g., SUSPENSE A/C)"
               isClearable
               className="text-sm"
-              menuPortalTarget={document.body}
-              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
             />
           </FormField>
 
@@ -891,8 +888,7 @@ const SavingsProductMaster = () => {
               placeholder="Select Interest Payable Head (e.g., Payable)"
               isClearable
               className="text-sm"
-              menuPortalTarget={document.body}
-              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
             />
           </FormField>
         </div>
@@ -959,8 +955,7 @@ const SavingsProductMaster = () => {
                 placeholder="Select Rate Method"
                 isClearable
                 className="text-sm"
-                menuPortalTarget={document.body}
-                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
               />
             </FormField>
 
@@ -1009,8 +1004,7 @@ const SavingsProductMaster = () => {
                 placeholder="Select Calculation Method"
                 isClearable
                 className="text-sm"
-                menuPortalTarget={document.body}
-                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
               />
             </FormField>
 
@@ -1235,8 +1229,7 @@ const SavingsProductMaster = () => {
                 placeholder="Select Posting Interval"
                 isClearable
                 className="text-sm"
-                menuPortalTarget={document.body}
-                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
               />
             </FormField>
 
@@ -1269,8 +1262,7 @@ const SavingsProductMaster = () => {
                 placeholder="Select Posting Date Type"
                 isClearable
                 className="text-sm"
-                menuPortalTarget={document.body}
-                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
               />
             </FormField>
 
@@ -1303,8 +1295,7 @@ const SavingsProductMaster = () => {
                 placeholder="Select Compound Interval"
                 isClearable
                 className="text-sm"
-                menuPortalTarget={document.body}
-                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
               />
             </FormField>
 
@@ -1337,8 +1328,7 @@ const SavingsProductMaster = () => {
                 placeholder="Select Compound Date Type"
                 isClearable
                 className="text-sm"
-                menuPortalTarget={document.body}
-                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
               />
             </FormField>
 
@@ -1371,8 +1361,7 @@ const SavingsProductMaster = () => {
                 placeholder="Select Action"
                 isClearable
                 className="text-sm"
-                menuPortalTarget={document.body}
-                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
               />
             </FormField>
           </div>

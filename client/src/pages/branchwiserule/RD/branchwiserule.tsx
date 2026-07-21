@@ -1,4 +1,4 @@
-// RDProductBranchwiserule.tsx
+﻿// RDProductBranchwiserule.tsx
 import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import Select from "react-select";
@@ -393,6 +393,7 @@ const RDProductBranchwiserule = () => {
     control: (base: any) => ({
       ...base,
       borderColor: hasError ? "#ef4444" : base.borderColor,
+      cursor: "pointer",
     }),
   });
 
@@ -477,7 +478,6 @@ const RDProductBranchwiserule = () => {
                         isClearable
                         isDisabled={loadingProductData}
                         styles={selectStyles(!!validationErrors.rdProductId)}
-                        menuPortalTarget={document.body}
                         className="text-sm"
                       />
                       <ErrorMsg msg={validationErrors.rdProductId} />
@@ -569,7 +569,6 @@ const RDProductBranchwiserule = () => {
                         styles={selectStyles(
                           !!validationErrors.accNoGeneration,
                         )}
-                        menuPortalTarget={document.body}
                         className="text-sm"
                       />
                       <ErrorMsg msg={validationErrors.accNoGeneration} />
@@ -699,7 +698,6 @@ const RDProductBranchwiserule = () => {
                         styles={selectStyles(
                           !!validationErrors.paymentDateType,
                         )}
-                        menuPortalTarget={document.body}
                         className="text-sm"
                       />
                       <ErrorMsg msg={validationErrors.paymentDateType} />
@@ -785,7 +783,6 @@ const RDProductBranchwiserule = () => {
                         styles={selectStyles(
                           !!validationErrors.intExpenseAccount,
                         )}
-                        menuPortalTarget={document.body}
                         className="text-sm"
                       />
                       <ErrorMsg msg={validationErrors.intExpenseAccount} />
@@ -825,7 +822,6 @@ const RDProductBranchwiserule = () => {
                         styles={selectStyles(
                           !!validationErrors.penaltyIncExpAccount,
                         )}
-                        menuPortalTarget={document.body}
                         className="text-sm"
                       />
                       <ErrorMsg msg={validationErrors.penaltyIncExpAccount} />
@@ -866,7 +862,6 @@ const RDProductBranchwiserule = () => {
                         styles={selectStyles(
                           !!validationErrors.closingChargesAccount,
                         )}
-                        menuPortalTarget={document.body}
                         className="text-sm"
                       />
                       <ErrorMsg msg={validationErrors.closingChargesAccount} />

@@ -57,6 +57,8 @@ export interface FDDetailDTO {
   fdmaturityDate: string;
   maturityAmount: number;
   slabId: number;
+  openingBalance?: number;
+  openingBalanceType?: string;
 }
 
 // Maps to VoucherDTO in backend

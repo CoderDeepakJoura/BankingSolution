@@ -45,6 +45,22 @@ namespace BankingPlatform.API.Controllers.Vouchers.Journal
             }
         }
 
+        [HttpGet("{voucherId}/gst")]
+        public async Task<IActionResult> GetGstRestoreDetails(int voucherId, [FromQuery] int brId)
+        {
+            try
+            {
+                var items = await _service.GetGstRestoreDetails(voucherId, brId);
+                return Ok(new { Success = true, data = items });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching GST restore details for voucher {VoucherId}.", voucherId);
+                await _commonFunctions.LogErrors(ex, nameof(GetGstRestoreDetails), nameof(JournalVoucherController));
+                return BadRequest(new ResponseDto { Success = false, Message = "Failed to fetch GST details." });
+            }
+        }
+
         [HttpPut("{voucherId}")]
         public async Task<IActionResult> UpdateJournalVoucher(int voucherId, [FromBody] JournalVoucherDTO dto)
         {

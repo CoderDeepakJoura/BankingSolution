@@ -81,6 +81,11 @@ const AccountsModule: React.FC = () => {
                 addPath="/rd-acc-master"
                 modifyPath="/rd-acc-info"
               />
+              <AccountOperations
+                accountType="Bank FD Account(s)"
+                addPath="/bank-fd-account/create"
+                modifyPath="/bank-fd-account"
+              />
 
               {/* Add other account types here as needed */}
             </div>

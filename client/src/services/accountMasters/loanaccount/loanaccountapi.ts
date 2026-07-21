@@ -140,9 +140,11 @@ export interface LoanAccFDPledgeDTO {
   fDAccId?: number;
   fDAccDetId?: number;
   fDAccNumber?: string;
+  fdAccName?: string;
   fDAmount?: number;
   interest?: number;
   date?: string;
+  status?: number;
 }
 
 export interface LoanAccRDPledgeDTO {
@@ -152,9 +154,11 @@ export interface LoanAccRDPledgeDTO {
   rDAccId?: number;
   rDAccDetId?: number;
   rDAccNumber?: string;
+  rdAccName?: string;
   rDAmount?: number;
   interest?: number;
   date?: string;
+  status?: number;
 }
 
 export interface CombinedLoanAccountDTO {
@@ -168,6 +172,7 @@ export interface CombinedLoanAccountDTO {
   openingBalanceDetails: LoanAccountBalanceDetailDTO[];
   fDPledges: LoanAccFDPledgeDTO[];
   rDPledges: LoanAccRDPledgeDTO[];
+  isNomineeRequired: boolean;
 }
 
 export interface LoanAccountFilter {
@@ -250,8 +255,15 @@ class LoanAccountApiService extends ApiService {
     });
   }
 
-  async getNextAccountNumber(productId: number, brId: number): Promise<ApiResponse<{ success: boolean; data: string }>> {
+  async getNextAccountNumber(productId: number, brId: number): Promise<ApiResponse<{ prefix: string; suffix: number }>> {
     return this.makeRequest(`/LoanAccountMaster/next-account-number/${productId}/${brId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  async checkAccountNumberExists(productId: number, brId: number, suffix: number, excludeAccId = 0): Promise<ApiResponse<boolean>> {
+    return this.makeRequest(`/LoanAccountMaster/check-account-number/${productId}/${brId}/${suffix}?excludeAccId=${excludeAccId}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });

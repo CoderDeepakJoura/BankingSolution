@@ -177,11 +177,6 @@ export const useFormValidation = () => {
 
       if (!rules) return fieldErrors;
 
-      console.log('🔍 Validating:', fieldName);
-      console.log('📦 Value:', value);
-      console.log('📋 FormData:', formData);
-      console.log('✅ TDS Checkbox:', formData?.bankFDTDSApplicability);
-
       // ✅ Define TDS conditional fields
       const tdsConditionalFields = [
         "bankFDTDSRate",
@@ -191,22 +186,16 @@ export const useFormValidation = () => {
 
       // ✅ For TDS fields, check if they should be validated
       if (tdsConditionalFields.includes(fieldName)) {
-        console.log('🎯 TDS Field detected:', fieldName);
-        
         // If TDS is NOT enabled, skip ALL validation
         if (!formData?.bankFDTDSApplicability) {
-          console.log('⏭️ Skipping validation - TDS checkbox unchecked');
           return fieldErrors; // Return empty array - no errors
         }
-        
-        console.log('✅ TDS is enabled - proceeding with validation');
-        
+
         // ✅ If TDS IS enabled, these fields are REQUIRED
         // Check for empty string, null, undefined, OR 0 (for dropdowns)
         const isEmpty = value === "" || value === null || value === undefined || value === 0;
-        
+
         if (isEmpty) {
-          console.log('❌ Field is empty or 0');
           fieldErrors.push({
             field: fieldName,
             message: rules.requiredMessage || `${fieldName} is required`,
@@ -270,18 +259,11 @@ export const useFormValidation = () => {
     (formData: any): ValidationResult => {
       const allErrors: ValidationError[] = [];
 
-      console.log('=== VALIDATING ENTIRE FORM ===');
-      console.log('Form Data:', formData);
-
       // Validate all fields
       Object.keys(validationRules).forEach((fieldName) => {
         const fieldErrors = validateField(fieldName, formData[fieldName], formData);
         allErrors.push(...fieldErrors);
       });
-
-      console.log('=== VALIDATION COMPLETE ===');
-      console.log('Total Errors:', allErrors.length);
-      console.log('Errors:', allErrors);
 
       // Group errors by field
       const errorsByField = allErrors.reduce((acc, error) => {

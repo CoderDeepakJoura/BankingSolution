@@ -246,6 +246,9 @@ const ChangeSessionPage: React.FC = () => {
           sessionFromDate:     info.sessionFromDate,
           sessionToDate:       info.sessionToDate,
           isSu:                info.isSu ?? false,
+          isMainBranch:        info.isMainBranch ?? false,
+          branchGstNo:         info.branchGstNo ?? "",
+          branchStateId:       info.branchStateId ?? 0,
         }));
         commonservice.setWorkingDate(info.workingDate);
       }

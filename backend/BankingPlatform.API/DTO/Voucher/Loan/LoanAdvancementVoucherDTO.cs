@@ -6,6 +6,7 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public int AccountType { get; set; }
         public decimal Amount { get; set; }
         public string? Narration { get; set; }
+        public GSTDetailDTO? GstDetail { get; set; }
     }
 
     public class LoanAdvancementVoucherDTO

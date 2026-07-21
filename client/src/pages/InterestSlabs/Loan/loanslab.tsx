@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import { decryptId } from "../../../utils/encryption";
 import Select from "react-select";
@@ -475,7 +475,6 @@ const LoanInterestSlab: React.FC = () => {
                         onChange={(opt) => handleInputChange("loanProductId", opt ? opt.value : 0)}
                         placeholder="Select Loan Product"
                         isClearable
-                        menuPortalTarget={document.body}
                         styles={{
                           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                           control: (base) => ({

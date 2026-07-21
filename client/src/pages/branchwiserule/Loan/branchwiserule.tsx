@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import Select from "react-select";
 import branchwiserule, {
@@ -254,6 +254,7 @@ const LoanProductBranchWiseRulePage = () => {
     control: (base: any) => ({
       ...base,
       borderColor: hasError ? "#ef4444" : base.borderColor,
+      cursor: "pointer",
     }),
   });
 
@@ -308,7 +309,6 @@ const LoanProductBranchWiseRulePage = () => {
         isClearable
         isDisabled={loadingProductData || disabled}
         styles={selectStyles(!!error)}
-        menuPortalTarget={document.body}
         className="text-sm"
       />
       <ErrorMsg msg={error} />
@@ -381,7 +381,6 @@ const LoanProductBranchWiseRulePage = () => {
                         isClearable
                         isDisabled={loadingProductData}
                         styles={selectStyles(!!validationErrors.loanProductId)}
-                        menuPortalTarget={document.body}
                         className="text-sm"
                       />
                       <ErrorMsg msg={validationErrors.loanProductId} />
@@ -405,7 +404,6 @@ const LoanProductBranchWiseRulePage = () => {
                         isClearable
                         isDisabled={loadingProductData}
                         styles={selectStyles(false)}
-                        menuPortalTarget={document.body}
                         className="text-sm"
                       />
                     </div>

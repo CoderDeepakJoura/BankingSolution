@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { encryptId, decryptId } from "../../utils/encryption";
 import { useFormValidation } from "../../services/Validations/member/useFormValidation";
 import { ValidationSummary } from "../../components/Validations/ValidationSummary";
@@ -1121,7 +1121,6 @@ const MemberMaster = () => {
       voucher: voucherDTO,
     };
 
-    // console.log(JSON.stringify(combinedMemberDTO));
     setLoading(true);
     try {
       const response = isEditMode
@@ -1637,6 +1636,8 @@ const MemberMaster = () => {
           isClearable
           required
           className="text-sm"
+
+
         />
       </FormField>
 
@@ -1733,6 +1734,8 @@ const MemberMaster = () => {
           isClearable
           required
           className="text-sm"
+
+
         />
       </FormField>
 
@@ -1772,6 +1775,8 @@ const MemberMaster = () => {
           isClearable
           required
           className="text-sm"
+
+
         />
       </FormField>
 
@@ -1995,6 +2000,8 @@ const MemberMaster = () => {
                 placeholder="Select Relation"
                 isClearable
                 className="text-sm"
+
+
               />
             </FormField>
 
@@ -2024,6 +2031,8 @@ const MemberMaster = () => {
                 isClearable
                 required
                 className="text-sm"
+
+
               />
             </FormField>
 
@@ -2268,6 +2277,8 @@ const MemberMaster = () => {
               isClearable
               required
               className="text-sm"
+
+
             />
           </FormField>
           <FormField
@@ -2363,6 +2374,8 @@ const MemberMaster = () => {
               isClearable
               required
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -2460,6 +2473,8 @@ const MemberMaster = () => {
               isClearable
               required
               className="text-sm"
+
+
             />
           </FormField>
           <FormField
@@ -2548,6 +2563,8 @@ const MemberMaster = () => {
               isClearable
               required
               className="text-sm"
+
+
             />
           </FormField>
           <FormField
@@ -2868,6 +2885,8 @@ const MemberMaster = () => {
               required
               isDisabled={isEditMode}
               className="text-sm"
+
+
             />
           </FormField>
           {/* Debit Amount - sum, readonly */}

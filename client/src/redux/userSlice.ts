@@ -4,6 +4,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 interface UserState {
   name: string;
   branchid: number;
+  branchCode?: string;
   branch_name?: string;
   email?: string;
   address?: string;
@@ -17,6 +18,10 @@ interface UserState {
   sessionFromDate: string;
   sessionToDate: string;
   isSu: boolean;
+  isMainBranch: boolean;
+  branchGstNo: string;
+  branchStateId: number;
+  lastSeenVersion: string;
 }
 
 const initialState: UserState = {
@@ -30,6 +35,10 @@ const initialState: UserState = {
   sessionInfo: "",
   sessionId: 0,
   isSu: false,
+  isMainBranch: false,
+  branchGstNo: "",
+  branchStateId: 0,
+  lastSeenVersion: "0.0.0",
 };
 
 const userSlice = createSlice({
@@ -58,6 +67,10 @@ const userSlice = createSlice({
       state.sessionFromDate = "";
       state.sessionToDate = "";
       state.isSu = false;
+      state.isMainBranch = false;
+      state.branchGstNo = "";
+      state.branchStateId = 0;
+      state.lastSeenVersion = "0.0.0";
     },
   },
 });

@@ -85,7 +85,7 @@ class RDProductApiService extends ApiService {
   async createRDProduct(
     combinedRDDTO: CombinedRDProductDTO
   ): Promise<ApiResponse<ResponseDto>> {
-    console.log(JSON.stringify(combinedRDDTO));
+
 
     return this.makeRequest<ResponseDto>("/rdproduct", {
       method: "POST",

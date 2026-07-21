@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import Swal from "sweetalert2";
 import Select from "react-select";
 import {
@@ -834,7 +834,7 @@ const EntryRow: React.FC<EntryRowProps> = ({
               value={selectedAccType ? { value: selectedAccType.value, label: selectedAccType.label } : null}
               onChange={(sel) => sel && onAccountTypeChange(entry.id, sel.value)}
               placeholder="Select type..."
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "42px",
@@ -883,7 +883,7 @@ const EntryRow: React.FC<EntryRowProps> = ({
                   : "Select account..."
               }
               noOptionsMessage={() => "No accounts found"}
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "42px",
@@ -975,7 +975,7 @@ const EntryRow: React.FC<EntryRowProps> = ({
                   entry.accountType
                 )
               }
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "42px",

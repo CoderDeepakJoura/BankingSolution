@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import { useFormValidation } from "../../../services/Validations/ProductMasters/FD/useFormValidation";
 import { ValidationSummary } from "../../../components/Validations/ValidationSummary";
 import { FormField } from "../../../components/Validations/FormField";
@@ -706,6 +706,8 @@ const FDProductMaster = () => {
               placeholder="Select Account Type"
               isClearable
               className="text-sm"
+
+
             />
             <p className="text-xs text-gray-500 mt-2">
               Interest posting destination: same account or linked account
@@ -803,6 +805,8 @@ const FDProductMaster = () => {
               placeholder="Select Principal Balance Head"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -829,6 +833,8 @@ const FDProductMaster = () => {
               placeholder="Select Suspended Balance Head"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -855,6 +861,8 @@ const FDProductMaster = () => {
               placeholder="Select Interest Payable Head"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
         </div>
@@ -1025,6 +1033,8 @@ const FDProductMaster = () => {
               placeholder="Select Applicable Date Type"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
           <FormField
@@ -1050,6 +1060,8 @@ const FDProductMaster = () => {
               placeholder="Select Action"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -1077,6 +1089,8 @@ const FDProductMaster = () => {
               placeholder="Select Calculation Type"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -1104,6 +1118,8 @@ const FDProductMaster = () => {
               placeholder="Select Calculation Type"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -1159,6 +1175,8 @@ const FDProductMaster = () => {
               placeholder="Select Posting Interval"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -1185,6 +1203,8 @@ const FDProductMaster = () => {
               placeholder="Select Posting Date Type"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import Select from "react-select";
 import { decryptId, encryptId } from "../../../utils/encryption";
@@ -42,7 +42,7 @@ const CATEGORY_UNSECURE = 1;
 
 interface LoanProduct { id: number; productName: string; }
 interface Relation { relationId: number; description: string; }
-interface FDAccount { accId: number; accountNumber: string; accountName: string; }
+interface FDAccount { accId: number; fdAccDetId: number; accountNumber: string; accountName: string; }
 interface RDAccount { accId: number; accountNumber: string; accountName: string; }
 interface ActiveMember { memberId: number; memberBrId: number; memberName: string; relativeName: string; permanentMembershipNo?: string; nominalMembershipNo?: string; }
 
@@ -57,6 +57,8 @@ const LoanAccountMaster: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState("loan-detail");
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
+  const loanAccSuffixRef = useRef<HTMLInputElement>(null);
   const [loanProducts, setLoanProducts] = useState<LoanProduct[]>([]);
   const [relations, setRelations] = useState<Relation[]>([]);
   const [fdAccounts, setFDAccounts] = useState<FDAccount[]>([]);
@@ -90,9 +92,7 @@ const LoanAccountMaster: React.FC = () => {
     memberAccountNo: "",
     membershipNo: "",
     agent: "",
-    accountNumber: "",
-    accPrefix: "",
-    accSuffix: 0,
+    accSuffix: "",
     headId: 0,
     headCode: 0,
     relationId: 0,
@@ -107,7 +107,7 @@ const LoanAccountMaster: React.FC = () => {
     marginAmount: "",
     loanPeriod: "",
     kistInterval: "",
-    firstKistDate: sessionDate,
+    firstKistDate: "",
     slabId: 0,
     loanNo: "",
     kistPrintPart: "",
@@ -147,7 +147,11 @@ const LoanAccountMaster: React.FC = () => {
 
   // Opening balance header
   const [openingBal, setOpeningBal] = useState({
-    totalBalance: "", balType: "Dr", overDueBal: "", openInt: "", openOverInt: "",
+    totalBalance: "", balType: "Dr",
+    overDueBal: "", overBalType: "Dr",
+    openInt: "", openIntType: "Dr",
+    openOverInt: "", openOverIntType: "Dr",
+    overDueDate: "",
   });
 
   // Opening balance entry row
@@ -163,14 +167,22 @@ const LoanAccountMaster: React.FC = () => {
   });
 
   // FD/RD pledge entry
-  const [fdPledgeEntry, setFdPledgeEntry] = useState<{ accId: number; accNumber: string; fdAmount: string; interest: string }>({ accId: 0, accNumber: "", fdAmount: "", interest: "" });
-  const [rdPledgeEntry, setRdPledgeEntry] = useState<{ accId: number; accNumber: string; rdAmount: string; interest: string }>({ accId: 0, accNumber: "", rdAmount: "", interest: "" });
+  const [fdPledgeEntry, setFdPledgeEntry] = useState<{ accId: number; detId: number; accNumber: string; accName: string; fdAmount: string; interest: string }>({ accId: 0, detId: 0, accNumber: "", accName: "", fdAmount: "", interest: "" });
+  const [rdPledgeEntry, setRdPledgeEntry] = useState<{ accId: number; accNumber: string; accName: string; rdAmount: string; interest: string }>({ accId: 0, accNumber: "", accName: "", rdAmount: "", interest: "" });
+
+  // Manual rate entry (enabled when no slab matches)
+  const [manualIntRate, setManualIntRate] = useState(false);
+  const [manualLimitIntRate, setManualLimitIntRate] = useState(false);
+
+  const [isNomineeRequired, setIsNomineeRequired] = useState(false);
 
   // ── Derived flags ────────────────────────────────────────────────────────────
-  const isInstallment = productInfo ? LOAN_TYPE_INSTALLMENT.includes(productInfo.typeId) : true;
-  const isLimitWise   = productInfo?.typeId === LOAN_TYPE_LIMITWISE;
-  const isUnsecure    = productInfo?.categoryId === CATEGORY_UNSECURE;
-  const hasFDRDPledge = productInfo?.securityIds?.split(",").map(s => s.trim()).includes(String(SECURITY_FD_RD)) ?? false;
+  const isInstallment  = productInfo ? LOAN_TYPE_INSTALLMENT.includes(productInfo.typeId) : true;
+  const isLimitWise    = productInfo?.typeId === LOAN_TYPE_LIMITWISE;
+  const isUnsecure     = productInfo?.categoryId === CATEGORY_UNSECURE;
+  const hasFDRDSecurity = productInfo?.securityIds?.split(",").map(s => s.trim()).includes(String(SECURITY_FD_RD)) ?? false;
+  // Pledge status: secure loan = 1 (Pledge), unsecure loan = 3 (Lock)
+  const fdRdStatus = isUnsecure ? 3 : 1;
 
   // ── Tabs ─────────────────────────────────────────────────────────────────────
   const showOpeningBal = canEnterOpeningBalance(user, formData.openingDate);
@@ -180,8 +192,8 @@ const LoanAccountMaster: React.FC = () => {
     { id: "nominee", label: "Nominee Detail" },
     { id: "opening-balance", label: "Opening Balance Detail", show: showOpeningBal },
     { id: "guarantors", label: "Guarantors And Witness Detail", show: isUnsecure || !productInfo },
-    { id: "fd-pledge", label: "Fd Pledge Detail", show: hasFDRDPledge },
-    { id: "rd-pledge", label: "Rd Pledge Detail", show: hasFDRDPledge },
+    { id: "fd-pledge", label: isUnsecure ? "FD Lock Detail" : "FD Pledge Detail", show: hasFDRDSecurity },
+    { id: "rd-pledge", label: isUnsecure ? "RD Lock Detail" : "RD Pledge Detail", show: hasFDRDSecurity },
   ];
   const visibleTabs = allTabs.filter(t => t.show === undefined || t.show);
 
@@ -257,12 +269,15 @@ const LoanAccountMaster: React.FC = () => {
           setInputMode(resolvedMode);
           setMemberType(resolvedMemberType);
 
+          const storedAccNo = acc.accountNumber ?? "";
+          const accNoParts = storedAccNo.split('-');
+          const loadedSuffix = acc.accSuffix ?? "";
+
           setFormData(prev => ({
             ...prev, selectedProductId: acc.generalProductId ?? 0,
             openingDate: commonservice.splitDate(acc.accOpeningDate),
-            accountNumber: acc.accPrefix ? `${acc.accPrefix}-${acc.accSuffix}` : (acc.accountNumber ?? ""),
-            accPrefix: acc.accPrefix ?? "",
-            accSuffix: acc.accSuffix ?? 0, headId: acc.headId, headCode: acc.headCode,
+            accSuffix: loadedSuffix,
+            headId: acc.headId, headCode: acc.headCode,
             memberAccountNo: resolvedMode === "account" ? (acc.accountNumber ?? "") : "",
             membershipNo: resolvedMode === "membership" ? (acc.membershipNo ?? "") : "",
           }));
@@ -277,6 +292,7 @@ const LoanAccountMaster: React.FC = () => {
             dateOfBirth: acc.dob ? String(acc.dob).split("T")[0] : "",
           });
 
+          let loadedSlabs: CombinedLoanSlabDTO[] = [];
           if (acc.generalProductId) {
             const [infoRes, slabRes] = await Promise.all([
               loanAccountApi.getLoanProductInfo(acc.generalProductId, user.branchid),
@@ -286,13 +302,27 @@ const LoanAccountMaster: React.FC = () => {
               setProductInfo(infoRes.data);
             }
             if (slabRes.success && (slabRes as any).loanSlabs) {
-              const filtered: CombinedLoanSlabDTO[] = ((slabRes as any).loanSlabs as CombinedLoanSlabDTO[])
+              loadedSlabs = ((slabRes as any).loanSlabs as CombinedLoanSlabDTO[])
                 .filter(s => s.loanSlab.loanProductId === acc.generalProductId);
-              setLoanSlabs(filtered);
+              setLoanSlabs(loadedSlabs);
             }
           }
           if (d.kistDetail) {
             const k = d.kistDetail;
+            const amount = parseFloat(k.loanAmountPassed?.toString() ?? "");
+            const period = parseInt(k.loanPeriod?.toString() ?? "");
+            let matchedSlabId = 0;
+            if (!isNaN(amount) && !isNaN(period) && loadedSlabs.length > 0) {
+              const sorted = [...loadedSlabs].sort((a, b) => new Date(b.loanSlab.date).getTime() - new Date(a.loanSlab.date).getTime());
+              for (const slab of sorted) {
+                const det = slab.loanSlabDetails.find(d2 => {
+                  const amtOk = amount >= d2.fromAmount && amount <= d2.toAmount;
+                  const perOk = (d2.periodFrom != null && d2.periodTo != null) ? period >= d2.periodFrom && period <= d2.periodTo : true;
+                  return amtOk && perOk;
+                });
+                if (det) { matchedSlabId = slab.loanSlab.id ?? 0; break; }
+              }
+            }
             setKistData(prev => ({
               ...prev,
               loanAmount: k.loanAmountPassed?.toString() ?? "",
@@ -306,20 +336,64 @@ const LoanAccountMaster: React.FC = () => {
               loanNo: k.loanNo ?? "",
               kistAmount: k.kistAmount ?? 0,
               intAmount: k.kislIntAmt ?? 0,
+              slabId: matchedSlabId,
             }));
+            if (matchedSlabId === 0) setManualIntRate(true);
           }
           setSchedule(d.kistSchedule ?? []);
           setLimitDetails(d.limitDetails ?? []);
           setNominees(d.nominees ?? []);
+          if ((d.nominees ?? []).length > 0) setIsNomineeRequired(true);
           if (d.guarantor) setGuarantorData({
             guar1MemId: d.guarantor.guar1MemId ?? 0, guar1MemBrId: d.guarantor.guar1MemBrId ?? 0,
             guar2MemId: d.guarantor.guar2MemId ?? 0, guar2MemBrId: d.guarantor.guar2MemBrId ?? 0,
             witness1MemId: d.guarantor.witness1MemId ?? 0, wit1MemBrId: d.guarantor.wit1MemBrId ?? 0,
             witness2MemId: d.guarantor.witness2MemId ?? 0, wit2MemBrId: d.guarantor.wit2MemBrId ?? 0,
           });
-          setFDPledges(d.fDPledges ?? []);
-          setRDPledges(d.rDPledges ?? []);
+          const loadedFDPledges = d.fdPledges ?? [];
+          const enrichedFDPledges = await Promise.all(
+            loadedFDPledges.map(async (fp: any) => {
+              if (fp.fdAccId) {
+                try {
+                  const balRes = await commonservice.fetch_fd_pledge_balance(user.branchid, fp.fdAccId);
+                  const bal = (balRes as any).data ?? (balRes as any).Data;
+                  return { ...fp, fDAmount: bal?.fdAmount ?? bal?.FdAmount ?? 0, interest: bal?.intRate ?? bal?.IntRate ?? 0 };
+                } catch { return fp; }
+              }
+              return fp;
+            })
+          );
+          setFDPledges(enrichedFDPledges);
+
+          const loadedRDPledges = d.rdPledges ?? [];
+          const enrichedRDPledges = await Promise.all(
+            loadedRDPledges.map(async (rp: any) => {
+              if (rp.rdAccId) {
+                try {
+                  const balRes = await commonservice.fetch_rd_pledge_balance(user.branchid, rp.rdAccId);
+                  const bal = (balRes as any).data ?? (balRes as any).Data;
+                  return { ...rp, rDAmount: bal?.rdAmount ?? bal?.RdAmount ?? 0, interest: bal?.intRate ?? bal?.IntRate ?? 0 };
+                } catch { return rp; }
+              }
+              return rp;
+            })
+          );
+          setRDPledges(enrichedRDPledges);
           setOpeningBalDetails(d.openingBalanceDetails ?? []);
+          if (d.openingBalance) {
+            const ob = d.openingBalance;
+            setOpeningBal({
+              totalBalance: ob.totalBalance?.toString() ?? "",
+              balType: ob.balType ?? "Dr",
+              overDueBal: ob.overDueBal?.toString() ?? "",
+              overBalType: ob.overBalType ?? "Dr",
+              openInt: ob.openInt?.toString() ?? "",
+              openIntType: ob.openIntType ?? "Dr",
+              openOverInt: ob.openOverInt?.toString() ?? "",
+              openOverIntType: ob.openOverIntType ?? "Dr",
+              overDueDate: ob.overDueDate ? commonservice.splitDate(ob.overDueDate) : "",
+            });
+          }
         }
         Swal.close();
       } catch (error: any) {
@@ -354,14 +428,12 @@ const LoanAccountMaster: React.FC = () => {
     }
 
     if (numRes.success && numRes.data) {
-      const parts = String(numRes.data).split("-");
+      const { suffix } = numRes.data as any;
       setFormData(prev => ({
         ...prev,
-        accPrefix: parts[0] ?? "",
-        accSuffix: parseInt(parts[parts.length - 1] ?? "1"),
-        accountNumber: String(numRes.data),
+        accSuffix: String(suffix ?? ""),
       }));
-      setKistData(prev => ({ ...prev, loanNo: String(numRes.data) }));
+      // loanNo is intentionally left blank — user must enter it manually
     }
 
     if (slabRes.success && (slabRes as any).loanSlabs) {
@@ -398,11 +470,13 @@ const LoanAccountMaster: React.FC = () => {
           stdIntRate: detail.stdIntRate?.toString() ?? "",
           overIntRate: detail.penalIntRate?.toString() ?? "",
         }));
+        setManualIntRate(false);
         return;
       }
     }
-    Swal.fire("Warning", "No matching slab found for this loan amount and period. Please verify the slab configuration.", "warning");
+    Swal.fire("Warning", "No matching slab found for this loan amount and period. Please enter the interest rates manually.", "warning");
     setKistData(prev => ({ ...prev, slabId: 0, stdIntRate: "", overIntRate: "" }));
+    setManualIntRate(true);
   };
 
   // ── Member search (same as saving master) ────────────────────────────────────
@@ -511,11 +585,13 @@ const LoanAccountMaster: React.FC = () => {
           stdIntRate: detail.stdIntRate?.toString() ?? "",
           overIntRate: detail.penalIntRate?.toString() ?? "",
         }));
+        setManualLimitIntRate(false);
         return;
       }
     }
-    Swal.fire("Warning", "No matching slab found for this loan amount and period. Please verify the slab configuration.", "warning");
+    Swal.fire("Warning", "No matching slab found for this loan amount and period. Please enter the interest rates manually.", "warning");
     setLimitEntry(prev => ({ ...prev, slabId: 0, stdIntRate: "", overIntRate: "" }));
+    setManualLimitIntRate(true);
   };
 
   // ── Session date range (parsed from "YYYY-YYYY", fiscal year Apr–Mar) ─────────
@@ -568,6 +644,10 @@ const LoanAccountMaster: React.FC = () => {
     const period   = parseInt(kistData.loanPeriod);
     const interval = parseInt(kistData.kistInterval);
 
+    if (!kistData.loanNo.trim()) {
+      Swal.fire("Validation", "Loan No. is required.", "warning");
+      return;
+    }
     if (!loan || !rate || !period || !interval || !kistData.firstKistDate) {
       Swal.fire("Incomplete", "Please fill Loan Amount, Std Int Rate, Loan Period, Kist Interval, and First Kist Date.", "warning");
       return;
@@ -646,28 +726,39 @@ const LoanAccountMaster: React.FC = () => {
   // ── Pledge handlers ──────────────────────────────────────────────────────────
   const handleAddFDPledge = () => {
     if (!fdPledgeEntry.accId) { Swal.fire("Validation", "Select FD Account.", "warning"); return; }
+    const fdAmt = parseFloat(fdPledgeEntry.fdAmount || "0");
+    const fdInt = parseFloat(fdPledgeEntry.interest || "0");
+    if (fdAmt <= 0 && fdInt <= 0) { Swal.fire("Validation", "FD Amount or Interest Rate must be greater than zero.", "warning"); return; }
     setFDPledges(prev => [...prev, {
       brId: user.branchid, loanAccId: 0,
       fDAccId: fdPledgeEntry.accId,
-      fDAccNumber: fdPledgeEntry.accNumber,
-      fDAmount: parseFloat(fdPledgeEntry.fdAmount || "0"),
-      interest: parseFloat(fdPledgeEntry.interest || "0"),
+      fDAccDetId: fdPledgeEntry.detId,
+      fdAccNumber: fdPledgeEntry.accNumber,
+      fdAccName: fdPledgeEntry.accName,
+      fDAmount: fdAmt,
+      interest: fdInt,
       date: sessionDate,
+      status: fdRdStatus,
     }]);
-    setFdPledgeEntry({ accId: 0, accNumber: "", fdAmount: "", interest: "" });
+    setFdPledgeEntry({ accId: 0, detId: 0, accNumber: "", accName: "", fdAmount: "", interest: "" });
   };
 
   const handleAddRDPledge = () => {
     if (!rdPledgeEntry.accId) { Swal.fire("Validation", "Select RD Account.", "warning"); return; }
+    const rdAmt = parseFloat(rdPledgeEntry.rdAmount || "0");
+    const rdInt = parseFloat(rdPledgeEntry.interest || "0");
+    if (rdAmt <= 0 && rdInt <= 0) { Swal.fire("Validation", "RD Amount or Interest Rate must be greater than zero.", "warning"); return; }
     setRDPledges(prev => [...prev, {
       brId: user.branchid, loanAccId: 0,
       rDAccId: rdPledgeEntry.accId,
       rDAccNumber: rdPledgeEntry.accNumber,
-      rDAmount: parseFloat(rdPledgeEntry.rdAmount || "0"),
-      interest: parseFloat(rdPledgeEntry.interest || "0"),
+      rdAccName: rdPledgeEntry.accName,
+      rDAmount: rdAmt,
+      interest: rdInt,
       date: sessionDate,
+      status: fdRdStatus,
     }]);
-    setRdPledgeEntry({ accId: 0, accNumber: "", rdAmount: "", interest: "" });
+    setRdPledgeEntry({ accId: 0, accNumber: "", accName: "", rdAmount: "", interest: "" });
   };
 
   // ── Opening balance entry ────────────────────────────────────────────────────
@@ -679,22 +770,35 @@ const LoanAccountMaster: React.FC = () => {
       amountCr: parseFloat(obEntry.amountCr || "0"),
       intDr: parseFloat(obEntry.intDr || "0"),
       intCr: parseFloat(obEntry.intCr || "0"),
-      date: obEntry.date, valueDate: obEntry.date, status: "A",
+      date: obEntry.date, valueDate: obEntry.date, status: "A", entryType: obEntry.entryType,
     }]);
     setObEntry({ date: sessionDate, entryType: "", amountDr: "", amountCr: "", intDr: "", intCr: "" });
   };
 
   // ── Submit ───────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
     if (!formData.selectedProductId) { Swal.fire("Validation", "Please select a Loan Product.", "warning"); return; }
+    if (!formData.accSuffix) { Swal.fire("Validation", "Please enter a Loan Account Number.", "warning"); return; }
     if (!memberDetails) { Swal.fire("Validation", "Please search and select a member.", "warning"); return; }
     if (isInstallment && schedule.length === 0) { Swal.fire("Validation", "Please generate the installment schedule first.", "warning"); return; }
-    if (nominees.length === 0) { Swal.fire("Validation", "At least one nominee is required.", "warning"); setActiveTab("nominee"); return; }
+    if (isNomineeRequired && nominees.length === 0) { Swal.fire("Validation", "At least one nominee must be added.", "warning"); setActiveTab("nominee"); return; }
     if (isUnsecure) {
       if (!guarantorData.guar1MemId) { Swal.fire("Validation", "Guarantor 1 is mandatory for unsecured loans.", "warning"); setActiveTab("guarantors"); return; }
       if (!guarantorData.guar2MemId) { Swal.fire("Validation", "Guarantor 2 is mandatory for unsecured loans.", "warning"); setActiveTab("guarantors"); return; }
     }
+    if (openingBalDetails.length > 0 && !parseFloat(openingBal.totalBalance || "0")) {
+      Swal.fire("Validation", "Opening Balance Info is required when detail entries exist. Please enter the Total Balance.", "warning");
+      setActiveTab("opening-balance");
+      return;
+    }
+    if (!isUnsecure && hasFDRDSecurity && fdPledges.length === 0 && rdPledges.length === 0) {
+      Swal.fire("Validation", "At least one FD or RD must be pledged for secured loans.", "warning");
+      setActiveTab("fd-pledge");
+      return;
+    }
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       const dto: CombinedLoanAccountDTO = {
@@ -704,9 +808,7 @@ const LoanAccountMaster: React.FC = () => {
           headCode: formData.headCode,
           accTypeId: 1, // Loan = 1
           generalProductId: formData.selectedProductId,
-          accountNumber: formData.accountNumber,
-          accPrefix: formData.accPrefix,
-          accSuffix: formData.accSuffix,
+          accountNumber: productInfo?.code ? `${productInfo.code}-${formData.accSuffix}` : formData.accSuffix,
           accountName: memberDetailsData.memberName,
           memberId: memberDetails?.memberId,
           memberBranchId: memberDetails?.memberBranchId,
@@ -754,12 +856,21 @@ const LoanAccountMaster: React.FC = () => {
           wit2MemBrId:   guarantorData.wit2MemBrId,
         } : undefined,
         openingBalance: openingBalDetails.length > 0 ? {
-          branchId: user.branchid, totalBalance: parseFloat(openingBal.totalBalance || "0"),
+          branchId: user.branchid,
+          totalBalance: parseFloat(openingBal.totalBalance || "0"),
           balType: openingBal.balType,
+          overDueBal: parseFloat(openingBal.overDueBal || "0") || undefined,
+          overBalType: openingBal.overBalType || undefined,
+          openInt: parseFloat(openingBal.openInt || "0") || undefined,
+          openIntType: openingBal.openIntType || undefined,
+          openOverInt: parseFloat(openingBal.openOverInt || "0") || undefined,
+          openOverIntType: openingBal.openOverIntType || undefined,
+          overDueDate: openingBal.overDueDate || undefined,
         } : undefined,
         openingBalanceDetails: openingBalDetails,
         fDPledges: fdPledges,
         rDPledges: rdPledges,
+        isNomineeRequired,
       };
 
       const res = isEditMode && accountId
@@ -768,27 +879,36 @@ const LoanAccountMaster: React.FC = () => {
 
       if (res.success) {
         await Swal.fire({ icon: "success", title: "Success!", text: res.message, showConfirmButton: false, timer: 2000 });
-        navigate(isEditMode ? "/loan-acc-info" : "/loan-acc-master");
+        if (isEditMode) {
+          navigate("/loan-acc-info");
+        } else {
+          handleReset();
+        }
       } else {
         throw new Error(res.message);
       }
     } catch (err: any) {
       Swal.fire("Error", err.message || "Failed to save loan account.", "error");
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
 
   const handleReset = () => {
-    setFormData({ branchId: user.branchid, selectedProductId: 0, openingDate: sessionDate, shareMoneyAccNo: "", memberAccountNo: "", membershipNo: "", agent: "", accountNumber: "", accPrefix: "", accSuffix: 0, headId: 0, headCode: 0, relationId: 0 });
+    setFormData({ branchId: user.branchid, selectedProductId: 0, openingDate: sessionDate, shareMoneyAccNo: "", memberAccountNo: "", membershipNo: "", agent: "", accSuffix: "", headId: 0, headCode: 0, relationId: 0 });
     setMemberDetails(null);
     setMemberDetailsData({ memberName: "", gender: 0, dateOfBirth: "", mobileNo: "", emailId: "", addressLine1: "", relativeName: "" });
     setInputMode("account"); setMemberType(2);
-    setKistData({ loanAmount: "", loanDate: sessionDate, stdIntRate: "", overIntRate: "", marginAmount: "", loanPeriod: "", kistInterval: "", firstKistDate: sessionDate, slabId: 0, loanNo: "", kistPrintPart: "", intFormulae: INT_FORMULAE_REDUCING, intSchedule: INT_SCHEDULE_WITH, kistAmount: 0, kistIntPart: 0, intAmount: 0 });
+    setKistData({ loanAmount: "", loanDate: sessionDate, stdIntRate: "", overIntRate: "", marginAmount: "", loanPeriod: "", kistInterval: "", firstKistDate: "", slabId: 0, loanNo: "", kistPrintPart: "", intFormulae: INT_FORMULAE_REDUCING, intSchedule: INT_SCHEDULE_WITH, kistAmount: 0, kistIntPart: 0, intAmount: 0 });
     setSchedule([]); setLimitDetails([]); setNominees([]); setFDPledges([]); setRDPledges([]);
     setGuarantorData({ guar1MemId: 0, guar1MemBrId: 0, guar2MemId: 0, guar2MemBrId: 0, witness1MemId: 0, wit1MemBrId: 0, witness2MemId: 0, wit2MemBrId: 0 });
-    setOpeningBalDetails([]); setProductInfo(null); setShareMoneyAccDetails(null);
+    setOpeningBalDetails([]);
+    setOpeningBal({ totalBalance: "", balType: "Dr", overDueBal: "", overBalType: "Dr", openInt: "", openIntType: "Dr", openOverInt: "", openOverIntType: "Dr", overDueDate: "" });
+    setProductInfo(null); setShareMoneyAccDetails(null);
     setLoanSlabs([]);
+    setManualIntRate(false); setManualLimitIntRate(false);
+    setIsNomineeRequired(false);
   };
 
   const memberOptions = activeMembers.map(m => ({
@@ -800,9 +920,18 @@ const LoanAccountMaster: React.FC = () => {
       + (m.nominalMembershipNo   ? ` · NM ${m.nominalMembershipNo}`   : ''),
   }));
 
+  // Search by name OR membership no (PM/NM numbers are in subLabel)
+  const memberFilterOption = (option: { data: { label: string; subLabel: string } }, inputValue: string) => {
+    const q = inputValue.toLowerCase();
+    return (
+      option.data.label.toLowerCase().includes(q) ||
+      (option.data.subLabel || '').toLowerCase().includes(q)
+    );
+  };
+
   const productOptions = loanProducts.map(p => ({ value: p.id, label: p.productName }));
   const relationOptions = relations.map(r => ({ value: r.relationId, label: r.description }));
-  const fdOptions = fdAccounts.map(a => ({ value: a.accId, label: `${a.accountNumber} - ${a.accountName}` }));
+  const fdOptions = fdAccounts.map(a => ({ value: a.accId, detId: a.fdAccDetId, label: `${a.accountNumber} - ${a.accountName}` }));
   const rdOptions = rdAccounts.map(a => ({ value: a.accId, label: `${a.accountNumber} - ${a.accountName}` }));
 
   // Interest formula options filtered by loan type
@@ -830,6 +959,25 @@ const LoanAccountMaster: React.FC = () => {
   const num = (v: string) => v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
   // allow digits only (no decimal)
   const int = (v: string) => v.replace(/[^0-9]/g, '');
+
+  // Add N months to a YYYY-MM-DD date string.
+  // If the source date is the last day of its month, the result is always the last day of the target month
+  // (e.g. 31-Mar + 1 month = 30-Apr, not 1-May).
+  const addMonths = (dateStr: string, months: number): string => {
+    if (!dateStr || !months) return dateStr;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    // m is 1-indexed. new Date(y, m, 0) gives the last day of month m.
+    const lastDayOfSrcMonth = new Date(y, m, 0).getDate();
+    const isMonthEnd = d === lastDayOfSrcMonth;
+    // Compute target year and month (1-indexed) without JS date overflow
+    const totalMonths = y * 12 + (m - 1) + months;
+    const tYear = Math.floor(totalMonths / 12);
+    const tMonth = (totalMonths % 12) + 1; // 1-indexed
+    const lastDayOfTgtMonth = new Date(tYear, tMonth, 0).getDate();
+    // Month-end → always land on last day of target month; otherwise cap at last day to avoid overflow
+    const tDay = isMonthEnd ? lastDayOfTgtMonth : Math.min(d, lastDayOfTgtMonth);
+    return `${tYear}-${String(tMonth).padStart(2, '0')}-${String(tDay).padStart(2, '0')}`;
+  };
 
   const inputCls = "w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none";
   const labelCls = "block text-sm font-medium text-gray-700 mb-1";
@@ -873,8 +1021,7 @@ const LoanAccountMaster: React.FC = () => {
                   <Select options={productOptions}
                     value={productOptions.find(o => o.value === formData.selectedProductId) || null}
                     onChange={handleProductChange} placeholder="Select Loan Product"
-                    isDisabled={isEditMode} menuPortalTarget={document.body}
-                    styles={{ menuPortal: b => ({ ...b, zIndex: 9999 }) }}
+                    isDisabled={isEditMode}
                     className="text-sm" />
                 </div>
 
@@ -959,11 +1106,42 @@ const LoanAccountMaster: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Loan A/C No. (auto-generated) */}
+                {/* Loan A/C No. — fixed prefix + editable suffix */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Loan A/C No.</label>
-                  <input type="text" value={formData.accountNumber} readOnly
-                    className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg bg-gray-100 outline-none" placeholder="Auto-generated" />
+                  <label className="block text-sm font-medium text-gray-700">Loan A/C No.<span className="text-red-500">*</span></label>
+                  <div className="flex">
+                    {productInfo?.code && (
+                      <span className="px-3 py-2.5 bg-gray-200 border-2 border-r-0 border-gray-300 rounded-l-lg text-sm font-semibold text-gray-700 whitespace-nowrap select-none">
+                        {productInfo.code} -
+                      </span>
+                    )}
+                    <input
+                      ref={loanAccSuffixRef}
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.accSuffix}
+                      onChange={e => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setFormData(p => ({ ...p, accSuffix: val }));
+                      }}
+                      readOnly={isEditMode}
+                      onBlur={async () => {
+                        const sfx = parseInt(formData.accSuffix);
+                        if (!sfx || !formData.selectedProductId) return;
+                        const res = await loanAccountApi.checkAccountNumberExists(
+                          formData.selectedProductId, user.branchid, sfx,
+                          isEditMode && accountId ? accountId : 0
+                        );
+                        if (res.success && res.data) {
+                          const fullAccNo = productInfo?.code ? `${productInfo.code}-${formData.accSuffix}` : formData.accSuffix;
+                          await Swal.fire("Duplicate", `Loan account number '${fullAccNo}' already exists for this product.`, "warning");
+                          setFormData(p => ({ ...p, accSuffix: "" }));
+                        }
+                      }}
+                      className={`w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg${productInfo?.code ? " rounded-l-none border-l-0" : ""} outline-none focus:border-blue-500`}
+                      placeholder="Auto-generated"
+                    />
+                  </div>
                 </div>
 
               </div>
@@ -1073,13 +1251,28 @@ const LoanAccountMaster: React.FC = () => {
                               className={inputCls} placeholder="0" />
                           </div>
                           <div>
+                            <label className={labelCls}>Loan Period (months) <span className="text-red-500">*</span></label>
+                            <input type="text" inputMode="decimal" value={kistData.loanPeriod}
+                              onChange={e => setKistData(p => ({ ...p, loanPeriod: int(e.target.value) }))}
+                              onBlur={e => { if (kistData.loanAmount && e.target.value) applySlabRates(kistData.loanAmount, e.target.value); }}
+                              className={inputCls} placeholder="60" />
+                          </div>
+                          <div>
                             <label className={labelCls}>Loan Date <span className="text-red-500">*</span></label>
                             <DatePicker
                               value={kistData.loanDate}
                               min={formData.openingDate || sessionMinDate}
                               max={sessionMaxDate}
                               workingDate={sessionDate}
-                              onChange={val => { setKistData(p => ({ ...p, loanDate: val })); validateLoanDate(val); }}
+                              onChange={val => {
+                                const interval = parseInt(kistData.kistInterval);
+                                setKistData(p => ({
+                                  ...p,
+                                  loanDate: val,
+                                  firstKistDate: val && interval ? addMonths(val, interval) : p.firstKistDate,
+                                }));
+                                validateLoanDate(val);
+                              }}
                               className={inputCls}
                             />
                           </div>
@@ -1090,29 +1283,29 @@ const LoanAccountMaster: React.FC = () => {
                           <div>
                             <label className={labelCls}>Std Int Rate <span className="text-red-500">*</span></label>
                             <input type="text" inputMode="decimal" value={kistData.stdIntRate}
-                              readOnly={!kistData.slabId}
+                              readOnly={!kistData.slabId && !manualIntRate}
                               onChange={e => setKistData(p => ({ ...p, stdIntRate: num(e.target.value) }))}
-                              className={`${inputCls} ${kistData.slabId ? 'bg-yellow-50' : 'bg-gray-100 cursor-not-allowed'}`}
-                              placeholder={kistData.slabId ? "Auto from slab" : "Enter loan amount first"} />
+                              className={`${inputCls} ${kistData.slabId ? 'bg-yellow-50' : manualIntRate ? 'bg-orange-50' : 'bg-gray-100 cursor-not-allowed'}`}
+                              placeholder={kistData.slabId ? "Auto from slab" : manualIntRate ? "Enter rate manually" : "Enter loan amount first"} />
                           </div>
                           <div>
                             <label className={labelCls}>Over Int Rate <span className="text-red-500">*</span></label>
                             <input type="text" inputMode="decimal" value={kistData.overIntRate}
-                              readOnly={!kistData.slabId}
+                              readOnly={!kistData.slabId && !manualIntRate}
                               onChange={e => setKistData(p => ({ ...p, overIntRate: num(e.target.value) }))}
-                              className={`${inputCls} ${kistData.slabId ? 'bg-yellow-50' : 'bg-gray-100 cursor-not-allowed'}`}
-                              placeholder={kistData.slabId ? "Auto from slab" : "Enter loan amount first"} />
-                          </div>
-                          <div>
-                            <label className={labelCls}>Loan Period (months) <span className="text-red-500">*</span></label>
-                            <input type="text" inputMode="decimal" value={kistData.loanPeriod}
-                              onChange={e => setKistData(p => ({ ...p, loanPeriod: int(e.target.value) }))}
-                              onBlur={e => { if (kistData.loanAmount && e.target.value) applySlabRates(kistData.loanAmount, e.target.value); }}
-                              className={inputCls} placeholder="60" />
+                              className={`${inputCls} ${kistData.slabId ? 'bg-yellow-50' : manualIntRate ? 'bg-orange-50' : 'bg-gray-100 cursor-not-allowed'}`}
+                              placeholder={kistData.slabId ? "Auto from slab" : manualIntRate ? "Enter rate manually" : "Enter loan amount first"} />
                           </div>
                           <div>
                             <label className={labelCls}>Kist Interval <span className="text-red-500">*</span></label>
-                            <input type="text" inputMode="decimal" value={kistData.kistInterval} onChange={e => setKistData(p => ({ ...p, kistInterval: int(e.target.value) }))} className={inputCls} placeholder="1 = Monthly" />
+                            <input type="text" inputMode="decimal" value={kistData.kistInterval} onChange={e => {
+                              const interval = parseInt(e.target.value) || 0;
+                              setKistData(p => ({
+                                ...p,
+                                kistInterval: int(e.target.value),
+                                firstKistDate: p.loanDate && interval ? addMonths(p.loanDate, interval) : p.firstKistDate,
+                              }));
+                            }} className={inputCls} placeholder="1 = Monthly" />
                           </div>
                           <div>
                             <label className={labelCls}>First Kist Date <span className="text-red-500">*</span></label>
@@ -1206,9 +1399,9 @@ const LoanAccountMaster: React.FC = () => {
                         <div><label className={labelCls}>Loan Period (days) <span className="text-red-500">*</span></label>
                           <input type="text" inputMode="decimal" value={limitEntry.periodDays} onChange={e => setLimitEntry(p => ({ ...p, periodDays: int(e.target.value) }))} className={inputCls} /></div>
                         <div><label className={labelCls}>Std Int Rate <span className="text-red-500">*</span></label>
-                          <input type="text" inputMode="decimal" value={limitEntry.stdIntRate} onChange={e => setLimitEntry(p => ({ ...p, stdIntRate: num(e.target.value) }))} className={`${inputCls} bg-yellow-50`} placeholder="Auto from slab" /></div>
+                          <input type="text" inputMode="decimal" value={limitEntry.stdIntRate} onChange={e => setLimitEntry(p => ({ ...p, stdIntRate: num(e.target.value) }))} className={`${inputCls} ${manualLimitIntRate ? 'bg-orange-50' : 'bg-yellow-50'}`} placeholder={manualLimitIntRate ? "Enter rate manually" : "Auto from slab"} /></div>
                         <div><label className={labelCls}>Over Int Rate <span className="text-red-500">*</span></label>
-                          <input type="text" inputMode="decimal" value={limitEntry.overIntRate} onChange={e => setLimitEntry(p => ({ ...p, overIntRate: num(e.target.value) }))} className={`${inputCls} bg-yellow-50`} placeholder="Auto from slab" /></div>
+                          <input type="text" inputMode="decimal" value={limitEntry.overIntRate} onChange={e => setLimitEntry(p => ({ ...p, overIntRate: num(e.target.value) }))} className={`${inputCls} ${manualLimitIntRate ? 'bg-orange-50' : 'bg-yellow-50'}`} placeholder={manualLimitIntRate ? "Enter rate manually" : "Auto from slab"} /></div>
                       </div>
                       <div className="flex justify-end mb-4">
                         <button onClick={handleAddLimitEntry} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold">Ok</button>
@@ -1251,115 +1444,163 @@ const LoanAccountMaster: React.FC = () => {
               {/* ── Nominee Detail Tab ─────────────────────────────────────────── */}
               {activeTab === "nominee" && (
                 <div className="space-y-4">
-                  {nominees.length === 0 && (
-                    <div className="flex items-center gap-2 bg-red-50 border border-red-300 rounded-lg px-4 py-2 text-sm text-red-700 font-medium">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      At least one nominee must be added before saving.
+                  <label className="flex items-center gap-2 cursor-pointer w-fit">
+                    <input
+                      type="checkbox"
+                      checked={isNomineeRequired}
+                      onChange={e => {
+                        setIsNomineeRequired(e.target.checked);
+                        if (!e.target.checked) setNominees([]);
+                      }}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Nominee Detail Required</span>
+                  </label>
+                  {isNomineeRequired && <>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <div><label className={labelCls}>Nominee Name <span className="text-red-500">*</span></label>
+                        <input type="text" value={nomineeEntry.nomineeName} onChange={e => setNomineeEntry(p => ({ ...p, nomineeName: e.target.value }))} className={inputCls} /></div>
+                      <div><label className={labelCls}>Date of Birth <span className="text-red-500">*</span></label>
+                        <DatePicker value={nomineeEntry.nomineeDob} onChange={val => setNomineeEntry(p => ({ ...p, nomineeDob: val }))} max={sessionDate} workingDate={sessionDate} className={inputCls} /></div>
+                      <div><label className={labelCls}>Relation <span className="text-red-500">*</span></label>
+                        <Select
+                          options={relationOptions}
+                          value={relationOptions.find(o => o.value === nomineeEntry.relationId) || null}
+                          onChange={opt => setNomineeEntry(p => ({ ...p, relationId: opt?.value ?? 0 }))}
+                          placeholder="Select Relation"
+                          isClearable
+                          className="text-sm"
+                          styles={{ menuPortal: b => ({ ...b, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
+                        /></div>
+                      <div><label className={labelCls}>Is Minor</label>
+                        <select value={nomineeEntry.isMinor} onChange={e => setNomineeEntry(p => ({ ...p, isMinor: parseInt(e.target.value) }))} className={inputCls}>
+                          <option value={0}>No</option><option value={1}>Yes</option>
+                        </select></div>
+                      {nomineeEntry.isMinor === 1 && (
+                        <div><label className={labelCls}>Name of Guardian</label>
+                          <input type="text" value={nomineeEntry.nameOfGuardian} onChange={e => setNomineeEntry(p => ({ ...p, nameOfGuardian: e.target.value }))} className={inputCls} /></div>
+                      )}
+                      <div className="flex items-end">
+                        <button onClick={handleAddNominee} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2"><Plus className="w-4 h-4" /> Add</button>
+                      </div>
                     </div>
-                  )}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div><label className={labelCls}>Nominee Name <span className="text-red-500">*</span></label>
-                      <input type="text" value={nomineeEntry.nomineeName} onChange={e => setNomineeEntry(p => ({ ...p, nomineeName: e.target.value }))} className={inputCls} /></div>
-                    <div><label className={labelCls}>Date of Birth <span className="text-red-500">*</span></label>
-                      <DatePicker value={nomineeEntry.nomineeDob} onChange={val => setNomineeEntry(p => ({ ...p, nomineeDob: val }))} max={sessionDate} workingDate={sessionDate} className={inputCls} /></div>
-                    <div><label className={labelCls}>Relation <span className="text-red-500">*</span></label>
-                      <Select
-                        options={relationOptions}
-                        value={relationOptions.find(o => o.value === nomineeEntry.relationId) || null}
-                        onChange={opt => setNomineeEntry(p => ({ ...p, relationId: opt?.value ?? 0 }))}
-                        placeholder="Select Relation"
-                        isClearable
-                        className="text-sm"
-                        menuPortalTarget={document.body}
-                        styles={{ menuPortal: b => ({ ...b, zIndex: 9999 }) }}
-                      /></div>
-                    <div><label className={labelCls}>Is Minor</label>
-                      <select value={nomineeEntry.isMinor} onChange={e => setNomineeEntry(p => ({ ...p, isMinor: parseInt(e.target.value) }))} className={inputCls}>
-                        <option value={0}>No</option><option value={1}>Yes</option>
-                      </select></div>
-                    {nomineeEntry.isMinor === 1 && (
-                      <div><label className={labelCls}>Name of Guardian</label>
-                        <input type="text" value={nomineeEntry.nameOfGuardian} onChange={e => setNomineeEntry(p => ({ ...p, nameOfGuardian: e.target.value }))} className={inputCls} /></div>
-                    )}
-                    <div className="flex items-end">
-                      <button onClick={handleAddNominee} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2"><Plus className="w-4 h-4" /> Add</button>
-                    </div>
-                  </div>
-                  {nominees.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse text-sm">
-                        <thead>
-                          <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                            {["Sr.No.", "Name", "DOB", "Relation", "Is Minor", "Action"].map(h => <th key={h} className="border border-gray-300 px-3 py-2">{h}</th>)}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {nominees.map((n, i) => (
-                            <tr key={i} className={i % 2 === 0 ? "bg-blue-50" : "bg-white"}>
-                              <td className="border border-gray-300 px-3 py-1.5 text-center">{i + 1}</td>
-                              <td className="border border-gray-300 px-3 py-1.5">{n.nomineeName}</td>
-                              <td className="border border-gray-300 px-3 py-1.5">{new Date(n.nomineeDob).toLocaleDateString("en-IN")}</td>
-                              <td className="border border-gray-300 px-3 py-1.5">{relations.find(r => r.relationId === n.relationWithAccHolder)?.description ?? n.relationWithAccHolder}</td>
-                              <td className="border border-gray-300 px-3 py-1.5 text-center">{n.isMinor ? "Yes" : "No"}</td>
-                              <td className="border border-gray-300 px-3 py-1.5 text-center"><button onClick={() => setNominees(p => p.filter((_, j) => j !== i))} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
+                    {nominees.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-sm">
+                          <thead>
+                            <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                              {["Sr.No.", "Name", "DOB", "Relation", "Is Minor", "Action"].map(h => <th key={h} className="border border-gray-300 px-3 py-2">{h}</th>)}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                          </thead>
+                          <tbody>
+                            {nominees.map((n, i) => (
+                              <tr key={i} className={i % 2 === 0 ? "bg-blue-50" : "bg-white"}>
+                                <td className="border border-gray-300 px-3 py-1.5 text-center">{i + 1}</td>
+                                <td className="border border-gray-300 px-3 py-1.5">{n.nomineeName}</td>
+                                <td className="border border-gray-300 px-3 py-1.5">{new Date(n.nomineeDob).toLocaleDateString("en-IN")}</td>
+                                <td className="border border-gray-300 px-3 py-1.5">{relations.find(r => r.relationId === n.relationWithAccHolder)?.description ?? n.relationWithAccHolder}</td>
+                                <td className="border border-gray-300 px-3 py-1.5 text-center">{n.isMinor ? "Yes" : "No"}</td>
+                                <td className="border border-gray-300 px-3 py-1.5 text-center"><button onClick={() => setNominees(p => p.filter((_, j) => j !== i))} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>}
                 </div>
               )}
 
               {/* ── Opening Balance Tab ────────────────────────────────────────── */}
               {activeTab === "opening-balance" && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-orange-50 p-4 rounded-lg border border-orange-200">
-                    <div><label className={labelCls}>Date</label>
-                      <DatePicker value={obEntry.date} onChange={val => setObEntry(p => ({ ...p, date: val }))} max={sessionDate} workingDate={sessionDate} className={inputCls} /></div>
-                    <div><label className={labelCls}>Entry Type</label>
-                      <select value={obEntry.entryType} onChange={e => setObEntry(p => ({ ...p, entryType: e.target.value }))} className={inputCls}>
-                        <option value="">==Select==</option>
-                        <option value="OB">Opening Balance</option>
-                        <option value="TR">Transfer</option>
-                        <option value="OD">Overdue</option>
-                      </select></div>
-                    <div><label className={labelCls}>Amount Dr</label>
-                      <input type="text" inputMode="decimal" value={obEntry.amountDr} onChange={e => setObEntry(p => ({ ...p, amountDr: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
-                    <div><label className={labelCls}>Amount Cr</label>
-                      <input type="text" inputMode="decimal" value={obEntry.amountCr} onChange={e => setObEntry(p => ({ ...p, amountCr: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
-                    <div><label className={labelCls}>Int Dr</label>
-                      <input type="text" inputMode="decimal" value={obEntry.intDr} onChange={e => setObEntry(p => ({ ...p, intDr: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
-                    <div><label className={labelCls}>Int Cr</label>
-                      <input type="text" inputMode="decimal" value={obEntry.intCr} onChange={e => setObEntry(p => ({ ...p, intCr: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
-                    <div className="flex items-end gap-2">
-                      <button onClick={handleAddObEntry} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold">Ok</button>
+                <div className="space-y-6">
+
+                  {/* ── Section 1: Opening Balance Info (summary header) ── */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+                      Opening Balance Info {openingBalDetails.length > 0 && <span className="text-red-500">*</span>}
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <div><label className={labelCls}>Total Balance <span className="text-red-500">*</span></label>
+                        <input type="text" inputMode="decimal" value={openingBal.totalBalance} onChange={e => setOpeningBal(p => ({ ...p, totalBalance: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                      <div><label className={labelCls}>Bal Type</label>
+                        <select value={openingBal.balType} onChange={e => setOpeningBal(p => ({ ...p, balType: e.target.value }))} className={inputCls}>
+                          <option value="Dr">Dr</option><option value="Cr">Cr</option>
+                        </select></div>
+                      <div><label className={labelCls}>Overdue Balance</label>
+                        <input type="text" inputMode="decimal" value={openingBal.overDueBal} onChange={e => setOpeningBal(p => ({ ...p, overDueBal: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                      <div><label className={labelCls}>Overdue Bal Type</label>
+                        <select value={openingBal.overBalType} onChange={e => setOpeningBal(p => ({ ...p, overBalType: e.target.value }))} className={inputCls}>
+                          <option value="Dr">Dr</option><option value="Cr">Cr</option>
+                        </select></div>
+                      <div><label className={labelCls}>Opening Interest</label>
+                        <input type="text" inputMode="decimal" value={openingBal.openInt} onChange={e => setOpeningBal(p => ({ ...p, openInt: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                      <div><label className={labelCls}>Int Type</label>
+                        <select value={openingBal.openIntType} onChange={e => setOpeningBal(p => ({ ...p, openIntType: e.target.value }))} className={inputCls}>
+                          <option value="Dr">Dr</option><option value="Cr">Cr</option>
+                        </select></div>
+                      <div><label className={labelCls}>Opening Overdue Int</label>
+                        <input type="text" inputMode="decimal" value={openingBal.openOverInt} onChange={e => setOpeningBal(p => ({ ...p, openOverInt: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                      <div><label className={labelCls}>Overdue Int Type</label>
+                        <select value={openingBal.openOverIntType} onChange={e => setOpeningBal(p => ({ ...p, openOverIntType: e.target.value }))} className={inputCls}>
+                          <option value="Dr">Dr</option><option value="Cr">Cr</option>
+                        </select></div>
+                      <div><label className={labelCls}>Overdue Date</label>
+                        <DatePicker value={openingBal.overDueDate} onChange={val => setOpeningBal(p => ({ ...p, overDueDate: val }))} max={sessionDate} workingDate={sessionDate} className={inputCls} /></div>
                     </div>
                   </div>
-                  {openingBalDetails.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse text-sm">
-                        <thead>
-                          <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                            {["Date", "Entry Type", "Amount Dr", "Amount Cr", "Int Dr", "Int Cr", "Action"].map(h => <th key={h} className="border border-gray-300 px-3 py-2">{h}</th>)}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {openingBalDetails.map((b, i) => (
-                            <tr key={i} className={i % 2 === 0 ? "bg-orange-50" : "bg-white"}>
-                              <td className="border border-gray-300 px-3 py-1.5">{new Date(b.date).toLocaleDateString("en-IN")}</td>
-                              <td className="border border-gray-300 px-3 py-1.5">{b.status}</td>
-                              <td className="border border-gray-300 px-3 py-1.5 text-right">{b.amountDr.toLocaleString("en-IN")}</td>
-                              <td className="border border-gray-300 px-3 py-1.5 text-right">{b.amountCr.toLocaleString("en-IN")}</td>
-                              <td className="border border-gray-300 px-3 py-1.5 text-right">{b.intDr.toLocaleString("en-IN")}</td>
-                              <td className="border border-gray-300 px-3 py-1.5 text-right">{b.intCr.toLocaleString("en-IN")}</td>
-                              <td className="border border-gray-300 px-3 py-1.5 text-center"><button onClick={() => setOpeningBalDetails(p => p.filter((_, j) => j !== i))} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+
+                  {/* ── Section 2: Opening Balance Detail (grid entries) ── */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Opening Balance Detail</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-orange-50 p-4 rounded-lg border border-orange-200">
+                      <div><label className={labelCls}>Date</label>
+                        <DatePicker value={obEntry.date} onChange={val => setObEntry(p => ({ ...p, date: val }))} max={sessionDate} workingDate={sessionDate} className={inputCls} /></div>
+                      <div><label className={labelCls}>Entry Type <span className="text-red-500">*</span></label>
+                        <select value={obEntry.entryType} onChange={e => setObEntry(p => ({ ...p, entryType: e.target.value }))} className={inputCls}>
+                          <option value="">==Select==</option>
+                          <option value="ADV">Advancement</option>
+                          <option value="RC">Recovery</option>
+                          <option value="INT">Interest</option>
+                        </select></div>
+                      <div><label className={labelCls}>Amount Dr</label>
+                        <input type="text" inputMode="decimal" value={obEntry.amountDr} onChange={e => setObEntry(p => ({ ...p, amountDr: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                      <div><label className={labelCls}>Amount Cr</label>
+                        <input type="text" inputMode="decimal" value={obEntry.amountCr} onChange={e => setObEntry(p => ({ ...p, amountCr: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                      <div><label className={labelCls}>Int Dr</label>
+                        <input type="text" inputMode="decimal" value={obEntry.intDr} onChange={e => setObEntry(p => ({ ...p, intDr: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                      <div><label className={labelCls}>Int Cr</label>
+                        <input type="text" inputMode="decimal" value={obEntry.intCr} onChange={e => setObEntry(p => ({ ...p, intCr: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                      <div className="flex items-end">
+                        <button onClick={handleAddObEntry} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold">Add</button>
+                      </div>
                     </div>
-                  )}
+                    {openingBalDetails.length > 0 && (
+                      <div className="overflow-x-auto mt-3">
+                        <table className="w-full border-collapse text-sm">
+                          <thead>
+                            <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                              {["Date", "Entry Type", "Amount Dr", "Amount Cr", "Int Dr", "Int Cr", "Action"].map(h => <th key={h} className="border border-gray-300 px-3 py-2">{h}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {openingBalDetails.map((b, i) => (
+                              <tr key={i} className={i % 2 === 0 ? "bg-orange-50" : "bg-white"}>
+                                <td className="border border-gray-300 px-3 py-1.5">{new Date(b.date).toLocaleDateString("en-IN")}</td>
+                                <td className="border border-gray-300 px-3 py-1.5">{b.entryType}</td>
+                                <td className="border border-gray-300 px-3 py-1.5 text-right">{b.amountDr.toLocaleString("en-IN")}</td>
+                                <td className="border border-gray-300 px-3 py-1.5 text-right">{b.amountCr.toLocaleString("en-IN")}</td>
+                                <td className="border border-gray-300 px-3 py-1.5 text-right">{b.intDr.toLocaleString("en-IN")}</td>
+                                <td className="border border-gray-300 px-3 py-1.5 text-right">{b.intCr.toLocaleString("en-IN")}</td>
+                                <td className="border border-gray-300 px-3 py-1.5 text-center"><button onClick={() => setOpeningBalDetails(p => p.filter((_, j) => j !== i))} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
                 </div>
               )}
 
@@ -1381,15 +1622,15 @@ const LoanAccountMaster: React.FC = () => {
                           options={memberOptions}
                           value={memberOptions.find(o => o.value === guarantorData.guar1MemId) || null}
                           onChange={opt => setGuarantorData(p => ({ ...p, guar1MemId: opt?.value ?? 0, guar1MemBrId: opt?.brId ?? 0 }))}
+                          filterOption={memberFilterOption}
                           formatOptionLabel={o => (
                             <div>
                               <div className="font-medium text-sm">{o.label}</div>
                               <div className="text-xs text-gray-400">{o.subLabel}</div>
                             </div>
                           )}
-                          placeholder="Search member..."
+                          placeholder="Search name / membership no..."
                           isClearable
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: b => ({ ...b, zIndex: 9999 }),
                             control: (b) => ({ ...b, borderColor: isUnsecure && !guarantorData.guar1MemId ? '#f87171' : b.borderColor, backgroundColor: isUnsecure && !guarantorData.guar1MemId ? '#fef2f2' : b.backgroundColor }),
@@ -1402,15 +1643,15 @@ const LoanAccountMaster: React.FC = () => {
                           options={memberOptions}
                           value={memberOptions.find(o => o.value === guarantorData.guar2MemId) || null}
                           onChange={opt => setGuarantorData(p => ({ ...p, guar2MemId: opt?.value ?? 0, guar2MemBrId: opt?.brId ?? 0 }))}
+                          filterOption={memberFilterOption}
                           formatOptionLabel={o => (
                             <div>
                               <div className="font-medium text-sm">{o.label}</div>
                               <div className="text-xs text-gray-400">{o.subLabel}</div>
                             </div>
                           )}
-                          placeholder="Search member..."
+                          placeholder="Search name / membership no..."
                           isClearable
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: b => ({ ...b, zIndex: 9999 }),
                             control: (b) => ({ ...b, borderColor: isUnsecure && !guarantorData.guar2MemId ? '#f87171' : b.borderColor, backgroundColor: isUnsecure && !guarantorData.guar2MemId ? '#fef2f2' : b.backgroundColor }),
@@ -1428,15 +1669,15 @@ const LoanAccountMaster: React.FC = () => {
                           options={memberOptions}
                           value={memberOptions.find(o => o.value === guarantorData.witness1MemId) || null}
                           onChange={opt => setGuarantorData(p => ({ ...p, witness1MemId: opt?.value ?? 0, wit1MemBrId: opt?.brId ?? 0 }))}
+                          filterOption={memberFilterOption}
                           formatOptionLabel={o => (
                             <div>
                               <div className="font-medium text-sm">{o.label}</div>
                               <div className="text-xs text-gray-400">{o.subLabel}</div>
                             </div>
                           )}
-                          placeholder="Search member..."
+                          placeholder="Search name / membership no..."
                           isClearable
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: b => ({ ...b, zIndex: 9999 }),
                             control: (b) => ({ ...b }),
@@ -1449,15 +1690,15 @@ const LoanAccountMaster: React.FC = () => {
                           options={memberOptions}
                           value={memberOptions.find(o => o.value === guarantorData.witness2MemId) || null}
                           onChange={opt => setGuarantorData(p => ({ ...p, witness2MemId: opt?.value ?? 0, wit2MemBrId: opt?.brId ?? 0 }))}
+                          filterOption={memberFilterOption}
                           formatOptionLabel={o => (
                             <div>
                               <div className="font-medium text-sm">{o.label}</div>
                               <div className="text-xs text-gray-400">{o.subLabel}</div>
                             </div>
                           )}
-                          placeholder="Search member..."
+                          placeholder="Search name / membership no..."
                           isClearable
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: b => ({ ...b, zIndex: 9999 }),
                             control: (b) => ({ ...b }),
@@ -1477,12 +1718,23 @@ const LoanAccountMaster: React.FC = () => {
                     <div className="grid grid-cols-3 gap-4 mb-4">
                       <div><label className={labelCls}>FD Account <span className="text-red-500">*</span></label>
                         <Select options={fdOptions} value={fdOptions.find(o => o.value === fdPledgeEntry.accId) || null}
-                          onChange={opt => setFdPledgeEntry(p => ({ ...p, accId: opt?.value ?? 0, accNumber: fdAccounts.find(a => a.accId === opt?.value)?.accountNumber ?? "" }))}
-                          menuPortalTarget={document.body} styles={{ menuPortal: b => ({ ...b, zIndex: 9999 }) }} /></div>
-                      <div><label className={labelCls}>FD Amount <span className="text-red-500">*</span></label>
-                        <input type="text" inputMode="decimal" value={fdPledgeEntry.fdAmount} onChange={e => setFdPledgeEntry(p => ({ ...p, fdAmount: num(e.target.value) }))} className={inputCls} /></div>
-                      <div><label className={labelCls}>Interest <span className="text-red-500">*</span></label>
-                        <input type="text" inputMode="decimal" value={fdPledgeEntry.interest} onChange={e => setFdPledgeEntry(p => ({ ...p, interest: num(e.target.value) }))} className={inputCls} /></div>
+                          onChange={async opt => {
+                            const accId = opt?.value ?? 0;
+                            const detId = (opt as any)?.detId ?? 0;
+                            const fdAcc = fdAccounts.find(a => a.accId === accId);
+                            const accNumber = fdAcc?.accountNumber ?? "";
+                            const accName = fdAcc?.accountName ?? "";
+                            setFdPledgeEntry(p => ({ ...p, accId, detId, accNumber, accName, fdAmount: "", interest: "" }));
+                            if (accId) {
+                              const res = await commonservice.fetch_fd_pledge_balance(user.branchid, accId);
+                              const d = (res as any).data;
+                              if (d) setFdPledgeEntry(p => ({ ...p, fdAmount: d.fdAmount?.toString() ?? "", interest: d.intRate?.toString() ?? "" }));
+                            }
+                          }} styles={{ menuPortal: b => ({ ...b, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }} /></div>
+                      <div><label className={labelCls}>FD Amount</label>
+                        <input type="text" value={fdPledgeEntry.fdAmount} readOnly className={`${inputCls} bg-gray-100 cursor-not-allowed`} /></div>
+                      <div><label className={labelCls}>Int. Rate (%)</label>
+                        <input type="text" value={fdPledgeEntry.interest} readOnly className={`${inputCls} bg-gray-100 cursor-not-allowed`} /></div>
                     </div>
                     <div className="flex justify-end">
                       <button onClick={handleAddFDPledge} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">Ok</button>
@@ -1493,14 +1745,15 @@ const LoanAccountMaster: React.FC = () => {
                       <table className="w-full border-collapse text-sm">
                         <thead>
                           <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                            {["Sr.No", "FD Account", "FD Amount", "Interest", "Action"].map(h => <th key={h} className="border border-gray-300 px-3 py-2">{h}</th>)}
+                            {["Sr.No", "FD Account", "Account Name", "FD Amount", "Int. Rate (%)", "Action"].map(h => <th key={h} className="border border-gray-300 px-3 py-2">{h}</th>)}
                           </tr>
                         </thead>
                         <tbody>
                           {fdPledges.map((f, i) => (
                             <tr key={i} className={i % 2 === 0 ? "bg-green-50" : "bg-white"}>
                               <td className="border border-gray-300 px-3 py-1.5 text-center">{i + 1}</td>
-                              <td className="border border-gray-300 px-3 py-1.5">{f.fDAccNumber}</td>
+                              <td className="border border-gray-300 px-3 py-1.5">{f.fdAccNumber}</td>
+                              <td className="border border-gray-300 px-3 py-1.5">{f.fdAccName ?? ""}</td>
                               <td className="border border-gray-300 px-3 py-1.5 text-right">{f.fDAmount?.toLocaleString("en-IN")}</td>
                               <td className="border border-gray-300 px-3 py-1.5 text-right">{f.interest?.toLocaleString("en-IN")}</td>
                               <td className="border border-gray-300 px-3 py-1.5 text-center"><button onClick={() => setFDPledges(p => p.filter((_, j) => j !== i))} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
@@ -1521,12 +1774,22 @@ const LoanAccountMaster: React.FC = () => {
                     <div className="grid grid-cols-3 gap-4 mb-4">
                       <div><label className={labelCls}>RD Account <span className="text-red-500">*</span></label>
                         <Select options={rdOptions} value={rdOptions.find(o => o.value === rdPledgeEntry.accId) || null}
-                          onChange={opt => setRdPledgeEntry(p => ({ ...p, accId: opt?.value ?? 0, accNumber: rdAccounts.find(a => a.accId === opt?.value)?.accountNumber ?? "" }))}
-                          menuPortalTarget={document.body} styles={{ menuPortal: b => ({ ...b, zIndex: 9999 }) }} /></div>
-                      <div><label className={labelCls}>RD Amount <span className="text-red-500">*</span></label>
-                        <input type="text" inputMode="decimal" value={rdPledgeEntry.rdAmount} onChange={e => setRdPledgeEntry(p => ({ ...p, rdAmount: num(e.target.value) }))} className={inputCls} /></div>
-                      <div><label className={labelCls}>Interest <span className="text-red-500">*</span></label>
-                        <input type="text" inputMode="decimal" value={rdPledgeEntry.interest} onChange={e => setRdPledgeEntry(p => ({ ...p, interest: num(e.target.value) }))} className={inputCls} /></div>
+                          onChange={async opt => {
+                            const accId = opt?.value ?? 0;
+                            const rdAcc = rdAccounts.find(a => a.accId === accId);
+                            const accNumber = rdAcc?.accountNumber ?? "";
+                            const accName = rdAcc?.accountName ?? "";
+                            setRdPledgeEntry(p => ({ ...p, accId, accNumber, accName, rdAmount: "", interest: "" }));
+                            if (accId) {
+                              const res = await commonservice.fetch_rd_pledge_balance(user.branchid, accId);
+                              const d = (res as any).data;
+                              if (d) setRdPledgeEntry(p => ({ ...p, rdAmount: d.rdAmount?.toString() ?? "", interest: d.intRate?.toString() ?? "" }));
+                            }
+                          }} styles={{ menuPortal: b => ({ ...b, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }} /></div>
+                      <div><label className={labelCls}>RD Amount</label>
+                        <input type="text" value={rdPledgeEntry.rdAmount} readOnly className={`${inputCls} bg-gray-100 cursor-not-allowed`} /></div>
+                      <div><label className={labelCls}>Int. Rate (%)</label>
+                        <input type="text" value={rdPledgeEntry.interest} readOnly className={`${inputCls} bg-gray-100 cursor-not-allowed`} /></div>
                     </div>
                     <div className="flex justify-end">
                       <button onClick={handleAddRDPledge} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold">Ok</button>
@@ -1537,7 +1800,7 @@ const LoanAccountMaster: React.FC = () => {
                       <table className="w-full border-collapse text-sm">
                         <thead>
                           <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                            {["Sr.No", "RD Account", "RD Amount", "Interest", "Action"].map(h => <th key={h} className="border border-gray-300 px-3 py-2">{h}</th>)}
+                            {["Sr.No", "RD Account", "Account Name", "RD Amount", "Int. Rate (%)", "Action"].map(h => <th key={h} className="border border-gray-300 px-3 py-2">{h}</th>)}
                           </tr>
                         </thead>
                         <tbody>
@@ -1545,6 +1808,7 @@ const LoanAccountMaster: React.FC = () => {
                             <tr key={i} className={i % 2 === 0 ? "bg-purple-50" : "bg-white"}>
                               <td className="border border-gray-300 px-3 py-1.5 text-center">{i + 1}</td>
                               <td className="border border-gray-300 px-3 py-1.5">{r.rDAccNumber}</td>
+                              <td className="border border-gray-300 px-3 py-1.5">{r.rdAccName ?? ""}</td>
                               <td className="border border-gray-300 px-3 py-1.5 text-right">{r.rDAmount?.toLocaleString("en-IN")}</td>
                               <td className="border border-gray-300 px-3 py-1.5 text-right">{r.interest?.toLocaleString("en-IN")}</td>
                               <td className="border border-gray-300 px-3 py-1.5 text-center"><button onClick={() => setRDPledges(p => p.filter((_, j) => j !== i))} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button></td>

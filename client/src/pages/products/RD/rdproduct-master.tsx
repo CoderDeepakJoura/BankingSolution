@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import { useFormValidation } from "../../../services/Validations/ProductMasters/RD/useFormValidation";
 import { ValidationSummary } from "../../../components/Validations/ValidationSummary";
 import { FormField } from "../../../components/Validations/FormField";
@@ -467,6 +467,8 @@ const RDProductMaster = () => {
               placeholder="Select Document Plan"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -520,6 +522,8 @@ const RDProductMaster = () => {
               placeholder="Select Principal Balance Head"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -534,6 +538,8 @@ const RDProductMaster = () => {
               placeholder="Select Interest Payable Head"
               isClearable
               className="text-sm"
+
+
             />
           </FormField>
         </div>
@@ -599,6 +605,8 @@ const RDProductMaster = () => {
                       placeholder="==Select=="
                       isClearable
                       className="text-sm"
+
+
                     />
                   </FormField>
 
@@ -611,6 +619,8 @@ const RDProductMaster = () => {
                       placeholder="==Select=="
                       isClearable
                       className="text-sm"
+
+
                     />
                   </FormField>
 

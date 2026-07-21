@@ -17,5 +17,8 @@ namespace BankingPlatform.Infrastructure.Models.BranchWiseRule
         public int intexpaccount { get; set; }
         public int? depwithdrawlimitinterval { get; set; }
         public decimal? depwithdrawlimit { get; set; }
+
+        /// <summary>365 or 360 — days in a year for interest calculation. Defaults to 365.</summary>
+        public int DaysInAYear { get; set; } = 365;
     }
 }

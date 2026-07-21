@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+﻿import React, { useEffect } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import BranchApiService, { BranchDTO } from "../../services/branch/branchapi";
@@ -652,6 +652,8 @@ const BranchMaster: React.FC = () => {
                             ? "border-red-300 focus:border-red-500 focus:ring-red-100"
                             : "border-gray-200 focus:border-lime-500 focus:ring-lime-100"
                         }`}
+
+
                       />
                       {showValidation && stateId === 0 && (
                         <span className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
@@ -689,6 +691,8 @@ const BranchMaster: React.FC = () => {
                             ? "border-red-300 focus:border-red-500 focus:ring-red-100"
                             : "border-gray-200 focus:border-lime-500 focus:ring-lime-100"
                         }`}
+
+
                       />
                       {showValidation && villageId === 0 && (
                         <span className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
@@ -793,6 +797,8 @@ const BranchMaster: React.FC = () => {
                             : "border-gray-200 focus:border-green-500 focus:ring-green-100"
                         }`}
                         placeholder="+91"
+
+
                       />
                       {showValidation && !phonePrefix1.trim() && (
                         <span className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">

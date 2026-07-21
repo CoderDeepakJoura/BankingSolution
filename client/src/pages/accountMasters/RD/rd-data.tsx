@@ -406,7 +406,7 @@ const RDAccountMasterCRUD: React.FC = () => {
   const fetchAccountsWithBranch = useCallback(
     async (filter: RDAccountFilter) => {
       const result = await fetchRDAccounts(filter, user.branchid);
-      console.log(result);
+
       return result;
     },
     [user.branchid]

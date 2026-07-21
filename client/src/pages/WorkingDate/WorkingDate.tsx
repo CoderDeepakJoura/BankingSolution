@@ -71,11 +71,8 @@ const WorkingDateMaster: React.FC = () => {
       const branchId = 1;
       const response = await commonservice.fetch_branch_sessions(branchId);
 
-      console.log("Branch Sessions Response:", response);
-
       if (response.success && response.data) {
         const sessionsArray = Array.isArray(response.data) ? response.data : [];
-        console.log("Sessions Array:", sessionsArray);
         setBranchSessions(sessionsArray);
       } else {
         console.error("Invalid response structure:", response);
@@ -100,8 +97,6 @@ const WorkingDateMaster: React.FC = () => {
   };
 
   const handleSessionChange = (sessionId: number) => {
-    console.log("Selected Session ID:", sessionId);
-
     // ✅ Always reset date state first on any session change (including clearing)
     resetDateState();
 
@@ -113,7 +108,6 @@ const WorkingDateMaster: React.FC = () => {
     setSelectedSession(sessionId);
 
     const session = branchSessions.find((s) => s.id === sessionId);
-    console.log("Found Session:", session);
 
     if (!session || !session.branchSessionInfo) {
       console.error("Session not found or missing branchSessionInfo");
@@ -136,8 +130,6 @@ const WorkingDateMaster: React.FC = () => {
       Swal.fire("Error", "Invalid session year range", "error");
       return;
     }
-
-    console.log("Parsed Years - From:", fromYear, "To:", toYear);
 
     // Financial year: April 1 of fromYear → March 31 of toYear
     const sessionStart = new Date(fromYear, 3, 1);  // April 1, fromYear
@@ -166,13 +158,6 @@ const WorkingDateMaster: React.FC = () => {
       return;
     }
 
-    console.log("Session Date Range:", {
-      sessionStart: sessionStart.toLocaleDateString(),
-      sessionEnd: sessionEnd.toLocaleDateString(),
-      today: today.toLocaleDateString(),
-      maxDate: maxDate.toLocaleDateString(),
-    });
-
     const newSessionDateRange: SessionData = {
       sessionFrom: fromYear.toString(),
       sessionTo: toYear.toString(),
@@ -186,11 +171,9 @@ const WorkingDateMaster: React.FC = () => {
     if (today >= sessionStart && today <= maxDate) {
       setSelectedDate(today);
       setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-      console.log("Auto-selected today's date:", today.toLocaleDateString());
     } else {
       // Start calendar view at the beginning of the session
       setCurrentMonth(new Date(fromYear, 3, 1));
-      console.log("Today is outside session range; no auto-selection.");
     }
   };
 
@@ -240,11 +223,9 @@ const WorkingDateMaster: React.FC = () => {
       newDate < sessionDateRange.minDate ||
       newDate > sessionDateRange.maxDate
     ) {
-      console.log("Date out of range:", newDate.toLocaleDateString());
       return;
     }
 
-    console.log("Date selected:", newDate.toLocaleDateString());
     setSelectedDate(newDate);
     setIsCalendarOpen(false);
   };

@@ -91,7 +91,7 @@ const LoanAccountMasterCRUD: React.FC = () => {
     [user.branchid]
   );
 
-  const handleModifyAccount = (dto: LoanAccListItemDTO) => {
+  const handleModifyAccount = async (dto: LoanAccListItemDTO) => {
     navigate(`/loan-acc-master/${encryptId(dto.accId)}`);
   };
 

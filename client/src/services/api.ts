@@ -145,6 +145,12 @@ export class ApiService {
       body: JSON.stringify({ WorkingDate: WorkingDate, sessionInfo: sessionInfo, sessionId: sessionId })
     });
   }
+  async acknowledge_version(version: string): Promise<ApiResponse> {
+    return this.makeRequest('/auth/acknowledge-version', {
+      method: 'PATCH',
+      body: JSON.stringify({ version })
+    });
+  }
 }
 
 

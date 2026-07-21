@@ -75,7 +75,7 @@ class SettingsApiService extends ApiService {
   async insert_settings(
     SettingsDTO: SettingsDTO
   ): Promise<ApiResponse<AuthResponse>> {
-    console.log(JSON.stringify(SettingsDTO))
+
     return this.makeRequest<AuthResponse>("/Settings", {
       method: "POST",
       body: JSON.stringify(SettingsDTO),

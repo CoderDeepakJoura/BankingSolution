@@ -99,6 +99,21 @@ namespace BankingPlatform.API.Controllers.AccountMasters
             }
         }
 
+        [HttpGet("last-account-number/{branchId}/{headId}")]
+        public async Task<IActionResult> GetLastAccountNumber(int branchId, int headId)
+        {
+            try
+            {
+                var (lastAccNum, nextAccNum) = await _service.GetLastAccountNumberByHeadAsync(branchId, headId);
+                return Ok(new { Success = true, LastAccountNumber = lastAccNum, NextAccountNumber = nextAccNum });
+            }
+            catch (Exception ex)
+            {
+                await _commonFunctions.LogErrors(ex, nameof(GetLastAccountNumber), "GeneralAccMasterController");
+                return BadRequest(new ResponseDto { Success = false, Message = "Error fetching last account number." });
+            }
+        }
+
         [HttpDelete("{id}/{branchId}")]
         public async Task<IActionResult> DeleteGeneralAccount(int id, int branchId)
         {

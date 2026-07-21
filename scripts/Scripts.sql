@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public."user" (
     isbranchsu INT           DEFAULT 0,
     isauthorized INT         DEFAULT 0,
     usertype  INT,
+    lastseenversion VARCHAR(20) DEFAULT '0.0.0',
     CONSTRAINT users_pkey PRIMARY KEY (id, branchid)
 );
 
@@ -856,6 +857,101 @@ CREATE TABLE IF NOT EXISTS servicetaxtypedet (
 );
 
 -- =============================================================================
+-- SECTION 6j: LOAN EXPENSE & GST TRANSACTION TABLES
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS stockmain (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT             NOT NULL,
+    date            TIMESTAMP(3)    NOT NULL,
+    vmid            INT             NULL,
+    narration       VARCHAR(1000)   NULL,
+    taxgroupid      INT             NOT NULL DEFAULT 0,
+    isrc            SMALLINT        NULL,
+    totalamount     NUMERIC(20,2)   NOT NULL DEFAULT 0,
+    roundamount     NUMERIC(20,2)   NULL DEFAULT 0,
+    transtypeid     INT             NULL,
+    CONSTRAINT stockmain_pkey PRIMARY KEY (id, brid)
+);
+
+CREATE TABLE IF NOT EXISTS stockbillbookdetail (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT             NOT NULL,
+    stockmainid     INT             NOT NULL,
+    billbookid      INT             NOT NULL,
+    billno          INT             NOT NULL,
+    date            TIMESTAMP(3)    NOT NULL,
+    draccid         INT             NOT NULL,
+    CONSTRAINT stockbillbookdetail_pkey PRIMARY KEY (id, brid)
+);
+
+CREATE TABLE IF NOT EXISTS smdetail (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT             NOT NULL,
+    stateid         INT             NOT NULL,
+    supplytypeid    INT             NOT NULL,
+    stockmainid     INT             NOT NULL,
+    gstino          VARCHAR(25)     NULL,
+    fkid            INT             NULL,
+    fkbrid          INT             NOT NULL DEFAULT 0,
+    fktypeid        INT             NULL,
+    CONSTRAINT smdetail_pkey PRIMARY KEY (id, brid)
+);
+
+CREATE TABLE IF NOT EXISTS gstservicedetail (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT             NOT NULL,
+    stockmainid     INT             NOT NULL,
+    serviceid       INT             NOT NULL,
+    taxid           INT             NOT NULL DEFAULT 0,
+    amount          NUMERIC(18,2)   NOT NULL,
+    netamount       NUMERIC(18,2)   NOT NULL,
+    date            TIMESTAMP(3)    NOT NULL,
+    CONSTRAINT gstservicedetail_pkey PRIMARY KEY (id, brid)
+);
+
+CREATE TABLE IF NOT EXISTS stocktaxdetail (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT             NOT NULL,
+    stockmainid     INT             NOT NULL,
+    taxtypeid       INT             NOT NULL,
+    taxperc         NUMERIC(10,4)   NOT NULL,
+    taxamt          NUMERIC(18,2)   NOT NULL,
+    CONSTRAINT stocktaxdetail_pkey PRIMARY KEY (id, brid)
+);
+
+CREATE TABLE IF NOT EXISTS nextbillnumber (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT             NOT NULL,
+    brsessid        INT             NOT NULL DEFAULT 0,
+    fkid            INT             NOT NULL,
+    nextbillno      INT             NOT NULL,
+    fktype          INT             NOT NULL,
+    CONSTRAINT nextbillnumber_pkey PRIMARY KEY (id, brid),
+    CONSTRAINT uq_nextbillnumber UNIQUE (brid, fkid, brsessid, fktype)
+);
+
+CREATE TABLE IF NOT EXISTS loanexpense (
+    id                  INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid                INT             NOT NULL,
+    date                TIMESTAMP(3)    NOT NULL,
+    loanproductid       INT             NOT NULL,
+    draccountid         INT             NOT NULL,
+    expensecategoryid   INT             NOT NULL,
+    expenseamount       NUMERIC(18,2)   NOT NULL,
+    totaltax            NUMERIC(18,2)   NOT NULL DEFAULT 0,
+    netamount           NUMERIC(18,2)   NOT NULL,
+    remarks             VARCHAR(500)    NULL,
+    craccounttypeid     INT             NOT NULL,
+    craccountid         INT             NOT NULL,
+    stockmainid         INT             NULL,
+    voucherid           INT             NULL,
+    voucherno           INT             NOT NULL DEFAULT 0,
+    addedby             INT             NOT NULL,
+    CONSTRAINT loanexpense_pkey PRIMARY KEY (id, brid)
+);
+
+-- =============================================================================
 -- SECTION 7 : SAVING PRODUCT TABLES
 -- =============================================================================
 
@@ -930,6 +1026,7 @@ CREATE TABLE IF NOT EXISTS savingproductbranchwiserule (
     intexpaccount           INTEGER        NOT NULL,
     depwithdrawlimitinterval INT,
     depwithdrawlimit        NUMERIC(18,2),
+    daysinayear             INTEGER        NOT NULL DEFAULT 365,
     CONSTRAINT savingproductbranchwiserule_pkey PRIMARY KEY (id, branchid)
 );
 
@@ -1068,7 +1165,7 @@ CREATE TABLE IF NOT EXISTS fdaccountdetail (
     fdstatus             INTEGER        NOT NULL,
     fdperiodmonths       INTEGER        NOT NULL,
     fdperioddays         INTEGER        NOT NULL,
-    slabid               INTEGER        NOT NULL,
+    slabid               INTEGER        NULL,
     intrate              NUMERIC(18,4)  NOT NULL,
     intcompinterval      INTEGER        NOT NULL,
     serialno             INTEGER        NOT NULL,
@@ -1076,6 +1173,8 @@ CREATE TABLE IF NOT EXISTS fdaccountdetail (
     interestpaidinterval INTEGER        NULL,
     interestpaidamount   NUMERIC(18,2)  NULL,
     misaccid             INTEGER        NULL,
+    openingbalance       NUMERIC(18,2)  NULL,
+    openingbalancetype   VARCHAR(5)     NULL,
     CONSTRAINT fdaccountdetail_pkey PRIMARY KEY (id, branchid),
     CONSTRAINT fk_fdaccountdetail_accountmaster
         FOREIGN KEY (accountid, branchid)
@@ -1501,7 +1600,9 @@ CREATE TABLE IF NOT EXISTS loanaccountbalancedetail (
     date          TIMESTAMP(3)     NOT NULL,
     valuedate     TIMESTAMP(3)     NOT NULL,
     status        VARCHAR(5)       NULL,
+    entrytype     VARCHAR(5)       NULL,
     headcode      BIGINT           NULL,
+    voucherid     INT              NULL,
     CONSTRAINT loanaccountbalancedetail_pkey PRIMARY KEY (id, brid)
 );
 
@@ -1614,6 +1715,158 @@ FOR EACH ROW EXECUTE FUNCTION fn_prevent_auditlog_modification();
 
 
 -- =============================================================================
+-- SECTION 14 : BANK FD MODULE
+-- =============================================================================
+
+-- BFDHeadTDSAccSettings — Bank FD TDS Account mapping (one row per head→TDS account per branch)
+CREATE TABLE IF NOT EXISTS bfdheadtdsaccsettings (
+    id    INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid  INT NOT NULL,
+    headcode  BIGINT NOT NULL DEFAULT 0,
+    tdsaccid  INT NOT NULL DEFAULT 0,
+    CONSTRAINT pk_bfdheadtdsaccsettings PRIMARY KEY (id, brid)
+);
+
+-- FDTDSSlab — FD TDS Slab master
+CREATE TABLE IF NOT EXISTS fdtdsslab (
+    id          INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid        INT NOT NULL,
+    name        VARCHAR(150) NOT NULL DEFAULT '',
+    namesl      VARCHAR(150) NULL,
+    date        TIMESTAMP(3) NOT NULL DEFAULT NOW(),
+    type        INT NOT NULL DEFAULT 8,
+    withpancard SMALLINT NOT NULL DEFAULT 0,
+    CONSTRAINT pk_fdtdsslab PRIMARY KEY (id, brid)
+);
+
+-- FDTDSSlabDetail — FD TDS Slab detail rows
+CREATE TABLE IF NOT EXISTS fdtdsslabdetail (
+    id          INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid        INT NOT NULL,
+    slabid      INT NOT NULL DEFAULT 0,
+    fromamount  NUMERIC(18,2) NOT NULL DEFAULT 0,
+    toamount    NUMERIC(18,2) NOT NULL DEFAULT 0,
+    intrate     FLOAT NOT NULL DEFAULT 0,
+    CONSTRAINT pk_fdtdsslabdetail PRIMARY KEY (id, brid)
+);
+
+-- Bank FD Account detail rows
+CREATE TABLE IF NOT EXISTS bankfdaccountdetail (
+    id               INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid             INT NOT NULL,
+    accid            INT NOT NULL DEFAULT 0,
+    fdamount         NUMERIC(18,2) NOT NULL DEFAULT 0,
+    fddate           TIMESTAMP(3) NOT NULL,
+    fdmaturitydate   TIMESTAMP(3) NOT NULL,
+    maturityamount   NUMERIC(18,2) NOT NULL DEFAULT 0,
+    ltdno            VARCHAR(50) NOT NULL DEFAULT '',
+    fdstatus         INT NOT NULL DEFAULT 1,
+    fdperiodmonths   INT NOT NULL DEFAULT 0,
+    fdperioddays     INT NOT NULL DEFAULT 0,
+    intrate          FLOAT NOT NULL DEFAULT 0,
+    intcompinterval  INT NOT NULL DEFAULT 1,
+    serialno         NUMERIC(18,0) NULL,
+    CONSTRAINT pk_bankfdaccountdetail PRIMARY KEY (id, brid)
+);
+
+-- Bank FD per-detail opening balance
+CREATE TABLE IF NOT EXISTS bankfdaccountopeningbalance (
+    id           INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    branchid     INT NOT NULL,
+    accountid    INT NOT NULL DEFAULT 0,
+    fdaccdetid   INT NOT NULL DEFAULT 0,
+    balance      NUMERIC(18,2) NOT NULL DEFAULT 0,
+    balancetype  VARCHAR(2) NOT NULL DEFAULT 'Cr',
+    headcode     BIGINT NULL,
+    CONSTRAINT pk_bankfdaccountopeningbalance PRIMARY KEY (id, branchid)
+);
+
+-- Bank FD per-detail opening TDS
+CREATE TABLE IF NOT EXISTS bankfdaccountopeningtds (
+    id         INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    branchid   INT NOT NULL,
+    accountid  INT NOT NULL DEFAULT 0,
+    fdaccdetid INT NOT NULL DEFAULT 0,
+    balance    NUMERIC(18,2) NOT NULL DEFAULT 0,
+    headcode   BIGINT NULL,
+    CONSTRAINT pk_bankfdaccountopeningtds PRIMARY KEY (id, branchid)
+);
+
+CREATE TABLE IF NOT EXISTS otherbranchaccounts (
+    id        INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid      INT    NOT NULL,
+    otherbrid INT    NOT NULL,
+    accid     INT    NOT NULL,
+    CONSTRAINT pk_otherbranchaccounts PRIMARY KEY (id),
+    CONSTRAINT uq_otherbranchaccounts_pair UNIQUE (brid, otherbrid)
+);
+
+-- Inter-branch voucher master: tracks all three steps of every inter-branch transaction.
+-- Every account/name involved at each step is denormalised here for a permanent audit log.
+CREATE TABLE IF NOT EXISTS interbranchvoucher (
+    id               SERIAL          NOT NULL,
+
+    -- Core transaction
+    vouchertype      VARCHAR(20)     NOT NULL,          -- 'IBSavingDeposit', …
+    flowtype         VARCHAR(20)     NOT NULL DEFAULT 'BranchToBranch',  -- 'HOToBranch' | 'BranchToBranch'
+    amount           NUMERIC(18,2)   NOT NULL,
+    narration        VARCHAR(300)    NULL,
+    entrydate        DATE            NOT NULL,
+    status           VARCHAR(20)     NOT NULL DEFAULT 'Pending',  -- Pending / HOConfirmed / Completed
+
+    -- Branches
+    frombrid         INT             NOT NULL,          -- originating branch
+    destbrid         INT             NOT NULL,          -- destination branch
+
+    -- Destination account (final account to be credited/debited at step 3) — stored for audit
+    destaccid        INT             NOT NULL,
+    destaccno        VARCHAR(50)     NOT NULL,
+    destaccname      VARCHAR(200)    NULL,
+    destmemberid     INT             NULL,
+
+    -- Step 1 — originating branch creates voucher (e.g. Dr Cash, Cr IB ref account)
+    step1voucherid   INT             NULL,
+    step1brid        INT             NULL,
+    step1draccid     INT             NULL,
+    step1draccname   VARCHAR(200)    NULL,
+    step1drheadcode  BIGINT          NULL,
+    step1craccid     INT             NULL,
+    step1craccname   VARCHAR(200)    NULL,
+    step1crheadcode  BIGINT          NULL,
+    step1date        TIMESTAMP       NULL,
+    step1workingdate DATE            NULL,
+    step1userid      VARCHAR(100)    NULL,
+
+    -- Step 2 — HO settles (Dr IB ref for from-branch, Cr IB ref for dest-branch)
+    step2voucherid   INT             NULL,
+    step2brid        INT             NULL,
+    step2draccid     INT             NULL,
+    step2draccname   VARCHAR(200)    NULL,
+    step2drheadcode  BIGINT          NULL,
+    step2craccid     INT             NULL,
+    step2craccname   VARCHAR(200)    NULL,
+    step2crheadcode  BIGINT          NULL,
+    step2date        TIMESTAMP       NULL,
+    step2workingdate DATE            NULL,
+    step2userid      VARCHAR(100)    NULL,
+
+    -- Step 3 — destination branch completes (Dr IB ref account, Cr destination account)
+    step3voucherid   INT             NULL,
+    step3brid        INT             NULL,
+    step3draccid     INT             NULL,
+    step3draccname   VARCHAR(200)    NULL,
+    step3drheadcode  BIGINT          NULL,
+    step3craccid     INT             NULL,
+    step3craccname   VARCHAR(200)    NULL,
+    step3crheadcode  BIGINT          NULL,
+    step3date        TIMESTAMP       NULL,
+    step3workingdate DATE            NULL,
+    step3userid      VARCHAR(100)    NULL,
+
+    CONSTRAINT pk_interbranchvoucher PRIMARY KEY (id)
+);
+
+-- =============================================================================
 -- SECTION 13 : INCREMENTAL COLUMN ADDITIONS
 -- =============================================================================
 -- Put every new column you add to an existing table here.
@@ -1629,3 +1882,186 @@ FOR EACH ROW EXECUTE FUNCTION fn_prevent_auditlog_modification();
 
 -- loanproductdefinition: interest calculation method ('Schedule' | 'Balance' | 'MinBalance')
 ALTER TABLE loanproductdefinition ADD COLUMN IF NOT EXISTS intcalcmethod VARCHAR(12) DEFAULT 'Schedule';
+
+-- fdaccountdetail: per-FD individual opening balance (replaces combined account-level opening balance)
+ALTER TABLE fdaccountdetail ADD COLUMN IF NOT EXISTS openingbalance     NUMERIC(18,2) NULL;
+ALTER TABLE fdaccountdetail ADD COLUMN IF NOT EXISTS openingbalancetype VARCHAR(5)    NULL;
+
+-- fdaccountdetail: make slabid nullable (no slab when rate not configured; NULL skips FK check)
+ALTER TABLE fdaccountdetail ALTER COLUMN slabid DROP NOT NULL;
+
+-- savingproductbranchwiserule: days in a year for interest calculation (365 or 360)
+ALTER TABLE savingproductbranchwiserule ADD COLUMN IF NOT EXISTS daysinayear INTEGER NOT NULL DEFAULT 365;
+
+-- BankFD module tables: incremental columns (tables are newly created so ALTER is a no-op if run fresh,
+-- but listed here to follow the pattern for future column additions)
+ALTER TABLE bfdheadtdsaccsettings ADD COLUMN IF NOT EXISTS headcode BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE bfdheadtdsaccsettings ADD COLUMN IF NOT EXISTS tdsaccid INT NOT NULL DEFAULT 0;
+ALTER TABLE fdtdsslab ADD COLUMN IF NOT EXISTS namesl VARCHAR(150) NULL;
+ALTER TABLE fdtdsslab ADD COLUMN IF NOT EXISTS withpancard SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE fdtdsslabdetail ADD COLUMN IF NOT EXISTS fromamount NUMERIC(18,2) NOT NULL DEFAULT 0;
+ALTER TABLE fdtdsslabdetail ADD COLUMN IF NOT EXISTS toamount NUMERIC(18,2) NOT NULL DEFAULT 0;
+ALTER TABLE fdtdsslabdetail ADD COLUMN IF NOT EXISTS intrate FLOAT NOT NULL DEFAULT 0;
+
+-- loanaccountbalancedetail: links each balance movement to its source voucher for cleanup on delete
+ALTER TABLE loanaccountbalancedetail ADD COLUMN IF NOT EXISTS voucherid INT NULL;
+ALTER TABLE loanaccountbalancedetail ADD COLUMN IF NOT EXISTS entrytype VARCHAR(5) NULL;
+
+-- user: tracks the last app version the user acknowledged in the What's New modal
+ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS lastseenversion VARCHAR(20) DEFAULT '0.0.0';
+
+-- interbranchvoucher: distinguishes 2-step HO-to-Branch from 3-step Branch-to-Branch flows
+ALTER TABLE interbranchvoucher ADD COLUMN IF NOT EXISTS flowtype VARCHAR(20) NOT NULL DEFAULT 'BranchToBranch';
+
+-- userfavourites: per-user pinned screen shortcuts (persists across login/logout)
+CREATE TABLE IF NOT EXISTS userfavourites (
+    id          SERIAL PRIMARY KEY,
+    userid      INTEGER NOT NULL,
+    path        VARCHAR(200) NOT NULL,
+    label       VARCHAR(200) NOT NULL,
+    category    VARCHAR(100) NOT NULL DEFAULT '',
+    sortorder   INTEGER NOT NULL DEFAULT 0,
+    createdat   TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_userfavourites_user_path UNIQUE (userid, path)
+);
+
+-- =============================================================================
+-- REFERENTIAL INTEGRITY: add missing FK constraints (idempotent — safe to re-run)
+-- Pattern: DO $$ BEGIN IF NOT EXISTS (pg_constraint lookup) THEN ALTER TABLE ADD CONSTRAINT; END IF; END $$;
+-- =============================================================================
+
+-- fdinterestslabdetail → fdinterestslab (RESTRICT: cannot delete a slab while detail rows exist)
+-- Clean up orphaned rows first so the constraint can be added safely
+DELETE FROM fdinterestslabdetail
+WHERE NOT EXISTS (
+    SELECT 1 FROM fdinterestslab
+    WHERE id = fdinterestslabdetail.fdintslabid
+      AND branchid = fdinterestslabdetail.branchid
+);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_fdinterestslabdetail_fdinterestslab') THEN
+        ALTER TABLE fdinterestslabdetail
+            ADD CONSTRAINT fk_fdinterestslabdetail_fdinterestslab
+            FOREIGN KEY (fdintslabid, branchid)
+            REFERENCES fdinterestslab (id, branchid) ON DELETE RESTRICT;
+    END IF;
+END $$;
+
+-- fdinterestslabdetail → fdinterestslabinfo (CASCADE: info deletion propagates to its detail rows)
+DELETE FROM fdinterestslabdetail
+WHERE NOT EXISTS (
+    SELECT 1 FROM fdinterestslabinfo
+    WHERE id = fdinterestslabdetail.fdintslabinfoid
+      AND branchid = fdinterestslabdetail.branchid
+);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_fdinterestslabdetail_fdinterestslabinfo') THEN
+        ALTER TABLE fdinterestslabdetail
+            ADD CONSTRAINT fk_fdinterestslabdetail_fdinterestslabinfo
+            FOREIGN KEY (fdintslabinfoid, branchid)
+            REFERENCES fdinterestslabinfo (id, branchid) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+-- vouchersavingdetail → voucher (RESTRICT: consistent with voucherfddetail and voucherrddetail)
+DELETE FROM vouchersavingdetail
+WHERE NOT EXISTS (
+    SELECT 1 FROM voucher
+    WHERE id = vouchersavingdetail.voucherid
+      AND brid = vouchersavingdetail.brid
+);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_vouchersavingdetail_voucher') THEN
+        ALTER TABLE vouchersavingdetail
+            ADD CONSTRAINT fk_vouchersavingdetail_voucher
+            FOREIGN KEY (voucherid, brid)
+            REFERENCES voucher (id, brid) ON DELETE RESTRICT;
+    END IF;
+END $$;
+
+-- voucherrecintdetail → voucher: intentionally NOT constrained.
+-- DeleteVoucherAsync does not clean up voucherrecintdetail before removing the voucher;
+-- adding RESTRICT here would break loan interest posting and recovery voucher deletions.
+
+-- accopeningbalance → accountmaster (CASCADE: opening balance is owned by the account)
+-- Clean up orphaned rows before adding the FK (accounts deleted before this constraint existed)
+DELETE FROM accopeningbalance
+WHERE NOT EXISTS (
+    SELECT 1 FROM accountmaster
+    WHERE id = accopeningbalance.accountid
+      AND branchid = accopeningbalance.branchid
+);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_accopeningbalance_accountmaster') THEN
+        ALTER TABLE accopeningbalance
+            ADD CONSTRAINT fk_accopeningbalance_accountmaster
+            FOREIGN KEY (accountid, branchid)
+            REFERENCES accountmaster (id, branchid) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+-- rdaccountdetail → accountmaster (CASCADE: DeleteRDAccountAsync calls accountmaster.Remove() directly
+-- without first removing rdaccountdetail — the service comment says "CASCADE DELETE handles rdaccountdetail")
+DELETE FROM rdaccountdetail
+WHERE accid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM accountmaster
+    WHERE id = rdaccountdetail.accid
+      AND branchid = rdaccountdetail.brid
+);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_rdaccountdetail_accountmaster') THEN
+        ALTER TABLE rdaccountdetail
+            ADD CONSTRAINT fk_rdaccountdetail_accountmaster
+            FOREIGN KEY (accid, brid)
+            REFERENCES accountmaster (id, branchid) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+-- accountkistdetail → accountmaster (RESTRICT: cannot delete account while loan kist detail exists)
+DELETE FROM accountkistdetail
+WHERE NOT EXISTS (
+    SELECT 1 FROM accountmaster
+    WHERE id = accountkistdetail.accountid
+      AND branchid = accountkistdetail.brid
+);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_accountkistdetail_accountmaster') THEN
+        ALTER TABLE accountkistdetail
+            ADD CONSTRAINT fk_accountkistdetail_accountmaster
+            FOREIGN KEY (accountid, brid)
+            REFERENCES accountmaster (id, branchid) ON DELETE RESTRICT;
+    END IF;
+END $$;
+
+-- accountlimitdetail → accountmaster (RESTRICT: cannot delete account while loan limit detail exists)
+DELETE FROM accountlimitdetail
+WHERE NOT EXISTS (
+    SELECT 1 FROM accountmaster
+    WHERE id = accountlimitdetail.accountid
+      AND branchid = accountlimitdetail.brid
+);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_accountlimitdetail_accountmaster') THEN
+        ALTER TABLE accountlimitdetail
+            ADD CONSTRAINT fk_accountlimitdetail_accountmaster
+            FOREIGN KEY (accountid, brid)
+            REFERENCES accountmaster (id, branchid) ON DELETE RESTRICT;
+    END IF;
+END $$;
+
+-- loanslabdetail → loanslab (RESTRICT: cannot delete a slab while detail rows exist)
+DELETE FROM loanslabdetail
+WHERE NOT EXISTS (
+    SELECT 1 FROM loanslab
+    WHERE id = loanslabdetail.slabid
+      AND brid = loanslabdetail.brid
+);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_loanslabdetail_loanslab') THEN
+        ALTER TABLE loanslabdetail
+            ADD CONSTRAINT fk_loanslabdetail_loanslab
+            FOREIGN KEY (slabid, brid)
+            REFERENCES loanslab (id, brid) ON DELETE RESTRICT;
+    END IF;
+END $$;

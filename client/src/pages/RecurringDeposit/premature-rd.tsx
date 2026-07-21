@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import Swal from "sweetalert2";
@@ -334,8 +334,8 @@ const PrematureRDPage: React.FC = () => {
                           placeholder="Select General Account"
                           isClearable
                           styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         />
                       </div>
                       <div className="flex flex-col">
@@ -365,8 +365,8 @@ const PrematureRDPage: React.FC = () => {
                           placeholder="Select Saving Account"
                           isClearable
                           styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         />
                       </div>
                       <div className="flex flex-col">
@@ -396,8 +396,8 @@ const PrematureRDPage: React.FC = () => {
                           placeholder="Select Loan Account"
                           isClearable
                           styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         />
                       </div>
                       <div className="flex flex-col">
@@ -420,8 +420,8 @@ const PrematureRDPage: React.FC = () => {
                           placeholder="Select product"
                           isClearable
                           styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         />
                       </div>
                     </div>
@@ -440,8 +440,8 @@ const PrematureRDPage: React.FC = () => {
                           placeholder="Select income account"
                           isClearable
                           styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         />
                       </div>
                       <div className="flex flex-col">

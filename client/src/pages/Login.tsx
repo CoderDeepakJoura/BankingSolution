@@ -20,7 +20,6 @@ const Login = () => {
 
     try {
       const data = await ApiService.login(username, password, branchcode);
-      console.log(data);
       if (!data.success) {
         Swal.fire({
           icon: "error",
@@ -33,7 +32,6 @@ const Login = () => {
       }
       navigate("/workingdate");
     } catch (error) {
-      console.log(error);
       Swal.fire({
           icon: "error",
           title: "Login Failed",

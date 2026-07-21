@@ -1,3 +1,4 @@
+using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.AccountMasters.Loan;
@@ -158,12 +159,73 @@ namespace BankingPlatform.API.Controllers.AccountMasters
         {
             try
             {
-                var number = await _service.GetNextLoanAccountNumber(productId, brId);
-                return Ok(new { Success = true, Data = number });
+                var (prefix, suffix) = await _service.GetNextLoanAccountNumber(productId, brId);
+                return Ok(new { Success = true, Data = new { Prefix = prefix, Suffix = suffix } });
             }
             catch (Exception ex)
             {
                 await _commonFunctions.LogErrors(ex, nameof(GetNextAccountNumber), nameof(LoanAccountMasterController));
+                return BadRequest(new ResponseDto { Success = false, Message = "An error occurred." });
+            }
+        }
+
+        [HttpPost("unpledge-unlock-fd")]
+        public async Task<IActionResult> UnpledgeUnlockFD([FromBody] UnpledgeUnlockFDDTO dto)
+        {
+            try
+            {
+                if (dto == null || dto.BrId <= 0 || dto.PledgeId <= 0)
+                    return BadRequest(new ResponseDto { Success = false, Message = "Invalid request data." });
+
+                var result = await _service.UnpledgeUnlockFDAsync(dto);
+                if (result != "Success")
+                    return BadRequest(new ResponseDto { Success = false, Message = result });
+
+                string actionName = dto.Action == (int)Enums.PledgeStatus.Unpledge ? "unpledged" : "unlocked";
+                return Ok(new ResponseDto { Success = true, Message = $"FD {actionName} successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _commonFunctions.LogErrors(ex, nameof(UnpledgeUnlockFD), nameof(LoanAccountMasterController));
+                return BadRequest(new ResponseDto { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpPost("unpledge-unlock-rd")]
+        public async Task<IActionResult> UnpledgeUnlockRD([FromBody] UnpledgeUnlockRDDTO dto)
+        {
+            try
+            {
+                if (dto == null || dto.BrId <= 0 || dto.PledgeId <= 0)
+                    return BadRequest(new ResponseDto { Success = false, Message = "Invalid request data." });
+
+                var result = await _service.UnpledgeUnlockRDAsync(dto);
+                if (result != "Success")
+                    return BadRequest(new ResponseDto { Success = false, Message = result });
+
+                string actionName = dto.Action == (int)Enums.PledgeStatus.Unpledge ? "unpledged" : "unlocked";
+                return Ok(new ResponseDto { Success = true, Message = $"RD {actionName} successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _commonFunctions.LogErrors(ex, nameof(UnpledgeUnlockRD), nameof(LoanAccountMasterController));
+                return BadRequest(new ResponseDto { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpGet("check-account-number/{productId}/{brId}/{suffix}")]
+        public async Task<IActionResult> CheckAccountNumber(int productId, int brId, int suffix, [FromQuery] int excludeAccId = 0)
+        {
+            try
+            {
+                var prefix = await _service.GetLoanProductPrefix(productId, brId);
+                var fullAccNo = $"{prefix}-{suffix}";
+                var exists = await _service.IsLoanAccountNumberDuplicate(productId, brId, fullAccNo, excludeAccId);
+                return Ok(new { Success = true, Data = exists });
+            }
+            catch (Exception ex)
+            {
+                await _commonFunctions.LogErrors(ex, nameof(CheckAccountNumber), nameof(LoanAccountMasterController));
                 return BadRequest(new ResponseDto { Success = false, Message = "An error occurred." });
             }
         }

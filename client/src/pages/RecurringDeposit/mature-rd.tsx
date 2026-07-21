@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import Select from "react-select";
@@ -583,8 +583,8 @@ const MatureRDPage: React.FC = () => {
                       isLoading={isLoadingProducts}
                       isClearable
                       styles={customSelectStyles}
-                      menuPortalTarget={document.body}
-                      menuPosition="fixed"
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
                     />
                   </div>
 
@@ -603,8 +603,8 @@ const MatureRDPage: React.FC = () => {
                       isLoading={isFetchingRD}
                       isClearable
                       styles={customSelectStyles}
-                      menuPortalTarget={document.body}
-                      menuPosition="fixed"
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
                     />
                   </div>
                 </div>
@@ -888,8 +888,8 @@ const MatureRDPage: React.FC = () => {
                               placeholder="Select General Account"
                               isClearable
                               styles={customSelectStyles}
-                              menuPortalTarget={document.body}
-                              menuPosition="fixed"
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
                             />
                           </div>
                           <div className="flex flex-col">
@@ -927,8 +927,8 @@ const MatureRDPage: React.FC = () => {
                               placeholder="Select Saving Account"
                               isClearable
                               styles={customSelectStyles}
-                              menuPortalTarget={document.body}
-                              menuPosition="fixed"
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
                             />
                           </div>
                           <div className="flex flex-col">
@@ -966,8 +966,8 @@ const MatureRDPage: React.FC = () => {
                               placeholder="Select Loan Account"
                               isClearable
                               styles={customSelectStyles}
-                              menuPortalTarget={document.body}
-                              menuPosition="fixed"
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
                             />
                           </div>
                           <div className="flex flex-col">
@@ -997,8 +997,8 @@ const MatureRDPage: React.FC = () => {
                               placeholder="Select product"
                               isClearable
                               styles={customSelectStyles}
-                              menuPortalTarget={document.body}
-                              menuPosition="fixed"
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
                             />
                           </div>
                         </div>
@@ -1038,8 +1038,8 @@ const MatureRDPage: React.FC = () => {
                               placeholder="Select penal account"
                               isClearable
                               styles={customSelectStyles}
-                              menuPortalTarget={document.body}
-                              menuPosition="fixed"
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
                             />
                           </div>
 

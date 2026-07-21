@@ -597,6 +597,16 @@ class commonService extends ApiService {
       }
     );
   }
+  async calculate_fd_maturity_custom(dto: {
+    branchId: number; productId: number; amount: number;
+    interestRate: number; fdDate: string; maturityDate: string; compoundingInterval: string;
+  }): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>("/fetchdata/calculate-fd-maturity-amount-custom", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dto),
+    });
+  }
   async get_FD_Prefix_And_Suffix(branchId: Number, productId: Number): Promise<ApiResponse<any>> {
     return this.makeRequest<AuthResponse>(
       `/fetchdata/fetch-fd-prefix-and-suffix/${branchId}/${productId}`,
@@ -711,6 +721,20 @@ class commonService extends ApiService {
     );
   }
 
+  async fetch_fd_pledge_balance(branchId: number, accId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/fd-pledge-balance/${branchId}/${accId}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async fetch_rd_pledge_balance(branchId: number, accId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/rd-pledge-balance/${branchId}/${accId}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   async fetch_active_members(branchId: number): Promise<ApiResponse<any>> {
     return this.makeRequest<any>(
       `/fetchdata/active-members/${branchId}`,
@@ -772,6 +796,42 @@ class commonService extends ApiService {
     return this.makeRequest<any>(
       `/fetchdata/can-modify-account/${accountId}/${branchId}`,
       { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async fetch_fd_accounts_pledged_locked(branchId: number, fromDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/fd-accounts-pledged-locked/${branchId}/${fromDate}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async unpledge_unlock_fd(dto: { brId: number; pledgeId: number; action: number; date: string }): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/LoanAccountMaster/unpledge-unlock-fd`,
+      {
+        method: "POST",
+        body: JSON.stringify(dto),
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  async fetch_rd_accounts_pledged_locked(branchId: number, fromDate: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/fetchdata/rd-accounts-pledged-locked/${branchId}/${fromDate}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async unpledge_unlock_rd(dto: { brId: number; pledgeId: number; action: number; date: string }): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(
+      `/LoanAccountMaster/unpledge-unlock-rd`,
+      {
+        method: "POST",
+        body: JSON.stringify(dto),
+        headers: { "Content-Type": "application/json" },
+      }
     );
   }
 

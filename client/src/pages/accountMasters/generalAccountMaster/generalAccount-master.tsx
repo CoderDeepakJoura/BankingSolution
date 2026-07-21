@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { useFormValidation } from "../../../services/Validations/accountMasters/generalaccmastervalidation";
 import { ValidationSummary } from "../../../components/Validations/ValidationSummary";
 import { FormField } from "../../../components/Validations/FormField";
@@ -74,6 +74,8 @@ const GeneralAccountMaster = () => {
   const [loading, setLoading] = useState(false);
   const [accountHeads, setaccountHeads] = useState<AccountHead[]>([]);
   const [states, setstates] = useState<State[]>([]);
+  const [lastAccNum, setLastAccNum] = useState<string | null>(null);
+  const isAccNumManual = useRef(false);
   const [accountHeadId, setaccountHeadId] = useState("");
   // Basic Information State
   const [accMasterData, setAccMasterData] = useState({
@@ -99,6 +101,26 @@ const GeneralAccountMaster = () => {
     setAccMasterData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleAccountHeadChange = async (headId: string) => {
+    handleInputChange("accounthead", headId);
+    setaccountHeadId(headId);
+    if (!headId) {
+      setLastAccNum(null);
+      return;
+    }
+    try {
+      const res = await GeneralAccountApiService.getLastAccountNumber(user.branchid, Number(headId)) as any;
+      if (res.success) {
+        setLastAccNum(res.lastAccountNumber ?? null);
+        if (!isAccNumManual.current) {
+          setAccMasterData((prev) => ({ ...prev, accountNumber: res.nextAccountNumber ?? "1" }));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const handleNumericChange = (field: string, value: string) => {
     let numericValue = value.replace(/[^0-9.]/g, "");
     const parts = numericValue.split(".");
@@ -109,7 +131,7 @@ const GeneralAccountMaster = () => {
 
   // Enhanced handleSubmit with validation
   const handleSubmit = async () => {
-    console.log(accMasterData);
+
     const validation = validateForm(accMasterData);
 
     if (!validation.isValid) {
@@ -249,7 +271,8 @@ const GeneralAccountMaster = () => {
 
         clearErrors();
         setShowValidationSummary(false);
-        handleReset(); // reset form after save
+        isAccNumManual.current = false;
+        handleReset();
       } else {
         throw new Error(res.message || "Failed to save General Account");
       }
@@ -298,6 +321,8 @@ const GeneralAccountMaster = () => {
     });
     setActiveTab("basic");
     setaccountHeadId("");
+    setLastAccNum(null);
+    isAccNumManual.current = false;
     clearErrors();
     setShowValidationSummary(false);
   };
@@ -347,12 +372,13 @@ const GeneralAccountMaster = () => {
             ) || null
           }
           onChange={(selected) =>
-            handleInputChange("accounthead", selected ? selected.value : "")
+            handleAccountHeadChange(selected ? selected.value : "")
           }
           placeholder="Select Account Head"
           isClearable
           required
           className="text-sm"
+          styles={{ control: (base) => ({ ...base, cursor: "pointer" }) }}
         />
       </FormField>
       <FormField
@@ -365,13 +391,24 @@ const GeneralAccountMaster = () => {
         <input
           type="text"
           value={accMasterData.accountNumber}
-          onChange={(e) => handleInputChange("accountNumber", e.target.value)}
+          onChange={(e) => {
+            isAccNumManual.current = true;
+            handleInputChange("accountNumber", e.target.value);
+          }}
           onBlur={() => handleFieldBlur("accountNumber")}
           className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
           placeholder="Enter Account Number"
           required
           maxLength={20}
         />
+        {lastAccNum !== null && (
+          <p className="text-xs text-gray-500 mt-1">
+            Last account number for this head: <span className="font-medium text-blue-600">{lastAccNum}</span>
+          </p>
+        )}
+        {lastAccNum === null && accMasterData.accounthead && (
+          <p className="text-xs text-gray-500 mt-1">No previous account for this head</p>
+        )}
       </FormField>
       <FormField
         name="accountName"
@@ -509,6 +546,7 @@ const GeneralAccountMaster = () => {
               isClearable
               required
               className="text-sm"
+              styles={{ control: (base) => ({ ...base, cursor: "pointer" }) }}
             />
           </FormField>
 

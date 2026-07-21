@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useFormValidation } from "../../../services/Validations/voucher/saving/savingwithdrawal";
 import { FormField } from "../../../components/Validations/FormField";
 import Swal from "sweetalert2";
@@ -10,6 +10,8 @@ import savingVoucherApi, {
 import commonservice, {
   AccountInformation,
 } from "../../../services/common/commonservice";
+import otherBranchAccountApi from "../../../services/interbranch/otherBranchAccountApi";
+import ibVoucherApi from "../../../services/interbranch/ibVoucherApi";
 import {
   SavingProduct,
   DebitAccount,
@@ -39,6 +41,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
+import savingLedgerApi, { SavingLedger } from "../../../services/reports/savingLedgerApi";
 
 // Joint Account Holder Interface
 export interface JointAccountHolder {
@@ -94,6 +97,14 @@ const SavingWithdrawalVoucher: React.FC = () => {
   const [signatureFile, setSignatureFile] = useState<any>(null);
   const [accountBalance, setAccountBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [ledgerData, setLedgerData] = useState<SavingLedger | null>(null);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+
+  // Inter-Branch state
+  const [ibMappings, setIbMappings] = useState<any[]>([]);
+  const [destBrId, setDestBrId]     = useState<number>(0);
+  const [ibDrAccId, setIbDrAccId]   = useState<number>(0);
+  const [ibDrAccName, setIbDrAccName] = useState<string>("");
 
   // Voucher Data State
   const [voucherData, setVoucherData] = useState({
@@ -243,6 +254,82 @@ const SavingWithdrawalVoucher: React.FC = () => {
     fetchData();
   }, [user.branchid]);
 
+  useEffect(() => {
+    otherBranchAccountApi.getAll(user.branchid).then((res) => {
+      if (res.success && res.data) setIbMappings(res.data);
+    });
+  }, [user.branchid]);
+
+  useEffect(() => {
+    if (!voucherData.accountId) {
+      setLedgerData(null);
+      return;
+    }
+    const brId = destBrId || user.branchid;
+    const fromDate = user.sessionFromDate || sessionDate;
+    const toDate = user.workingdate ? user.workingdate.split("T")[0] : sessionDate;
+    setLedgerLoading(true);
+    savingLedgerApi.getSavingLedger(brId, voucherData.accountId, fromDate, toDate)
+      .then(res => setLedgerData(res?.data ?? null))
+      .catch(() => setLedgerData(null))
+      .finally(() => setLedgerLoading(false));
+  }, [voucherData.accountId, destBrId]);
+
+  const [allBranches, setAllBranches] = useState<{ value: number; label: string }[]>([]);
+
+  useEffect(() => {
+    if (!user.isMainBranch) {
+      import("../../../services/branch/branchapi").then(({ default: BranchApiService }) => {
+        (BranchApiService.fetchBranches({ searchTerm: "", pageNumber: 1, pageSize: 1000 }, 1) as any).then((res: any) => {
+          if (res.success) {
+            setAllBranches(
+              (res.branches ?? [])
+                .filter((b: any) => b.id !== user.branchid && !b.isMainBranch)
+                .map((b: any) => ({ value: b.id, label: `${b.code} — ${b.name}` }))
+            );
+          }
+        });
+      });
+    }
+  }, [user.branchid, user.isMainBranch]);
+
+  // HO (isMainBranch): 2-step "HO to Branch" — dest = any non-HO branch, Dr = that branch's ref account
+  const destBrOptions = user.isMainBranch
+    ? ibMappings.map((m: any) => ({
+        value: m.otherBrId,
+        label: `${m.otherBranchCode ? m.otherBranchCode + " - " : ""}${m.otherBranchName ?? m.otherBrId}`,
+        accId: m.accId,
+        accountName: m.accountName,
+      }))
+    : ([] as { value: number; label: string; accId: number; accountName: string }[]);
+
+  const effectiveDestBrOptions = user.isMainBranch ? destBrOptions : allBranches;
+
+  const handleDestBrChange = async (selected: any) => {
+    const brId = selected ? selected.value : 0;
+    setDestBrId(brId);
+    // HO: Dr = the ref account mapped to this specific dest branch
+    // Non-HO: Dr = always their one HO ref account (ibMappings[0])
+    if (user.isMainBranch) {
+      setIbDrAccId(selected ? selected.accId : 0);
+      setIbDrAccName(selected ? (selected.accountName ?? "") : "");
+    } else {
+      const hoRef = ibMappings[0];
+      setIbDrAccId(hoRef?.accId ?? 0);
+      setIbDrAccName(hoRef?.accountName ?? "");
+    }
+    setVoucherData((prev) => ({ ...prev, savingProduct: "", accountId: 0, creditAccount: "" }));
+    setSavingProductAccounts([]);
+    setAccountData(null);
+    setJointHolders([]);
+    setPictureFile(null);
+    setSignatureFile(null);
+    setAccountBalance(null);
+    const effectiveBrId = brId || user.branchid;
+    const productsRes = await commonservice.fetch_saving_products(effectiveBrId);
+    setSavingProducts(productsRes.data || []);
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setVoucherData((prev) => ({ ...prev, [field]: value }));
   };
@@ -277,8 +364,9 @@ const SavingWithdrawalVoucher: React.FC = () => {
     // Fetch accounts if product is selected
     if (productId && productId.trim() !== "") {
       try {
+        const effectiveBrId = destBrId || user.branchid;
         const response = await commonservice.fetch_deposit_accounts(
-          user.branchid,
+          effectiveBrId,
           Number(productId),
           2
         );
@@ -405,23 +493,46 @@ const SavingWithdrawalVoucher: React.FC = () => {
 
     setLoading(true);
     try {
-      const savingVoucherPayload: SavingVoucherDTO = {
-        voucher: {
-          brID: user.branchid,
+      let response: any;
+
+      if (destBrId > 0) {
+        // IB Saving Withdrawal — route to inter-branch API
+        if (!ibDrAccId) throw new Error("Reference account not configured for this branch pair.");
+        response = await ibVoucherApi.createSavingWithdrawalStep1({
+          brId: user.branchid,
+          destBrId,
+          destAccId: voucherData.accountId,
+          destAccNo: String(voucherData.accountId),
+          destAccName: savingProductAccounts.find((a) => a.accId === voucherData.accountId)?.accountName ?? "",
+          destMemberId: accountData ? Number(accountData.memberId) : undefined,
+          drAccId: ibDrAccId,
+          crAccId: Number(voucherData.creditAccount),
+          amount: parseFloat(voucherData.withdrawalAmount),
+          narration: voucherData.narration || undefined,
           voucherDate: voucherData.voucherDate,
-          voucherNarration:
-            voucherData.narration ||
-            "Saving Withdrawal Voucher with amount:" +
-              voucherData.withdrawalAmount,
-          totalDebit: parseFloat(voucherData.withdrawalAmount),
-          creditAccountId: Number(voucherData.creditAccount),
-          debitAccountId: voucherData.accountId,
-        },
-        voucherSubType: "W", // "W" for Withdrawal
-      };
-      const response = isEditMode && editVoucherId
-        ? await savingVoucherApi.updateSavingVoucher(editVoucherId, savingVoucherPayload)
-        : await savingVoucherApi.addSavingVoucher(savingVoucherPayload);
+          workingDate: user.workingdate ?? voucherData.voucherDate,
+          flowType: user.isMainBranch ? "HOToBranch" : "BranchToBranch",
+        });
+      } else {
+        // Regular Saving Withdrawal
+        const savingVoucherPayload: SavingVoucherDTO = {
+          voucher: {
+            brID: user.branchid,
+            voucherDate: voucherData.voucherDate,
+            voucherNarration:
+              voucherData.narration ||
+              "Saving Withdrawal Voucher with amount:" +
+                voucherData.withdrawalAmount,
+            totalDebit: parseFloat(voucherData.withdrawalAmount),
+            creditAccountId: Number(voucherData.creditAccount),
+            debitAccountId: voucherData.accountId,
+          },
+          voucherSubType: "W", // "W" for Withdrawal
+        };
+        response = isEditMode && editVoucherId
+          ? await savingVoucherApi.updateSavingVoucher(editVoucherId, savingVoucherPayload)
+          : await savingVoucherApi.addSavingVoucher(savingVoucherPayload);
+      }
 
       if (response.success) {
         await Swal.fire({
@@ -472,11 +583,15 @@ const SavingWithdrawalVoucher: React.FC = () => {
     setJointHolders([]);
     setSavingProductAccounts([]);
     setAccountBalance(null);
+    setLedgerData(null);
     setActiveTab("account-info");
     clearErrors();
     setPictureFile(null);
     setSignatureFile(null);
     setFieldErrors([]);
+    setDestBrId(0);
+    setIbDrAccId(0);
+    setIbDrAccName("");
   };
 
   // Use fieldErrors state instead of errors from hook
@@ -547,6 +662,38 @@ const SavingWithdrawalVoucher: React.FC = () => {
       </div>
 
       <div className="p-6">
+        {/* IB Branch Row */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Destination Branch <span className="text-xs text-gray-400">(leave empty for regular withdrawal)</span>
+          </label>
+          <Select
+            options={effectiveDestBrOptions}
+            value={effectiveDestBrOptions.find((o) => o.value === destBrId) || null}
+            onChange={handleDestBrChange}
+            placeholder="Select branch for inter-branch withdrawal..."
+            isClearable
+            isDisabled={isEditMode}
+            styles={{
+              control: (base, state) => ({
+                ...base,
+                minHeight: "48px",
+                borderWidth: "2px",
+                borderColor: destBrId > 0 ? "#6366f1" : state.isFocused ? "#3b82f6" : "#e5e7eb",
+                borderRadius: "0.5rem",
+                boxShadow: state.isFocused ? "0 0 0 2px rgba(99,102,241,0.2)" : "none",
+                "&:hover": { borderColor: "#6366f1" },
+                cursor: "pointer",
+              }),
+            }}
+          />
+          {destBrId > 0 && ibDrAccName && (
+            <p className="text-xs text-indigo-600 mt-1 font-medium">
+              IB Ref Debit Account: {ibDrAccName}
+            </p>
+          )}
+        </div>
+
         {/* First Row - 3 columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
           {/* Voucher Date */}
@@ -589,7 +736,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
               placeholder="Select Saving Product"
               isClearable
               isDisabled={isEditMode}
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",
@@ -642,7 +789,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
                 if (accountId !== 0) {
                   setBalanceLoading(true);
                   setAccountBalance(null);
-                  commonservice.get_account_balance(user.branchid, accountId)
+                  commonservice.get_account_balance(destBrId || user.branchid, accountId)
                     .then(res => setAccountBalance(res?.data ?? null))
                     .catch(() => setAccountBalance(null))
                     .finally(() => setBalanceLoading(false));
@@ -653,10 +800,10 @@ const SavingWithdrawalVoucher: React.FC = () => {
                 // Fetch account information if valid account selected
                 if (accountId !== 0) {
                   try {
-                    // Fetch account details
+                    // Fetch account details (from dest branch if IB mode)
                     const response =
                       await commonservice.fetch_deposit_account_info_from_accountId(
-                        user.branchid,
+                        destBrId || user.branchid,
                         accountId,
                         2
                       );
@@ -745,7 +892,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
                   ? "Please select a saving product first"
                   : "No accounts found"
               }
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",
@@ -767,23 +914,25 @@ const SavingWithdrawalVoucher: React.FC = () => {
         {/* Second Row - 2 columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Withdrawal Amount */}
-          <FormField
-            name="withdrawalAmount"
-            label="Withdrawal Amount"
-            required
-            errors={errorsByField.withdrawalAmount || []}
-          >
-            <input
-              type="text"
-              id="withdrawalAmount"
-              value={voucherData.withdrawalAmount}
-              onChange={handleWithdrawalAmountChange}
-              onBlur={() => handleFieldBlur("withdrawalAmount")}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
-              placeholder="Enter Amount (e.g., 1000.00)"
-              inputMode="decimal"
-              maxLength={18}
-            />
+          <div>
+            <FormField
+              name="withdrawalAmount"
+              label="Withdrawal Amount"
+              required
+              errors={errorsByField.withdrawalAmount || []}
+            >
+              <input
+                type="text"
+                id="withdrawalAmount"
+                value={voucherData.withdrawalAmount}
+                onChange={handleWithdrawalAmountChange}
+                onBlur={() => handleFieldBlur("withdrawalAmount")}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
+                placeholder="Enter Amount (e.g., 1000.00)"
+                inputMode="decimal"
+                maxLength={18}
+              />
+            </FormField>
             {balanceLoading ? (
               <p className="text-xs text-gray-400 mt-1">Fetching balance...</p>
             ) : accountBalance !== null ? (
@@ -798,7 +947,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
                 );
               })()
             ) : null}
-          </FormField>
+          </div>
 
           {/* Credit Account */}
           <FormField
@@ -830,7 +979,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
               onBlur={() => handleFieldBlur("creditAccount")}
               placeholder="Select Credit Account"
               isClearable
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",
@@ -1057,7 +1206,11 @@ const SavingWithdrawalVoucher: React.FC = () => {
             <div>
               <p className="text-xs text-gray-500 mb-1">Balance</p>
               <p className="text-sm font-semibold text-gray-800">
-                {accountData.balance || "N/A"}
+                {balanceLoading
+                  ? "Loading..."
+                  : accountBalance !== null
+                  ? `₹${accountBalance.toFixed(2)}`
+                  : "N/A"}
               </p>
             </div>
           </div>
@@ -1073,20 +1226,104 @@ const SavingWithdrawalVoucher: React.FC = () => {
     </div>
   );
 
-  const renderAccountLedger = () => (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <FileText className="w-5 h-5 text-blue-600" />
-        <h3 className="text-lg font-semibold text-gray-800">
-          Account Ledger View
-        </h3>
+  const renderAccountLedger = () => {
+    const fmt = (n: number) =>
+      n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtBal = (n: number) =>
+      `${fmt(Math.abs(n))} ${n >= 0 ? "Cr" : "Dr"}`;
+    const fmtDate = (s: string) => {
+      if (!s) return "";
+      const d = new Date(s);
+      return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <FileText className="w-5 h-5 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-800">Account Ledger View</h3>
+        </div>
+
+        {!voucherData.accountId ? (
+          <div className="text-center py-12 text-gray-500">
+            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm">Select an account to view the ledger</p>
+          </div>
+        ) : ledgerLoading ? (
+          <div className="text-center py-12 text-gray-500">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm">Loading ledger...</p>
+          </div>
+        ) : !ledgerData ? (
+          <div className="text-center py-12 text-gray-500">
+            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm">No ledger data found for this account</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+            <div className="bg-blue-50 px-4 py-2 text-sm text-blue-800 flex flex-wrap gap-x-6 gap-y-1 border-b border-blue-100">
+              <span><span className="font-medium">Account:</span> {ledgerData.accountName}</span>
+              <span><span className="font-medium">A/C No:</span> {ledgerData.accountIdentifier}</span>
+              <span><span className="font-medium">Product:</span> {ledgerData.productName}</span>
+              <span><span className="font-medium">Period:</span> {fmtDate(ledgerData.fromDate)} – {fmtDate(ledgerData.toDate)}</span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gradient-to-r from-slate-700 to-slate-800 text-white">
+                  <th className="px-3 py-2 text-center font-semibold w-10">S.No</th>
+                  <th className="px-3 py-2 text-center font-semibold whitespace-nowrap">Date</th>
+                  <th className="px-3 py-2 text-center font-semibold">V.No</th>
+                  <th className="px-3 py-2 text-left font-semibold">Particulars</th>
+                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Withdrawals (Dr)</th>
+                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Deposits (Cr)</th>
+                  <th className="px-3 py-2 text-right font-semibold">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="bg-amber-50">
+                  <td className="px-3 py-2 text-center text-amber-700" />
+                  <td className="px-3 py-2 text-center text-amber-700 whitespace-nowrap">{fmtDate(ledgerData.fromDate)}</td>
+                  <td className="px-3 py-2 text-center text-amber-700" />
+                  <td className="px-3 py-2 text-amber-700 font-medium">Opening Balance</td>
+                  <td className="px-3 py-2 text-right text-amber-700" />
+                  <td className="px-3 py-2 text-right text-amber-700" />
+                  <td className="px-3 py-2 text-right text-amber-800 font-semibold">{fmtBal(ledgerData.openingBalance)}</td>
+                </tr>
+                {ledgerData.entries.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                      No transactions found for the selected period.
+                    </td>
+                  </tr>
+                ) : ledgerData.entries.map((entry, i) => (
+                  <tr key={i} className={`hover:bg-blue-50/50 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/70"}`}>
+                    <td className="px-3 py-2 text-center text-slate-500">{i + 1}</td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap text-slate-600">{fmtDate(entry.voucherDate)}</td>
+                    <td className="px-3 py-2 text-center text-slate-600">{entry.voucherNo}</td>
+                    <td className="px-3 py-2 text-slate-800">
+                      {entry.particulars}
+                      {entry.narration && <span className="text-slate-400"> — {entry.narration}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right text-red-700 font-medium">{entry.dr != null ? fmt(entry.dr) : ""}</td>
+                    <td className="px-3 py-2 text-right text-emerald-700 font-medium">{entry.cr != null ? fmt(entry.cr) : ""}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtBal(entry.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-100 border-t-2 border-slate-300">
+                  <td colSpan={4} className="px-3 py-2 text-right font-semibold text-slate-700">Total</td>
+                  <td className="px-3 py-2 text-right font-semibold text-red-700">{fmt(ledgerData.totalDr)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-emerald-700">{fmt(ledgerData.totalCr)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtBal(ledgerData.closingBalance)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
-      <div className="text-center py-12 text-gray-500">
-        <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-        <p className="text-sm">Ledger view content will appear here</p>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderPhotoSignature = () => (
     <div className="space-y-6">

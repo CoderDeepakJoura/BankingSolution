@@ -27,6 +27,7 @@
             Cash = 6,
             Journal = 7,
             OdReserve = 8,
+            InterBranch = 9,
         }
 
         public enum VoucherSubType
@@ -44,6 +45,29 @@
             PaymentReceipt = 11,
             Transfer = 12,
             OdReservePosting = 13,
+            LoanExpense = 14,
+            MISInterestPosting = 15,
+            MultipleKist = 16,
+            IBSavingDeposit = 17,       // legacy — do not use for new entries
+            IBSavingWithdrawal = 18,    // legacy — do not use for new entries
+
+            // HO-to-Branch 2-step saving deposit
+            IBHOSavDepStep1 = 19,       // HO: Dr Cash, Cr Dest-Branch-Ref
+            IBHOSavDepStep2 = 20,       // Dest Branch: Dr HO-Ref, Cr Customer Saving Acc
+
+            // Branch-to-Branch 3-step saving deposit
+            IBBrSavDepStep1 = 21,       // Source Branch: Dr Cash, Cr HO-Ref
+            IBBrSavDepStep2 = 22,       // HO: Dr Source-Ref, Cr Dest-Ref
+            IBBrSavDepStep3 = 23,       // Dest Branch: Dr HO-Ref, Cr Customer Saving Acc
+
+            // HO-to-Branch 2-step saving withdrawal (reverse of deposit)
+            IBHOSavWdlStep1 = 24,       // HO: Dr Dest-Branch-Ref, Cr Cash
+            IBHOSavWdlStep2 = 25,       // Dest Branch: Dr Customer Saving Acc, Cr HO-Ref
+
+            // Branch-to-Branch 3-step saving withdrawal (reverse of deposit)
+            IBBrSavWdlStep1 = 26,       // Source Branch: Dr HO-Ref, Cr Cash
+            IBBrSavWdlStep2 = 27,       // HO: Dr Dest-Ref, Cr Source-Ref
+            IBBrSavWdlStep3 = 28,       // Dest Branch: Dr Customer Saving Acc, Cr HO-Ref
         }
 
         public enum VoucherStatus
@@ -96,6 +120,14 @@
             Matured = 2,
             Pre_Matured = 3,
             Renewed = 4,
+        }
+
+        public enum PledgeStatus
+        {
+            Pledge = 1,
+            Unpledge = 2,
+            Lock = 3,
+            Unlock = 4,
         }
     }
 }

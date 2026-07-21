@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import { encryptId, decryptId } from "../../../utils/encryption";
 import Select from "react-select";
@@ -98,7 +98,6 @@ const SavingAccountInterestSlab = () => {
   // Fetch interest slab data if in edit mode
   useEffect(() => {
     const fetchInterestSlabData = async () => {
-      console.log("Fetching interest slab data for ID:", slabId);
       if (isEditMode && slabId) {
         try {
           Swal.fire({
@@ -493,8 +492,6 @@ const SavingAccountInterestSlab = () => {
         })),
       };
 
-      console.log("Submitting DTO:", dto);
-
       const res = isEditMode
         ? await interestSlabService.updateInterestSlab(formData.id!, dto)
         : await interestSlabService.createInterestSlab(dto);
@@ -611,7 +608,6 @@ const SavingAccountInterestSlab = () => {
                               ? "border-red-500"
                               : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({

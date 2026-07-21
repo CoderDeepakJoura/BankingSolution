@@ -61,7 +61,7 @@
 
         public int? MISAccId { get; set; }
 
-
-
+        public decimal? OpeningBalance { get; set; }
+        public string? OpeningBalanceType { get; set; }
     }
 }

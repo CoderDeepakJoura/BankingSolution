@@ -119,6 +119,7 @@ namespace BankingPlatform.API.Common.CommonFunctions
                 ScreenName = screenName,
                 UserId = 1
             };
+            _appcontext.ChangeTracker.Clear();
             _appcontext.errorlog.Add(ErrorlogInfo);
             await _appcontext.SaveChangesAsync();
         }
@@ -384,7 +385,8 @@ namespace BankingPlatform.API.Common.CommonFunctions
                 depwithdrawlimitinterval = existingrule?.depwithdrawlimitinterval,
                 intexpaccount = existingrule != null ? existingrule.intexpaccount : 0,
                 SavingProductId = existingrule != null ? existingrule.SavingProductId : 0,
-                Id = existingrule != null ? existingrule.Id : 0
+                Id = existingrule != null ? existingrule.Id : 0,
+                DaysInAYear = existingrule?.DaysInAYear ?? 365,
             };
         }
 
@@ -436,6 +438,12 @@ namespace BankingPlatform.API.Common.CommonFunctions
          .FirstOrDefaultAsync() ?? "";
 
         public async Task<bool> IsAnyBranchStatedAsMain(int branchId = 0) => await _appcontext.branchmaster.AsNoTracking().Where(x => x.id != branchId && x.branchmaster_ismainbranch == 1).AnyAsync();
+
+        public int GetCurrentSessionId()
+        {
+            var raw = _httpContextAccessor.HttpContext?.User?.FindFirst("sessionId")?.Value;
+            return int.TryParse(raw, out var id) ? id : 0;
+        }
 
         public string GetCurrentUserId()
         {

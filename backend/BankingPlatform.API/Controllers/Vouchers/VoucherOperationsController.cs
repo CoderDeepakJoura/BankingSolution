@@ -1,3 +1,4 @@
+using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.Service.Vouchers;
 using Microsoft.AspNetCore.Authorization;
@@ -12,11 +13,13 @@ namespace BankingPlatform.API.Controllers.Vouchers
     {
         private readonly VoucherOperationsService _service;
         private readonly ILogger<VoucherOperationsController> _logger;
+        private readonly CommonFunctions _commonFunctions;
 
-        public VoucherOperationsController(VoucherOperationsService service, ILogger<VoucherOperationsController> logger)
+        public VoucherOperationsController(VoucherOperationsService service, ILogger<VoucherOperationsController> logger, CommonFunctions commonFunctions)
         {
             _service = service;
             _logger = logger;
+            _commonFunctions = commonFunctions;
         }
 
         [HttpGet("preview/{branchId}/{voucherDate}/{voucherNo}")]
@@ -39,6 +42,7 @@ namespace BankingPlatform.API.Controllers.Vouchers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting voucher {VoucherNo}", voucherNo);
+                await _commonFunctions.LogErrors(ex, nameof(Delete), nameof(VoucherOperationsController));
                 return BadRequest(new ResponseDto { Success = false, Message = "An error occurred while deleting the voucher." });
             }
         }

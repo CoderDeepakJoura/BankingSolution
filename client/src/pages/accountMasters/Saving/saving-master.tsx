@@ -1,4 +1,4 @@
-// pages/AccountMasters/SavingAccount/SavingAccountMaster.tsx
+﻿// pages/AccountMasters/SavingAccount/SavingAccountMaster.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { encryptId, decryptId } from "../../../utils/encryption";
 import Swal from "sweetalert2";
@@ -1110,6 +1110,8 @@ const SavingAccountMaster = () => {
               isDisabled={isEditMode}
               placeholder="Select Saving Product"
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -1779,6 +1781,8 @@ const SavingAccountMaster = () => {
                       }
                       placeholder="Select Relation"
                       className="text-sm"
+
+
                     />
                     {errorsByField[
                       `jointHolders[${index}].relationWithMainHolder`
@@ -1942,6 +1946,8 @@ const SavingAccountMaster = () => {
               }
               placeholder="Select Debit Account"
               className="text-sm"
+
+
             />
           </FormField>
 
@@ -2162,6 +2168,8 @@ const SavingAccountMaster = () => {
                       }
                       placeholder="Select Relation"
                       className="text-sm"
+
+
                     />
                     {errorsByField[
                       `nominees[${index}].relationWithAccountHolder`

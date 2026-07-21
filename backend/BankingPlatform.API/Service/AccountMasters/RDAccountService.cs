@@ -430,6 +430,15 @@ namespace BankingPlatform.API.Service.AccountMasters
                 .AsNoTracking()
                 .FirstOrDefaultAsync(f => f.AccId == accountId && f.BrId == branchId);
 
+            string rdSlabName = "";
+            if (rdDetail?.RdSlabId > 0)
+            {
+                var slab = await _context.rdinterestslab
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Id == rdDetail.RdSlabId);
+                rdSlabName = slab?.SlabName ?? "";
+            }
+
             string[] validValues = new[] { "NM", "PM" };
             string membershipNo = "";
             if (validValues.Contains(accountMaster.addedusing))
@@ -502,6 +511,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     MaturityAmt = rdDetail.MaturityAmt,
                     NoOfDays = rdDetail.NoOfDays,
                     CompoundingInterval = rdDetail.CompoundingInterval,
+                    slabName = rdSlabName,
                 } : null,
                 OpeningBalance = accOpeningBalDetail != null ? accOpeningBalDetail.OpeningAmount.ToString() : "0",
                 OpeningBalanceType = accOpeningBalDetail != null ? accOpeningBalDetail.EntryType : "Cr",

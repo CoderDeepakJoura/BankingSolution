@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import { useFormValidation } from "../../../services/Validations/ProductMasters/Loan/useFormValidation";
 import { ValidationSummary } from "../../../components/Validations/ValidationSummary";
 import { FormField } from "../../../components/Validations/FormField";
@@ -226,8 +226,7 @@ const LoanProductMaster: React.FC = () => {
   };
 
   const accOpts = accountHeads.map((h) => ({ value: h.headCode, label: h.accountHeadName }));
-  const selectPortalStyles = { menuPortal: (base: any) => ({ ...base, zIndex: 9999 }) };
-  const prod = data.loanProductDTO!;
+const prod = data.loanProductDTO!;
   const def = data.loanProductDefinitionDTO!;
   const adv = data.loanProductAdvancementDTO!;
   const mmr = data.loanProductMarginMoneyRuleDTO!;
@@ -248,10 +247,10 @@ const LoanProductMaster: React.FC = () => {
           <legend className="text-sm font-semibold text-gray-700 px-2">Definition</legend>
           <div className="space-y-3">
             <FormField name="typeId" label="Loan Type" required errors={errorsByField.typeId || []}>
-              <Select instanceId="loan-type" options={LOAN_TYPES} value={LOAN_TYPES.find((o) => o.value === def.typeId) || null} onChange={(s) => setDef("typeId", s?.value || 0)} placeholder="Select Loan Type" isClearable menuPortalTarget={document.body} styles={selectPortalStyles} className="text-sm" />
+              <Select instanceId="loan-type" options={LOAN_TYPES} value={LOAN_TYPES.find((o) => o.value === def.typeId) || null} onChange={(s) => setDef("typeId", s?.value || 0)} placeholder="Select Loan Type" isClearable className="text-sm" />
             </FormField>
             <FormField name="categoryId" label="Category" errors={errorsByField.categoryId || []}>
-              <Select instanceId="category" options={CATEGORIES} value={CATEGORIES.find((o) => o.value === def.categoryId) || null} onChange={(s) => setDef("categoryId", s?.value || 0)} placeholder="Select Category" isClearable menuPortalTarget={document.body} styles={selectPortalStyles} className="text-sm" />
+              <Select instanceId="category" options={CATEGORIES} value={CATEGORIES.find((o) => o.value === def.categoryId) || null} onChange={(s) => setDef("categoryId", s?.value || 0)} placeholder="Select Category" isClearable className="text-sm" />
             </FormField>
             <FormField name="securityIds" label="Security" errors={errorsByField.securityIds || []}>
               <div className="border border-gray-200 rounded p-2 max-h-28 overflow-y-auto space-y-1 bg-white">
@@ -267,7 +266,7 @@ const LoanProductMaster: React.FC = () => {
               <input type="text" inputMode="numeric" value={def.secReviewFreqPeriod || ""} onChange={(e) => numInput(e, (v) => setDef("secReviewFreqPeriod", v), false, 4)} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none text-sm" placeholder="e.g. 12" />
             </FormField>
             <FormField name="docPlanId" label="Document Plan" required errors={errorsByField.docPlanId || []}>
-              <Select instanceId="doc-plan" options={DOC_PLANS} value={DOC_PLANS.find((o) => o.value === def.docPlanId) || null} onChange={(s) => setDef("docPlanId", s?.value || 0)} placeholder="Select Document Plan" isClearable menuPortalTarget={document.body} styles={selectPortalStyles} className="text-sm" />
+              <Select instanceId="doc-plan" options={DOC_PLANS} value={DOC_PLANS.find((o) => o.value === def.docPlanId) || null} onChange={(s) => setDef("docPlanId", s?.value || 0)} placeholder="Select Document Plan" isClearable className="text-sm" />
             </FormField>
             <FormField name="intSchedule" label="Installment Schedule" errors={[]}>
               <div className="flex gap-5 mt-1">
@@ -349,7 +348,7 @@ const LoanProductMaster: React.FC = () => {
         <legend className="text-sm font-semibold text-gray-700 px-2">Margin Money</legend>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <FormField name="ratioOrPerc" label="Ratio/Perc." errors={errorsByField.ratioOrPerc || []}>
-            <Select instanceId="ratio-perc" options={MARGIN_RATIO_OPTIONS} value={MARGIN_RATIO_OPTIONS.find((o) => o.value === mmr.ratioOrPerc) || null} onChange={(s) => setMmr("ratioOrPerc", s?.value || 0)} placeholder="==Select==" isClearable menuPortalTarget={document.body} styles={selectPortalStyles} className="text-sm" />
+            <Select instanceId="ratio-perc" options={MARGIN_RATIO_OPTIONS} value={MARGIN_RATIO_OPTIONS.find((o) => o.value === mmr.ratioOrPerc) || null} onChange={(s) => setMmr("ratioOrPerc", s?.value || 0)} placeholder="==Select==" isClearable className="text-sm" />
           </FormField>
           <FormField name="loanProportion" label="Loan Amount" errors={[]}>
             <input type="text" inputMode="decimal" value={mmr.loanProportion || ""} onChange={(e) => numInput(e, (v) => setMmr("loanProportion", v), true, 10)} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none text-sm" placeholder="0" />
@@ -431,7 +430,7 @@ const LoanProductMaster: React.FC = () => {
           </FormField>
 
           <FormField name="actOnIntPosting" label="Action on Int. Posting" required errors={[]}>
-            <Select instanceId="act-on-int" options={ACTION_ON_INT_OPTIONS} value={ACTION_ON_INT_OPTIONS.find((o) => o.value === def.actOnIntPosting) || null} onChange={(s) => setDef("actOnIntPosting", s?.value || 1)} placeholder="Select Action" isClearable menuPortalTarget={document.body} styles={selectPortalStyles} className="text-sm" />
+            <Select instanceId="act-on-int" options={ACTION_ON_INT_OPTIONS} value={ACTION_ON_INT_OPTIONS.find((o) => o.value === def.actOnIntPosting) || null} onChange={(s) => setDef("actOnIntPosting", s?.value || 1)} placeholder="Select Action" isClearable className="text-sm" />
           </FormField>
 
           <FormField name="recoveryAdjustmentSeq" label="Recovery Adjustment Seq." required errors={errorsByField.recoveryAdjustmentSeq || []}>
@@ -443,7 +442,7 @@ const LoanProductMaster: React.FC = () => {
           </FormField>
 
           <FormField name="intPostingInterval" label="Int. Posting Interval" required errors={errorsByField.intPostingInterval || []}>
-            <Select instanceId="int-posting-interval" options={POSTING_INTERVAL_OPTIONS} value={POSTING_INTERVAL_OPTIONS.find((o) => o.value === rec.intPostingInterval) || null} onChange={(s) => setRec("intPostingInterval", s?.value || 0)} placeholder="Select Interval" isClearable menuPortalTarget={document.body} styles={selectPortalStyles} className="text-sm" />
+            <Select instanceId="int-posting-interval" options={POSTING_INTERVAL_OPTIONS} value={POSTING_INTERVAL_OPTIONS.find((o) => o.value === rec.intPostingInterval) || null} onChange={(s) => setRec("intPostingInterval", s?.value || 0)} placeholder="Select Interval" isClearable className="text-sm" />
           </FormField>
 
           <FormField name="stdOverdueOnKistDate" label="Stand Overdue On Kist Date" errors={[]}>
@@ -475,8 +474,7 @@ const LoanProductMaster: React.FC = () => {
                 onChange={(s) => setPost(key, s?.value || 0)}
                 placeholder={`Select ${label}`}
                 isClearable
-                menuPortalTarget={document.body}
-                styles={selectPortalStyles}
+               
                 className="text-sm"
               />
             </FormField>

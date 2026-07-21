@@ -1,4 +1,4 @@
-// pages/AccountMasters/RDAccount/RDAccountMaster.tsx
+﻿// pages/AccountMasters/RDAccount/RDAccountMaster.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { decryptId } from "../../../utils/encryption";
 import Swal from "sweetalert2";
@@ -216,6 +216,7 @@ const RDAccountMaster = () => {
   const [relations, setRelations] = useState<Relation[]>([]);
   const [debitAccounts, setDebitAccounts] = useState<DebitAccount[]>([]);
   const [savingAccounts, setSavingAccounts] = useState<SavingAccountItem[]>([]);
+  const [defaultCashAccountId, setDefaultCashAccountId] = useState(0);
   const [inputMode, setInputMode] = useState<"account" | "membership">("account");
 
   const memberAccountNoRef = useRef<HTMLInputElement>(null);
@@ -278,16 +279,22 @@ const RDAccountMaster = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [relationsRes, debitAccountsRes, rdProductsRes, savingAccountsRes] = await Promise.all([
+        const [relationsRes, debitAccountsRes, rdProductsRes, savingAccountsRes, defaultCashRes] = await Promise.all([
           commonservice.relation_info(),
           commonservice.general_accmasters_info(user.branchid),
           commonservice.fetch_rd_products(user.branchid),
           commonservice.fetch_Saving_Accounts(user.branchid, sessionDate),
+          commonservice.default_cash_in_hand_account(user.branchid),
         ]);
         setRelations(relationsRes.data || []);
         setRdProducts(rdProductsRes.data || []);
         setDebitAccounts(debitAccountsRes.data || []);
         setSavingAccounts(savingAccountsRes.data || []);
+        const defCashId = Number(defaultCashRes.data) || 0;
+        if (defCashId > 0) {
+          setDefaultCashAccountId(defCashId);
+          setVoucherCash((prev) => ({ ...prev, debitAccountId: defCashId }));
+        }
       } catch (error) {
         Swal.fire("Error", "Failed to load required data", "error");
       }
@@ -379,13 +386,6 @@ useEffect(() => {
             6: "Half-Yearly",
             12: "Yearly",
           };
-          const reverseCompoundingMap: Record<string, string> = {
-            "3": "Monthly",
-            "4": "Quarterly",
-            "5": "Half-Yearly",
-            "6": "Yearly",
-          };
-
           setRdDetailForm({
             rdDate: rd.rdDate?.split("T")[0] || sessionDate,
             rdNo: rd.rdNumber?.toString() || "",
@@ -399,12 +399,9 @@ useEffect(() => {
             paymentDate: rd.maturityDate?.split("T")[0] || sessionDate,
             matAmount: rd.maturityAmt?.toString() || "",
             penaltyAmount: rd.penaltyAmt?.toString() || "",
-            slabName: rd.slabName?.toString() || "", // you may want slab name from a lookup
-            compoundingInterval:
-              reverseCompoundingMap[rd.compoundingInterval?.toString()] ||
-              rd.compoundingInterval?.toString() ||
-              "3",
-            slabId: rd.rdslabId?.toString() || "",
+            slabName: rd.slabName?.toString() || "",
+            compoundingInterval: rd.compoundingInterval?.toString() || "3",
+            slabId: rd.rdSlabId?.toString() || "",
           });
         }
 
@@ -979,7 +976,7 @@ useEffect(() => {
     });
     setVoucherPaymentMode("byCash");
     setVoucherCash({
-      debitAccountId: 0,
+      debitAccountId: defaultCashAccountId,
       amount: "",
     });
     setVoucherSaving({
@@ -1406,7 +1403,7 @@ useEffect(() => {
               isDisabled={isEditMode}
               placeholder="Select RD Product"
               className="text-sm"
-              styles={{
+              styles={{ 
                 control: (base) => ({
                   ...base,
                   borderColor: errorsByField.rdProductId ? "#ef4444" : base.borderColor,
@@ -1868,7 +1865,7 @@ useEffect(() => {
                     onChange={(opt) => handleRdDetailChange("kistInterval", opt?.value || "")}
                     placeholder="==Select=="
                     className="text-sm cursor-pointer"
-                    styles={{
+                    styles={{ 
                       control: (base) => ({
                         ...base,
                         borderColor: errorsByField.kistInterval ? "#ef4444" : base.borderColor,
@@ -2185,7 +2182,7 @@ useEffect(() => {
                       }
                       placeholder="Select Relation"
                       className="text-sm"
-                      styles={{
+                      styles={{ 
                         control: (base) => ({
                           ...base,
                           borderColor: errorsByField[`nominees[${index}].relationWithAccountHolder`]
@@ -2395,7 +2392,7 @@ useEffect(() => {
                         }}
                         placeholder="-- Select Account --"
                         className="text-sm cursor-pointer"
-                        styles={{
+                        styles={{ 
                           control: (base) => ({
                             ...base,
                             borderColor: errorsByField.debitAccountId ? "#ef4444" : base.borderColor,
@@ -2455,7 +2452,7 @@ useEffect(() => {
                         }}
                         placeholder="-- Select Saving Account --"
                         className="text-sm cursor-pointer"
-                        styles={{
+                        styles={{ 
                           control: (base) => ({
                             ...base,
                             borderColor: errorsByField.savingAccountId ? "#ef4444" : base.borderColor,
@@ -2721,7 +2718,7 @@ useEffect(() => {
                       }
                       placeholder="Select Relation"
                       className="text-sm"
-                      styles={{
+                      styles={{ 
                         control: (base) => ({
                           ...base,
                           borderColor: errorsByField[`jointHolders[${index}].relationWithMainHolder`]

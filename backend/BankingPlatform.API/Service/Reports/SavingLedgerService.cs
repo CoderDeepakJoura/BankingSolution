@@ -167,7 +167,7 @@ namespace BankingPlatform.API.Service.Reports
                 .Where(x => x.BrID == branchId
                     && x.VoucherDate >= fromDate.Date
                     && x.VoucherDate < toExclusive)
-                .Select(x => new { x.Id, x.VoucherNo, x.VoucherDate })
+                .Select(x => new { x.Id, x.VoucherNo, x.VoucherDate, x.VoucherNarration })
                 .ToListAsync();
 
             if (!voucherData.Any())
@@ -176,7 +176,7 @@ namespace BankingPlatform.API.Service.Reports
             var voucherIdList = voucherData.Select(v => v.Id).ToList();
             var voucherInfoMap = voucherData.ToDictionary(
                 v => v.Id,
-                v => new SLVoucherInfo(v.VoucherNo, v.VoucherDate.Date));
+                v => new SLVoucherInfo(v.VoucherNo, v.VoucherDate.Date, v.VoucherNarration));
 
             // Get this account's entries only
             var accountEntries = await _context.vouchercreditdebitdetails.AsNoTracking()
@@ -224,7 +224,9 @@ namespace BankingPlatform.API.Service.Reports
                     .Distinct()
                     .ToList();
 
-                string particulars = contras.Any() ? string.Join(" / ", contras) : "—";
+                string particulars = !string.IsNullOrWhiteSpace(info.VoucherNarration)
+                    ? info.VoucherNarration
+                    : contras.Any() ? string.Join(" / ", contras) : "—";
 
                 decimal? dr = entry.VoucherEntryType == "Dr" ? entry.VoucherAmount : (decimal?)null;
                 decimal? cr = entry.VoucherEntryType == "Cr" ? entry.VoucherAmount : (decimal?)null;
@@ -272,7 +274,7 @@ namespace BankingPlatform.API.Service.Reports
             });
         }
 
-        private record SLVoucherInfo(int VoucherNo, DateTime VoucherDate);
+        private record SLVoucherInfo(int VoucherNo, DateTime VoucherDate, string? VoucherNarration);
 
         private async Task<decimal> CalculateOpeningBalanceAsync(int branchId, int accountId, DateTime fromDate)
         {

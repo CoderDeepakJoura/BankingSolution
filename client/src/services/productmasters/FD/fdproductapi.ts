@@ -91,7 +91,7 @@ class FDProductApiService extends ApiService {
   async createFDProduct(
     combinedFDDTO: CombinedFDDTO
   ): Promise<ApiResponse<ResponseDto>> {
-    console.log(JSON.stringify(combinedFDDTO));
+
     
     return this.makeRequest<ResponseDto>("/fdproduct", {
       method: "POST",

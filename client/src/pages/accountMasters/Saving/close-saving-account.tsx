@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useFormValidation } from "../../../services/Validations/accountMasters/closesavingaccountvalidations";
 import { FormField } from "../../../components/Validations/FormField";
 import Swal from "sweetalert2";
@@ -309,7 +309,7 @@ const CloseSavingAccount: React.FC = () => {
     const validation = validateForm(voucherData);
 
     if (!validation.isValid) {
-      console.log(validation.errors)
+
       setFieldErrors(validation.errors);
 
       await Swal.fire({
@@ -503,7 +503,7 @@ const CloseSavingAccount: React.FC = () => {
               autoFocus
               placeholder="Select Saving Product"
               isClearable
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",
@@ -641,7 +641,7 @@ const CloseSavingAccount: React.FC = () => {
                   ? "Please select a saving product first"
                   : "No accounts found"
               }
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",
@@ -757,7 +757,7 @@ const CloseSavingAccount: React.FC = () => {
               onBlur={() => handleFieldBlur("incomeAccount")}
               placeholder="Select Income Account"
               isClearable
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",
@@ -807,7 +807,7 @@ const CloseSavingAccount: React.FC = () => {
               onBlur={() => handleFieldBlur("creditAccount")}
               placeholder="Select Credit Account"
               isClearable
-              styles={{
+              styles={{ 
                 control: (base, state) => ({
                   ...base,
                   minHeight: "48px",

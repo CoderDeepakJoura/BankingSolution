@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import { decryptId } from "../../../utils/encryption";
 import Select from "react-select";
@@ -505,7 +505,6 @@ const RDAccountInterestSlab = () => {
                         onChange={handleRDProductChange}
                         placeholder="Select RD Product"
                         isClearable
-                        menuPortalTarget={document.body}
                         styles={{
                           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                           control: (base) => ({
@@ -646,7 +645,6 @@ const RDAccountInterestSlab = () => {
                                 onChange={(opt) => handleSlabChange(index, "kistInterval", opt ? opt.value : "")}
                                 onBlur={() => handleSlabBlur(index, "kistInterval")}
                                 placeholder="==Select=="
-                                menuPortalTarget={document.body}
                                 styles={{
                                   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                                   control: (base) => ({

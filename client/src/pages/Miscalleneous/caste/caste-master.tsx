@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+﻿import React, { useEffect, useState, useRef } from "react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import CasteApiService from "../../../services/caste/casteapi";
@@ -255,6 +255,8 @@ const CasteMaster: React.FC = () => {
                       isClearable
                       required
                       className="text-sm"
+
+
                     />
                   </div>
                 </div>

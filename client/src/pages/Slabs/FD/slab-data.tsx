@@ -29,7 +29,7 @@ const fetchFDInterestSlabs = async (
 }> => {
   try {
     const res = await fdInterestSlabService.fetchFDInterestSlabs(branchId, filter);
-    console.log("Fetched FD Interest Slabs:", res);
+
     return {
       success: res.success ?? false,
       data: res.fdInterestSlabs || [],

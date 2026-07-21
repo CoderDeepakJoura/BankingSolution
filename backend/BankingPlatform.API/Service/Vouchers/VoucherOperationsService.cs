@@ -130,6 +130,25 @@ namespace BankingPlatform.API.Service.Vouchers
             if (voucher == null)
                 return (false, "Voucher not found.");
 
+            // ── IB voucher protection / revert logic ─────────────────────────────
+
+            // Check if this voucher is the Step 1 of any IB record
+            var ibAsStep1 = await _context.interbranchvoucher
+                .FirstOrDefaultAsync(x => x.Step1VoucherId == voucher.Id);
+            if (ibAsStep1 != null)
+            {
+                if (ibAsStep1.Step2VoucherId.HasValue)
+                    return (false, "Cannot delete: this IB voucher has already been confirmed at HO (Step 2). Delete the HO settlement voucher first.");
+                if (ibAsStep1.Step3VoucherId.HasValue)
+                    return (false, "Cannot delete: this IB voucher has already been approved at the destination branch (Step 3). Delete the destination approval voucher first.");
+            }
+
+            // Check if this voucher is a Step 2 or Step 3 IB approval — revert the IB record after deletion
+            var ibAsStep2 = await _context.interbranchvoucher
+                .FirstOrDefaultAsync(x => x.Step2VoucherId == voucher.Id);
+            var ibAsStep3 = await _context.interbranchvoucher
+                .FirstOrDefaultAsync(x => x.Step3VoucherId == voucher.Id);
+
             // AsNoTracking: entries are only read for account-ID lookups; the DB CASCADE deletes
             // them automatically when the voucher is deleted, so we must NOT track them.
             var entries = await _context.vouchercreditdebitdetails.AsNoTracking()
@@ -216,10 +235,69 @@ namespace BankingPlatform.API.Service.Vouchers
                     }
                 }
 
+                // Delete StockMain and related GST records linked to this voucher (no CASCADE from voucher)
+                var stockMains = await _context.stockmain
+                    .Where(x => x.VmId == voucher.Id && x.BrId == branchId)
+                    .ToListAsync();
+                if (stockMains.Any())
+                {
+                    foreach (var sm in stockMains)
+                    {
+                        var td = await _context.stocktaxdetail.Where(x => x.StockMainId == sm.Id).ToListAsync();
+                        if (td.Any()) _context.stocktaxdetail.RemoveRange(td);
+                        var sd = await _context.gstservicedetail.Where(x => x.StockMainId == sm.Id).ToListAsync();
+                        if (sd.Any()) _context.gstservicedetail.RemoveRange(sd);
+                        var smd = await _context.smdetail.Where(x => x.StockMainId == sm.Id).ToListAsync();
+                        if (smd.Any()) _context.smdetail.RemoveRange(smd);
+                        var bbd = await _context.stockbillbookdetail.Where(x => x.StockMainId == sm.Id).ToListAsync();
+                        if (bbd.Any()) _context.stockbillbookdetail.RemoveRange(bbd);
+                    }
+                    _context.stockmain.RemoveRange(stockMains);
+                    await _context.SaveChangesAsync();
+                }
+
                 // VoucherCreditDebitDetails has ON DELETE CASCADE — no explicit RemoveRange needed.
                 _context.voucher.Remove(voucher);
 
                 await _context.SaveChangesAsync();
+
+                // ── Revert IB record if this was a step 2 or step 3 approval ────
+                if (ibAsStep2 != null)
+                {
+                    ibAsStep2.Step2VoucherId  = null;
+                    ibAsStep2.Step2BrId       = null;
+                    ibAsStep2.Step2DrAccId    = null;
+                    ibAsStep2.Step2DrAccName  = null;
+                    ibAsStep2.Step2DrHeadCode = null;
+                    ibAsStep2.Step2CrAccId    = null;
+                    ibAsStep2.Step2CrAccName  = null;
+                    ibAsStep2.Step2CrHeadCode = null;
+                    ibAsStep2.Step2Date       = null;
+                    ibAsStep2.Step2WorkingDate = null;
+                    ibAsStep2.Step2UserId     = null;
+                    // Revert status: if Step 3 was also done, fall back to BranchCompleted, else Pending
+                    ibAsStep2.Status = ibAsStep2.Step3VoucherId.HasValue ? "BranchCompleted" : "Pending";
+                    await _context.SaveChangesAsync();
+                }
+
+                if (ibAsStep3 != null)
+                {
+                    ibAsStep3.Step3VoucherId  = null;
+                    ibAsStep3.Step3BrId       = null;
+                    ibAsStep3.Step3DrAccId    = null;
+                    ibAsStep3.Step3DrAccName  = null;
+                    ibAsStep3.Step3DrHeadCode = null;
+                    ibAsStep3.Step3CrAccId    = null;
+                    ibAsStep3.Step3CrAccName  = null;
+                    ibAsStep3.Step3CrHeadCode = null;
+                    ibAsStep3.Step3Date       = null;
+                    ibAsStep3.Step3WorkingDate = null;
+                    ibAsStep3.Step3UserId     = null;
+                    // Revert status: if HO step was done, back to HOConfirmed, else Pending
+                    ibAsStep3.Status = ibAsStep3.Step2VoucherId.HasValue ? "HOConfirmed" : "Pending";
+                    await _context.SaveChangesAsync();
+                }
+
                 await tx.CommitAsync();
                 return (true, "Voucher deleted successfully.");
             }
@@ -259,23 +337,34 @@ namespace BankingPlatform.API.Service.Vouchers
             5 => "Loan",
             6 => "Cash",
             7 => "Journal",
+            9 => "Inter Branch",
             _ => "Unknown"
         };
 
         private static string GetVoucherSubTypeName(int subType) => subType switch
         {
-            1 => "Share Money",
-            2 => "Deposit",
-            3 => "Withdrawal",
-            4 => "Interest Posting",
-            5 => "Mature",
-            6 => "Renew",
-            7 => "Pre-Mature",
-            8 => "Kist",
-            9 => "Loan Advancement",
+            1  => "Share Money",
+            2  => "Deposit",
+            3  => "Withdrawal",
+            4  => "Interest Posting",
+            5  => "Mature",
+            6  => "Renew",
+            7  => "Pre-Mature",
+            8  => "Kist",
+            9  => "Loan Advancement",
             10 => "Loan Recovery",
             11 => "Payment/Receipt",
             12 => "Transfer",
+            19 => "IB Saving Dep — HO Step 1",
+            20 => "IB Saving Dep — Branch Credit (HO→Br)",
+            21 => "IB Saving Dep — Source Branch Step 1",
+            22 => "IB Saving Dep — HO Settlement",
+            23 => "IB Saving Dep — Dest Branch Credit",
+            24 => "IB Saving Wdl — HO Step 1",
+            25 => "IB Saving Wdl — Dest Branch Debit (HO→Br)",
+            26 => "IB Saving Wdl — Source Branch Step 1",
+            27 => "IB Saving Wdl — HO Settlement",
+            28 => "IB Saving Wdl — Dest Branch Debit",
             _ => "Unknown"
         };
     }

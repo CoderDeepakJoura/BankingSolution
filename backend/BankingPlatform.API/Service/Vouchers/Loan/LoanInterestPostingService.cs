@@ -256,6 +256,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     ValueDate     = valDate,
                     Status        = "IP",
                     HeadCode      = loanHead,
+                    VoucherId     = voucherId,
                 });
 
                 await _db.SaveChangesAsync();

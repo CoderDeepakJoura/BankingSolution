@@ -48,7 +48,11 @@ namespace BankingPlatform.Infrastructure.Models.AccMasters.Loan
         public DateTime ValueDate { get; set; }
         [MaxLength(5)]
         public string? Status { get; set; }
+        [MaxLength(5)]
+        public string? EntryType { get; set; }
         public long? HeadCode { get; set; }
+        // Links this balance movement to its source voucher for cleanup on delete
+        public int? VoucherId { get; set; }
     }
 
     public class LoanAccountRecoveryInterest

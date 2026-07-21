@@ -110,6 +110,14 @@ class GeneralAccountApiService extends ApiService {
     );
   }
 
+  // Get last account number by head
+  async getLastAccountNumber(branchId: number, headId: number): Promise<ApiResponse<{ lastAccountNumber: string | null; nextAccountNumber: string }>> {
+    return this.makeRequest<{ lastAccountNumber: string | null; nextAccountNumber: string }>(
+      `/GeneralAccMaster/last-account-number/${branchId}/${headId}`,
+      { method: 'GET' }
+    );
+  }
+
   // Delete
   async deleteGeneralAccount(
     id: number,

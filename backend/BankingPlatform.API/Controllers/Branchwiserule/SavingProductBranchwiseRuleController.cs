@@ -65,16 +65,18 @@ namespace BankingPlatform.API.Controllers.Branchwiserule
                         branchwiserules.depwithdrawlimit = branchWiseRuleDTO.depwithdrawlimit;
                         branchwiserules.intexpaccount = branchWiseRuleDTO.intexpaccount;
                         branchwiserules.SavingProductId = branchWiseRuleDTO.SavingProductId;
+                        branchwiserules.DaysInAYear = branchWiseRuleDTO.DaysInAYear > 0 ? branchWiseRuleDTO.DaysInAYear : 365;
                     }
                     else
-                    {                
+                    {
                         SavingProductBranchWiseRule newRule = new SavingProductBranchWiseRule
                         {
                             BranchId = branchWiseRuleDTO.BranchId,
                             depwithdrawlimitinterval = branchWiseRuleDTO.depwithdrawlimitinterval,
                             depwithdrawlimit = branchWiseRuleDTO.depwithdrawlimit,
                             intexpaccount = branchWiseRuleDTO.intexpaccount,
-                            SavingProductId = branchWiseRuleDTO.SavingProductId
+                            SavingProductId = branchWiseRuleDTO.SavingProductId,
+                            DaysInAYear = branchWiseRuleDTO.DaysInAYear > 0 ? branchWiseRuleDTO.DaysInAYear : 365,
                         };
                         await _appcontext.savingproductbranchwiserule.AddAsync(newRule);
                     }

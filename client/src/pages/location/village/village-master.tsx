@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+﻿import React, { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { FaPlus, FaTimes, FaMapMarkerAlt, FaGlobe, FaSave, FaArrowLeft, FaInfoCircle, FaBuilding, FaCode, FaEnvelope, FaChevronDown, FaSearch } from "react-icons/fa";
@@ -460,7 +460,7 @@ const VillageMaster = () => {
                       placeholder="Select Zone"
                       isClearable
                       className="text-sm"
-                      styles={{
+                      styles={{ 
                         control: (base) => ({
                           ...base,
                           borderColor: errors.zone ? '#fca5a5' : base.borderColor,
@@ -493,7 +493,7 @@ const VillageMaster = () => {
                       placeholder="Select Thana"
                       isClearable
                       className="text-sm"
-                      styles={{
+                      styles={{ 
                         control: (base) => ({
                           ...base,
                           borderColor: errors.thana ? '#fca5a5' : base.borderColor,
@@ -526,7 +526,7 @@ const VillageMaster = () => {
                       placeholder="Select Post Office"
                       isClearable
                       className="text-sm"
-                      styles={{
+                      styles={{ 
                         control: (base) => ({
                           ...base,
                           borderColor: errors.postOffice ? '#fca5a5' : base.borderColor,
@@ -559,7 +559,7 @@ const VillageMaster = () => {
                       placeholder="Select Tehsil"
                       isClearable
                       className="text-sm"
-                      styles={{
+                      styles={{ 
                         control: (base) => ({
                           ...base,
                           borderColor: errors.tehsil ? '#fca5a5' : base.borderColor,
@@ -591,7 +591,7 @@ const VillageMaster = () => {
                       placeholder="Select Patwar"
                       isClearable
                       className="text-sm"
-                      styles={{
+                      styles={{ 
                         control: (base) => ({
                           ...base,
                           borderColor: errors.tehsil ? '#fca5a5' : base.borderColor,

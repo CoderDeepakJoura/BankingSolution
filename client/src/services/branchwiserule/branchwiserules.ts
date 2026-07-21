@@ -8,6 +8,7 @@ export interface SavingProductBranchwiseRuleDTO {
   IntExpAccount: number;
   DepWithdrawLimitInterval?: number;
   DepWithdrawLimit?: number;
+  DaysInAYear: number;
 }
 
 export interface FDProductBranchwiseRuleDTO {

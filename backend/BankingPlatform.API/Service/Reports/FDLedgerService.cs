@@ -376,12 +376,16 @@ namespace BankingPlatform.API.Service.Reports
 
         private async Task<decimal> CalculateOpeningBalanceAsync(int branchId, int accountId, DateTime fromDate)
         {
-            var ob = await _context.accopeningbalance.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.BranchId == branchId && x.AccountId == accountId);
+            // Per-detail opening balance stored in fdaccountdetail (Cr = positive, Dr = negative)
+            var detailOpeningBals = await _context.fdaccountdetail.AsNoTracking()
+                .Where(x => x.BranchId == branchId && x.AccountId == accountId && x.OpeningBalance != null)
+                .Select(x => new { x.OpeningBalance, x.OpeningBalanceType })
+                .ToListAsync();
 
-            // FD is a liability (like Saving): Cr OB = positive balance
-            decimal initial = ob == null ? 0
-                : (ob.EntryType?.ToUpper() == "CR" ? ob.OpeningAmount : -ob.OpeningAmount);
+            decimal initial = detailOpeningBals.Sum(x =>
+                x.OpeningBalanceType?.ToUpper() == "CR"
+                    ? (x.OpeningBalance ?? 0)
+                    : -(x.OpeningBalance ?? 0));
 
             var crSum = await _context.vouchercreditdebitdetails
                 .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })

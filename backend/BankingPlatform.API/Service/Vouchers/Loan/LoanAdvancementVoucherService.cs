@@ -3,6 +3,7 @@ using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.Voucher.Loan;
 using BankingPlatform.API.Mappers.Voucher;
 using BankingPlatform.API.Services;
+using BankingPlatform.Infrastructure.Models.GST;
 using BankingPlatform.Infrastructure.Models.voucher;
 
 namespace BankingPlatform.API.Service.Vouchers.Loan
@@ -94,11 +95,16 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         ? $"Loan Advancement Credit - {dto.VoucherDate:dd-MMM-yyyy}"
                         : item.Narration;
 
+                    // Base amount = net amount (already includes tax from frontend)
+                    decimal baseAmount = item.GstDetail != null && item.GstDetail.TaxLines.Count > 0
+                        ? item.Amount - item.GstDetail.TaxLines.Sum(t => t.TaxAmt)
+                        : item.Amount;
+
                     long crHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(item.AccountId, branchId);
                     var crEntry = _memberService.voucherCreditDebitDetails(
                         crHeadCode, item.AccountId, branchId,
                         Enums.VoucherStatus.Cr.ToString(), itemNarration,
-                        item.Amount, voucherStatus, valueDate, "Cr", voucherId, row);
+                        baseAmount, voucherStatus, valueDate, "Cr", voucherId, row);
                     await _context.vouchercreditdebitdetails.AddAsync(crEntry);
                     await _context.SaveChangesAsync();
                     row++;
@@ -108,7 +114,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     {
                         var savingDetail = _voucherMapper.voucherSavingDetails(
                             branchId, item.AccountId, 0, crEntry.Id, voucherId,
-                            itemNarration, item.Amount, voucherStatus, voucherDate, valueDate, "SD", 0);
+                            itemNarration, baseAmount, voucherStatus, voucherDate, valueDate, "SD", 0);
                         await _context.vouchersavingdetail.AddAsync(savingDetail);
                     }
                     // RD account — insert into voucherrddetail
@@ -121,8 +127,88 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                         var rdDetail = _voucherMapper.voucherRDDetails(
                             branchId, item.AccountId, rdAccDet?.Id ?? 0, crEntry.Id, voucherId,
-                            (double)item.Amount, 0, "RC", voucherStatus, voucherDate, valueDate);
+                            (double)baseAmount, 0, "RC", voucherStatus, voucherDate, valueDate);
                         await _context.voucherrddetail.AddAsync(rdDetail);
+                    }
+
+                    // GST entries if service is associated with this credit account
+                    if (item.GstDetail != null && item.GstDetail.TaxLines.Count > 0)
+                    {
+                        var gst = item.GstDetail;
+
+                        var taxForGroup = await _context.tax.AsNoTracking()
+                            .FirstOrDefaultAsync(x => x.Id == gst.TaxId && x.BrId == branchId);
+
+                        var stockMain = new StockMain
+                        {
+                            BrId = branchId,
+                            Date = voucherDate,
+                            VmId = null,
+                            Narration = itemNarration,
+                            TaxGroupId = taxForGroup?.TaxGroupId ?? 0,
+                            IsRC = 0,
+                            TotalAmount = baseAmount,
+                            RoundAmount = null,
+                            TransTypeId = null,
+                        };
+                        await _context.stockmain.AddAsync(stockMain);
+                        await _context.SaveChangesAsync();
+
+                        await _context.stockbillbookdetail.AddAsync(new StockBillBookDetail
+                        {
+                            BrId = branchId,
+                            StockMainId = stockMain.Id,
+                            BillBookId = gst.BillBookId,
+                            BillNo = gst.BillNo,
+                            Date = voucherDate,
+                            DrAccId = dto.LoanAccountId,
+                        });
+
+                        await _context.smdetail.AddAsync(new SMDetail
+                        {
+                            BrId = branchId,
+                            StateId = gst.StateId,
+                            SupplyTypeId = gst.SupplyTypeId,
+                            StockMainId = stockMain.Id,
+                            GstINo = gst.GstinNo,
+                            FkId = dto.LoanAccountId,
+                            FkBrId = branchId,
+                            FkTypeId = 1,
+                        });
+
+                        await _context.gstservicedetail.AddAsync(new GSTServiceDetail
+                        {
+                            BrId = branchId,
+                            StockMainId = stockMain.Id,
+                            ServiceId = gst.ServiceId,
+                            TaxId = gst.TaxId,
+                            Amount = baseAmount,
+                            NetAmount = item.Amount,
+                            Date = voucherDate,
+                        });
+
+                        foreach (var taxLine in gst.TaxLines)
+                        {
+                            await _context.stocktaxdetail.AddAsync(new StockTaxDetail
+                            {
+                                BrId = branchId,
+                                StockMainId = stockMain.Id,
+                                TaxTypeId = taxLine.TaxTypeId,
+                                TaxPerc = taxLine.Perc,
+                                TaxAmt = taxLine.TaxAmt,
+                            });
+
+                            if (taxLine.AccId > 0 && taxLine.TaxAmt > 0)
+                            {
+                                long taxHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(taxLine.AccId, branchId);
+                                var taxCrEntry = _memberService.voucherCreditDebitDetails(
+                                    taxHeadCode, taxLine.AccId, branchId,
+                                    Enums.VoucherStatus.Cr.ToString(), $"GST - {taxLine.TaxTypeName}",
+                                    taxLine.TaxAmt, voucherStatus, valueDate, "Cr", voucherId, row++);
+                                await _context.vouchercreditdebitdetails.AddAsync(taxCrEntry);
+                            }
+                        }
+                        await _context.SaveChangesAsync();
                     }
                 }
 

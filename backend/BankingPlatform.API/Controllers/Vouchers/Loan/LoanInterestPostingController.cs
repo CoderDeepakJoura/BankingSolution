@@ -1,3 +1,4 @@
+using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.Voucher.Loan;
 using BankingPlatform.API.Service.Vouchers.Loan;
 using Microsoft.AspNetCore.Authorization;
@@ -12,11 +13,13 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
     {
         private readonly LoanInterestPostingService _service;
         private readonly ILogger<LoanInterestPostingController> _logger;
+        private readonly CommonFunctions _commonFunctions;
 
-        public LoanInterestPostingController(LoanInterestPostingService service, ILogger<LoanInterestPostingController> logger)
+        public LoanInterestPostingController(LoanInterestPostingService service, ILogger<LoanInterestPostingController> logger, CommonFunctions commonFunctions)
         {
             _service = service;
             _logger  = logger;
+            _commonFunctions = commonFunctions;
         }
 
         /// <summary>Search active loan accounts by name or account number, optionally filtered by product.</summary>
@@ -34,6 +37,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error searching loan accounts for interest posting");
+                await _commonFunctions.LogErrors(ex, nameof(Search), nameof(LoanInterestPostingController));
                 return StatusCode(500, new { Success = false, Message = ex.Message });
             }
         }
@@ -53,6 +57,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching postable interest");
+                await _commonFunctions.LogErrors(ex, nameof(GetPostableInterest), nameof(LoanInterestPostingController));
                 return StatusCode(500, new { Success = false, Message = ex.Message });
             }
         }
@@ -72,6 +77,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in batch interest calculation");
+                await _commonFunctions.LogErrors(ex, nameof(BatchCalculate), nameof(LoanInterestPostingController));
                 return StatusCode(500, new { Success = false, Message = ex.Message });
             }
         }
@@ -91,6 +97,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in batch interest posting");
+                await _commonFunctions.LogErrors(ex, nameof(BatchPost), nameof(LoanInterestPostingController));
                 return StatusCode(500, new { Success = false, Message = ex.Message });
             }
         }
@@ -114,6 +121,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error saving interest posting voucher");
+                await _commonFunctions.LogErrors(ex, nameof(PostInterest), nameof(LoanInterestPostingController));
                 return StatusCode(500, new { Success = false, Message = ex.Message });
             }
         }

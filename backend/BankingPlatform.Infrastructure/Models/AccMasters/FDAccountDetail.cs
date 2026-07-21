@@ -55,9 +55,8 @@ namespace BankingPlatform.Infrastructure.Models.AccMasters
         [Column("fdperioddays")]
         public int FDPeriodDays { get; set; }
 
-        [Required]
         [Column("slabid")]
-        public int SlabId { get; set; }
+        public int? SlabId { get; set; }
 
         [Required]
         [Column("intrate", TypeName = "numeric(18,4)")]
@@ -84,6 +83,11 @@ namespace BankingPlatform.Infrastructure.Models.AccMasters
         [Column("misaccid")]
         public int? MISAccId { get; set; }
 
+        [Column("openingbalance", TypeName = "numeric(18,2)")]
+        public decimal? OpeningBalance { get; set; }
 
+        [Column("openingbalancetype")]
+        [MaxLength(5)]
+        public string? OpeningBalanceType { get; set; }
     }
 }

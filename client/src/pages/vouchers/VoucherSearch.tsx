@@ -10,6 +10,7 @@ import { RootState } from "../../redux";
 import voucherOperationsApi, {
   VoucherPreview,
   EDIT_ROUTE_MAP,
+  MODIFY_BLOCKED_REASON,
 } from "../../services/vouchers/voucherOperationsApi";
 import commonservice from "../../services/common/commonservice";
 import DatePicker from "../../components/DatePicker";
@@ -22,6 +23,9 @@ const VoucherSearch: React.FC = () => {
   const workingDateISO = user.workingdate
     ? commonservice.parseWorkingDate(user.workingdate)
     : commonservice.getTodaysDate();
+  const sessionFromDate = user.sessionInfo
+    ? `${user.sessionInfo.split('-')[0]}-04-01`
+    : undefined;
 
   const [voucherDate, setVoucherDate] = useState(workingDateISO);
   const [loading, setLoading] = useState(false);
@@ -34,6 +38,10 @@ const VoucherSearch: React.FC = () => {
 
   const handleSearch = async () => {
     if (!voucherNo || !voucherDate) return;
+    if (sessionFromDate && voucherDate < sessionFromDate) {
+      setError(`Voucher date cannot be before the session start date (${sessionFromDate}).`);
+      return;
+    }
     if (voucherDate > workingDateISO) {
       setError(`Voucher date cannot be after the working date (${workingDateISO}).`);
       return;
@@ -106,8 +114,8 @@ const VoucherSearch: React.FC = () => {
           confirmButtonColor: "#EF4444",
         });
       }
-    } catch {
-      Swal.fire({ icon: "error", title: "Error", text: "An unexpected error occurred.", confirmButtonColor: "#EF4444" });
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "Deletion Failed", text: err instanceof Error ? err.message : "An unexpected error occurred.", confirmButtonColor: "#EF4444" });
     } finally {
       setDeleting(false);
     }
@@ -118,10 +126,12 @@ const VoucherSearch: React.FC = () => {
     const key = `${preview.voucherType}-${preview.voucherSubType}`;
     const route = EDIT_ROUTE_MAP[key];
     if (!route) {
+      const reason = MODIFY_BLOCKED_REASON[key]
+        ?? `Modification is not supported for ${preview.voucherTypeName} — ${preview.voucherSubTypeName} vouchers.`;
       Swal.fire({
         icon: "info",
-        title: "Not Supported",
-        text: "Modify is not available for this voucher type.",
+        title: "Modification Not Available",
+        text: reason,
         confirmButtonColor: "#3B82F6",
       });
       return;
@@ -244,6 +254,7 @@ const VoucherSearch: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Voucher Date</label>
                     <DatePicker
                       value={voucherDate}
+                      min={sessionFromDate}
                       max={workingDateISO}
                       workingDate={workingDateISO}
                       onChange={(v) => { setVoucherDate(v); setPreview(null); setError(""); }}

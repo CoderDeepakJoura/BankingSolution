@@ -1,3 +1,4 @@
+using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.AccountMasters;
 using BankingPlatform.API.DTO.AccountMasters.Loan;
@@ -45,13 +46,27 @@ namespace BankingPlatform.API.Service.AccountMasters
                 if (headId == 0 || headCode == 0)
                     return ("Principal Balance Head Code not configured in Loan Product Posting. Please configure it before creating a loan account.", 0);
 
+                if (dto.IsNomineeRequired && (dto.Nominees == null || dto.Nominees.Count == 0))
+                    return ("At least one nominee is required.", 0);
+
+                // Validate account number
+                if (string.IsNullOrWhiteSpace(accDto.AccountNumber))
+                    return ("Loan account number is required.", 0);
+
+                var duplicate = await _context.accountmaster
+                    .AnyAsync(x => x.BranchId == accDto.BranchId
+                        && x.GeneralProductId == accDto.GeneralProductId
+                        && x.AccTypeId == (int)Common.Enums.AccountTypes.Loan
+                        && x.AccountNumber == accDto.AccountNumber);
+                if (duplicate)
+                    return ($"Loan account number '{accDto.AccountNumber}' already exists for this product.", 0);
+
                 var accEntity = _memberService.MapToEntity(accDto);
                 accEntity.AccTypeId = (int)Common.Enums.AccountTypes.Loan;
                 accEntity.IsAccClosed = false;
                 accEntity.HeadId = headId;
                 accEntity.HeadCode = headCode;
-                accEntity.AccPrefix = null;
-                accEntity.AccSuffix = null;
+                accEntity.AccountNumber = accDto.AccountNumber;
 
                 await _context.accountmaster.AddAsync(accEntity);
                 await _context.SaveChangesAsync();
@@ -174,7 +189,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                         OpenIntType = ob.OpenIntType,
                         OpenOverInt = ob.OpenOverInt,
                         OpenOverIntType = ob.OpenOverIntType,
-                        HeadCode = ob.HeadCode,
+                        HeadCode = headCode,
                         OverDueDate = ob.OverDueDate.HasValue ? ToUnspecified(ob.OverDueDate.Value) : null,
                     };
                     await _context.loanaccopeningbalance.AddAsync(obEntity);
@@ -194,7 +209,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                             Date = ToUnspecified(bd.Date),
                             ValueDate = ToUnspecified(bd.ValueDate),
                             Status = bd.Status,
-                            HeadCode = bd.HeadCode,
+                            EntryType = bd.EntryType,
+                            HeadCode = headCode,
                         });
                     }
                 }
@@ -202,13 +218,14 @@ namespace BankingPlatform.API.Service.AccountMasters
                 // FD Pledges
                 foreach (var fp in dto.FDPledges ?? new())
                 {
+                    int fpStatus = fp.Status ?? (int)Enums.PledgeStatus.Pledge;
                     var pledge = new LoanAccFDPledge
                     {
                         BrId = accDto.BranchId,
                         LoanAccId = accountId,
                         FDAccId = fp.FDAccId,
                         FDAccDetId = fp.FDAccDetId,
-                        LatestStatus = 1,
+                        LatestStatus = fpStatus,
                         Date = fp.Date.HasValue ? ToUnspecified(fp.Date.Value) : DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
                     };
                     await _context.loanaccfdpledge.AddAsync(pledge);
@@ -219,20 +236,21 @@ namespace BankingPlatform.API.Service.AccountMasters
                         BrId = accDto.BranchId,
                         LAccFDPledgeId = pledge.Id,
                         Date = pledge.Date,
-                        Status = 1,
+                        Status = fpStatus,
                     });
                 }
 
                 // RD Pledges
                 foreach (var rp in dto.RDPledges ?? new())
                 {
+                    int rpStatus = rp.Status ?? (int)Enums.PledgeStatus.Pledge;
                     var pledge = new LoanAccRDPledge
                     {
                         BrId = accDto.BranchId,
                         LoanAccId = accountId,
                         RDAccId = rp.RDAccId,
                         RDAccDetId = rp.RDAccDetId,
-                        LatestStatus = 1,
+                        LatestStatus = rpStatus,
                         Date = rp.Date.HasValue ? ToUnspecified(rp.Date.Value) : DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
                     };
                     await _context.loanaccrdpledge.AddAsync(pledge);
@@ -243,7 +261,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                         BrId = accDto.BranchId,
                         LAccRDPledgeId = pledge.Id,
                         Date = pledge.Date,
-                        Status = 1,
+                        Status = rpStatus,
                         IsHOUpdated = 0,
                     });
                 }
@@ -271,6 +289,9 @@ namespace BankingPlatform.API.Service.AccountMasters
             if (!await _commonFunctions.CanModifyAccountInCurrentSession(dto.AccountMasterDTO.BranchId, accEntity.AccOpeningDate))
                 return "This account can only be modified in the session it was opened in.";
 
+            if (dto.IsNomineeRequired && (dto.Nominees == null || dto.Nominees.Count == 0))
+                return "At least one nominee is required.";
+
             using var tx = await _context.Database.BeginTransactionAsync();
             try
             {
@@ -293,8 +314,20 @@ namespace BankingPlatform.API.Service.AccountMasters
                 accEntity.IsAccClosed = accEntity.IsAccClosed; // preserve closed flag
                 accEntity.HeadId = headId;
                 accEntity.HeadCode = headCode;
-                accEntity.AccPrefix = null;
-                accEntity.AccSuffix = null;
+
+                // Update account number
+                if (!string.IsNullOrWhiteSpace(accDto.AccountNumber))
+                {
+                    var duplicate = await _context.accountmaster
+                        .AnyAsync(x => x.BranchId == accDto.BranchId
+                            && x.GeneralProductId == accDto.GeneralProductId
+                            && x.AccTypeId == (int)Common.Enums.AccountTypes.Loan
+                            && x.AccountNumber == accDto.AccountNumber
+                            && x.ID != accountId);
+                    if (duplicate)
+                        return $"Loan account number '{accDto.AccountNumber}' already exists for this product.";
+                    accEntity.AccountNumber = accDto.AccountNumber;
+                }
 
                 // Nominees — replace
                 var existingNominees = await _context.accountnomineeinfo
@@ -419,7 +452,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                             AmountDr = bd.AmountDr, AmountCr = bd.AmountCr,
                             IntDr = bd.IntDr, IntCr = bd.IntCr,
                             Date = ToUnspecified(bd.Date), ValueDate = ToUnspecified(bd.ValueDate),
-                            Status = bd.Status, HeadCode = bd.HeadCode,
+                            Status = bd.Status, EntryType = bd.EntryType, HeadCode = bd.HeadCode,
                         });
                     }
                 }
@@ -436,16 +469,17 @@ namespace BankingPlatform.API.Service.AccountMasters
                 _context.loanaccfdpledge.RemoveRange(existingFD);
                 foreach (var fp in dto.FDPledges ?? new())
                 {
+                    int fpStatus = fp.Status ?? (int)Enums.PledgeStatus.Pledge;
                     var pledge = new LoanAccFDPledge
                     {
                         BrId = accDto.BranchId, LoanAccId = accountId,
-                        FDAccId = fp.FDAccId, FDAccDetId = fp.FDAccDetId, LatestStatus = 1,
+                        FDAccId = fp.FDAccId, FDAccDetId = fp.FDAccDetId, LatestStatus = fpStatus,
                         Date = fp.Date.HasValue ? ToUnspecified(fp.Date.Value) : DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
                     };
                     await _context.loanaccfdpledge.AddAsync(pledge);
                     await _context.SaveChangesAsync();
                     await _context.loanaccfdpledgedetail.AddAsync(new LoanAccFDPledgeDetail
-                    { BrId = accDto.BranchId, LAccFDPledgeId = pledge.Id, Date = pledge.Date, Status = 1 });
+                    { BrId = accDto.BranchId, LAccFDPledgeId = pledge.Id, Date = pledge.Date, Status = fpStatus });
                 }
 
                 // RD pledges — replace
@@ -460,16 +494,17 @@ namespace BankingPlatform.API.Service.AccountMasters
                 _context.loanaccrdpledge.RemoveRange(existingRD);
                 foreach (var rp in dto.RDPledges ?? new())
                 {
+                    int rpStatus = rp.Status ?? (int)Enums.PledgeStatus.Pledge;
                     var pledge = new LoanAccRDPledge
                     {
                         BrId = accDto.BranchId, LoanAccId = accountId,
-                        RDAccId = rp.RDAccId, RDAccDetId = rp.RDAccDetId, LatestStatus = 1,
+                        RDAccId = rp.RDAccId, RDAccDetId = rp.RDAccDetId, LatestStatus = rpStatus,
                         Date = rp.Date.HasValue ? ToUnspecified(rp.Date.Value) : DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
                     };
                     await _context.loanaccrdpledge.AddAsync(pledge);
                     await _context.SaveChangesAsync();
                     await _context.loanaccrdpledgedetail.AddAsync(new LoanAccRDPledgeDetail
-                    { BrId = accDto.BranchId, LAccRDPledgeId = pledge.Id, Date = pledge.Date, Status = 1 });
+                    { BrId = accDto.BranchId, LAccRDPledgeId = pledge.Id, Date = pledge.Date, Status = rpStatus });
                 }
 
                 await _context.SaveChangesAsync();
@@ -522,24 +557,35 @@ namespace BankingPlatform.API.Service.AccountMasters
                     .ToListAsync()
                 : new();
 
+            int pledgeStatus = (int)Common.Enums.PledgeStatus.Pledge;
+            int lockStatus = (int)Common.Enums.PledgeStatus.Lock;
+
             var fdPledges = await _context.loanaccfdpledge.AsNoTracking()
-                .Where(x => x.LoanAccId == accountId && x.BrId == brId)
+                .Where(x => x.LoanAccId == accountId && x.BrId == brId
+                         && (x.LatestStatus == pledgeStatus || x.LatestStatus == lockStatus))
                 .ToListAsync();
 
             var rdPledges = await _context.loanaccrdpledge.AsNoTracking()
-                .Where(x => x.LoanAccId == accountId && x.BrId == brId)
+                .Where(x => x.LoanAccId == accountId && x.BrId == brId
+                         && (x.LatestStatus == pledgeStatus || x.LatestStatus == lockStatus))
                 .ToListAsync();
 
-            // Enrich FD pledges with account numbers
+            // Enrich FD pledges with account numbers and names
             var fdAccIds = fdPledges.Select(x => x.FDAccId).Where(x => x.HasValue).Select(x => x!.Value).ToList();
-            var fdAccNumbers = await _context.accountmaster.AsNoTracking()
+            var fdAccData = await _context.accountmaster.AsNoTracking()
                 .Where(x => fdAccIds.Contains(x.ID))
-                .ToDictionaryAsync(x => x.ID, x => x.AccountNumber);
+                .Select(x => new { x.ID, Number = (x.AccPrefix ?? "") + "-" + x.AccSuffix, x.AccountName })
+                .ToListAsync();
+            var fdAccNumbers = fdAccData.ToDictionary(x => x.ID, x => x.Number);
+            var fdAccNames = fdAccData.ToDictionary(x => x.ID, x => x.AccountName ?? "");
 
             var rdAccIds = rdPledges.Select(x => x.RDAccId).Where(x => x.HasValue).Select(x => x!.Value).ToList();
-            var rdAccNumbers = await _context.accountmaster.AsNoTracking()
+            var rdAccData = await _context.accountmaster.AsNoTracking()
                 .Where(x => rdAccIds.Contains(x.ID))
-                .ToDictionaryAsync(x => x.ID, x => x.AccountNumber);
+                .Select(x => new { x.ID, Number = (x.AccPrefix ?? "") + "-" + x.AccSuffix, x.AccountName })
+                .ToListAsync();
+            var rdAccNumbers = rdAccData.ToDictionary(x => x.ID, x => x.Number);
+            var rdAccNames = rdAccData.ToDictionary(x => x.ID, x => x.AccountName ?? "");
 
             decimal runningPrincipal = kistDetail != null ? (decimal)(kistDetail.LoanAmountPassed ?? 0) : 0;
             var scheduleDTO = schedule.Select(s =>
@@ -564,6 +610,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                     acc.MemberId.Value, acc.MemberBranchID.Value, memberType);
             }
 
+            acc.AccPrefix = acc.AccountNumber.Split('-')[0];
+            acc.AccSuffix = Int32.Parse(acc.AccountNumber.Split('-')[1]);
             // Overwrite AccountNumber with the member's share money account number
             // (same pattern as RD/Saving GET — frontend uses this for the member lookup field)
             if (acc.MemberId.HasValue && acc.MemberBranchID.HasValue)
@@ -572,6 +620,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     acc.MemberId.Value, acc.MemberBranchID.Value, (int)Common.Enums.AccountTypes.ShareMoney);
             }
 
+            
             return new CombinedLoanAccountDTO
             {
                 AccountMasterDTO = _memberService.MapToDTO(acc, membershipNo),
@@ -632,19 +681,21 @@ namespace BankingPlatform.API.Service.AccountMasters
                 {
                     Id = b.Id, BrId = b.BrId, LoanOpenBalId = b.LoanOpenBalId, AccountId = b.AccountId,
                     AmountDr = b.AmountDr, AmountCr = b.AmountCr, IntDr = b.IntDr, IntCr = b.IntCr,
-                    Date = b.Date, ValueDate = b.ValueDate, Status = b.Status, HeadCode = b.HeadCode,
+                    Date = b.Date, ValueDate = b.ValueDate, Status = b.Status, EntryType = b.EntryType, HeadCode = b.HeadCode,
                 }).ToList(),
                 FDPledges = fdPledges.Select(f => new LoanAccFDPledgeDTO
                 {
                     Id = f.Id, BrId = f.BrId, LoanAccId = f.LoanAccId, FDAccId = f.FDAccId,
-                    FDAccDetId = f.FDAccDetId, Date = f.Date,
+                    FDAccDetId = f.FDAccDetId, Date = f.Date, Status = f.LatestStatus,
                     FDAccNumber = f.FDAccId.HasValue ? fdAccNumbers.GetValueOrDefault(f.FDAccId.Value) : null,
+                    FDAccName = f.FDAccId.HasValue ? fdAccNames.GetValueOrDefault(f.FDAccId.Value) : null,
                 }).ToList(),
                 RDPledges = rdPledges.Select(r => new LoanAccRDPledgeDTO
                 {
                     Id = r.Id, BrId = r.BrId, LoanAccId = r.LoanAccId, RDAccId = r.RDAccId,
-                    RDAccDetId = r.RDAccDetId, Date = r.Date,
+                    RDAccDetId = r.RDAccDetId, Date = r.Date, Status = r.LatestStatus,
                     RDAccNumber = r.RDAccId.HasValue ? rdAccNumbers.GetValueOrDefault(r.RDAccId.Value) : null,
+                    RDAccName = r.RDAccId.HasValue ? rdAccNames.GetValueOrDefault(r.RDAccId.Value) : null,
                 }).ToList(),
             };
         }
@@ -803,6 +854,111 @@ namespace BankingPlatform.API.Service.AccountMasters
             }
         }
 
+        // ── UNPLEDGE / UNLOCK FD ─────────────────────────────────────────────────
+
+        public async Task<string> UnpledgeUnlockFDAsync(UnpledgeUnlockFDDTO dto)
+        {
+            using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var pledge = await _context.loanaccfdpledge
+                    .FirstOrDefaultAsync(x => x.Id == dto.PledgeId && x.BrId == dto.BrId);
+
+                if (pledge == null) return "FD pledge record not found.";
+
+                if (dto.Action == (int)Common.Enums.PledgeStatus.Unpledge && pledge.LoanAccId.HasValue)
+                {
+                    decimal drTotal = await _context.vouchercreditdebitdetails
+                        .Where(x => x.BrId == dto.BrId && x.AccountId == pledge.LoanAccId.Value
+                                 && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                                 && x.VoucherEntryType == "Dr")
+                        .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+
+                    decimal crTotal = await _context.vouchercreditdebitdetails
+                        .Where(x => x.BrId == dto.BrId && x.AccountId == pledge.LoanAccId.Value
+                                 && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                                 && x.VoucherEntryType == "Cr")
+                        .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+
+                    if (drTotal > crTotal)
+                        return "Cannot unpledge. The associated loan account has an outstanding balance.";
+                }
+
+                pledge.LatestStatus = dto.Action;
+
+                await _context.loanaccfdpledgedetail.AddAsync(new LoanAccFDPledgeDetail
+                {
+                    BrId = dto.BrId,
+                    LAccFDPledgeId = pledge.Id,
+                    Date = DateTime.SpecifyKind(dto.Date, DateTimeKind.Unspecified),
+                    Status = dto.Action,
+                });
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                return "Success";
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                await _commonFunctions.LogErrors(ex, nameof(UnpledgeUnlockFDAsync), nameof(LoanAccountService));
+                return ex.Message;
+            }
+        }
+
+        // ── UNPLEDGE / UNLOCK RD ─────────────────────────────────────────────────
+
+        public async Task<string> UnpledgeUnlockRDAsync(UnpledgeUnlockRDDTO dto)
+        {
+            using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var pledge = await _context.loanaccrdpledge
+                    .FirstOrDefaultAsync(x => x.Id == dto.PledgeId && x.BrId == dto.BrId);
+
+                if (pledge == null) return "RD pledge record not found.";
+
+                if (dto.Action == (int)Common.Enums.PledgeStatus.Unpledge && pledge.LoanAccId.HasValue)
+                {
+                    decimal drTotal = await _context.vouchercreditdebitdetails
+                        .Where(x => x.BrId == dto.BrId && x.AccountId == pledge.LoanAccId.Value
+                                 && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                                 && x.VoucherEntryType == "Dr")
+                        .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+
+                    decimal crTotal = await _context.vouchercreditdebitdetails
+                        .Where(x => x.BrId == dto.BrId && x.AccountId == pledge.LoanAccId.Value
+                                 && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                                 && x.VoucherEntryType == "Cr")
+                        .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+
+                    if (drTotal > crTotal)
+                        return "Cannot unpledge. The associated loan account has an outstanding balance.";
+                }
+
+                pledge.LatestStatus = dto.Action;
+
+                await _context.loanaccrdpledgedetail.AddAsync(new LoanAccRDPledgeDetail
+                {
+                    BrId = dto.BrId,
+                    LAccRDPledgeId = pledge.Id,
+                    Date = DateTime.SpecifyKind(dto.Date, DateTimeKind.Unspecified),
+                    Status = dto.Action,
+                    IsHOUpdated = 0,
+                });
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                return "Success";
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                await _commonFunctions.LogErrors(ex, nameof(UnpledgeUnlockRDAsync), nameof(LoanAccountService));
+                return ex.Message;
+            }
+        }
+
         // ── PRODUCT INFO ─────────────────────────────────────────────────────────
 
         public async Task<LoanProductInfoDTO?> GetLoanProductInfoAsync(int productId, int brId)
@@ -836,21 +992,43 @@ namespace BankingPlatform.API.Service.AccountMasters
 
         // ── LOAN PREFIX+SUFFIX ───────────────────────────────────────────────────
 
-        public async Task<string> GetNextLoanAccountNumber(int productId, int brId)
+        public async Task<(string Prefix, int Suffix)> GetNextLoanAccountNumber(int productId, int brId)
         {
-            var product = await _context.loanproduct
+            var prefix = await _context.loanproduct
                 .Where(p => p.Id == productId && p.BrId == brId)
                 .Select(p => p.Code)
                 .FirstOrDefaultAsync() ?? "";
 
             int accountType = (int)Common.Enums.AccountTypes.Loan;
-            var maxSuffix = await _context.accountmaster
-                .Where(x => x.BranchId == brId && x.GeneralProductId == productId && x.AccTypeId == accountType)
-                .Select(x => x.AccSuffix)
-                .MaxAsync(x => (int?)x) ?? 0;
 
-            return $"{product}-{maxSuffix + 1}";
+            var accountNumbers = await _context.accountmaster
+                .Where(x => x.BranchId == brId && x.GeneralProductId == productId && x.AccTypeId == accountType)
+                .Select(x => x.AccountNumber)
+                .ToListAsync();
+
+            int maxSuffix = 0;
+            foreach (var accNo in accountNumbers)
+            {
+                if (accNo == null) continue;
+                var parts = accNo.Split('-');
+                if (int.TryParse(parts[^1], out int s) && s > maxSuffix)
+                    maxSuffix = s;
+            }
+
+            return (prefix, maxSuffix + 1);
         }
+
+        public async Task<string> GetLoanProductPrefix(int productId, int brId) =>
+            await _context.loanproduct.Where(p => p.Id == productId && p.BrId == brId)
+                .Select(p => p.Code).FirstOrDefaultAsync() ?? "";
+
+        public async Task<bool> IsLoanAccountNumberDuplicate(int productId, int brId, string fullAccNo, int excludeAccId = 0) =>
+            await _context.accountmaster.AnyAsync(x =>
+                x.BranchId == brId &&
+                x.GeneralProductId == productId &&
+                x.AccTypeId == (int)Common.Enums.AccountTypes.Loan &&
+                x.AccountNumber == fullAccNo &&
+                x.ID != excludeAccId);
 
         // ── SCHEDULE CALCULATION ─────────────────────────────────────────────────
 

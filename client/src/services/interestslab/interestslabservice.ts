@@ -52,7 +52,7 @@ class InterestSlabService extends ApiService {
   async createInterestSlab(
     dto: CombinedSavingIntDTO
   ): Promise<ApiResponse<ResponseDto>> {
-    console.log("DTO in service:", dto);
+
     return this.makeRequest<ResponseDto>("/SavingInterestSlab", {
       method: "POST",
       body: JSON.stringify(dto),

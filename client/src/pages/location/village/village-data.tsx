@@ -864,7 +864,7 @@ const VillageMaster: React.FC = () => {
     [user.branchid]
   );
 
-  console.log(zones, thanas, postOffices, tehsils);
+
   
   return (
     <CRUDMaster<Village>

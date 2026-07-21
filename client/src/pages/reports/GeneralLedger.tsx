@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -40,6 +40,7 @@ const balCls   = (n: number)   => n >= 0 ? "text-blue-700" : "text-red-600";
 const selectStyles = {
   menuPortal: (b: any) => ({ ...b, zIndex: 9999 }),
   menu:       (b: any) => ({ ...b, zIndex: 9999 }),
+  control:    (b: any) => ({ ...b, cursor: "pointer" }),
 };
 
 // ── Export builders ────────────────────────────────────────────────────────────
@@ -266,8 +267,7 @@ const GeneralLedgerPage: React.FC = () => {
                   <Select
                     options={headOptions} value={selectedHead}
                     onChange={(opt) => { setSelectedHead(opt); setAcReport(null); setHeadReport(null); }}
-                    placeholder="Select account head…" isClearable
-                    menuPortalTarget={document.body} menuPosition="fixed" styles={selectStyles}
+                    placeholder="Select account head…" isClearable styles={selectStyles}
                   />
                 </div>
 
@@ -278,8 +278,7 @@ const GeneralLedgerPage: React.FC = () => {
                       options={accountOptions} value={selectedAccount}
                       onChange={(opt) => { setSelectedAccount(opt); setAcReport(null); }}
                       placeholder={selectedHead ? "Select account…" : "Select a head first…"}
-                      isClearable isDisabled={!selectedHead}
-                      menuPortalTarget={document.body} menuPosition="fixed" styles={selectStyles}
+                      isClearable isDisabled={!selectedHead} styles={selectStyles}
                     />
                   </div>
                 )}

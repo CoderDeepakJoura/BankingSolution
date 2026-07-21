@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import Select from "react-select";
 import {
@@ -10,6 +10,7 @@ import {
   Landmark,
   AlertCircle,
   RotateCcw,
+  CalendarDays,
 } from "lucide-react";
 import branchwiserule, {
   SavingProductBranchwiseRuleDTO,
@@ -67,6 +68,7 @@ const BranchWiseRule = () => {
     intexpaccount: 0,
     depwithdrawlimitinterval: 0,
     depwithdrawlimit: "",
+    daysInAYear: 365,
   });
 
   // Fetch initial data on component mount
@@ -163,6 +165,7 @@ const BranchWiseRule = () => {
           intexpaccount: response.data.intexpaccount || 0,
           depwithdrawlimitinterval: response.data.depwithdrawlimitinterval || 0,
           depwithdrawlimit: response.data.depwithdrawlimit?.toString() || "",
+          daysInAYear: response.data.daysInAYear === 360 ? 360 : 365,
         }));
       } else {
         // No existing data found for this product, reset fields
@@ -172,6 +175,7 @@ const BranchWiseRule = () => {
           intexpaccount: 0,
           depwithdrawlimitinterval: 0,
           depwithdrawlimit: "",
+          daysInAYear: 365,
         }));
       }
     } catch (err: any) {
@@ -246,6 +250,7 @@ const BranchWiseRule = () => {
         intexpaccount: 0,
         depwithdrawlimitinterval: 0,
         depwithdrawlimit: "",
+        daysInAYear: 365,
       }));
     }
   };
@@ -267,6 +272,7 @@ const BranchWiseRule = () => {
       intexpaccount: 0,
       depwithdrawlimitinterval: 0,
       depwithdrawlimit: "",
+      daysInAYear: 365,
     });
     setValidationErrors({});
     setLoading(false);
@@ -324,6 +330,7 @@ const BranchWiseRule = () => {
         DepWithdrawLimit: formData.depwithdrawlimit
           ? Number(formData.depwithdrawlimit)
           : undefined,
+        DaysInAYear: formData.daysInAYear,
       };
 
       const res = await branchwiserules.insert_saving_product_branchwise_rule(dto);
@@ -416,7 +423,7 @@ const BranchWiseRule = () => {
                       <Landmark className="w-5 h-5" />
                       Product & Account Configuration
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* Saving Product Field */}
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -443,7 +450,6 @@ const BranchWiseRule = () => {
                           className={`text-sm ${
                             validationErrors.savingProductId ? "border-red-500" : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({
@@ -495,7 +501,6 @@ const BranchWiseRule = () => {
                           className={`text-sm ${
                             validationErrors.intexpaccount ? "border-red-500" : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({
@@ -512,6 +517,36 @@ const BranchWiseRule = () => {
                             {validationErrors.intexpaccount}
                           </span>
                         )}
+                      </div>
+
+                      {/* Days in a Year */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <span className="flex items-center gap-2">
+                            <CalendarDays className="w-4 h-4 text-indigo-500" />
+                            Days in a Year
+                          </span>
+                        </label>
+                        <div className="flex gap-3 mt-1">
+                          {[365, 360].map((days) => (
+                            <button
+                              key={days}
+                              type="button"
+                              disabled={loadingProductData}
+                              onClick={() => handleInputChange("daysInAYear", days)}
+                              className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-bold transition-all duration-150
+                                ${formData.daysInAYear === days
+                                  ? "bg-indigo-600 border-indigo-600 text-white shadow-md"
+                                  : "bg-white border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600"
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              {days} Days
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Used for daily interest rate calculation
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -550,7 +585,6 @@ const BranchWiseRule = () => {
                               ? "border-red-500"
                               : ""
                           }`}
-                          menuPortalTarget={document.body}
                           styles={{
                             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                             control: (base) => ({

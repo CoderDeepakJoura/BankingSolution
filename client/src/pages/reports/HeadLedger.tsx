@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -170,9 +170,7 @@ const HeadLedgerPage: React.FC = () => {
                     onChange={(opt) => { setSelectedHead(opt); setReport(null); }}
                     placeholder="Select account head…"
                     isClearable
-                    menuPortalTarget={document.body}
-                    menuPosition="fixed"
-                    styles={{ menuPortal: (b) => ({ ...b, zIndex: 9999 }), menu: (b) => ({ ...b, zIndex: 9999 }) }}
+                    styles={{ menuPortal: (b) => ({ ...b, zIndex: 9999 }), menu: (b) => ({ ...b, zIndex: 9999 }), control: (b: any) => ({ ...b, cursor: "pointer" }) }}
                   />
                 </div>
 

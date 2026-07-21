@@ -301,7 +301,6 @@ const addAccountHead = async (
         AccountHeadId: 0,
       };
 
-      console.log("Adding account head with payload:", payload);
       await AccountHeadApiService.add_new_accounthead(payload as any);
 
       Swal.fire({
@@ -589,7 +588,6 @@ const modifyAccountHead = async (
 
   if (formValues) {
     try {
-      // console.log("Updating account head with values:", formValues);
       await AccountHeadApiService.modify_accounthead(
         formValues.id,
         formValues.AccountHeadName,
@@ -637,7 +635,6 @@ const deleteAccountHead = async (
 
   if (result.isConfirmed) {
     try {
-      console.log("Deleting account head with ID:", AccountHead.accountHeadId);
       await AccountHeadApiService.delete_accounthead(
         AccountHead.accountHeadId,
         AccountHead.accountHeadName,

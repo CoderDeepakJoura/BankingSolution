@@ -16,6 +16,7 @@ import Header from "../components/HeaderLandingPage";
 import Footer from "../components/Footer";
 import ApiService from "../services/api";
 import { useEffect } from "react";
+import WhatsNewModal from "../components/WhatsNewModal";
 
 interface Transaction {
   id: number;
@@ -84,10 +85,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   }>({});
   const [activePath, setActivePath] = useState<string>("");
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
   const isSu = useSelector((state: RootState) => state.user.isSu);
+  const isMainBranch = useSelector((state: RootState) => state.user.isMainBranch);
+  const branchGstNo = useSelector((state: RootState) => state.user.branchGstNo);
   useBrowserNavigationControl(true);
   useEffect(() => {
     const init = async () => {
@@ -107,6 +111,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               name: data.userName,
               email: data.email,
               branch_name: data.branchName,
+              branchCode: data.branchCode ?? "",
               address: data.address,
               contact: data.contact,
               workingdate: data.workingDate,
@@ -119,6 +124,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               sessionFromDate: data.sessionFromDate,
               sessionToDate: data.sessionToDate,
               isSu: data.isSu ?? false,
+              isMainBranch: data.isMainBranch ?? false,
+              branchGstNo: data.branchGstNo ?? "",
+              branchStateId: data.branchStateId ?? 0,
+              lastSeenVersion: data.lastSeenVersion ?? "0.0.0",
             }),
           );
         } else {
@@ -252,6 +261,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               path: "",
               subItems: [
                 { label: "Loan Expense Category", path: "/expense-category-operations" },
+                { label: "Unpledge / Unlock FD", path: "/unpledge-fd" },
+                { label: "Unpledge / Unlock RD", path: "/unpledge-rd" },
+              ],
+            },
+            {
+              label: "Bank FD",
+              path: "",
+              subItems: [
+                { label: "Bank FD TDS Setting", path: "/bank-fd-tds-setting" },
+                { label: "FD TDS Slab", path: "/fd-tds-slab" },
               ],
             },
           ],
@@ -259,6 +278,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {
           label: "GST Masters",
           path: "",
+          gstOnly: true,
           subItems: [
             { label: "Tax Type", path: "/taxtype-operations" },
             { label: "Tax Group", path: "/taxgroup-operations" },
@@ -270,6 +290,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {
           label: "Service Masters",
           path: "",
+          gstOnly: true,
           subItems: [
             { label: "Service", path: "/service-operations" },
             { label: "Update Account Service", path: "/acc-service" },
@@ -290,6 +311,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: "",
           subItems: [
             { label: "Voucher Operations", path: "/voucher-operations" },
+          ],
+        },
+        {
+          label: "Inter Branch",
+          path: "",
+          subItems: [
+            { label: "Other Branch Accounts", path: "/other-branch-accounts" },
+            { label: "IB Pending Vouchers", path: "/ib-pending-vouchers", mainBranchOnly: true },
+            { label: "IB Incoming Vouchers", path: "/ib-incoming-vouchers" },
           ],
         },
       ],
@@ -377,9 +407,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     },
   ];
 
+  const hasGst = !!branchGstNo;
+
   const filterByRole = (items: any[]): any[] =>
     items
-      .filter((item) => !item.suOnly || isSu)
+      .filter((item) => (!item.suOnly || isSu) && (!item.gstOnly || hasGst) && (!item.mainBranchOnly || isMainBranch))
       .map((item) => ({
         ...item,
         subItems: item.subItems ? filterByRole(item.subItems) : undefined,
@@ -483,8 +515,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     );
   };
 
+  const handleWhatsNewClose = () => setShowWhatsNew(false);
+
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative">
+      {showWhatsNew && <WhatsNewModal onClose={handleWhatsNewClose} />}
       {/* Bubbles */}
       <div className="absolute inset-0 overflow-hidden z-0">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full filter blur-3xl opacity-20 animate-pulse" />
@@ -579,7 +614,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           <main
             id="mainlayoutdiv"
             className={`flex-1 p-6 sm:p-8 lg:p-10 ${
-              enableScroll ? "overflow-y-auto" : ""
+              enableScroll ? "overflow-y-auto" : "overflow-hidden"
             }`}
           >
             {mainContent}
@@ -587,7 +622,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         </div>
       </div>
 
-      <Footer />
+      <Footer onWhatsNewClick={() => setShowWhatsNew(true)} />
     </div>
   );
 };

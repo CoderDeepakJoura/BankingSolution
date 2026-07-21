@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+﻿import React, { useEffect, useState, useRef } from "react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import AccountHeadApiService from "../../../services/accountHead/accountheadapi";
@@ -287,6 +287,8 @@ const AccountHeadMaster: React.FC = () => {
                       isClearable
                       required
                       className="text-sm"
+
+
                     />
                   </div>
 
@@ -337,6 +339,8 @@ const AccountHeadMaster: React.FC = () => {
                       placeholder="Select Parent Id"
                       isClearable
                       className="text-sm"
+
+
                     />
                   </div>
 

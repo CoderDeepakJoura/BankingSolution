@@ -68,10 +68,11 @@ namespace BankingPlatform.API.Service.Reports
             var headCodes = heads.Select(h => h.headcode).Distinct().ToList();
 
             // Voucher balances grouped by head code up to asOfDate (inclusive)
+            // EntryStatus "V" and "A" are both valid (per balance formula in CLAUDE.md)
             var nextDay = asOfDate.Date.AddDays(1);
             var voucherBalances = await _context.vouchercreditdebitdetails.AsNoTracking()
                 .Where(v => v.BrId == branchId
-                    && v.EntryStatus == "V"
+                    && (v.EntryStatus == "V" || v.EntryStatus == "A")
                     && v.ValueDate < nextDay
                     && headCodes.Contains(v.AccHeadCode))
                 .GroupBy(v => v.AccHeadCode)
@@ -85,7 +86,14 @@ namespace BankingPlatform.API.Service.Reports
 
             var voucherMap = voucherBalances.ToDictionary(x => x.HeadCode);
 
-            // Opening balances: join accounts to get headcode, then aggregate by headcode
+            // Aggregate opening balances per head code from three sources:
+            // 1. accopeningbalance  — Saving / General / ShareMoney / RD accounts
+            // 2. fdaccountdetail    — FD opening balance (per-detail, no longer in accopeningbalance)
+            // 3. loanaccopeningbalance — Loan opening balance (separate table with its own HeadCode)
+            var obDrByHead = new Dictionary<long, decimal>();
+            var obCrByHead = new Dictionary<long, decimal>();
+
+            // ── 1. Standard opening balances (Saving, General, RD, ShareMoney) ──────────
             var accounts = await _context.accountmaster.AsNoTracking()
                 .Where(a => a.BranchId == branchId && headCodes.Contains(a.HeadCode))
                 .Select(a => new { a.ID, a.HeadCode })
@@ -98,9 +106,6 @@ namespace BankingPlatform.API.Service.Reports
                 .Where(ob => ob.BranchId == branchId && accountIds.Contains(ob.AccountId))
                 .ToListAsync();
 
-            // Aggregate opening balance per headcode
-            var obDrByHead = new Dictionary<long, decimal>();
-            var obCrByHead = new Dictionary<long, decimal>();
             foreach (var ob in obRecords)
             {
                 if (!accountHeadMap.TryGetValue(ob.AccountId, out var hc)) continue;
@@ -108,6 +113,51 @@ namespace BankingPlatform.API.Service.Reports
                     obDrByHead[hc] = obDrByHead.GetValueOrDefault(hc) + ob.OpeningAmount;
                 else
                     obCrByHead[hc] = obCrByHead.GetValueOrDefault(hc) + ob.OpeningAmount;
+            }
+
+            // ── 2. FD opening balance (stored per-detail, not in accopeningbalance) ──────
+            var fdObRecords = await (
+                from fd in _context.fdaccountdetail.AsNoTracking()
+                join acc in _context.accountmaster.AsNoTracking()
+                    on fd.AccountId equals acc.ID
+                where acc.BranchId == branchId
+                    && fd.OpeningBalance != null
+                    && fd.OpeningBalance > 0
+                    && headCodes.Contains(acc.HeadCode)
+                select new
+                {
+                    HeadCode = acc.HeadCode,
+                    fd.OpeningBalance,
+                    fd.OpeningBalanceType
+                }
+            ).ToListAsync();
+
+            foreach (var fd in fdObRecords)
+            {
+                var hc = fd.HeadCode;
+                var amt = fd.OpeningBalance ?? 0m;
+                if (fd.OpeningBalanceType?.ToUpper() == "DR")
+                    obDrByHead[hc] = obDrByHead.GetValueOrDefault(hc) + amt;
+                else
+                    obCrByHead[hc] = obCrByHead.GetValueOrDefault(hc) + amt;
+            }
+
+            // ── 3. Loan opening balance (loanaccopeningbalance has HeadCode directly) ────
+            var loanObRecords = await _context.loanaccopeningbalance.AsNoTracking()
+                .Where(l => l.BranchId == branchId
+                    && l.HeadCode != null
+                    && l.TotalBalance != null
+                    && headCodes.Contains(l.HeadCode!.Value))
+                .ToListAsync();
+
+            foreach (var loan in loanObRecords)
+            {
+                var hc = loan.HeadCode!.Value;
+                var amt = loan.TotalBalance ?? 0m;
+                if (loan.BalType?.ToUpper() == "DR")
+                    obDrByHead[hc] = obDrByHead.GetValueOrDefault(hc) + amt;
+                else
+                    obCrByHead[hc] = obCrByHead.GetValueOrDefault(hc) + amt;
             }
 
             var rows = new List<TrialBalanceRowDTO>();

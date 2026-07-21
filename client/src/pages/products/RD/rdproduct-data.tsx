@@ -26,8 +26,6 @@ const fetchRdProducts = async (
   try {
     const res = await rdProductApiService.fetchRDProducts(filter, branchId);
 
-    console.log("API RAW RESPONSE:", res); // ← add this temporarily to verify
-
     return {
       success:    res.success          ?? false,
       data:       res.rdProducts       || [],   // ✅ controller returns rdProducts directly

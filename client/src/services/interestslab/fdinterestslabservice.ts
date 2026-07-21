@@ -93,7 +93,7 @@ class FDInterestSlabService extends ApiService {
   async createFDInterestSlab(
     dto: CombinedFDIntInfoDTO
   ): Promise<ApiResponse<ResponseDto>> {
-    console.log("FD DTO in service:", dto);
+
     return this.makeRequest<ResponseDto>("/FDInterestSlab", {
       method: "POST",
       body: JSON.stringify(dto),

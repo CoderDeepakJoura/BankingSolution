@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Save,
   X,
@@ -27,6 +27,8 @@ import commonservice from "../../../services/common/commonservice";
 import loanAdvancementApi, {
   LoanAdvancementCreditItemDTO,
 } from "../../../services/vouchers/loan/loanAdvancementApi";
+import { GSTDetailDTO } from "../../../services/vouchers/loan/loanExpenseApi";
+import GSTDetailPanel from "../../../components/GST/GSTDetailPanel";
 import {
   loanAccountApi,
   CombinedLoanAccountDTO,
@@ -55,6 +57,7 @@ const selectStyles = (hasError = false) => ({
   option: (base: any) => ({ ...base, cursor: "pointer" }),
   dropdownIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
   clearIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
+  menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
 });
 
 const compactSelectStyles = (hasError = false) => ({
@@ -71,6 +74,7 @@ const compactSelectStyles = (hasError = false) => ({
   option: (base: any) => ({ ...base, cursor: "pointer" }),
   dropdownIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
   clearIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
+  menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
 });
 
 interface LoanAccountOption {
@@ -83,6 +87,8 @@ interface CreditRow extends LoanAdvancementCreditItemDTO {
   rowId: number;
   accountName: string;
   accountTypeName: string;
+  baseAmount: number;
+  totalTax: number;
 }
 
 const formatDate = (value?: string | null) => {
@@ -132,6 +138,12 @@ const LoanAdvancementVoucher: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Row-level GST states
+  const [rowHasGstService, setRowHasGstService] = useState(false);
+  const [rowGstDetail, setRowGstDetail] = useState<GSTDetailDTO | null>(null);
+  const [rowTotalTax, setRowTotalTax] = useState(0);
+  const [rowGstModalOpen, setRowGstModalOpen] = useState(false);
 
   // Shared: load loan account details + guarantors for any account ID
   const loadAccountDetails = async (accountId: number) => {
@@ -183,17 +195,29 @@ const LoanAdvancementVoucher: React.FC = () => {
 
         setLoanAccounts([{ accId: drEntry.accountId, accountName: drEntry.accountName, loanAmountPassed: 0 }]);
 
-        setCreditItems(
-          crEntries.map((cr) => ({
-            rowId: Date.now() + Math.random(),
-            accountId: cr.accountId,
-            accountType: cr.accountType,
-            amount: cr.amount,
-            narration: cr.narration ?? "",
-            accountName: cr.accountName,
-            accountTypeName: ACCOUNT_TYPE_LABELS[cr.accountType] ?? "Unknown",
-          }))
-        );
+        // Group GST tax entries back into their preceding real credit item
+        const groupedItems: CreditRow[] = [];
+        for (const cr of crEntries) {
+          const isGst = (cr.narration ?? "").startsWith("GST - ");
+          if (!isGst) {
+            groupedItems.push({
+              rowId: Date.now() + Math.random(),
+              accountId: cr.accountId,
+              accountType: cr.accountType,
+              amount: cr.amount,
+              narration: cr.narration ?? "",
+              accountName: cr.accountName,
+              accountTypeName: ACCOUNT_TYPE_LABELS[cr.accountType] ?? "Unknown",
+              baseAmount: cr.amount,
+              totalTax: 0,
+            });
+          } else if (groupedItems.length > 0) {
+            const last = groupedItems[groupedItems.length - 1];
+            last.totalTax += cr.amount;
+            last.amount = last.baseAmount + last.totalTax;
+          }
+        }
+        setCreditItems(groupedItems);
 
         // Load account details (guarantors, kist info, etc.)
         loadAccountDetails(drEntry.accountId).then((data) => {
@@ -258,10 +282,18 @@ const LoanAdvancementVoucher: React.FC = () => {
     await loadAccountDetails(sel.value);
   };
 
+  const resetRowGst = () => {
+    setRowHasGstService(false);
+    setRowGstDetail(null);
+    setRowTotalTax(0);
+    setRowGstModalOpen(false);
+  };
+
   const handleRowTypeChange = async (sel: any) => {
     const t = sel ? sel.value : null;
     setRowForm((p) => ({ ...p, accountType: t, accountId: null }));
     setCreditAccountsForRow([]);
+    resetRowGst();
     clearError("rowType");
     clearError("rowAccount");
     if (t) {
@@ -282,9 +314,10 @@ const LoanAdvancementVoucher: React.FC = () => {
     setRowForm({
       accountType: row.accountType,
       accountId: row.accountId,
-      amount: row.amount.toFixed(2),
+      amount: row.baseAmount.toFixed(2),
       narration: row.narration ?? "",
     });
+    resetRowGst();
     setEditingRowId(row.rowId);
     ["rowType", "rowAccount", "rowAmount"].forEach(clearError);
   };
@@ -293,15 +326,18 @@ const LoanAdvancementVoucher: React.FC = () => {
     setEditingRowId(null);
     setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
     setCreditAccountsForRow([]);
+    resetRowGst();
     ["rowType", "rowAccount", "rowAmount"].forEach(clearError);
   };
 
   const handleAddRow = () => {
+    const baseAmt = Number(rowForm.amount);
+    const netAmt = baseAmt + rowTotalTax;
     const errs: Record<string, string> = {};
     if (!rowForm.accountType) errs.rowType = "Select account type";
     if (!rowForm.accountId) errs.rowAccount = "Select account";
-    if (!rowForm.amount || Number(rowForm.amount) <= 0) errs.rowAmount = "Enter valid amount";
-    else if (Number(rowForm.amount) > pending + 0.01) errs.rowAmount = `Exceeds available (${pending.toFixed(2)})`;
+    if (!rowForm.amount || baseAmt <= 0) errs.rowAmount = "Enter valid amount";
+    else if (netAmt > pending + 0.01) errs.rowAmount = `Exceeds available (${pending.toFixed(2)})`;
     if (Object.keys(errs).length) { setErrors((p) => ({ ...p, ...errs })); return; }
 
     const accOpt = creditAccountsForRow.find((a) => a.accId === rowForm.accountId);
@@ -315,10 +351,13 @@ const LoanAdvancementVoucher: React.FC = () => {
                 ...r,
                 accountId: rowForm.accountId!,
                 accountType: rowForm.accountType!,
-                amount: Number(rowForm.amount),
+                amount: netAmt,
                 narration: rowForm.narration,
                 accountName: accOpt?.accountName ?? r.accountName,
                 accountTypeName: typeLabel,
+                baseAmount: baseAmt,
+                totalTax: rowTotalTax,
+                gstDetail: rowGstDetail ?? undefined,
               }
             : r
         )
@@ -331,16 +370,20 @@ const LoanAdvancementVoucher: React.FC = () => {
           rowId: Date.now(),
           accountId: rowForm.accountId!,
           accountType: rowForm.accountType!,
-          amount: Number(rowForm.amount),
+          amount: netAmt,
           narration: rowForm.narration,
           accountName: accOpt?.accountName ?? "",
           accountTypeName: typeLabel,
+          baseAmount: baseAmt,
+          totalTax: rowTotalTax,
+          gstDetail: rowGstDetail ?? undefined,
         },
       ]);
     }
 
     setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
     setCreditAccountsForRow([]);
+    resetRowGst();
     ["rowType", "rowAccount", "rowAmount", "creditItems"].forEach(clearError);
   };
 
@@ -360,6 +403,7 @@ const LoanAdvancementVoucher: React.FC = () => {
     setEditingRowId(null);
     setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
     setCreditAccountsForRow([]);
+    resetRowGst();
     setErrors({});
     setActiveTab("account-info");
   };
@@ -390,6 +434,7 @@ const LoanAdvancementVoucher: React.FC = () => {
         accountType: r.accountType,
         amount: r.amount,
         narration: r.narration || undefined,
+        gstDetail: r.gstDetail || undefined,
       })),
     };
 
@@ -859,6 +904,64 @@ const LoanAdvancementVoucher: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* GST — hidden detector; visible button when service exists */}
+                    {rowForm.accountId ? (
+                      <div className="hidden">
+                        <GSTDetailPanel
+                          date={formData.voucherDate}
+                          crAccountId={rowForm.accountId}
+                          expenseAmount={Number(rowForm.amount) || 0}
+                          value={rowGstDetail}
+                          onChange={(v, tax) => { setRowGstDetail(v); setRowTotalTax(tax); }}
+                          onHasService={setRowHasGstService}
+                        />
+                      </div>
+                    ) : null}
+
+                    {rowHasGstService && (
+                      <div className="mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setRowGstModalOpen(true)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-colors ${
+                            rowGstDetail
+                              ? "border-green-400 bg-green-50 text-green-700 hover:bg-green-100"
+                              : "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                          }`}
+                        >
+                          {rowGstDetail ? `GST Applied — Tax: ${rowTotalTax.toFixed(2)}` : "View GST Detail"}
+                        </button>
+                      </div>
+                    )}
+
+                    {rowHasGstService && rowGstModalOpen && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden">
+                          <div className="flex items-center justify-between px-6 py-4 bg-blue-700">
+                            <h2 className="text-lg font-bold text-white">GST Detail</h2>
+                            <button onClick={() => setRowGstModalOpen(false)} className="p-1.5 rounded-lg hover:bg-blue-600 text-white">
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                          <div className="px-6 py-5">
+                            <GSTDetailPanel
+                              date={formData.voucherDate}
+                              crAccountId={rowForm.accountId!}
+                              expenseAmount={Number(rowForm.amount) || 0}
+                              value={rowGstDetail}
+                              onChange={(v, tax) => { setRowGstDetail(v); setRowTotalTax(tax); }}
+                              onHasService={setRowHasGstService}
+                            />
+                          </div>
+                          <div className="flex justify-end px-6 py-4 border-t border-gray-200 bg-gray-50">
+                            <button onClick={() => setRowGstModalOpen(false)} className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">
+                              Done
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {errors.creditItems && (
                       <p className="mb-2 text-sm text-red-600">{errors.creditItems}</p>
                     )}
@@ -868,7 +971,7 @@ const LoanAdvancementVoucher: React.FC = () => {
                       <table className="w-full">
                         <thead className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200">
                           <tr>
-                            {["#", "Account Type", "Account", "Amount (Cr)", "Narration", "Action"].map((h) => (
+                            {["#", "Account Type", "Account", "Base Amt", "Tax", "Net Amt (Cr)", "Narration", "Action"].map((h) => (
                               <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-green-800 uppercase tracking-wider">
                                 {h}
                               </th>
@@ -878,7 +981,7 @@ const LoanAdvancementVoucher: React.FC = () => {
                         <tbody className="bg-white divide-y divide-gray-200">
                           {creditItems.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-400">
+                              <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">
                                 No credit accounts added yet. Use the form above to add.
                               </td>
                             </tr>
@@ -901,6 +1004,8 @@ const LoanAdvancementVoucher: React.FC = () => {
                                     </span>
                                   </td>
                                   <td className="px-4 py-3 text-sm font-medium text-gray-800">{row.accountName}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-600">₹{row.baseAmount.toFixed(2)}</td>
+                                  <td className="px-4 py-3 text-sm text-orange-600">{row.totalTax > 0 ? `₹${row.totalTax.toFixed(2)}` : "—"}</td>
                                   <td className="px-4 py-3 text-sm font-semibold text-green-700">₹{row.amount.toFixed(2)}</td>
                                   <td className="px-4 py-3 text-sm text-gray-500">{row.narration || "—"}</td>
                                   <td className="px-4 py-3">
@@ -938,7 +1043,7 @@ const LoanAdvancementVoucher: React.FC = () => {
                           )}
                           {creditItems.length > 0 && (
                             <tr className="bg-green-50 border-t-2 border-green-200">
-                              <td colSpan={3} className="px-4 py-3 text-sm font-semibold text-green-800">
+                              <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-green-800">
                                 Total Credited (Cr)
                               </td>
                               <td className="px-4 py-3 text-sm font-bold text-green-700">

@@ -27,6 +27,7 @@ using BankingPlatform.Infrastructure.Models.Auth;
 using BankingPlatform.Infrastructure.Models.voucher;
 using BankingPlatform.Infrastructure.Models.GST;
 using BankingPlatform.Infrastructure.Models.Services;
+using BankingPlatform.Infrastructure.Models.BankFD;
 namespace BankingPlatform.Infrastructure.Models;
 
 public partial class BankingDbContext : DbContext
@@ -145,6 +146,22 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<ServiceTaxRule> servicetaxrule { get; set; }
     public virtual DbSet<ServiceTaxTypeDet> servicetaxtypedet { get; set; }
     public virtual DbSet<AccServiceDetail> accservicedetail { get; set; }
+    public virtual DbSet<StockMain> stockmain { get; set; }
+    public virtual DbSet<StockBillBookDetail> stockbillbookdetail { get; set; }
+    public virtual DbSet<SMDetail> smdetail { get; set; }
+    public virtual DbSet<GSTServiceDetail> gstservicedetail { get; set; }
+    public virtual DbSet<StockTaxDetail> stocktaxdetail { get; set; }
+    public virtual DbSet<NextBillNumber> nextbillnumber { get; set; }
+    public virtual DbSet<LoanExpense> loanexpense { get; set; }
+    public virtual DbSet<BFDHeadTDSAccSetting> bfdheadtdsaccsettings { get; set; }
+    public virtual DbSet<FDTDSSlab> fdtdsslab { get; set; }
+    public virtual DbSet<FDTDSSlabDetail> fdtdsslabdetail { get; set; }
+    public virtual DbSet<BankFDAccountDetail> bankfdaccountdetail { get; set; }
+    public virtual DbSet<BankFDAccountOpeningBalance> bankfdaccountopeningbalance { get; set; }
+    public virtual DbSet<BankFDAccountOpeningTDS> bankfdaccountopeningtds { get; set; }
+    public virtual DbSet<OtherBranchAccount> otherbranchaccounts { get; set; }
+    public virtual DbSet<InterBranchVoucher> interbranchvoucher { get; set; }
+    public virtual DbSet<UserFavourite> userfavourites { get; set; }
 
     // ── Audit logging ────────────────────────────────────────────────────────────
 
@@ -312,6 +329,13 @@ public partial class BankingDbContext : DbContext
 
         modelBuilder.Entity<NPAPlanCategory>()
             .HasKey(x => new { x.Id, x.BrId });
+
+        modelBuilder.Entity<BFDHeadTDSAccSetting>().HasKey(x => new { x.ID, x.BrId });
+        modelBuilder.Entity<FDTDSSlab>().HasKey(x => new { x.ID, x.BrId });
+        modelBuilder.Entity<FDTDSSlabDetail>().HasKey(x => new { x.ID, x.BrId });
+        modelBuilder.Entity<BankFDAccountDetail>().HasKey(x => new { x.ID, x.BrId });
+        modelBuilder.Entity<BankFDAccountOpeningBalance>().HasKey(x => new { x.ID, x.BranchID });
+        modelBuilder.Entity<BankFDAccountOpeningTDS>().HasKey(x => new { x.ID, x.BranchID });
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BankingDbContext).Assembly);
         foreach (var entity in modelBuilder.Model.GetEntityTypes())

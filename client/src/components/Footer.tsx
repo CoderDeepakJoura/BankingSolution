@@ -1,7 +1,11 @@
 import React from "react";
 import { APP_VERSION, APP_VERSION_DATE } from "../constants/config";
 
-const Footer = () => {
+interface FooterProps {
+  onWhatsNewClick?: () => void;
+}
+
+const Footer: React.FC<FooterProps> = ({ onWhatsNewClick }) => {
   return (
     <footer className="fixed bottom-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md border-t border-gray-200 py-4 shadow-t">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -9,7 +13,15 @@ const Footer = () => {
           {/* Left: Links */}
           <div className="flex flex-wrap justify-center md:justify-start gap-4">
             <span>© {new Date().getFullYear()} Sicswave FinCore Ltd.</span>
-            <span className="text-gray-400">v{APP_VERSION} · {APP_VERSION_DATE}</span>
+            <button
+              onClick={onWhatsNewClick}
+              className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium transition cursor-pointer"
+            >
+              <span>🎉</span>
+              <span>What's New</span>
+              <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full text-[10px] font-semibold">v{APP_VERSION}</span>
+            </button>
+            <span className="text-gray-400">{APP_VERSION_DATE}</span>
             <a href="#" className="hover:text-blue-600 transition">Privacy Policy</a>
             <a href="#" className="hover:text-blue-600 transition">Terms of Service</a>
             <a href="#" className="hover:text-blue-600 transition">Security</a>

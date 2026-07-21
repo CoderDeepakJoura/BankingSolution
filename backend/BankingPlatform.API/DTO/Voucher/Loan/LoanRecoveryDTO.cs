@@ -1,5 +1,16 @@
 namespace BankingPlatform.API.DTO.Voucher.Loan
 {
+    public class IntRecDetailRowDTO
+    {
+        public int Id { get; set; }
+        public DateTime EntryDate { get; set; }
+        public int IntCatId { get; set; }
+        public string IntCatName { get; set; } = "";
+        public double IntDr { get; set; }
+        public double IntCr { get; set; }
+        public int VoucherNo { get; set; }
+    }
+
     public class LoanRecoveryDebitItemDTO
     {
         public int AccountId { get; set; }
@@ -52,6 +63,12 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
 
         // 'Schedule' | 'Balance' | 'MinBalance'
         public string IntCalcMethod { get; set; } = "Schedule";
+
+        // 1 = AddInBalance (interest embedded in principal), 2 = Stand (tracked via voucherrecintdetail)
+        public int? ActOnIntPosting { get; set; }
+
+        // For Stand loans: the full voucherrecintdetail history (IntDr = posted, IntCr = recovered)
+        public List<IntRecDetailRowDTO> IntRecDetail { get; set; } = new();
     }
 
     public class LoanAccountSearchDTO

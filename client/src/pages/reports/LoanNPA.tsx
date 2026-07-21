@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -33,6 +33,7 @@ const toInputDate = (iso: string) => isoDatePart(iso);
 const selectStyles = {
   menuPortal: (b: any) => ({ ...b, zIndex: 9999 }),
   menu: (b: any) => ({ ...b, zIndex: 9999 }),
+  control: (b: any) => ({ ...b, cursor: "pointer" }),
 };
 
 // NPA category styling
@@ -302,8 +303,6 @@ const LoanNPAPage: React.FC = () => {
                     value={selectedProduct ?? productOptions[0]}
                     onChange={(opt) => { setSelectedProduct(opt?.value === 0 ? null : opt); setReport(null); }}
                     placeholder="All Products"
-                    menuPortalTarget={document.body}
-                    menuPosition="fixed"
                     styles={selectStyles}
                   />
                 </div>

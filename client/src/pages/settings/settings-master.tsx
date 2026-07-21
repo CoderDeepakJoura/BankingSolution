@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useFormValidation } from "../../services/Validations/settings/settingsValidations";
 import { ValidationSummary } from "../../components/Validations/ValidationSummary";
 import { FormField } from "../../components/Validations/FormField";
@@ -409,8 +409,7 @@ const SettingsMaster = () => {
               placeholder="Select Admission Fee Account"
               isClearable
               className="text-sm"
-              menuPortalTarget={document.body}
-              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
             />
           </FormField>
 
@@ -448,8 +447,7 @@ const SettingsMaster = () => {
               placeholder="Select Default Cash Account"
               isClearable
               className="text-sm"
-              menuPortalTarget={document.body}
-              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
             />
           </FormField>
         </div>
@@ -764,8 +762,7 @@ const SettingsMaster = () => {
               placeholder="Select Voucher Number Setting"
               isClearable
               className="text-sm"
-              menuPortalTarget={document.body}
-              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
             />
           </FormField>
 
@@ -907,8 +904,7 @@ const SettingsMaster = () => {
                     isClearable
                     isDisabled={!settingsData.bankFDTDSApplicability}
                     className="text-sm"
-                    menuPortalTarget={document.body}
-                    styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                    styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     When should TDS be deducted from FD interest
@@ -939,8 +935,7 @@ const SettingsMaster = () => {
                   isClearable
                   isDisabled={!settingsData.bankFDTDSApplicability}
                   className="text-sm"
-                  menuPortalTarget={document.body}
-                  styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                  styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), control: (base: any) => ({ ...base, cursor: "pointer" }) }}
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Select the ledger account where deducted TDS will be posted

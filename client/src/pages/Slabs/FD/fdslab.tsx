@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import { encryptId, decryptId } from "../../../utils/encryption";
 import Select from "react-select";
@@ -349,7 +349,7 @@ const FDSlab = () => {
         fdInterestSlabDetails: [], // Empty array - no detail slabs
       };
 
-      console.log("Submitting FD DTO:", dto);
+
 
       const res = isEditMode
         ? await fdInterestSlabService.updateFDInterestSlab(formData.id!, dto)
@@ -465,7 +465,6 @@ const FDSlab = () => {
                         className={`text-sm ${
                           validationErrors.fdProductId ? "border-red-500" : ""
                         }`}
-                        menuPortalTarget={document.body}
                         styles={{
                           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                           control: (base) => ({
@@ -614,7 +613,6 @@ const FDSlab = () => {
                             ? "border-red-500"
                             : ""
                         }`}
-                        menuPortalTarget={document.body}
                         styles={{
                           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                           control: (base) => ({

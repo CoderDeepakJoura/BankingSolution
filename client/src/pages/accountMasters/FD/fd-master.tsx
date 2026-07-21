@@ -1,4 +1,4 @@
-// pages/AccountMasters/FDAccount/FDAccountMaster.tsx
+﻿// pages/AccountMasters/FDAccount/FDAccountMaster.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { encryptId, decryptId } from "../../../utils/encryption";
 import Swal from "sweetalert2";
@@ -73,6 +73,8 @@ interface FDDetailItem {
   slabId: number;
   linkedAccountId?: number;
   ltdNo?: string;
+  openingBalance: number;
+  balanceType: string;
 }
 
 const FDAccountMaster = () => {
@@ -238,6 +240,8 @@ const FDAccountMaster = () => {
                     maturityDate: fd.fdMaturityDate?.split("T")[0] || "",
                     maturityAmount: fd.maturityAmount,
                     slabId: fd.slabId || 0,
+                    openingBalance: fd.openingBalance || 0,
+                    balanceType: fd.openingBalanceType || "Cr",
                   })),
                 );
               }
@@ -394,6 +398,8 @@ const FDAccountMaster = () => {
             slabId: response.data.slabId || 0,
           }));
         } else {
+          if (response.data.daysInAYear > 0)
+            setFdDaysInAYear(response.data.daysInAYear);
           setFdDetailForm((prev) => ({
             ...prev,
             maturityDate: commonservice.splitDate(response.data.maturityDate),
@@ -479,11 +485,14 @@ const FDAccountMaster = () => {
     maturityDate: "",
     maturityAmount: "",
     slabId: 0,
+    openingBalance: "",
+    balanceType: "Cr",
   });
 
   // FD Details List
   const [fdDetailsList, setFdDetailsList] = useState<FDDetailItem[]>([]);
   const [editingFdIndex, setEditingFdIndex] = useState<number | null>(null);
+  const [fdDaysInAYear, setFdDaysInAYear] = useState<number>(360);
 
   // Voucher payment mode
   const [voucherPaymentMode, setVoucherPaymentMode] = useState<
@@ -553,6 +562,8 @@ const FDAccountMaster = () => {
       maturityDate: "",
       maturityAmount: "",
       slabId: 0,
+      openingBalance: "",
+      balanceType: "Cr",
     });
 
     // Clear MIS details too
@@ -886,6 +897,30 @@ const FDAccountMaster = () => {
     }
   };
 
+  const calculateMaturityLocally = (
+    principal: number,
+    annualRate: number,
+    fdDate: string,
+    maturityDate: string,
+    compoundingInterval: string,
+    daysInAYear: number = 360,
+  ): number => {
+    const fd = new Date(fdDate);
+    const mat = new Date(maturityDate);
+    const actualDays = Math.floor((mat.getTime() - fd.getTime()) / (1000 * 60 * 60 * 24));
+    if (actualDays <= 0) return 0;
+    const timeInYears = actualDays / daysInAYear;
+    const rate = annualRate / 100;
+    if (compoundingInterval === "No-Compounding") {
+      return Math.round(principal * (1 + rate * timeInYears));
+    }
+    const nMap: Record<string, number> = {
+      Monthly: 12, Quarterly: 4, "Half-Yearly": 2, Yearly: 1, "Two-Yearly": 24,
+    };
+    const n = nMap[compoundingInterval] ?? 4;
+    return Math.round(principal * Math.pow(1 + rate / n, n * timeInYears));
+  };
+
   // FD Detail handlers
   const handleFdDetailChange = async (field: string, value: any) => {
     // Update the field first
@@ -894,7 +929,20 @@ const FDAccountMaster = () => {
       [field]: value,
     }));
 
-    // Fetch maturity date when relevant fields change
+    if (field === "intRate" || field === "compoundingInterval") {
+      const rate = field === "intRate" ? parseFloat(value) || 0 : parseFloat(fdDetailForm.intRate) || 0;
+      const compInterval = field === "compoundingInterval" ? value : fdDetailForm.compoundingInterval;
+      const amount = parseFloat(fdDetailForm.fdAmount) || 0;
+      const matDate = fdDetailForm.maturityDate;
+      const fdDate = fdDetailForm.fdDate;
+      if (rate > 0 && amount > 0 && fdDate && matDate) {
+        const maturityAmount = calculateMaturityLocally(amount, rate, fdDate, matDate, compInterval, fdDaysInAYear);
+        setFdDetailForm((prev) => ({ ...prev, maturityAmount: String(maturityAmount) }));
+      }
+      return;
+    }
+
+    // Fetch maturity date (and reset slab rate) when period/date/amount changes
     if (field === "fdDate" || field === "months" || field === "days" || field === "fdAmount") {
       const fdDate = field === "fdDate" ? value : fdDetailForm.fdDate;
       const months =
@@ -905,16 +953,26 @@ const FDAccountMaster = () => {
           ? parseFloat(value) || 0
           : parseFloat(fdDetailForm.fdAmount) || 0;
       if (fdDate && (months || days) && fdAmount > 0) {
-        await fetchMaturityDate(fdDate, months, days, false);
+        if (editingFdIndex !== null) {
+          // Editing existing row: preserve user's custom rate/compounding, only update maturityDate
+          const savedRate = fdDetailForm.intRate;
+          const savedCompounding = fdDetailForm.compoundingInterval;
+          await fetchMaturityDate(fdDate, months, days, false);
+          setFdDetailForm((prev) => {
+            const rate = parseFloat(savedRate) || 0;
+            const amount = parseFloat(prev.fdAmount) || 0;
+            const matAmt =
+              rate > 0 && amount > 0 && prev.fdDate && prev.maturityDate
+                ? calculateMaturityLocally(amount, rate, prev.fdDate, prev.maturityDate, savedCompounding, fdDaysInAYear)
+                : parseFloat(prev.maturityAmount) || 0;
+            return { ...prev, intRate: savedRate, compoundingInterval: savedCompounding, maturityAmount: String(matAmt) };
+          });
+        } else {
+          await fetchMaturityDate(fdDate, months, days, false);
+        }
       } else {
-        setFdDetailForm((prev) => ({
-          ...prev,
-          maturityDate: "",
-        }));
-        setMisDetailForm((prev) => ({
-          ...prev,
-          maturityDate: "",
-        }));
+        setFdDetailForm((prev) => ({ ...prev, maturityDate: "" }));
+        setMisDetailForm((prev) => ({ ...prev, maturityDate: "" }));
       }
     }
   };
@@ -936,8 +994,6 @@ const FDAccountMaster = () => {
         field === "fdAmount"
           ? parseFloat(value) || 0
           : parseFloat(misDetailForm.misAmount) || 0;
-          alert(months);
-
       if (fdDate && (months || days) && fdAmount > 0) {
         await fetchMaturityDate(fdDate, months, days, true);
       } else {
@@ -959,6 +1015,11 @@ const FDAccountMaster = () => {
 
     if (!fdDetailForm.fdDate) {
       errors.push("• FD Date is required");
+    } else if (
+      formData.accountMasterDTO.accountOpeningDate &&
+      fdDetailForm.fdDate < formData.accountMasterDTO.accountOpeningDate
+    ) {
+      errors.push("• FD Date cannot be before the Account Opening Date");
     }
 
     if (
@@ -1022,6 +1083,8 @@ const FDAccountMaster = () => {
                 maturityDate: fdDetailForm.maturityDate,
                 maturityAmount: parseFloat(fdDetailForm.maturityAmount),
                 slabId: fdDetailForm.slabId,
+                openingBalance: parseFloat(fdDetailForm.openingBalance) || 0,
+                balanceType: fdDetailForm.balanceType,
               }
             : item,
         ),
@@ -1047,6 +1110,8 @@ const FDAccountMaster = () => {
         maturityDate: fdDetailForm.maturityDate,
         maturityAmount: parseFloat(fdDetailForm.maturityAmount),
         slabId: fdDetailForm.slabId,
+        openingBalance: parseFloat(fdDetailForm.openingBalance) || 0,
+        balanceType: fdDetailForm.balanceType,
       };
       setFdDetailsList((prev) => [...prev, newItem]);
       Swal.fire({
@@ -1069,6 +1134,8 @@ const FDAccountMaster = () => {
       maturityDate: "",
       maturityAmount: "",
       slabId: 0,
+      openingBalance: "",
+      balanceType: "Cr",
     });
   };
 
@@ -1085,6 +1152,8 @@ const FDAccountMaster = () => {
       maturityDate: item.maturityDate,
       maturityAmount: item.maturityAmount.toString(),
       slabId: item.slabId,
+      openingBalance: item.openingBalance ? item.openingBalance.toString() : "",
+      balanceType: item.balanceType || "Cr",
     });
     setEditingFdIndex(index);
   };
@@ -1469,7 +1538,9 @@ const FDAccountMaster = () => {
               fdmaturityDate: fd.maturityDate,
               maturityAmount: fd.maturityAmount,
               slabId: fd.slabId,
-              LTDNo: fd.receiptNo.toString()
+              LTDNo: fd.receiptNo.toString(),
+              openingBalance: fd.openingBalance || 0,
+              openingBalanceType: fd.balanceType || "Cr",
             })),
 
         voucher: isOpeningEntry
@@ -1478,10 +1549,10 @@ const FDAccountMaster = () => {
               brID: user.branchid,
               voucherDate: formData.accountMasterDTO.accountOpeningDate,
               debitAccountId: 0,
-              totalDebit: Number(formData.accountMasterDTO.openingBalance) || 0,
+              totalDebit: 0,
               voucherNarration: showMIS ? "MIS Account Opening" : "FD Account Opening",
-              openingBalanceType: formData.accountMasterDTO.balanceType,
-              openingAmount: Number(formData.accountMasterDTO.openingBalance) || 0,
+              openingBalanceType: "Cr",
+              openingAmount: 0,
             }
           : {
               id: 0,
@@ -1621,6 +1692,8 @@ const FDAccountMaster = () => {
       maturityDate: "",
       maturityAmount: "",
       slabId: 0,
+      openingBalance: "",
+      balanceType: "Cr",
     });
 
     setMisDetailForm({
@@ -1974,74 +2047,17 @@ const FDAccountMaster = () => {
               <input
                 type="text"
                 value={formData.accountMasterDTO.suffix}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  handleFieldChange("suffix", val);
+                }}
+                readOnly={isEditMode}
                 placeholder="Enter Suffix"
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                className={`w-full px-3 py-2.5 border-2 rounded-lg outline-none ${isEditMode ? "border-gray-200 bg-gray-100 cursor-not-allowed" : "border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"}`}
               />
             </FormField>
           </div>
 
-          {/* Opening Balance */}
-          {isOpeningEntry && (
-            <>
-              <FormField
-                name="openingBalance"
-                label="Opening Balance"
-                errors={errorsByField.openingBalance || []}
-                icon={<IndianRupee className="w-4 h-4 text-green-500" />}
-              >
-                <input
-                  type="text"
-                  value={formData.accountMasterDTO.openingBalance || ""}
-                  onChange={(e) =>
-                    handleNumericChange("openingBalance", e.target.value)
-                  }
-                  placeholder="Enter Opening Balance"
-                  className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                />
-              </FormField>
-
-              {/* Balance Type */}
-              <div className="space-y-2 md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Balance Type
-                  <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-4 mt-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="balanceType"
-                      value="Cr"
-                      checked={formData.accountMasterDTO.balanceType === "Cr"}
-                      onChange={(e) =>
-                        handleFieldChange("balanceType", e.target.value)
-                      }
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <span className="text-sm font-medium text-gray-700">
-                      Credit (Cr)
-                    </span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="balanceType"
-                      value="Dr"
-                      checked={formData.accountMasterDTO.balanceType === "Dr"}
-                      onChange={(e) =>
-                        handleFieldChange("balanceType", e.target.value)
-                      }
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <span className="text-sm font-medium text-gray-700">
-                      Debit (Dr)
-                    </span>
-                  </label>
-                </div>
-              </div>
-            </>
-          )}
         </div>
       </div>
 
@@ -2201,7 +2217,7 @@ const FDAccountMaster = () => {
                   <DatePicker
                     value={fdDetailForm.fdDate}
                     onChange={(val) => handleFdDetailChange("fdDate", val)}
-                    min={sessionMinDate}
+                    min={formData.accountMasterDTO.accountOpeningDate || sessionMinDate}
                     max={sessionMaxDate}
                     workingDate={sessionDate}
                     className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg outline-none"
@@ -2296,9 +2312,13 @@ const FDAccountMaster = () => {
                   <input
                     type="text"
                     value={fdDetailForm.intRate}
-                    readOnly
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^\d*\.?\d{0,4}$/.test(v))
+                        handleFdDetailChange("intRate", v);
+                    }}
                     placeholder="Auto from slab"
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
+                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
                   />
                 </div>
 
@@ -2314,7 +2334,6 @@ const FDAccountMaster = () => {
                     onChange={(option) =>
                       handleFdDetailChange("compoundingInterval", option?.value)
                     }
-                    isDisabled
                     className="text-sm"
                   />
                 </div>
@@ -2338,11 +2357,67 @@ const FDAccountMaster = () => {
                   <input
                     type="text"
                     value={fdDetailForm.maturityAmount}
-                    readOnly
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^\d*\.?\d{0,2}$/.test(v))
+                        handleFdDetailChange("maturityAmount", v);
+                    }}
                     placeholder="Auto calculated"
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
+                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
                   />
                 </div>
+
+                {/* Per-FD Opening Balance (only in opening entry mode) */}
+                {isOpeningEntry && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700 flex items-center gap-1">
+                        <IndianRupee className="w-3.5 h-3.5 text-green-500" />
+                        Opening Balance
+                      </label>
+                      <input
+                        type="text"
+                        value={fdDetailForm.openingBalance}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (/^\d*\.?\d{0,2}$/.test(v))
+                            setFdDetailForm((prev) => ({ ...prev, openingBalance: v }));
+                        }}
+                        placeholder="Enter Opening Balance"
+                        className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Balance Type
+                      </label>
+                      <div className="flex gap-4 pt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="fdBalanceType"
+                            value="Cr"
+                            checked={fdDetailForm.balanceType === "Cr"}
+                            onChange={() => setFdDetailForm((prev) => ({ ...prev, balanceType: "Cr" }))}
+                            className="w-4 h-4 text-purple-600"
+                          />
+                          <span className="text-sm text-gray-700">Credit (Cr)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="fdBalanceType"
+                            value="Dr"
+                            checked={fdDetailForm.balanceType === "Dr"}
+                            onChange={() => setFdDetailForm((prev) => ({ ...prev, balanceType: "Dr" }))}
+                            className="w-4 h-4 text-purple-600"
+                          />
+                          <span className="text-sm text-gray-700">Debit (Dr)</span>
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -2488,7 +2563,7 @@ const FDAccountMaster = () => {
                             ₹{item.openingBalance.toLocaleString("en-IN")}{" "}
                             <span
                               className={`ml-1 text-xs ${
-                                item.balanceType === "Credit"
+                                item.balanceType === "Cr"
                                   ? "text-green-600"
                                   : "text-red-600"
                               }`}
@@ -2731,8 +2806,6 @@ const FDAccountMaster = () => {
                         interestPostInterval: option?.value || "Monthly",
                       }))
                     }
-                    menuPortalTarget={document.body}
-                    menuPosition="fixed"
                     styles={{
                       menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                     }}

@@ -391,7 +391,7 @@ const SavingAccountMasterCRUD: React.FC = () => {
       message: string;
     }> => {
       const result = await fetchSavingAccounts(filter, user.branchid);
-      console.log(result)
+
       return result;
     },
     [user.branchid]

@@ -346,7 +346,7 @@ namespace BankingPlatform.API.Service.AccountMasters
 
         private GSTInfoDTO MapToDTO(GSTInfo entity) => new()
         {
-            
+
             GSTInfoId = entity.ID,
             BranchId = entity.BranchId,
             AccId = entity.AccId,
@@ -354,6 +354,26 @@ namespace BankingPlatform.API.Service.AccountMasters
             GSTInNo = entity.GSTInNo,
             StateName = entity.StateId > 0 ? _commonfunctions.GetStateFromId(entity.StateId) : ""
         };
+
+        public async Task<(string? LastAccountNumber, string NextAccountNumber)> GetLastAccountNumberByHeadAsync(int branchId, int headId)
+        {
+            var accountNumbers = await _context.accountmaster
+                .Where(x => x.BranchId == branchId && x.HeadId == headId && x.AccTypeId == (int)Enums.AccountTypes.General)
+                .Select(x => x.AccountNumber)
+                .ToListAsync();
+
+            var maxNum = accountNumbers
+                .Select(n => int.TryParse(n, out var parsed) ? parsed : (int?)null)
+                .Where(n => n.HasValue)
+                .Select(n => n!.Value)
+                .DefaultIfEmpty(0)
+                .Max();
+
+            var lastAccountNumber = maxNum == 0 ? null : maxNum.ToString();
+            var nextAccountNumber = (maxNum + 1).ToString();
+
+            return (lastAccountNumber, nextAccountNumber);
+        }
 
     }
 }

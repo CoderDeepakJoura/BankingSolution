@@ -15,6 +15,7 @@ namespace BankingPlatform.API.DTO.AccountMasters.Loan
         public List<LoanAccountBalanceDetailDTO> OpeningBalanceDetails { get; set; } = new();
         public List<LoanAccFDPledgeDTO> FDPledges { get; set; } = new();
         public List<LoanAccRDPledgeDTO> RDPledges { get; set; } = new();
+        public bool IsNomineeRequired { get; set; }
     }
 
     public class AccountKistDetailDTO
@@ -115,6 +116,7 @@ namespace BankingPlatform.API.DTO.AccountMasters.Loan
         public DateTime Date { get; set; }
         public DateTime ValueDate { get; set; }
         public string? Status { get; set; }
+        public string? EntryType { get; set; }
         public long? HeadCode { get; set; }
     }
 
@@ -126,9 +128,11 @@ namespace BankingPlatform.API.DTO.AccountMasters.Loan
         public int? FDAccId { get; set; }
         public int? FDAccDetId { get; set; }
         public string? FDAccNumber { get; set; }
+        public string? FDAccName { get; set; }
         public decimal? FDAmount { get; set; }
         public decimal? Interest { get; set; }
         public DateTime? Date { get; set; }
+        public int? Status { get; set; }
     }
 
     public class LoanAccRDPledgeDTO
@@ -139,9 +143,11 @@ namespace BankingPlatform.API.DTO.AccountMasters.Loan
         public int? RDAccId { get; set; }
         public int? RDAccDetId { get; set; }
         public string? RDAccNumber { get; set; }
+        public string? RDAccName { get; set; }
         public decimal? RDAmount { get; set; }
         public decimal? Interest { get; set; }
         public DateTime? Date { get; set; }
+        public int? Status { get; set; }
     }
 
     public class LoanAccListItemDTO
@@ -179,6 +185,22 @@ namespace BankingPlatform.API.DTO.AccountMasters.Loan
         public decimal KistAmount { get; set; }
         public decimal KistIntPart { get; set; }
         public decimal KistPrinPart { get; set; }
+    }
+
+    public class UnpledgeUnlockFDDTO
+    {
+        public int BrId { get; set; }
+        public int PledgeId { get; set; }
+        public int Action { get; set; }
+        public DateTime Date { get; set; }
+    }
+
+    public class UnpledgeUnlockRDDTO
+    {
+        public int BrId { get; set; }
+        public int PledgeId { get; set; }
+        public int Action { get; set; }
+        public DateTime Date { get; set; }
     }
 
     public class LoanProductInfoDTO

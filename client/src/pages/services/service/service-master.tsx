@@ -95,10 +95,13 @@ const ServiceMaster: React.FC = () => {
     nameRef.current?.focus();
   };
 
+  const maxDate = user.workingdate || today();
+
   // ── Tax Rule (Tab 1) handlers ────────────────────────────────────────────────
   const handleAddRule = () => {
     const errors: string[] = [];
     if (!ruleDate) errors.push("Date is required.");
+    if (ruleDate > maxDate) errors.push(`Applicable date cannot be greater than working date (${maxDate}).`);
     if (!ruleTaxId || ruleTaxId === 0) errors.push("Tax is required.");
     if (errors.length > 0) {
       Swal.fire({ icon: "warning", title: "Please fix the following:", html: `<ul class="text-left list-disc pl-5 space-y-1">${errors.map(e => `<li>${e}</li>`).join("")}</ul>` });
@@ -131,6 +134,7 @@ const ServiceMaster: React.FC = () => {
   const handleAddDet = () => {
     const errors: string[] = [];
     if (!detDate) errors.push("Date is required.");
+    if (detDate > maxDate) errors.push(`Date cannot be greater than working date (${maxDate}).`);
     if (!detTaxTypeId || detTaxTypeId === 0) errors.push("Tax Type is required.");
     if (Number(detPerc) <= 0) errors.push("Percentage must be greater than 0.");
     if (errors.length > 0) {
@@ -167,7 +171,6 @@ const ServiceMaster: React.FC = () => {
     if (!data.sac?.trim()) errors.push("SAC(TC) is required.");
     if (!data.purchaseAccId || data.purchaseAccId === 0) errors.push("Purchase Account is required.");
     if (data.taxRules.length === 0) errors.push("At least one Tax Detail is required.");
-    if (data.taxTypeDets.length === 0) errors.push("At least one Tax Type Detail is required.");
     if (errors.length > 0) {
       Swal.fire({ icon: "warning", title: "Please fix the following:", html: `<ul class="text-left list-disc pl-5 space-y-1">${errors.map(e => `<li>${e}</li>`).join("")}</ul>` });
       return;
@@ -277,7 +280,7 @@ const ServiceMaster: React.FC = () => {
                     <div className="lg:col-span-2 bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Date <span className="text-red-500">*</span></label>
-                        <input type="date" value={ruleDate} onChange={e => setRuleDate(e.target.value)} className={inp} />
+                        <input type="date" value={ruleDate} max={maxDate} onChange={e => setRuleDate(e.target.value)} className={inp} />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Tax <span className="text-red-500">*</span></label>
@@ -322,7 +325,7 @@ const ServiceMaster: React.FC = () => {
                     <div className="lg:col-span-2 bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Date <span className="text-red-500">*</span></label>
-                        <input type="date" value={detDate} onChange={e => setDetDate(e.target.value)} className={inp} />
+                        <input type="date" value={detDate} max={maxDate} onChange={e => setDetDate(e.target.value)} className={inp} />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Tax Type <span className="text-red-500">*</span></label>

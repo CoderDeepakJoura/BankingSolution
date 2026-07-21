@@ -1,10 +1,12 @@
 import { ApiService, ApiResponse } from '../../api';
+import { GSTDetailDTO } from './loanExpenseApi';
 
 export interface LoanAdvancementCreditItemDTO {
   accountId: number;
   accountType: number;
   amount: number;
   narration?: string;
+  gstDetail?: GSTDetailDTO;
 }
 
 export interface LoanAdvancementVoucherDTO {

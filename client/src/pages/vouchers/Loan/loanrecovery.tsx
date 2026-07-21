@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Save, X, FileText, User, Users, Phone, MapPin, CreditCard,
   Calendar, DollarSign, ArrowLeft, Plus, Trash2, RotateCcw,
@@ -13,6 +13,7 @@ import { RootState } from "../../../redux";
 import commonservice from "../../../services/common/commonservice";
 import loanRecoveryApi, {
   LoanRecoveryBalanceDTO,
+  IntRecDetailRowDTO,
 } from "../../../services/vouchers/loan/loanRecoveryApi";
 import {
   loanAccountApi,
@@ -72,6 +73,7 @@ const selectStyles = (hasError = false) => ({
   option: (base: any) => ({ ...base, cursor: "pointer" }),
   dropdownIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
   clearIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
+  menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
 });
 
 const compactSelectStyles = (hasError = false) => ({
@@ -88,6 +90,7 @@ const compactSelectStyles = (hasError = false) => ({
   option: (base: any) => ({ ...base, cursor: "pointer" }),
   dropdownIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
   clearIndicator: (base: any) => ({ ...base, cursor: "pointer" }),
+  menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -181,7 +184,7 @@ const LoanRecovery: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!loanBalance) { setAllocation([]); return; }
+    if (!loanBalance || loanBalance.actOnIntPosting === 1) { setAllocation([]); return; }
     const total = parseFloat(formData.totalAmount) || 0;
     setAllocation(total > 0 ? computeAllocation(total, loanBalance) : []);
   }, [formData.totalAmount, loanBalance]);
@@ -489,10 +492,48 @@ const LoanRecovery: React.FC = () => {
               <p className="text-sm text-gray-500">Select a loan account to view interest details</p>
             </div>
           );
+
+        // AddInBalance: interest is embedded in the principal balance — no separate interest categories
+        if (loanBalance.actOnIntPosting === 1) {
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <p className="text-sm text-amber-800 font-medium">
+                  This is an <span className="font-bold">Add in Balance</span> type loan — interest is added directly
+                  to the loan balance and is not tracked separately. The outstanding balance below includes all accrued interest.
+                </p>
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full">
+                  <thead className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Description</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Balance (₹)</th>
+                      {totalAmt > 0 && <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Recovering (₹)</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    <tr className="bg-blue-50 font-semibold">
+                      <td className="px-6 py-4 text-sm text-blue-800">Outstanding Balance (incl. interest)</td>
+                      <td className="px-6 py-4 text-sm text-blue-700">₹{fmt(loanBalance.principalBalance)}</td>
+                      {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700">₹{fmt(totalAmt)}</td>}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        }
+
+        // Stand: show interest category breakdown + voucherrecintdetail ledger
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Interest calculation metadata */}
             <div className="flex flex-wrap gap-4 text-xs bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+              <span className="text-blue-700 font-medium">
+                Type: <span className="font-bold">Stand</span>
+              </span>
               <span className="text-blue-700 font-medium">
                 Calc Method: <span className="font-bold">{loanBalance.intCalcMethod ?? "Schedule"}</span>
               </span>
@@ -515,14 +556,15 @@ const LoanRecovery: React.FC = () => {
               )}
             </div>
 
+            {/* Outstanding interest categories */}
             <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="w-full">
                 <thead className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Interest Category</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Description</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Outstanding (₹)</th>
-                    {totalAmt > 0 && <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Recovering (₹)</th>}
+                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Outstanding (₹)</th>
+                    {totalAmt > 0 && <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Recovering (₹)</th>}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -537,9 +579,9 @@ const LoanRecovery: React.FC = () => {
                       <tr key={catId} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-sm font-medium text-gray-800">{label}</td>
                         <td className="px-6 py-4 text-xs text-gray-500">{desc}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-amber-700">₹{fmt(out)}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-amber-700 text-right">₹{fmt(out)}</td>
                         {totalAmt > 0 && (
-                          <td className={`px-6 py-4 text-sm font-semibold ${rec > 0 ? "text-green-700" : "text-gray-400"}`}>
+                          <td className={`px-6 py-4 text-sm font-semibold text-right ${rec > 0 ? "text-green-700" : "text-gray-400"}`}>
                             ₹{fmt(rec)}
                           </td>
                         )}
@@ -549,25 +591,89 @@ const LoanRecovery: React.FC = () => {
                   <tr className="bg-amber-50 border-t-2 border-amber-200 font-semibold">
                     <td className="px-6 py-4 text-sm text-amber-800">Total Interest</td>
                     <td className="px-6 py-4"></td>
-                    <td className="px-6 py-4 text-sm text-amber-700">
+                    <td className="px-6 py-4 text-sm text-amber-700 text-right">
                       ₹{fmt(loanBalance.stdInterestOutstanding + loanBalance.penalInterestOutstanding + loanBalance.stdRecoverableOutstanding + loanBalance.overdueRecoverableOutstanding)}
                     </td>
-                    {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700">₹{fmt(intTotal)}</td>}
+                    {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700 text-right">₹{fmt(intTotal)}</td>}
                   </tr>
                   <tr className="bg-blue-50 border-t border-blue-200 font-semibold">
                     <td className="px-6 py-4 text-sm text-blue-800">Principal Balance</td>
                     <td className="px-6 py-4"></td>
-                    <td className="px-6 py-4 text-sm text-blue-700">₹{fmt(loanBalance.principalBalance)}</td>
-                    {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700">₹{fmt(principalRec)}</td>}
+                    <td className="px-6 py-4 text-sm text-blue-700 text-right">₹{fmt(loanBalance.principalBalance)}</td>
+                    {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700 text-right">₹{fmt(principalRec)}</td>}
                   </tr>
                   <tr className="bg-green-50 border-t-2 border-green-200 font-bold">
                     <td className="px-6 py-4 text-sm text-green-800">Total Outstanding</td>
                     <td className="px-6 py-4"></td>
-                    <td className="px-6 py-4 text-sm text-green-700">₹{fmt(loanBalance.totalOutstanding)}</td>
-                    {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700">₹{fmt(totalAmt)}</td>}
+                    <td className="px-6 py-4 text-sm text-green-700 text-right">₹{fmt(loanBalance.totalOutstanding)}</td>
+                    {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700 text-right">₹{fmt(totalAmt)}</td>}
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            {/* Interest ledger — voucherrecintdetail rows */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Interest Posting / Recovery Ledger</h3>
+              {(loanBalance.intRecDetail ?? []).length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                  <BarChart2 className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm text-gray-500">No interest entries yet — interest will appear here after posting or recovery</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                        <th className="px-4 py-3 text-center font-semibold w-10">#</th>
+                        <th className="px-4 py-3 text-left font-semibold">Date</th>
+                        <th className="px-4 py-3 text-left font-semibold">Category</th>
+                        <th className="px-4 py-3 text-right font-semibold">Int. Dr (Posted) ₹</th>
+                        <th className="px-4 py-3 text-right font-semibold">Int. Cr (Recovered) ₹</th>
+                        <th className="px-4 py-3 text-center font-semibold">Voucher No</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(loanBalance.intRecDetail ?? []).map((row: IntRecDetailRowDTO, idx: number) => (
+                        <tr
+                          key={row.id}
+                          className={`${idx % 2 === 0 ? "bg-blue-50" : "bg-white"} hover:bg-blue-100 transition-colors`}
+                        >
+                          <td className="px-4 py-2.5 text-center text-gray-500">{idx + 1}</td>
+                          <td className="px-4 py-2.5 text-gray-700">{formatDate(row.entryDate)}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                              row.intCatId === 1 ? "bg-blue-100 text-blue-700"
+                              : row.intCatId === 2 ? "bg-orange-100 text-orange-700"
+                              : row.intCatId === 3 ? "bg-purple-100 text-purple-700"
+                              : "bg-red-100 text-red-700"
+                            }`}>
+                              {row.intCatName}
+                            </span>
+                          </td>
+                          <td className={`px-4 py-2.5 text-right font-medium ${row.intDr > 0 ? "text-rose-700" : "text-gray-400"}`}>
+                            {row.intDr > 0 ? `₹${fmt(row.intDr)}` : "—"}
+                          </td>
+                          <td className={`px-4 py-2.5 text-right font-medium ${row.intCr > 0 ? "text-green-700" : "text-gray-400"}`}>
+                            {row.intCr > 0 ? `₹${fmt(row.intCr)}` : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-center text-gray-600 font-mono">{row.voucherNo}</td>
+                        </tr>
+                      ))}
+                      <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-sm">
+                        <td colSpan={3} className="px-4 py-2.5 text-gray-700">Totals</td>
+                        <td className="px-4 py-2.5 text-right text-rose-700">
+                          ₹{fmt((loanBalance.intRecDetail ?? []).reduce((s: number, r: IntRecDetailRowDTO) => s + r.intDr, 0))}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-green-700">
+                          ₹{fmt((loanBalance.intRecDetail ?? []).reduce((s: number, r: IntRecDetailRowDTO) => s + r.intCr, 0))}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -852,9 +958,9 @@ const LoanRecovery: React.FC = () => {
                       {totalAmt > 0 && loanBalance && (
                         <div className="flex flex-wrap items-center gap-3 pt-6">
                           <span className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium">
-                            Principal: ₹{fmt(principalRec)}
+                            {loanBalance.actOnIntPosting === 1 ? "Recovery" : "Principal"}: ₹{fmt(loanBalance.actOnIntPosting === 1 ? totalAmt : principalRec)}
                           </span>
-                          {intTotal > 0 && (
+                          {loanBalance.actOnIntPosting !== 1 && intTotal > 0 && (
                             <span className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium">
                               Interest: ₹{fmt(intTotal)}
                             </span>

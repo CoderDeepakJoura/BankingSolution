@@ -12,5 +12,6 @@
         public int intexpaccount { get; set; }
         public int? depwithdrawlimitinterval { get; set; }
         public decimal? depwithdrawlimit { get; set; }
+        public int DaysInAYear { get; set; } = 365;
     }
 }

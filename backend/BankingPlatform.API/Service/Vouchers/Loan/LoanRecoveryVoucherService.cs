@@ -45,31 +45,52 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             var kist = await _db.accountkistdetail.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.AccountId == loanAccId && x.BrId == branchId);
 
-            // Interest calculation method from product definition
+            // Product definition — drives both interest calc method and loan interest type
             string intCalcMethod = "Schedule";
+            int? actOnIntPosting = null;  // 1=AddInBalance, 2=Stand
             if (acc.GeneralProductId.HasValue)
             {
                 var prodDef = await _db.loanproductdefinition.AsNoTracking()
                     .FirstOrDefaultAsync(x => x.ProductId == acc.GeneralProductId.Value && x.BrId == branchId);
                 if (!string.IsNullOrWhiteSpace(prodDef?.IntCalcMethod))
                     intCalcMethod = prodDef.IntCalcMethod;
+                actOnIntPosting = prodDef?.ActOnIntPosting;
             }
+            bool isAddInBalance = actOnIntPosting == 1;
 
             // Opening balance
             var ob = await _db.loanaccopeningbalance.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.AccId == loanAccId && x.BranchId == branchId);
 
-            // All principal movements (advancement Cr, recovery Dr)
-            var moves = await _db.loanaccountbalancedetail.AsNoTracking()
+            // Opening balance detail rows (historical/migration data; AmountDr/Cr for OB movements,
+            // IntDr/Cr for AddInBalance interest postings recorded in this table)
+            var obDetails = await _db.loanaccountbalancedetail.AsNoTracking()
                 .Where(x => x.AccountId == loanAccId && x.BrId == branchId)
-                .OrderBy(x => x.Date)
                 .ToListAsync();
 
-            // Current principal balance = opening + advancements - recoveries
+            // Post-migration advancements and recoveries come from vouchercreditdebitdetails
+            decimal advancedTotal = await _db.vouchercreditdebitdetails.AsNoTracking()
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId
+                         && x.EntryStatus == Enums.VoucherStatus.LA.ToString()
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
+                .SumAsync(x => x.VoucherAmount);
+
+            decimal recoveredTotal = await _db.vouchercreditdebitdetails.AsNoTracking()
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId
+                         && x.EntryStatus == Enums.VoucherStatus.LR.ToString()
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
+                .SumAsync(x => x.VoucherAmount);
+
             decimal openingPrincipal = ob?.TotalBalance ?? 0m;
             decimal principalBal = openingPrincipal
-                                 + moves.Sum(x => x.AmountDr)
-                                 - moves.Sum(x => x.AmountCr);
+                                 + obDetails.Sum(x => x.AmountDr)
+                                 - obDetails.Sum(x => x.AmountCr)
+                                 + advancedTotal
+                                 - recoveredTotal;
+            // For AddInBalance: interest is embedded in the balance; IntDr/IntCr rows are recorded
+            // in loanaccountbalancedetail by the interest posting service
+            if (isAddInBalance)
+                principalBal += obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr);
             principalBal = Math.Max(0, principalBal);
 
             // Opening interest (migrated/imported balances)
@@ -78,31 +99,84 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             decimal openOvdInt = (ob?.OpenOverInt > 0 && ob!.OpenOverIntType == "Dr")
                 ? (decimal)ob.OpenOverInt!.Value : 0m;
 
-            // ── VoucherRecIntDetail — primary interest ledger ─────────────────────
-            // Cat 1/2 IntDr = formally posted interest (interest posting voucher)
-            // Cat 3   IntCr = interest recovered against posted interest
+            // ── AddInBalance short-circuit ────────────────────────────────────────
+            // For AddInBalance loans, interest is baked into the principal — no voucherrecintdetail.
+            // Outstanding = principal balance only; no interest category breakdown.
+            if (isAddInBalance)
+            {
+                string recSeqAib = "4,3,2,1";
+                if (acc.GeneralProductId.HasValue)
+                {
+                    var prodRecAib = await _db.loanproductrecovery.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.ProductId == acc.GeneralProductId.Value && x.BrId == branchId);
+                    if (!string.IsNullOrWhiteSpace(prodRecAib?.RecoverySeq))
+                        recSeqAib = prodRecAib.RecoverySeq;
+                }
+                return new LoanRecoveryBalanceDTO
+                {
+                    LoanAccId                    = loanAccId,
+                    AccountNumber                = acc.AccountNumber,
+                    MemberName                   = member?.MemberName ?? acc.AccountName ?? string.Empty,
+                    MemberRelativeName           = member?.RelativeName,
+                    PhoneNo                      = member?.PhoneNo1,
+                    MembershipNo                 = member?.PermanentMembershipNo ?? member?.NominalMembershipNo,
+                    LoanNo                       = kist?.LoanNo,
+                    LoanDate                     = kist?.LoanDate,
+                    StandardInterestRate         = kist?.StandardInterestRate,
+                    OverdueInterestRate          = kist?.OverdueInterestRate,
+                    KistAmount                   = kist?.KistAmount.HasValue == true ? (decimal)kist.KistAmount!.Value : null,
+                    PrincipalBalance             = principalBal,
+                    StdInterestOutstanding       = 0,
+                    PenalInterestOutstanding     = 0,
+                    StdRecoverableOutstanding    = 0,
+                    OverdueRecoverableOutstanding= 0,
+                    TotalOutstanding             = principalBal,
+                    RecoverySeq                  = recSeqAib,
+                    SavingBalance                = 0,
+                    OverdueInstallments          = 0,
+                    OverduePrincipal             = 0,
+                    InterestCalcFromDate         = null,
+                    InterestCalcToDate           = DateTime.Today,
+                    IntCalcMethod                = intCalcMethod,
+                    ActOnIntPosting              = actOnIntPosting,
+                    IntRecDetail                 = new List<IntRecDetailRowDTO>(),
+                };
+            }
+
+            // ── VoucherRecIntDetail — primary interest ledger (Stand loans only) ──
+            // Cat 1/2 IntDr = formally posted interest (IP voucher) OR auto-post during direct recovery
+            // Cat 1/2 IntCr = recovery of unposted interest (auto-post path: IntDr and IntCr both written)
+            // Cat 3   IntCr = recovery against formally posted interest (posted-then-recover path)
             var intEntries = await _db.voucherrecintdetail.AsNoTracking()
                 .Where(x => x.AccId == loanAccId && x.BrId == branchId)
+                .OrderBy(x => x.EntryDate)
+                .ThenBy(x => x.Id)
                 .ToListAsync();
 
+            // All Cat 1 IntDr (IP voucher formal postings + auto-post amounts from direct recovery)
             decimal postedStdInt   = (decimal)intEntries.Where(x => x.IntCatId == CAT_STD).Sum(x => x.IntDr);
+            // All Cat 2 IntDr (same dual source as above)
             decimal postedPenalInt = (decimal)intEntries.Where(x => x.IntCatId == CAT_PENAL).Sum(x => x.IntDr);
             decimal totalPosted    = postedStdInt + postedPenalInt;
 
-            // Cat 3 IntCr = recoveries against formally posted interest
+            // Cat 3 IntCr = recoveries against formally posted interest (posted-then-recover path)
             decimal postedRecovered = (decimal)intEntries.Where(x => x.IntCatId == CAT_STDREC).Sum(x => x.IntCr);
 
-            // Cat 1/2 IntCr = recoveries of unposted interest (auto-post + recover in one tx)
-            decimal unpostedRecovered = (decimal)(
-                intEntries.Where(x => x.IntCatId == CAT_STD).Sum(x => x.IntCr) +
-                intEntries.Where(x => x.IntCatId == CAT_PENAL).Sum(x => x.IntCr));
+            // Cat 1/2 IntCr = the recovery side of auto-post entries (direct recovery of unposted).
+            // These exist ONLY in auto-post entries (IntDr == IntCr), so they cancel out the auto-post
+            // IntDr that inflated totalPosted. Must be subtracted from stdRec to avoid overstating it.
+            decimal unpostedRecStd   = (decimal)intEntries.Where(x => x.IntCatId == CAT_STD).Sum(x => x.IntCr);
+            decimal unpostedRecPenal = (decimal)intEntries.Where(x => x.IntCatId == CAT_PENAL).Sum(x => x.IntCr);
+            decimal unpostedRecovered = unpostedRecStd + unpostedRecPenal;
 
             // Cat 4 IntDr/IntCr = overdue kist principal posted/recovered
             decimal ovdRecPosted    = (decimal)intEntries.Where(x => x.IntCatId == CAT_OVDREC).Sum(x => x.IntDr);
             decimal ovdRecRecovered = (decimal)intEntries.Where(x => x.IntCatId == CAT_OVDREC).Sum(x => x.IntCr);
 
-            // Net formally posted and not yet recovered → Cat 3 StdRecoverable
-            decimal stdRec = Math.Max(0, totalPosted + openStdInt - postedRecovered);
+            // Cat 3 (StdRecoverable) = all formally posted (std + penal) minus already recovered.
+            // Subtract unpostedRecovered to cancel auto-post entries whose IntDr inflated totalPosted
+            // but whose IntCr means the interest was immediately recovered (net effect = 0 on this pool).
+            decimal stdRec = Math.Max(0, totalPosted + openStdInt - postedRecovered - unpostedRecovered);
 
             // Net overdue recoverable
             decimal ovdRec = Math.Max(0, ovdRecPosted + openOvdInt - ovdRecRecovered);
@@ -122,10 +196,13 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             int overdueInstallments = overdueKists.Count;
             decimal overduePrincipal = overdueKists.Sum(x => x.PrincipalAmt ?? 0m);
 
-            // Last interest posting date for interest period display
-            DateTime? lastPostDate = intEntries.Any(x => x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL)
+            // Last FORMAL interest posting date — exclude auto-post entries (IntCr > 0 on Cat 1/2
+            // means it is an auto-post+recover entry from direct recovery, not an IP voucher entry).
+            // Including auto-post dates would advance calcFromDate and hide remaining unposted interest.
+            DateTime? lastPostDate = intEntries.Any(x =>
+                    (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0)
                 ? intEntries
-                    .Where(x => x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL)
+                    .Where(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0)
                     .Max(x => (DateTime?)x.EntryDate)
                 : null;
 
@@ -138,10 +215,23 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
             if (intCalcMethod == "Schedule" && kistSchedule.Any())
             {
-                // Schedule-based: sum InterestAmt of all overdue kists, subtract already-posted
+                // Schedule-based: sum standard InterestAmt of all overdue kists.
+                // Subtract only postedStdInt (Cat 1 IntDr) — not totalPosted — because scheduleIntDue
+                // is standard interest only and penal is computed separately below.
                 decimal scheduleIntDue = overdueKists.Sum(x => x.InterestAmt ?? 0m) + openStdInt;
-                decimal alreadyAccountedFor = totalPosted + unpostedRecovered;
-                dynStdInt = Math.Max(0, scheduleIntDue - alreadyAccountedFor);
+                dynStdInt = Math.Max(0, scheduleIntDue - postedStdInt);
+
+                // WO (without-interest) schedule: InterestAmt is 0 on every installment but rate
+                // is still set — fall back to Balance method for standard interest calculation.
+                if (dynStdInt == 0 && kist != null && (kist.StandardInterestRate ?? 0) > 0 && principalBal > 0)
+                {
+                    int days = Math.Max(0, (calcToDate - calcFromDate).Days);
+                    decimal rawStd = Math.Round(
+                        principalBal * (decimal)kist.StandardInterestRate!.Value / 100m * days / 365m, 2);
+                    // Use postedStdInt only (Cat 1 IntDr) — not totalPosted which would also subtract
+                    // penal amounts from the standard interest calculation, understating dynStdInt.
+                    dynStdInt = Math.Max(0, rawStd + openStdInt - postedStdInt);
+                }
 
                 // Overdue (penal) interest: on overdue principal at overdue rate since due date
                 if (kist != null && (kist.OverdueInterestRate ?? 0) > 0 && overduePrincipal > 0)
@@ -164,13 +254,15 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 decimal effectivePrincipal;
                 if (intCalcMethod == "MinBalance")
-                    effectivePrincipal = CalculateMinimumBalance(openingPrincipal, moves, calcFromDate, calcToDate);
+                    effectivePrincipal = CalculateMinimumBalance(openingPrincipal, obDetails, calcFromDate, calcToDate);
                 else
                     effectivePrincipal = principalBal; // Balance method: current outstanding
 
                 decimal rawStd = Math.Round(
                     effectivePrincipal * (decimal)kist.StandardInterestRate!.Value / 100m * days / 365m, 2);
-                dynStdInt = Math.Max(0, rawStd + openStdInt - totalPosted - unpostedRecovered);
+                // Use postedStdInt (Cat 1 IntDr only) — not totalPosted which mixes penal amounts
+                // into the standard interest offset, causing dynStdInt to be understated.
+                dynStdInt = Math.Max(0, rawStd + openStdInt - postedStdInt);
 
                 // Overdue penal on overdue principal
                 if ((kist.OverdueInterestRate ?? 0) > 0 && overduePrincipal > 0)
@@ -198,6 +290,25 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
             decimal totalOut = principalBal + dynStdInt + dynPenalInt + stdRec + ovdRec;
 
+            // Map voucherrecintdetail rows to DTOs for the UI interest detail grid
+            var catNames = new Dictionary<int, string>
+            {
+                [CAT_STD]    = "Standard Interest",
+                [CAT_PENAL]  = "Penal Interest",
+                [CAT_STDREC] = "Std. Recoverable",
+                [CAT_OVDREC] = "Overdue Recoverable",
+            };
+            var intRecDetail = intEntries.Select(e => new IntRecDetailRowDTO
+            {
+                Id         = e.Id,
+                EntryDate  = e.EntryDate,
+                IntCatId   = e.IntCatId,
+                IntCatName = catNames.GetValueOrDefault(e.IntCatId, $"Cat {e.IntCatId}"),
+                IntDr      = e.IntDr,
+                IntCr      = e.IntCr,
+                VoucherNo  = e.VoucherNo,
+            }).ToList();
+
             return new LoanRecoveryBalanceDTO
             {
                 LoanAccId                    = loanAccId,
@@ -224,6 +335,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 InterestCalcFromDate         = calcFromDate == today ? null : calcFromDate,
                 InterestCalcToDate           = calcToDate,
                 IntCalcMethod                = intCalcMethod,
+                ActOnIntPosting              = actOnIntPosting,
+                IntRecDetail                 = intRecDetail,
             };
         }
 
@@ -286,7 +399,20 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 if (dto.TotalAmount > bal.TotalOutstanding + 0.01m)
                     return ($"Recovery ({dto.TotalAmount:N2}) exceeds outstanding balance ({bal.TotalOutstanding:N2}).", 0);
 
-                var (principalRec, intRec) = Allocate(dto.TotalAmount, bal);
+                bool isAddInBalance = bal.ActOnIntPosting == 1;
+
+                decimal principalRec;
+                Dictionary<int, decimal> intRec;
+                if (isAddInBalance)
+                {
+                    // AddInBalance: no interest allocation; all recovery reduces the principal balance
+                    principalRec = Math.Min(dto.TotalAmount, bal.PrincipalBalance);
+                    intRec = new Dictionary<int, decimal>();
+                }
+                else
+                {
+                    (principalRec, intRec) = Allocate(dto.TotalAmount, bal);
+                }
 
                 // Voucher header
                 int nextVrNo   = await _cf.GetLatestVoucherNo(dto.BrId, dto.VoucherDate);
@@ -424,25 +550,6 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         });
                     }
                 }
-
-                // LoanAccountBalanceDetail — principal movement record for this recovery
-                var ob = await _db.loanaccopeningbalance.AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.AccId == dto.LoanAccountId && x.BranchId == dto.BrId);
-
-                await _db.loanaccountbalancedetail.AddAsync(new LoanAccountBalanceDetail
-                {
-                    BrId          = dto.BrId,
-                    LoanOpenBalId = ob?.Id ?? 0,
-                    AccountId     = dto.LoanAccountId,
-                    AmountDr      = 0,
-                    AmountCr      = principalRec,
-                    IntDr         = 0,
-                    IntCr         = intTotal,
-                    Date          = vrDate,
-                    ValueDate     = valDate,
-                    Status        = "RC",
-                    HeadCode      = loanHead,
-                });
 
                 await _db.SaveChangesAsync();
                 await tx.CommitAsync();

@@ -36,6 +36,12 @@ namespace BankingPlatform.API.Controllers
         public string BranchCode { get; set; } = ""!;
     }
 
+    public class AcknowledgeVersionDto
+    {
+        [Required]
+        public string Version { get; set; } = ""!;
+    }
+
     [ApiController]
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
@@ -325,18 +331,31 @@ namespace BankingPlatform.API.Controllers
         {
             GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession, out bool isSu, out string _, out string __);
 
+            string lastSeenVersion = "0.0.0";
+
             // Always fetch isSu from DB — JWT may predate when the claim was added
             if (int.TryParse(userId, out int parsedUserId) && parsedUserId > 0)
             {
                 var user = await _context.user.FirstOrDefaultAsync(u => u.id == parsedUserId && u.branchid == branchId);
                 if (user != null)
+                {
                     isSu = user.issu == 1;
+                    lastSeenVersion = user.lastseenversion ?? "0.0.0";
+                }
             }
 
             var (firstSessionFromDate, firstSessionToDate) = await _commonFns.FirstSessionFromDateAndToDate(branchId);
 
             var currentSession = await _context.branchsession.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.branchid == branchId && x.iscurrent);
+
+            var branchInfo = await _context.branchmaster.AsNoTracking()
+                .Where(x => x.id == branchId)
+                .Select(x => new { x.branchmaster_gstino, x.branchmaster_stateid, x.branchmaster_ismainbranch })
+                .FirstOrDefaultAsync();
+            var branchGstNo = branchInfo?.branchmaster_gstino ?? "";
+            var branchStateId = branchInfo?.branchmaster_stateid ?? 0;
+            var isMainBranch = (branchInfo?.branchmaster_ismainbranch ?? 0) == 1;
 
             return Ok(new
             {
@@ -357,8 +376,41 @@ namespace BankingPlatform.API.Controllers
                 FirstSessionToDate = firstSessionToDate,
                 SessionFromDate = currentSession?.fromdate ?? DateTime.MinValue,
                 SessionToDate = currentSession?.todate ?? DateTime.MinValue,
-                IsSu = isSu
+                IsSu = isSu,
+                BranchGstNo = branchGstNo,
+                BranchStateId = branchStateId,
+                LastSeenVersion = lastSeenVersion,
+                IsMainBranch = isMainBranch
             });
+        }
+
+        [Authorize]
+        [HttpPatch("acknowledge-version")]
+        public async Task<IActionResult> AcknowledgeVersion([FromBody] AcknowledgeVersionDto dto)
+        {
+            try
+            {
+                GetClaims(out string _u, out string _bn, out string _bc, out int branchId, out string _sn, out string _c, out string _a, out string _e, out string userId, out string _wd, out string _si, out int _sid, out bool _ifs, out bool _isu, out string _sfd, out string _std);
+
+                if (!int.TryParse(userId, out int parsedUserId) || parsedUserId <= 0)
+                    return BadRequest(new ResponseDto { Success = false, Message = "Invalid user." });
+
+                // ExecuteUpdateAsync bypasses the change tracker and custom SaveChanges override,
+                // issuing a direct UPDATE that cannot be blocked by audit-log side effects.
+                int rows = await _context.user
+                    .Where(u => u.id == parsedUserId && u.branchid == branchId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(u => u.lastseenversion, dto.Version));
+
+                if (rows == 0)
+                    return NotFound(new ResponseDto { Success = false, Message = "User not found." });
+
+                return Ok(new ResponseDto { Success = true, Message = "Version acknowledged." });
+            }
+            catch (Exception ex)
+            {
+                await _commonFns.LogErrors(ex, nameof(AcknowledgeVersion), "AuthController");
+                return StatusCode(500, new ResponseDto { Success = false, Message = "An unexpected error occurred." });
+            }
         }
 
         [Authorize]

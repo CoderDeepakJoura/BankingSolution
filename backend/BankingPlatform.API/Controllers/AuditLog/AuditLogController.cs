@@ -1,3 +1,4 @@
+using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.Service.AuditLog;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,11 +12,13 @@ namespace BankingPlatform.API.Controllers.AuditLog
     {
         private readonly AuditLogService _service;
         private readonly ILogger<AuditLogController> _logger;
+        private readonly CommonFunctions _commonFunctions;
 
-        public AuditLogController(AuditLogService service, ILogger<AuditLogController> logger)
+        public AuditLogController(AuditLogService service, ILogger<AuditLogController> logger, CommonFunctions commonFunctions)
         {
             _service = service;
             _logger = logger;
+            _commonFunctions = commonFunctions;
         }
 
         [HttpGet]
@@ -29,6 +32,7 @@ namespace BankingPlatform.API.Controllers.AuditLog
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching audit logs");
+                await _commonFunctions.LogErrors(ex, nameof(GetLogs), nameof(AuditLogController));
                 return StatusCode(500, new { Success = false, Message = "Error fetching audit logs" });
             }
         }
@@ -44,6 +48,7 @@ namespace BankingPlatform.API.Controllers.AuditLog
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching entity history");
+                await _commonFunctions.LogErrors(ex, nameof(GetEntityHistory), nameof(AuditLogController));
                 return StatusCode(500, new { Success = false, Message = "Error fetching entity history" });
             }
         }
@@ -59,6 +64,7 @@ namespace BankingPlatform.API.Controllers.AuditLog
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching audit modules");
+                await _commonFunctions.LogErrors(ex, nameof(GetModules), nameof(AuditLogController));
                 return StatusCode(500, new { Success = false, Message = "Error fetching audit modules" });
             }
         }

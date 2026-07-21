@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -95,8 +95,6 @@ const NPAPlanCategoryPage: React.FC = () => {
   const set = (key: keyof NPAPlanCategoryDTO, val: any) => setData(p => ({ ...p, [key]: val }));
 
   const inputCls = "w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm";
-  const selectPortalStyles = { menuPortal: (b: any) => ({ ...b, zIndex: 9999 }) };
-
   const planOpts = plans.map(p => ({ value: p.id, label: `${p.code}${p.description ? " - " + p.description : ""}` }));
   const parentOpts = parentGroups.filter(g => g.id !== data.id).map(g => ({ value: g.id!, label: g.description || `#${g.id}` }));
 
@@ -204,8 +202,7 @@ const NPAPlanCategoryPage: React.FC = () => {
                     onChange={s => set("planId", s?.value ?? null)}
                     placeholder="Select NPA Plan"
                     isClearable
-                    menuPortalTarget={document.body}
-                    styles={selectPortalStyles}
+                   
                     className="text-sm"
                   />
                 </div>
@@ -217,8 +214,7 @@ const NPAPlanCategoryPage: React.FC = () => {
                     onChange={s => set("parentId", s?.value ?? null)}
                     placeholder="Select Parent Group"
                     isClearable
-                    menuPortalTarget={document.body}
-                    styles={selectPortalStyles}
+                   
                     className="text-sm"
                   />
                 </div>

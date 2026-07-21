@@ -40,6 +40,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error searching loan accounts");
+                await _cf.LogErrors(ex, nameof(Search), nameof(LoanRecoveryController));
                 return StatusCode(500, new { Success = false, Message = ex.Message });
             }
         }
@@ -59,6 +60,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching loan balance");
+                await _cf.LogErrors(ex, nameof(GetBalance), nameof(LoanRecoveryController));
                 return StatusCode(500, new { Success = false, Message = ex.Message });
             }
         }
@@ -75,6 +77,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching kist schedule");
+                await _cf.LogErrors(ex, nameof(GetKistSchedule), nameof(LoanRecoveryController));
                 return StatusCode(500, new { Success = false, Message = ex.Message });
             }
         }
@@ -98,6 +101,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error saving loan recovery voucher");
+                await _cf.LogErrors(ex, nameof(AddRecovery), nameof(LoanRecoveryController));
                 return StatusCode(500, new { Success = false, Message = ex.Message });
             }
         }
