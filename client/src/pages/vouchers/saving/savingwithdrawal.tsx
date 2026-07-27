@@ -663,6 +663,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
 
       <div className="p-6">
         {/* IB Branch Row */}
+        {user.enableIBTransactions && (
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Destination Branch <span className="text-xs text-gray-400">(leave empty for regular withdrawal)</span>
@@ -693,6 +694,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
             </p>
           )}
         </div>
+        )}
 
         {/* First Row - 3 columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">

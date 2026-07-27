@@ -45,6 +45,7 @@ namespace BankingPlatform.API.Service.AccountMasters
         public DateTime FromDate { get; set; }
         public DateTime ToDate { get; set; }
         public List<int> AccountIds { get; set; } = new();
+        public Dictionary<int, decimal>? InterestOverrides { get; set; }
     }
 
     public class RDInterestPostingService
@@ -234,7 +235,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                         interest += (decimal)kist.AmountCr * (decimal)rate / 100m * days / 365m;
                     }
 
-                    interest = Math.Round(interest, 2);
+                    interest = (dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(accountId, out var rdOv))
+                        ? Math.Round(rdOv, 2)
+                        : Math.Round(interest, 2);
                     if (interest <= 0) continue;
 
                     // Create voucher

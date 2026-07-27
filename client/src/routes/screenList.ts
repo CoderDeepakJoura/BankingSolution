@@ -3,6 +3,10 @@ export interface ScreenEntry {
   path: string;
   label: string;
   category: string;
+  /** If true, only shown in search for super-user accounts. */
+  suOnly?: boolean;
+  /** If true, only shown in search when IB transactions are enabled. */
+  ibOnly?: boolean;
 }
 
 export const SEARCHABLE_SCREENS: ScreenEntry[] = [
@@ -134,9 +138,9 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
   { path: "/bank-fd-account",                 label: "Bank FD Account",                 category: "Bank FD" },
 
   // ── Inter Branch ──────────────────────────────────────────────────────────
-  { path: "/other-branch-accounts",           label: "Other Branch Accounts",           category: "Inter Branch" },
-  { path: "/ib-pending-vouchers",             label: "IB Pending Vouchers",             category: "Inter Branch" },
-  { path: "/ib-incoming-vouchers",            label: "IB Incoming Vouchers",            category: "Inter Branch" },
+  { path: "/other-branch-accounts",           label: "Other Branch Accounts",           category: "Inter Branch", ibOnly: true },
+  { path: "/ib-pending-vouchers",             label: "IB Pending Vouchers",             category: "Inter Branch", ibOnly: true },
+  { path: "/ib-incoming-vouchers",            label: "IB Incoming Vouchers",            category: "Inter Branch", ibOnly: true },
 
   // ── Daily Reports ─────────────────────────────────────────────────────────
   { path: "/day-book",                        label: "Day Book",                        category: "Daily Reports" },
@@ -177,4 +181,7 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
   { path: "/member-report",                   label: "Member Report",                   category: "Member Reports" },
   { path: "/member-accounts",                 label: "Accounts Detail",                 category: "Member Reports" },
   { path: "/member-int-cert",                 label: "Interest Certificate",            category: "Member Reports" },
+
+  // ── Super User ────────────────────────────────────────────────────────────
+  { path: "/su-settings",                     label: "Super User Settings",             category: "Super User",       suOnly: true },
 ];

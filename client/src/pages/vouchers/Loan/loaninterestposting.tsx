@@ -10,6 +10,7 @@ import Swal from "sweetalert2";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import commonservice from "../../../services/common/commonservice";
+import superUserSettingsApi from "../../../services/superuser/superUserSettingsApi";
 import loanInterestPostingApi, {
   LoanInterestBatchItemDTO,
 } from "../../../services/vouchers/loan/loanInterestPostingApi";
@@ -78,10 +79,18 @@ const LoanInterestPostingVoucher: React.FC = () => {
   const [batchItems, setBatchItems] = useState<LoanInterestBatchItemDTO[]>([]);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
   const [hasShown, setHasShown] = useState(false);
+  const [stdOverrides, setStdOverrides] = useState<Record<number, number>>({});
+  const [penalOverrides, setPenalOverrides] = useState<Record<number, number>>({});
+  const [stdDisplayValues, setStdDisplayValues] = useState<Record<number, string>>({});
+  const [penalDisplayValues, setPenalDisplayValues] = useState<Record<number, string>>({});
+  const [allowLoanInterestChange, setAllowLoanInterestChange] = useState(false);
 
   // ── Load products on mount ────────────────────────────────────────────────
 
   useEffect(() => {
+    superUserSettingsApi.getInterestPostingSettings(user.branchid).then((res: any) => {
+      if (res.success && res.data) setAllowLoanInterestChange(res.data.allowLoanInterestChange);
+    });
     setProductsLoading(true);
     commonservice
       .fetch_loan_products(user.branchid)
@@ -141,6 +150,10 @@ const LoanInterestPostingVoucher: React.FC = () => {
     setBatchItems([]);
     setCheckedIds(new Set());
     setHasShown(false);
+    setStdOverrides({});
+    setPenalOverrides({});
+    setStdDisplayValues({});
+    setPenalDisplayValues({});
 
     try {
       const res = await loanInterestPostingApi.batchCalculate(
@@ -217,8 +230,8 @@ const LoanInterestPostingVoucher: React.FC = () => {
         narration: narration || undefined,
         items: selected.map((x) => ({
           loanAccountId: x.loanAccId,
-          stdInterestAmount: x.stdInterest,
-          penalInterestAmount: x.penalInterest,
+          stdInterestAmount: getStd(x),
+          penalInterestAmount: getPenal(x),
         })),
       });
 
@@ -264,6 +277,10 @@ const LoanInterestPostingVoucher: React.FC = () => {
     setNarration("");
     setErrors({});
     setHasShown(false);
+    setStdOverrides({});
+    setPenalOverrides({});
+    setStdDisplayValues({});
+    setPenalDisplayValues({});
   };
 
   // ── Options ───────────────────────────────────────────────────────────────
@@ -271,9 +288,13 @@ const LoanInterestPostingVoucher: React.FC = () => {
   const loanProductOptions = loanProducts.map((p) => ({ value: p.id, label: p.productName }));
   const loanAccountOptions = loanAccounts.map((a) => ({ value: a.accId, label: a.accountName }));
 
+  const getStd = (x: LoanInterestBatchItemDTO) => stdOverrides[x.loanAccId] ?? x.stdInterest;
+  const getPenal = (x: LoanInterestBatchItemDTO) => penalOverrides[x.loanAccId] ?? x.penalInterest;
+  const getTotalPostable = (x: LoanInterestBatchItemDTO) => getStd(x) + getPenal(x);
+
   const totalSelected = batchItems
     .filter((x) => checkedIds.has(x.loanAccId))
-    .reduce((s, x) => s + x.totalPostable, 0);
+    .reduce((s, x) => s + getTotalPostable(x), 0);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -532,17 +553,61 @@ const LoanInterestPostingVoucher: React.FC = () => {
                               <td className="px-4 py-3 text-right text-gray-700">
                                 ₹{fmt(item.principalBalance)}
                               </td>
-                              <td className="px-4 py-3 text-right text-amber-700 font-semibold">
-                                ₹{fmt(item.stdInterest)}
+                              <td className="px-4 py-3 text-right text-amber-700 font-semibold" onClick={(e) => e.stopPropagation()}>
+                                {allowLoanInterestChange ? (
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    maxLength={8}
+                                    value={
+                                      stdDisplayValues[item.loanAccId] !== undefined
+                                        ? stdDisplayValues[item.loanAccId]
+                                        : parseFloat(item.stdInterest.toFixed(2)).toString()
+                                    }
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      if (raw === "" || /^\d*\.?\d{0,2}$/.test(raw)) {
+                                        setStdDisplayValues((prev) => ({ ...prev, [item.loanAccId]: raw }));
+                                        const val = parseFloat(raw);
+                                        setStdOverrides((prev) => ({ ...prev, [item.loanAccId]: isNaN(val) ? 0 : val }));
+                                      }
+                                    }}
+                                    className="w-24 px-2 py-1 text-right border border-amber-300 rounded-lg text-sm font-semibold text-amber-700 bg-white outline-none focus:ring-2 focus:ring-amber-400"
+                                  />
+                                ) : (
+                                  <>₹{fmt(getStd(item))}</>
+                                )}
                               </td>
-                              <td className="px-4 py-3 text-right text-rose-700 font-semibold">
-                                {item.penalInterest > 0 ? `₹${fmt(item.penalInterest)}` : "—"}
+                              <td className="px-4 py-3 text-right text-rose-700 font-semibold" onClick={(e) => e.stopPropagation()}>
+                                {allowLoanInterestChange ? (
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    maxLength={8}
+                                    value={
+                                      penalDisplayValues[item.loanAccId] !== undefined
+                                        ? penalDisplayValues[item.loanAccId]
+                                        : parseFloat(item.penalInterest.toFixed(2)).toString()
+                                    }
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      if (raw === "" || /^\d*\.?\d{0,2}$/.test(raw)) {
+                                        setPenalDisplayValues((prev) => ({ ...prev, [item.loanAccId]: raw }));
+                                        const val = parseFloat(raw);
+                                        setPenalOverrides((prev) => ({ ...prev, [item.loanAccId]: isNaN(val) ? 0 : val }));
+                                      }
+                                    }}
+                                    className="w-24 px-2 py-1 text-right border border-rose-300 rounded-lg text-sm font-semibold text-rose-700 bg-white outline-none focus:ring-2 focus:ring-rose-400"
+                                  />
+                                ) : (
+                                  <>{getPenal(item) > 0 ? `₹${fmt(getPenal(item))}` : "—"}</>
+                                )}
                               </td>
                               <td className="px-4 py-3 text-right text-purple-700 font-semibold">
                                 {item.stdRecoverable > 0 ? `₹${fmt(item.stdRecoverable)}` : "—"}
                               </td>
                               <td className="px-4 py-3 text-right text-green-700 font-bold">
-                                ₹{fmt(item.totalPostable)}
+                                ₹{fmt(getTotalPostable(item))}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="text-xs text-gray-600 leading-relaxed">
@@ -567,16 +632,16 @@ const LoanInterestPostingVoucher: React.FC = () => {
                             Totals ({batchItems.length} accounts)
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-bold text-amber-700">
-                            ₹{fmt(batchItems.reduce((s, x) => s + x.stdInterest, 0))}
+                            ₹{fmt(batchItems.reduce((s, x) => s + getStd(x), 0))}
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-bold text-rose-700">
-                            ₹{fmt(batchItems.reduce((s, x) => s + x.penalInterest, 0))}
+                            ₹{fmt(batchItems.reduce((s, x) => s + getPenal(x), 0))}
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-bold text-purple-700">
                             ₹{fmt(batchItems.reduce((s, x) => s + x.stdRecoverable, 0))}
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-bold text-green-700">
-                            ₹{fmt(batchItems.reduce((s, x) => s + x.totalPostable, 0))}
+                            ₹{fmt(batchItems.reduce((s, x) => s + getTotalPostable(x), 0))}
                           </td>
                           <td />
                         </tr>

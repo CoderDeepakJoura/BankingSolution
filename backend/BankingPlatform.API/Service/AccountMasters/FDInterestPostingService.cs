@@ -41,6 +41,7 @@ namespace BankingPlatform.API.Service.AccountMasters
         public DateTime PostingDate { get; set; }
         public List<int> AccountIds { get; set; } = new();
         public bool IsMIS { get; set; }
+        public Dictionary<int, decimal>? InterestOverrides { get; set; }
     }
 
     // ── Service ──────────────────────────────────────────────────────────────────
@@ -255,7 +256,10 @@ namespace BankingPlatform.API.Service.AccountMasters
                     }
 
                     if (!periodPostings.Any()) continue;
-                    decimal totalInterest = periodPostings.Sum(p => p.Interest);
+                    decimal totalInterest = (dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(accountId, out var fdOv))
+                        ? Math.Round(fdOv, 2)
+                        : periodPostings.Sum(p => p.Interest);
+                    if (totalInterest <= 0) continue;
 
                     // Create voucher
                     var voucherEntity = new VoucherDTO

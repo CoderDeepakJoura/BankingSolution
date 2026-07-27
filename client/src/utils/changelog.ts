@@ -15,6 +15,30 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.3.2",
+    date: "2026-07-25",
+    changes: [
+      { type: "new",         text: "Favourites: pin any screen to a personal quick-access bar from the header" },
+      { type: "improvement", text: "Header search bar now finds screens instantly with live filtering" },
+      { type: "new",         text: "Dashboard redesigned with gradient hero card, branch info chips, and 6 quick-access tiles" },
+      { type: "new",         text: "Inter-Branch voucher detail view: full step-by-step status and audit trail visible per voucher" },
+      { type: "improvement", text: "General Ledger & Head Ledger: balance now shows Dr/Cr suffix (e.g. 820 Cr) instead of raw negative numbers" },
+      { type: "improvement", text: "Debit amounts highlighted in red, credit amounts in green across all ledger reports" },
+      { type: "fix",         text: "Head Ledger opening balance now correctly includes Loan OB and FD per-detail OB" },
+      { type: "fix",         text: "Head Ledger now filters only verified and approved vouchers (status V/A)" },
+    ],
+  },
+  {
+    version: "1.3.1",
+    date: "2026-07-14",
+    changes: [
+      { type: "new",         text: "IB Saving Withdrawal: source branch can now initiate inter-branch withdrawal" },
+      { type: "new",         text: "IB Saving Withdrawal voucher ledger view added" },
+      { type: "improvement", text: "IB Incoming & Pending voucher screens handle both deposit and withdrawal with correct Dr/Cr labels" },
+      { type: "fix",         text: "Removed stray console.log statements from production build" },
+    ],
+  },
+  {
     version: "1.3.0",
     date: "2026-06-14",
     changes: [

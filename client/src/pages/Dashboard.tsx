@@ -56,15 +56,18 @@ const AddFavouriteModal: React.FC<{
   existingPaths: Set<string>;
   onAdd: (path: string, label: string, category: string) => void;
   onClose: () => void;
-}> = ({ existingPaths, onAdd, onClose }) => {
+  isSu: boolean;
+}> = ({ existingPaths, onAdd, onClose, isSu }) => {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
+  const visibleScreens = SEARCHABLE_SCREENS.filter(s => !s.suOnly || isSu);
+
   const filtered = query.trim().length === 0
-    ? SEARCHABLE_SCREENS
-    : SEARCHABLE_SCREENS.filter(s =>
+    ? visibleScreens
+    : visibleScreens.filter(s =>
         s.label.toLowerCase().includes(query.toLowerCase()) ||
         s.category.toLowerCase().includes(query.toLowerCase())
       );
@@ -285,6 +288,7 @@ const Dashboard: React.FC = () => {
         existingPaths={existingPaths}
         onAdd={handleAdd}
         onClose={() => setShowModal(false)}
+        isSu={user.isSu}
       />
     )}
     <DashboardLayout

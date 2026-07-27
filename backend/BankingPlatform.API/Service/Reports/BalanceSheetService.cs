@@ -85,18 +85,54 @@ namespace BankingPlatform.API.Service.Reports
 
             // ══════════════════════════════════════════════════════════════════════════════
             // PART A — IsAnnexure=1 BS heads + P&L heads: head-level balance
+            // SP's GetBalanceHEAD uses trailing-zeros prefix matching; replicate that here.
             // ══════════════════════════════════════════════════════════════════════════════
 
             var hlHeadCodes = ann1Heads.Select(h => h.headcode)
                 .Concat(plHeads.Select(h => h.headcode))
                 .Distinct().ToList();
 
-            // Voucher totals grouped by AccHeadCode (VoucherStatus V or A — matches GetAccountBalance)
-            var hlVoucherBals = await _db.vouchercreditdebitdetails.AsNoTracking()
+            // Build prefix map mirroring SP: trailing-zeros rule determines prefix length
+            static string GetAnn1Prefix(long headcode)
+            {
+                var s = headcode.ToString().PadLeft(12, '0');
+                if (s[3..] == "000000000") return s[..3];
+                if (s[6..] == "000000")    return s[..6];
+                if (s[9..] == "000")       return s[..9];
+                return s;
+            }
+
+            var prefixEntries = hlHeadCodes
+                .Select(hc => (Hc: hc, Prefix: GetAnn1Prefix(hc)))
+                .ToList();
+
+            // Fetch all headcodes in accounthead for this branch to enumerate child heads
+            var allBranchHeadCodes = await _db.accounthead.AsNoTracking()
+                .Where(h => h.branchid == branchId)
+                .Select(h => h.headcode)
+                .ToListAsync();
+
+            // Map every branch headcode → its parent reporting head (longest prefix match wins)
+            var childToParent = new Dictionary<long, long>();
+            foreach (var childHc in allBranchHeadCodes)
+            {
+                var childStr = childHc.ToString().PadLeft(12, '0');
+                var best = prefixEntries
+                    .Where(e => childStr.StartsWith(e.Prefix))
+                    .OrderByDescending(e => e.Prefix.Length)
+                    .Select(e => (long?)e.Hc)
+                    .FirstOrDefault();
+                if (best.HasValue)
+                    childToParent[childHc] = best.Value;
+            }
+            var expandedHlHcs = childToParent.Keys.ToList();
+
+            // Voucher totals grouped by AccHeadCode, then aggregated to parent reporting head
+            var hlVoucherRaw = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(d => d.BrId == branchId
                     && (d.VoucherStatus == "V" || d.VoucherStatus == "A")
                     && d.ValueDate < nextDay
-                    && hlHeadCodes.Contains(d.AccHeadCode))
+                    && expandedHlHcs.Contains(d.AccHeadCode))
                 .GroupBy(d => d.AccHeadCode)
                 .Select(g => new
                 {
@@ -106,7 +142,14 @@ namespace BankingPlatform.API.Service.Reports
                 })
                 .ToListAsync();
 
-            var hlVoucherMap = hlVoucherBals.ToDictionary(x => x.HeadCode);
+            // Aggregate child-head vouchers to parent ann1/P&L head
+            var hlVoucherByParent = new Dictionary<long, (decimal Dr, decimal Cr)>();
+            foreach (var v in hlVoucherRaw)
+            {
+                if (!childToParent.TryGetValue(v.HeadCode, out var parentHc)) continue;
+                var (dr, cr) = hlVoucherByParent.GetValueOrDefault(parentHc);
+                hlVoucherByParent[parentHc] = (dr + v.TotalDr, cr + v.TotalCr);
+            }
 
             // Opening balances for Ann1 BS heads + P&L heads (income/expense heads may have
             // accounts in accountmaster with entries in accopeningbalance)
@@ -120,12 +163,15 @@ namespace BankingPlatform.API.Service.Reports
             {
                 // 1. Standard opening balances (Saving / General / RD / ShareMoney)
                 var hlAccounts = await _db.accountmaster.AsNoTracking()
-                    .Where(a => a.BranchId == branchId && ann1HeadCodes.Contains(a.HeadCode))
+                    .Where(a => a.BranchId == branchId && expandedHlHcs.Contains(a.HeadCode))
                     .Select(a => new { a.ID, a.HeadCode })
                     .ToListAsync();
 
-                var hlAccIds    = hlAccounts.Select(a => a.ID).ToList();
-                var hlAccHdMap  = hlAccounts.ToDictionary(a => a.ID, a => a.HeadCode);
+                var hlAccIds   = hlAccounts.Select(a => a.ID).ToList();
+                // Map account headcode → parent ann1 head (child heads roll up to parent)
+                var hlAccHdMap = hlAccounts.ToDictionary(
+                    a => a.ID,
+                    a => childToParent.TryGetValue(a.HeadCode, out var ph) ? ph : a.HeadCode);
 
                 var hlObs = await _db.accopeningbalance.AsNoTracking()
                     .Where(ob => ob.BranchId == branchId && hlAccIds.Contains(ob.AccountId))
@@ -146,17 +192,18 @@ namespace BankingPlatform.API.Service.Reports
                     join acc in _db.accountmaster.AsNoTracking() on fd.AccountId equals acc.ID
                     where acc.BranchId == branchId
                         && fd.OpeningBalance != null && fd.OpeningBalance > 0
-                        && ann1HeadCodes.Contains(acc.HeadCode)
-                    select new { HeadCode = acc.HeadCode, fd.OpeningBalance, fd.OpeningBalanceType }
+                        && expandedHlHcs.Contains(acc.HeadCode)
+                    select new { acc.HeadCode, fd.OpeningBalance, fd.OpeningBalanceType }
                 ).ToListAsync();
 
                 foreach (var fd in hlFdObs)
                 {
+                    var hc = childToParent.TryGetValue(fd.HeadCode, out var ph) ? ph : fd.HeadCode;
                     var amt = fd.OpeningBalance ?? 0m;
                     if (fd.OpeningBalanceType?.ToUpper() == "DR")
-                        hlObDr[fd.HeadCode] = hlObDr.GetValueOrDefault(fd.HeadCode) + amt;
+                        hlObDr[hc] = hlObDr.GetValueOrDefault(hc) + amt;
                     else
-                        hlObCr[fd.HeadCode] = hlObCr.GetValueOrDefault(fd.HeadCode) + amt;
+                        hlObCr[hc] = hlObCr.GetValueOrDefault(hc) + amt;
                 }
 
                 // 3. Loan opening balance — join via accountmaster.HeadCode
@@ -165,7 +212,7 @@ namespace BankingPlatform.API.Service.Reports
                     from loan in _db.loanaccopeningbalance.AsNoTracking()
                     join acc in _db.accountmaster.AsNoTracking() on loan.AccId equals (int?)acc.ID
                     where acc.BranchId == branchId
-                        && ann1HeadCodes.Contains(acc.HeadCode)
+                        && expandedHlHcs.Contains(acc.HeadCode)
                     select new
                     {
                         loan.TotalBalance, loan.BalType,
@@ -192,7 +239,7 @@ namespace BankingPlatform.API.Service.Reports
 
                 foreach (var item in hlLoanObsRaw)
                 {
-                    var hc = item.PrincipalHc;
+                    var hc = childToParent.TryGetValue(item.PrincipalHc, out var ph) ? ph : item.PrincipalHc;
                     long? rawIntHc = item.ProductId.HasValue
                         ? hlLoanPostingMap.GetValueOrDefault(item.ProductId!.Value)
                         : null;
@@ -393,9 +440,9 @@ namespace BankingPlatform.API.Service.Reports
             // Ann1 BS heads (head-level balance, side-switching by sign)
             foreach (var h in ann1Heads)
             {
-                hlVoucherMap.TryGetValue(h.headcode, out var vb);
-                decimal dr      = (vb?.TotalDr ?? 0m) + hlObDr.GetValueOrDefault(h.headcode);
-                decimal cr      = (vb?.TotalCr ?? 0m) + hlObCr.GetValueOrDefault(h.headcode);
+                hlVoucherByParent.TryGetValue(h.headcode, out var vb);
+                decimal dr      = vb.Dr + hlObDr.GetValueOrDefault(h.headcode);
+                decimal cr      = vb.Cr + hlObCr.GetValueOrDefault(h.headcode);
                 decimal netDrCr = dr - cr;
 
                 if (netDrCr == 0m) continue;
@@ -463,9 +510,9 @@ namespace BankingPlatform.API.Service.Reports
             // P&L heads (income/expense — vouchers + opening balance from accountmaster if any)
             foreach (var h in plHeads)
             {
-                hlVoucherMap.TryGetValue(h.headcode, out var vb);
-                decimal dr = (vb?.TotalDr ?? 0m) + hlObDr.GetValueOrDefault(h.headcode);
-                decimal cr = (vb?.TotalCr ?? 0m) + hlObCr.GetValueOrDefault(h.headcode);
+                hlVoucherByParent.TryGetValue(h.headcode, out var vb);
+                decimal dr = vb.Dr + hlObDr.GetValueOrDefault(h.headcode);
+                decimal cr = vb.Cr + hlObCr.GetValueOrDefault(h.headcode);
                 // Income (cat 3): Cr normal → Cr-Dr; Expense (cat 4): Dr normal → Dr-Cr
                 decimal balance = h.categoryid == 4 ? (dr - cr) : (cr - dr);
 

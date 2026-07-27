@@ -5,7 +5,7 @@ import ApiService from "../services/api";
 import { useSelector } from "react-redux";
 import { RootState } from "../redux";
 import ibVoucherApi, { IBNotification, IBNotificationItem } from "../services/interbranch/ibVoucherApi";
-import { SEARCHABLE_SCREENS } from "../routes/screenList";
+import { SEARCHABLE_SCREENS, ScreenEntry } from "../routes/screenList";
 
 const SearchBar: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -15,9 +15,13 @@ const SearchBar: React.FC = () => {
   const containerRef                = useRef<HTMLDivElement>(null);
   const inputRef                    = useRef<HTMLInputElement>(null);
   const navigate                    = useNavigate();
+  const isSu                        = useSelector((state: RootState) => state.user.isSu);
+  const ibEnabledSearch             = useSelector((state: RootState) => state.user.enableIBTransactions);
+
+  const visibleScreens = SEARCHABLE_SCREENS.filter(s => (!s.suOnly || isSu) && (!s.ibOnly || ibEnabledSearch));
 
   const filtered = searchTerm.trim().length > 0
-    ? SEARCHABLE_SCREENS.filter(s =>
+    ? visibleScreens.filter(s =>
         s.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.category.toLowerCase().includes(searchTerm.toLowerCase())
       ).slice(0, 10)
@@ -43,7 +47,7 @@ const SearchBar: React.FC = () => {
     setShowDrop(true);
   };
 
-  const go = (screen: Screen) => {
+  const go = (screen: ScreenEntry) => {
     navigate(screen.path);
     setSearchTerm("");
     setShowDrop(false);
@@ -108,6 +112,7 @@ const SearchBar: React.FC = () => {
 
 const NotificationBell: React.FC<{ branchId: number }> = ({ branchId }) => {
   const navigate     = useNavigate();
+  const ibEnabled    = useSelector((state: RootState) => state.user.enableIBTransactions);
   const bellRef      = useRef<HTMLDivElement>(null);
   const dropdownRef  = useRef<HTMLDivElement>(null);
   const [open, setOpen]         = useState(false);
@@ -145,6 +150,8 @@ const NotificationBell: React.FC<{ branchId: number }> = ({ branchId }) => {
     setOpen(false);
     navigate(item.type === "incoming" ? "/ib-incoming-vouchers" : "/ib-pending-vouchers");
   };
+
+  if (!ibEnabled) return null;
 
   return (
     <div ref={bellRef} className="relative flex-none">

@@ -93,6 +93,20 @@ const IBPendingVouchers: React.FC = () => {
     </div>
   );
 
+  if (!user.enableIBTransactions) return (
+    <DashboardLayout enableScroll mainContent={
+      <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 text-center max-w-md">
+          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <GitMerge className="w-7 h-7 text-gray-400" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-700 mb-2">IB Transactions Disabled</h2>
+          <p className="text-sm text-gray-400">Inter-Branch transactions have been disabled for this branch. Contact your Super User to enable this feature.</p>
+        </div>
+      </div>
+    } />
+  );
+
   return (
     <DashboardLayout
       enableScroll={false}

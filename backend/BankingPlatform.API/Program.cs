@@ -406,6 +406,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// Auto-apply any pending EF Core migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<BankingDbContext>();
+    db.Database.Migrate();
+}
+
 // Helper method to validate JWT format
 static bool IsValidJwtFormat(string token)
 {

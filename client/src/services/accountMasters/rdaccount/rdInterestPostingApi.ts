@@ -33,6 +33,7 @@ export interface PostRDInterestDTO {
   fromDate: string;
   toDate: string;
   accountIds: number[];
+  interestOverrides?: Record<number, number>;
 }
 
 class RDInterestPostingApiService extends ApiService {

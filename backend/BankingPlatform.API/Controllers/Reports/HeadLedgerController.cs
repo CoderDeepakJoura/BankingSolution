@@ -37,12 +37,18 @@ namespace BankingPlatform.API.Controllers.Reports
             }
         }
 
+        // format = "detail"       → Head Ledger (In Detail): flat combined list, single running balance
+        // format = "consolidate"  → Head Ledger (Consolidate On Accounts): summary table per account
+        // format = "accounts"     → Head Ledger (Accounts): per-account sections, personal accounts only
         [HttpGet]
         public async Task<IActionResult> GetHeadLedger(
             [FromQuery] int branchId,
             [FromQuery] long headCode,
             [FromQuery] string fromDate,
-            [FromQuery] string toDate)
+            [FromQuery] string toDate,
+            [FromQuery] string format = "consolidate",
+            [FromQuery] bool consolidate = false,
+            [FromQuery] bool nonZero = false)
         {
             try
             {
@@ -55,11 +61,22 @@ namespace BankingPlatform.API.Controllers.Reports
                 if (from > to)
                     return BadRequest(new { Success = false, Message = "fromDate must be on or before toDate." });
 
-                var (success, message, data) = await _service.GetHeadLedgerAsync(branchId, headCode, from, to);
-                if (!success)
-                    return BadRequest(new { Success = false, Message = message });
-
-                return Ok(new { Success = true, Data = data });
+                if (format == "detail")
+                {
+                    var (success, message, data) = await _service.GetHeadInDetailAsync(
+                        branchId, headCode, from, to, consolidate, nonZero);
+                    if (!success)
+                        return BadRequest(new { Success = false, Message = message });
+                    return Ok(new { Success = true, Data = data });
+                }
+                else
+                {
+                    var (success, message, data) = await _service.GetHeadLedgerAsync(
+                        branchId, headCode, from, to, format, nonZero);
+                    if (!success)
+                        return BadRequest(new { Success = false, Message = message });
+                    return Ok(new { Success = true, Data = data });
+                }
             }
             catch (Exception ex)
             {

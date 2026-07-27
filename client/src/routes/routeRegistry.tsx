@@ -182,6 +182,7 @@ import MemberReportPage from "../pages/reports/MemberReport";
 import MemberAccountsPage from "../pages/reports/MemberAccounts";
 import MemberIntCertPage from "../pages/reports/MemberIntCert";
 import SeleniumAutomation from "../pages/seleniumautomation/automation";
+import SuperUserSettings from "../pages/superuser/SuperUserSettings";
 
 export interface RouteEntry {
   path: string;
@@ -190,6 +191,8 @@ export interface RouteEntry {
   label?: string;
   /** Search category. Required when label is set. */
   category?: string;
+  /** If true, only shown in sidebar/search for super-user accounts. */
+  suOnly?: boolean;
 }
 
 // ─── ROUTE REGISTRY ─────────────────────────────────────────────────────────
@@ -480,6 +483,9 @@ export const ROUTES: RouteEntry[] = [
   { path: "/member-report",                   element: <MemberReportPage />,            label: "Member Report",            category: "Member Reports" },
   { path: "/member-accounts",                 element: <MemberAccountsPage />,          label: "Accounts Detail",          category: "Member Reports" },
   { path: "/member-int-cert",                 element: <MemberIntCertPage />,           label: "Interest Certificate",     category: "Member Reports" },
+
+  // ── Super User ────────────────────────────────────────────────────────────
+  { path: "/su-settings",                     element: <SuperUserSettings />,           label: "Super User Settings",      category: "Super User",    suOnly: true },
 ];
 
 /** All searchable screens for the header search bar. Imported from screenList to avoid circular deps. */

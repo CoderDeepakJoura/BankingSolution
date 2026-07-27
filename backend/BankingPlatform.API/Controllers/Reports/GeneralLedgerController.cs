@@ -21,6 +21,22 @@ namespace BankingPlatform.API.Controllers.Reports
             _cf      = cf;
         }
 
+        [HttpGet("general-accounts")]
+        public async Task<IActionResult> GetGeneralAccounts([FromQuery] int branchId)
+        {
+            try
+            {
+                var (success, message, data) = await _service.GetGeneralAccountsAsync(branchId);
+                return Ok(new { Success = success, Message = message, Data = data });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching general accounts.");
+                await _cf.LogErrors(ex, nameof(GetGeneralAccounts), nameof(GeneralLedgerController));
+                return StatusCode(500, new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpGet("accounts")]
         public async Task<IActionResult> GetAccountsForHead([FromQuery] int branchId, [FromQuery] long headCode)
         {

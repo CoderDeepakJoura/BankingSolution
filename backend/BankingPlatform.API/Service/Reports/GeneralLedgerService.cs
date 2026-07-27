@@ -66,6 +66,25 @@ namespace BankingPlatform.API.Service.Reports
             return (true, "OK", accounts);
         }
 
+        public async Task<(bool success, string message, List<GeneralLedgerAccountItemDTO>? data)> GetGeneralAccountsAsync(
+            int branchId)
+        {
+            var accounts = await _db.accountmaster.AsNoTracking()
+                .Where(a => a.BranchId == branchId && a.AccTypeId == 3)
+                .OrderBy(a => a.AccSuffix)
+                .Select(a => new GeneralLedgerAccountItemDTO
+                {
+                    AccountId   = a.ID,
+                    AccountName = a.AccountName ?? "",
+                    AccountNo   = !string.IsNullOrWhiteSpace(a.AccountNumber)
+                                      ? a.AccountNumber
+                                      : (a.AccPrefix ?? "") + "-" + (a.AccSuffix ?? 0),
+                })
+                .ToListAsync();
+
+            return (true, "OK", accounts);
+        }
+
         public async Task<(bool success, string message, GeneralLedgerDTO? data)> GetGeneralLedgerAsync(
             int branchId, int accountId, DateTime fromDate, DateTime toDate,
             bool consolidate = false, bool nonZero = false)

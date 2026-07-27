@@ -323,6 +323,18 @@ CREATE TABLE IF NOT EXISTS printingsettings (
     CONSTRAINT printingsettings_pkey PRIMARY KEY (id, branchid)
 );
 
+CREATE TABLE IF NOT EXISTS superusersettings (
+    id                          INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    branchid                    INTEGER   NOT NULL DEFAULT 1,
+    allowsavinginterestchange   BOOLEAN   NOT NULL DEFAULT FALSE,
+    allowfdinterestchange       BOOLEAN   NOT NULL DEFAULT FALSE,
+    allowrdinterestchange       BOOLEAN   NOT NULL DEFAULT FALSE,
+    allowloaninterestchange     BOOLEAN   NOT NULL DEFAULT FALSE,
+    enableibtransactions        BOOLEAN   NOT NULL DEFAULT TRUE,
+    allowgstdeduction           BOOLEAN   NOT NULL DEFAULT TRUE,
+    CONSTRAINT superusersettings_pkey PRIMARY KEY (id, branchid)
+);
+
 
 -- =============================================================================
 -- SECTION 4 : MEMBER TABLES
@@ -2065,3 +2077,26 @@ DO $$ BEGIN
             REFERENCES loanslab (id, brid) ON DELETE RESTRICT;
     END IF;
 END $$;
+
+
+-- Incremental: rename interestpostingsettings → superusersettings and add new feature-flag columns
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'interestpostingsettings') THEN
+        ALTER TABLE interestpostingsettings RENAME TO superusersettings;
+    END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS superusersettings (
+    id                          INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    branchid                    INTEGER   NOT NULL DEFAULT 1,
+    allowsavinginterestchange   BOOLEAN   NOT NULL DEFAULT FALSE,
+    allowfdinterestchange       BOOLEAN   NOT NULL DEFAULT FALSE,
+    allowrdinterestchange       BOOLEAN   NOT NULL DEFAULT FALSE,
+    allowloaninterestchange     BOOLEAN   NOT NULL DEFAULT FALSE,
+    enableibtransactions        BOOLEAN   NOT NULL DEFAULT TRUE,
+    allowgstdeduction           BOOLEAN   NOT NULL DEFAULT TRUE,
+    CONSTRAINT superusersettings_pkey PRIMARY KEY (id, branchid)
+);
+
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS enableibtransactions BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS allowgstdeduction    BOOLEAN NOT NULL DEFAULT TRUE;

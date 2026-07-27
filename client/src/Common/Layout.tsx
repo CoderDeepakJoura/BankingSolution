@@ -10,11 +10,13 @@ import {
   Calculator,
   LayoutDashboard,
   BarChart2,
+  ShieldCheck,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Header from "../components/HeaderLandingPage";
 import Footer from "../components/Footer";
 import ApiService from "../services/api";
+import superUserSettingsApi from "../services/superuser/superUserSettingsApi";
 import { useEffect } from "react";
 import WhatsNewModal from "../components/WhatsNewModal";
 
@@ -92,6 +94,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const isSu = useSelector((state: RootState) => state.user.isSu);
   const isMainBranch = useSelector((state: RootState) => state.user.isMainBranch);
   const branchGstNo = useSelector((state: RootState) => state.user.branchGstNo);
+  const ibEnabled = useSelector((state: RootState) => state.user.enableIBTransactions);
   useBrowserNavigationControl(true);
   useEffect(() => {
     const init = async () => {
@@ -106,6 +109,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         // only run this if token is valid
         const data = await ApiService.get_login_info() as any;
         if (data.success) {
+          const suRes = await superUserSettingsApi.getSettings(data.branchId).catch(() => null);
           dispatch(
             setUser({
               name: data.userName,
@@ -128,6 +132,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               branchGstNo: data.branchGstNo ?? "",
               branchStateId: data.branchStateId ?? 0,
               lastSeenVersion: data.lastSeenVersion ?? "0.0.0",
+              enableIBTransactions: suRes?.data?.enableIBTransactions ?? true,
+              allowGSTDeduction: suRes?.data?.allowGSTDeduction ?? true,
             }),
           );
         } else {
@@ -316,6 +322,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {
           label: "Inter Branch",
           path: "",
+          ibOnly: true,
           subItems: [
             { label: "Other Branch Accounts", path: "/other-branch-accounts" },
             { label: "IB Pending Vouchers", path: "/ib-pending-vouchers", mainBranchOnly: true },
@@ -405,13 +412,26 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         },
       ],
     },
+    {
+      icon: <ShieldCheck size={18} />,
+      label: "Super User",
+      hasSubItems: true,
+      suOnly: true,
+      subItems: [
+        {
+          label: "Super User Settings",
+          path: "/su-settings",
+          suOnly: true,
+        },
+      ],
+    },
   ];
 
   const hasGst = !!branchGstNo;
 
   const filterByRole = (items: any[]): any[] =>
     items
-      .filter((item) => (!item.suOnly || isSu) && (!item.gstOnly || hasGst) && (!item.mainBranchOnly || isMainBranch))
+      .filter((item) => (!item.suOnly || isSu) && (!item.gstOnly || hasGst) && (!item.mainBranchOnly || isMainBranch) && (!item.ibOnly || ibEnabled))
       .map((item) => ({
         ...item,
         subItems: item.subItems ? filterByRole(item.subItems) : undefined,
@@ -518,22 +538,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const handleWhatsNewClose = () => setShowWhatsNew(false);
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative print:h-auto print:block print:bg-white">
       {showWhatsNew && <WhatsNewModal onClose={handleWhatsNewClose} />}
       {/* Bubbles */}
-      <div className="absolute inset-0 overflow-hidden z-0">
+      <div className="absolute inset-0 overflow-hidden z-0 print:hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full filter blur-3xl opacity-20 animate-pulse" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full filter blur-3xl opacity-20 animate-pulse delay-2000" />
         <div className="absolute top-40 left-40 w-80 h-80 bg-purple-400 rounded-full filter blur-3xl opacity-20 animate-pulse delay-4000" />
       </div>
 
-      <div className="relative z-10">
+      <div className="relative z-10 print:hidden">
         <Header />
       </div>
 
-      <div className="flex flex-1 relative z-10 overflow-hidden">
+      <div className="flex flex-1 relative z-10 overflow-hidden print:block print:overflow-visible">
         {/* Sidebar */}
-        <>
+        <div className="print:hidden">
           {sidebarOpen && (
             <div
               className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
@@ -599,10 +619,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               </div>
             </nav>
           </div>
-        </>
+        </div>{/* end print:hidden sidebar wrapper */}
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="lg:hidden p-4 bg-white shadow-sm flex-shrink-0">
+        <div className="flex-1 flex flex-col overflow-hidden print:block print:overflow-visible">
+          <div className="lg:hidden p-4 bg-white shadow-sm flex-shrink-0 print:hidden">
             <button
               onClick={toggleSidebar}
               className="p-2 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700"
@@ -613,7 +633,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           <main
             id="mainlayoutdiv"
-            className={`flex-1 p-6 sm:p-8 lg:p-10 ${
+            className={`flex-1 p-6 sm:p-8 lg:p-10 print:p-0 print:overflow-visible ${
               enableScroll ? "overflow-y-auto" : "overflow-hidden"
             }`}
           >
@@ -622,7 +642,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         </div>
       </div>
 
-      <Footer onWhatsNewClick={() => setShowWhatsNew(true)} />
+      <div className="print:hidden">
+        <Footer onWhatsNewClick={() => setShowWhatsNew(true)} />
+      </div>
     </div>
   );
 };

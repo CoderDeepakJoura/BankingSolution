@@ -22,6 +22,7 @@ export interface PostSavingInterestDTO {
   productId: number;
   postingDate: string;
   accountIds: number[];
+  interestOverrides?: Record<number, number>;
 }
 
 class SavingInterestApiService extends ApiService {

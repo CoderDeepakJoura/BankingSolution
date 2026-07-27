@@ -50,13 +50,15 @@ namespace BankingPlatform.API.Service.Reports
             var branch = await _db.branchmaster.AsNoTracking()
                 .FirstOrDefaultAsync(b => b.id == branchId);
 
-            // Income (cat 3) and Expense (cat 4) heads for this branch
+            // Income (cat 3) and Expense (cat 4) heads — showinreport=1 only (mirrors BalanceSheet SP)
             var heads = await (
                 from ah in _db.accounthead.AsNoTracking()
                 join aht in _db.accountheadtype.AsNoTracking()
                     on new { ah.accountheadtypeid, ah.branchid }
                     equals new { accountheadtypeid = aht.id, branchid = aht.branchid }
-                where ah.branchid == branchId && (aht.categoryid == 3 || aht.categoryid == 4)
+                where ah.branchid == branchId
+                   && ah.showinreport == 1
+                   && (aht.categoryid == 3 || aht.categoryid == 4)
                 select new
                 {
                     ah.headcode,
@@ -69,12 +71,49 @@ namespace BankingPlatform.API.Service.Reports
             if (!heads.Any())
                 return (false, "No income/expense account heads found for this branch.", null);
 
-            // Voucher balances within the date range (inclusive on both ends)
+            var headCodes = heads.Select(h => h.headcode).Distinct().ToList();
+
+            // Build prefix map matching SP's GetBalanceHEAD trailing-zeros rule
+            static string GetPrefix(long headcode)
+            {
+                var s = headcode.ToString().PadLeft(12, '0');
+                if (s[3..] == "000000000") return s[..3];
+                if (s[6..] == "000000")    return s[..6];
+                if (s[9..] == "000")       return s[..9];
+                return s;
+            }
+
+            var prefixEntries = headCodes.Select(hc => (Hc: hc, Prefix: GetPrefix(hc))).ToList();
+
+            // All head codes in this branch so we can map child heads to their parent P&L head
+            var allBranchHeadCodes = await _db.accounthead.AsNoTracking()
+                .Where(h => h.branchid == branchId)
+                .Select(h => h.headcode)
+                .ToListAsync();
+
+            var childToParent = new Dictionary<long, long>();
+            foreach (var childHc in allBranchHeadCodes)
+            {
+                var childStr = childHc.ToString().PadLeft(12, '0');
+                var best = prefixEntries
+                    .Where(e => childStr.StartsWith(e.Prefix))
+                    .OrderByDescending(e => e.Prefix.Length)
+                    .Select(e => (long?)e.Hc)
+                    .FirstOrDefault();
+                if (best.HasValue)
+                    childToParent[childHc] = best.Value;
+            }
+
+            var expandedHcs = childToParent.Keys.ToList();
+
+            // Voucher balances within the period — VoucherStatus V/A only, with prefix-expanded head codes
             var nextDay = toDate.Date.AddDays(1);
-            var voucherBalances = await _db.vouchercreditdebitdetails.AsNoTracking()
+            var voucherRaw = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(v => v.BrId == branchId
+                         && (v.VoucherStatus == "V" || v.VoucherStatus == "A")
                          && v.ValueDate >= fromDate.Date
-                         && v.ValueDate < nextDay)
+                         && v.ValueDate < nextDay
+                         && expandedHcs.Contains(v.AccHeadCode))
                 .GroupBy(v => v.AccHeadCode)
                 .Select(g => new
                 {
@@ -84,14 +123,21 @@ namespace BankingPlatform.API.Service.Reports
                 })
                 .ToListAsync();
 
-            var voucherMap = voucherBalances.ToDictionary(x => x.HeadCode);
+            // Roll up child-head vouchers to parent reporting P&L head
+            var voucherByParent = new Dictionary<long, (decimal Dr, decimal Cr)>();
+            foreach (var v in voucherRaw)
+            {
+                if (!childToParent.TryGetValue(v.HeadCode, out var parentHc)) continue;
+                var (dr, cr) = voucherByParent.GetValueOrDefault(parentHc);
+                voucherByParent[parentHc] = (dr + v.TotalDr, cr + v.TotalCr);
+            }
 
             var allLines = heads.Select(h =>
             {
-                voucherMap.TryGetValue(h.headcode, out var b);
-                decimal dr = b?.TotalDr ?? 0m;
-                decimal cr = b?.TotalCr ?? 0m;
-                // Income (cat 3): Cr normal balance; Expense (cat 4): Dr normal balance
+                voucherByParent.TryGetValue(h.headcode, out var vb);
+                decimal dr = vb.Dr;
+                decimal cr = vb.Cr;
+                // Income (cat 3): Cr normal balance → Cr-Dr; Expense (cat 4): Dr normal → Dr-Cr
                 decimal balance = (h.categoryid == 3) ? cr - dr : dr - cr;
 
                 return new ProfitLossLineDTO

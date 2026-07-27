@@ -28,6 +28,7 @@ export interface PostFDInterestDTO {
   postingDate: string;
   accountIds: number[];
   isMIS: boolean;
+  interestOverrides?: Record<number, number>;
 }
 
 export interface FDProductOption {

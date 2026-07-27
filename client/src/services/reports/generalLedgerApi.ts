@@ -32,6 +32,10 @@ export interface GeneralLedger {
 }
 
 class GeneralLedgerApiService extends ApiService {
+  async getGeneralAccounts(branchId: number): Promise<ApiResponse<GeneralLedgerAccountItem[]>> {
+    return this.makeRequest(`/GeneralLedger/general-accounts?branchId=${branchId}`);
+  }
+
   async getAccountsForHead(branchId: number, headCode: number): Promise<ApiResponse<GeneralLedgerAccountItem[]>> {
     return this.makeRequest(`/GeneralLedger/accounts?branchId=${branchId}&headCode=${headCode}`);
   }

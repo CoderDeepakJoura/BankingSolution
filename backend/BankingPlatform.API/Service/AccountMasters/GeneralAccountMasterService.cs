@@ -27,7 +27,8 @@ namespace BankingPlatform.API.Service.AccountMasters
             var duplicateFields = await _context.accountmaster
                                  .Where(x => x.ID != dto.AccountMasterDTO!.AccId
                                  && x.BranchId == dto.AccountMasterDTO.BranchId
-                                 && x.AccTypeId == (int)Enums.AccountTypes.General)
+                                 && x.AccTypeId == (int)Enums.AccountTypes.General
+                                 && x.HeadCode == dto.AccountMasterDTO.HeadCode)
                                 .Select(x => new { x.AccountName, x.AccountNumber })
                                 .ToListAsync();
 
@@ -156,7 +157,8 @@ namespace BankingPlatform.API.Service.AccountMasters
             var duplicateFields = await _context.accountmaster
                                  .Where(x => x.ID != dto.AccountMasterDTO!.AccId
                                  && x.BranchId == dto.AccountMasterDTO.BranchId
-                                 && x.AccTypeId == (int)Enums.AccountTypes.General)
+                                 && x.AccTypeId == (int)Enums.AccountTypes.General
+                                 && x.HeadCode == dto.AccountMasterDTO.HeadCode)
                                 .Select(x => new { x.AccountName, x.AccountNumber })
                                 .ToListAsync();
 

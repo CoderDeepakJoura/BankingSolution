@@ -36,6 +36,8 @@ namespace BankingPlatform.API.Service.AccountMasters
         public int ProductId { get; set; }
         public DateTime PostingDate { get; set; }
         public List<int> AccountIds { get; set; } = new();
+        // Key = accountId, Value = SU-overridden interest amount (null = use calculated)
+        public Dictionary<int, decimal>? InterestOverrides { get; set; }
     }
 
     // ── Service ──────────────────────────────────────────────────────────────────
@@ -149,9 +151,12 @@ namespace BankingPlatform.API.Service.AccountMasters
                 foreach (var accountId in dto.AccountIds)
                 {
                     var calc = await CalculateInterestForAccount(dto.BranchId, accountId, dto.PostingDate, rules);
-                    if (calc.TotalInterest <= 0) continue;
+                    if (calc.TotalInterest <= 0 && !(dto.InterestOverrides?.ContainsKey(accountId) == true)) continue;
 
-                    decimal interestAmt = Math.Round(calc.TotalInterest, 2);
+                    decimal interestAmt = (dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(accountId, out var ov))
+                        ? Math.Round(ov, 2)
+                        : Math.Round(calc.TotalInterest, 2);
+                    if (interestAmt <= 0) continue;
 
                     // Create voucher
                     var voucherEntity = new VoucherDTO

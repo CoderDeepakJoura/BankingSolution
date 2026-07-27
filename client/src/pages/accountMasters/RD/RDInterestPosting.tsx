@@ -11,6 +11,7 @@ import Swal from "sweetalert2";
 import Select from "react-select";
 import DatePicker from "../../../components/DatePicker";
 import commonservice from "../../../services/common/commonservice";
+import superUserSettingsApi from "../../../services/superuser/superUserSettingsApi";
 import rdInterestPostingApi, {
   RDInterestAccountDTO,
   RDInterestKistBreakdownDTO,
@@ -171,11 +172,17 @@ const RDInterestPosting: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
+  const [interestOverrides, setInterestOverrides] = useState<Record<number, number>>({});
+  const [interestDisplayValues, setInterestDisplayValues] = useState<Record<number, string>>({});
+  const [allowInterestChange, setAllowInterestChange] = useState(false);
 
   useEffect(() => {
     commonservice.fetch_rd_products(user.branchid).then((res: any) => {
       if (res.success && res.data)
         setProducts(res.data.map((p: any) => ({ value: p.id, label: p.productName })));
+    });
+    superUserSettingsApi.getInterestPostingSettings(user.branchid).then((res: any) => {
+      if (res.success && res.data) setAllowInterestChange(res.data.allowRDInterestChange);
     });
   }, [user.branchid]);
 
@@ -200,6 +207,8 @@ const RDInterestPosting: React.FC = () => {
     setLoading(true);
     setInfo(null);
     setSelectedIds(new Set());
+    setInterestOverrides({});
+    setInterestDisplayValues({});
     try {
       const res = await rdInterestPostingApi.getEligibleAccounts(
         user.branchid, selectedProduct.value, fromDate, toDate, selectedAccount?.value
@@ -245,6 +254,7 @@ const RDInterestPosting: React.FC = () => {
         fromDate,
         toDate,
         accountIds: Array.from(selectedIds),
+        interestOverrides: Object.keys(interestOverrides).length > 0 ? interestOverrides : undefined,
       });
       if (res.success) {
         await Swal.fire({
@@ -282,9 +292,11 @@ const RDInterestPosting: React.FC = () => {
       setSelectedIds(new Set(info.accounts.map((r) => r.accountId)));
   };
 
+  const getRDInterest = (row: RDInterestAccountDTO) => interestOverrides[row.accountId] ?? row.interest;
+
   const totalSelected = info?.accounts
     .filter((r) => selectedIds.has(r.accountId))
-    .reduce((s, r) => s + r.interest, 0) ?? 0;
+    .reduce((s, r) => s + getRDInterest(r), 0) ?? 0;
 
   return (
     <>
@@ -507,7 +519,29 @@ const RDInterestPosting: React.FC = () => {
                           <td className="px-4 py-3 text-gray-700">{row.accountName}</td>
                           <td className="px-4 py-3 text-gray-600">{row.rdNumber}</td>
                           <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                            ₹{row.interest.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            {allowInterestChange ? (
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                maxLength={8}
+                                value={
+                                  interestDisplayValues[row.accountId] !== undefined
+                                    ? interestDisplayValues[row.accountId]
+                                    : parseFloat(row.interest.toFixed(2)).toString()
+                                }
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  if (raw === "" || /^\d*\.?\d{0,2}$/.test(raw)) {
+                                    setInterestDisplayValues((prev) => ({ ...prev, [row.accountId]: raw }));
+                                    const val = parseFloat(raw);
+                                    setInterestOverrides((prev) => ({ ...prev, [row.accountId]: isNaN(val) ? 0 : val }));
+                                  }
+                                }}
+                                className="w-28 px-2 py-1 text-right border border-indigo-300 rounded-lg text-sm font-semibold text-emerald-700 bg-white outline-none focus:ring-2 focus:ring-indigo-400"
+                              />
+                            ) : (
+                              <>₹{getRDInterest(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <button

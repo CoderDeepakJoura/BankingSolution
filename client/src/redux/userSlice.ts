@@ -22,6 +22,8 @@ interface UserState {
   branchGstNo: string;
   branchStateId: number;
   lastSeenVersion: string;
+  enableIBTransactions: boolean;
+  allowGSTDeduction: boolean;
 }
 
 const initialState: UserState = {
@@ -39,6 +41,8 @@ const initialState: UserState = {
   branchGstNo: "",
   branchStateId: 0,
   lastSeenVersion: "0.0.0",
+  enableIBTransactions: true,
+  allowGSTDeduction: true,
 };
 
 const userSlice = createSlice({
@@ -71,6 +75,8 @@ const userSlice = createSlice({
       state.branchGstNo = "";
       state.branchStateId = 0;
       state.lastSeenVersion = "0.0.0";
+      state.enableIBTransactions = true;
+      state.allowGSTDeduction = true;
     },
   },
 });

@@ -15,6 +15,7 @@ import savingInterestApi, {
   SavingInterestAccountDTO,
   MonthlyInterestBreakdownDTO,
 } from "../../../services/accountMasters/saving/savingInterestApi";
+import superUserSettingsApi from "../../../services/superuser/superUserSettingsApi";
 
 interface ProductOption { value: number; label: string; }
 interface AccountOption { value: number; label: string; }
@@ -163,6 +164,9 @@ const SavingInterestPosting: React.FC = () => {
 
   const [gridData, setGridData] = useState<SavingInterestAccountDTO[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [interestOverrides, setInterestOverrides] = useState<Record<number, number>>({});
+  const [interestDisplayValues, setInterestDisplayValues] = useState<Record<number, string>>({});
+  const [allowInterestChange, setAllowInterestChange] = useState(false);
   const [popupRow, setPopupRow] = useState<SavingInterestAccountDTO | null>(null);
   const [loading, setLoading] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -172,6 +176,9 @@ const SavingInterestPosting: React.FC = () => {
     commonservice.fetch_saving_products(user.branchid).then((res) => {
       if (res.success && res.data)
         setProducts(res.data.map((p: any) => ({ value: p.id, label: p.productName })));
+    });
+    superUserSettingsApi.getInterestPostingSettings(user.branchid).then((res) => {
+      if (res.success && res.data) setAllowInterestChange(res.data.allowSavingInterestChange);
     });
   }, [user.branchid]);
 
@@ -205,6 +212,8 @@ const SavingInterestPosting: React.FC = () => {
       if (res.success && res.data) {
         setGridData(res.data);
         setSelectedIds(new Set(res.data.map((a) => a.accountId)));
+        setInterestOverrides({});
+        setInterestDisplayValues({});
         if (res.data.length === 0)
           setError("No eligible accounts found for the selected criteria. Accounts may have already had interest posted.");
       } else {
@@ -235,11 +244,13 @@ const SavingInterestPosting: React.FC = () => {
 
     setPosting(true);
     try {
+      const overrides = Object.keys(interestOverrides).length > 0 ? interestOverrides : undefined;
       const res = await savingInterestApi.postInterest({
         branchId: user.branchid,
         productId: selectedProduct!.value,
         postingDate,
         accountIds: Array.from(selectedIds),
+        interestOverrides: overrides,
       });
       if (res.success) {
         await Swal.fire({
@@ -276,9 +287,12 @@ const SavingInterestPosting: React.FC = () => {
       setSelectedIds(new Set(gridData.map((r) => r.accountId)));
   };
 
+  const getInterest = (r: SavingInterestAccountDTO) =>
+    interestOverrides[r.accountId] ?? r.calculatedInterest;
+
   const totalSelected = gridData
     .filter((r) => selectedIds.has(r.accountId))
-    .reduce((s, r) => s + r.calculatedInterest, 0);
+    .reduce((s, r) => s + getInterest(r), 0);
 
   return (
     <DashboardLayout
@@ -456,8 +470,30 @@ const SavingInterestPosting: React.FC = () => {
                             <td className="px-4 py-3 text-sm font-semibold text-gray-800">
                               ₹{row.currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                             </td>
-                            <td className="px-4 py-3 text-sm font-bold text-emerald-700">
-                              ₹{row.calculatedInterest.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            <td className="px-4 py-3 text-sm font-bold text-emerald-700" onClick={(e) => e.stopPropagation()}>
+                              {allowInterestChange ? (
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  maxLength={8}
+                                  value={
+                                    interestDisplayValues[row.accountId] !== undefined
+                                      ? interestDisplayValues[row.accountId]
+                                      : parseFloat(row.calculatedInterest.toFixed(2)).toString()
+                                  }
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw === "" || /^\d*\.?\d{0,2}$/.test(raw)) {
+                                      setInterestDisplayValues((prev) => ({ ...prev, [row.accountId]: raw }));
+                                      const val = parseFloat(raw);
+                                      setInterestOverrides((prev) => ({ ...prev, [row.accountId]: isNaN(val) ? 0 : val }));
+                                    }
+                                  }}
+                                  className="w-28 px-2 py-1 border border-emerald-300 rounded-md text-emerald-700 text-sm font-semibold focus:outline-none focus:border-emerald-500 bg-emerald-50"
+                                />
+                              ) : (
+                                <>₹{getInterest(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</>
+                              )}
                             </td>
                             <td className="px-4 py-3">
                               <button
