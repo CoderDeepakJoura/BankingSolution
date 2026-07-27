@@ -109,11 +109,11 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Stop banking-api service
+      - name: Stop both API services
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-            "systemctl stop banking-api.service && echo 'Service stopped'"
+            "systemctl stop banking-api.service hindu-society-api.service && echo 'Services stopped'"
 
       # appsettings.json  → server-specific (DB connection string, JWT secret, CORS, DocPaths)
       # appsettings.*.json → any environment override files
@@ -132,20 +132,24 @@ jobs:
             ./publish/ \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/banking-api/
 
-      # Always runs — ensures service is back up even if rsync failed
-      - name: Start banking-api service & verify
+      # Always runs — ensures both services are back up even if rsync failed
+      - name: Start both API services & verify
         if: always()
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
             "
-            systemctl start banking-api.service
+            systemctl start banking-api.service hindu-society-api.service
             sleep 6
-            if systemctl is-active --quiet banking-api.service; then
-              echo '✅ banking-api.service is running'
-            else
-              echo '❌ banking-api.service failed to start'
-              journalctl -u banking-api.service -n 40 --no-pager
-              exit 1
-            fi
+            FAILED=0
+            for svc in banking-api.service hindu-society-api.service; do
+              if systemctl is-active --quiet \$svc; then
+                echo \"✅ \$svc is running\"
+              else
+                echo \"❌ \$svc failed to start\"
+                journalctl -u \$svc -n 30 --no-pager
+                FAILED=1
+              fi
+            done
+            exit \$FAILED
             "
