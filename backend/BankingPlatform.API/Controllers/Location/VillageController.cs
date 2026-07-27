@@ -46,7 +46,6 @@ namespace BankingPlatform.API.Controllers.Location
                     .Where(v => v.branchid == villageMasterDTO.BranchId)
                     .Where(v =>
                         v.villagename.ToLower() == villageName ||
-                        v.pincode == villageMasterDTO.PinCode ||
                         !string.IsNullOrEmpty(villageNameSL) && v.villagenamesl != null && v.villagenamesl.ToLower() == villageNameSL
                     )
                     .ToListAsync();
@@ -59,9 +58,6 @@ namespace BankingPlatform.API.Controllers.Location
                 if (!string.IsNullOrEmpty(villageNameSL) &&
                     duplicateVillages.Any(v => v.villagenamesl != null && v.villagenamesl.ToLower() == villageNameSL))
                     errors.Add("Village Name SL already exists.");
-
-                if (duplicateVillages.Any(v => v.pincode == villageMasterDTO.PinCode))
-                    errors.Add("Pincode already exists.");
 
                 if (errors.Any())
                 {
@@ -230,7 +226,6 @@ namespace BankingPlatform.API.Controllers.Location
                     && v.branchid == villageMasterDTO.BranchId)
                     .Where(v =>
                         v.villagename.ToLower() == villageName ||
-                        v.pincode == villageMasterDTO.PinCode ||
                         !string.IsNullOrEmpty(villageNameSL) && v.villagenamesl != null && v.villagenamesl.ToLower() == villageNameSL
                     )
                     .ToListAsync();
@@ -243,9 +238,6 @@ namespace BankingPlatform.API.Controllers.Location
                 if (!string.IsNullOrEmpty(villageNameSL) &&
                     duplicateVillages.Any(v => v.villagenamesl != null && v.villagenamesl.ToLower() == villageNameSL))
                     errors.Add("Village Name SL already exists.");
-
-                if (duplicateVillages.Any(v => v.pincode == villageMasterDTO.PinCode))
-                    errors.Add("Pincode already exists.");
 
                 if (errors.Any())
                 {

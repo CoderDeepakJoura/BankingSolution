@@ -160,6 +160,7 @@ const LoanInterestPostingVoucher: React.FC = () => {
         user.branchid,
         selectedProductId,
         selectedAccountId || undefined,
+        sessionDate,
       );
       const data: LoanInterestBatchItemDTO[] = (res as any).data ?? (res as any).Data ?? [];
       if (!Array.isArray(data)) {

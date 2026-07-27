@@ -36,6 +36,8 @@
         public int? DebitAccountId { get; set; } = 0;
         public decimal? OpeningAmount { get; set; } = 0;
 
+        public bool IsOpeningEntry { get; set; } = false;
+
         public string? OpeningBalanceType { get; set; } = ""!;
         public int? CreditAccountId { get; set; }
 

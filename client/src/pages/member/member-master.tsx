@@ -567,6 +567,22 @@ const MemberMaster = () => {
     email1: "",
     email2: "",
   });
+
+  const firstSessionFromDateStr = user.firstSessionFromDate
+    ? commonservice.splitDate(user.firstSessionFromDate)
+    : null;
+const isOpeningEntry = !!(
+    firstSessionFromDateStr &&
+    memberData.joiningDate &&
+    memberData.joiningDate < firstSessionFromDateStr
+  );
+
+  useEffect(() => {
+    if (isOpeningEntry && activeTab === "voucher") {
+      setActiveTab("basic");
+    }
+  }, [isOpeningEntry]);
+
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       // Only warn if in edit mode or form has data
@@ -979,13 +995,12 @@ const MemberMaster = () => {
       }
     }
 
-    if (debitAccount == 0) {
+    if (!isOpeningEntry && debitAccount == 0) {
       Swal.fire({
         icon: "error",
         title: "Error.",
         text: "Debit Account is required in Voucher Tab.",
         didClose: () => {
-          // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
           refDebitAccount.current?.focus();
         },
       });
@@ -1101,6 +1116,7 @@ const MemberMaster = () => {
       debitAccountId: Number(debitAccount) ?? 0,
       totalDebit: Number(voucherData.debitAmount) || 0,
       openingAmount: Number(voucherData.openingAmount) || 0,
+      isOpeningEntry: isOpeningEntry,
     };
     const accMasterDTO = {
       BranchId: user.branchid,
@@ -1437,7 +1453,7 @@ const MemberMaster = () => {
     { id: "address", label: "Address", icon: MapPin },
     { id: "contact", label: "Contact", icon: Phone },
     { id: "documents", label: "Documents", icon: CreditCard },
-    { id: "voucher", label: "Voucher Info", icon: FileText },
+    ...(!isOpeningEntry ? [{ id: "voucher", label: "Voucher Info", icon: FileText }] : []),
     { id: "nominees", label: "Nominees", icon: Users },
   ];
 
@@ -1780,22 +1796,24 @@ const MemberMaster = () => {
         />
       </FormField>
 
-      <FormField
-        name="openingAmount"
-        label="Opening Amount"
-        errors={errorsByField.openingAmount || []}
-      >
-        <input
-          type="text"
-          pattern="^\d*(\.\d{0,2})?$"
-          value={voucherData.openingAmount}
-          onChange={handleOpeningAmountChange}
-          className="w-full px-3 py-2 border rounded"
-          placeholder="Enter Opening amount"
-          inputMode="decimal"
-          maxLength={10}
-        />
-      </FormField>
+      {isOpeningEntry && (
+        <FormField
+          name="openingAmount"
+          label="Opening Amount"
+          errors={errorsByField.openingAmount || []}
+        >
+          <input
+            type="text"
+            pattern="^\d*(\.\d{0,2})?$"
+            value={voucherData.openingAmount}
+            onChange={handleOpeningAmountChange}
+            className="w-full px-3 py-2 border rounded"
+            placeholder="Enter Opening amount"
+            inputMode="decimal"
+            maxLength={10}
+          />
+        </FormField>
+      )}
     </div>
   );
 

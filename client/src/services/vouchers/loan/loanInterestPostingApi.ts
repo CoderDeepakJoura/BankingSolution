@@ -72,8 +72,11 @@ class LoanInterestPostingApiService extends ApiService {
     return this.makeRequest(url);
   }
 
-  async getPostableInterest(loanAccId: number, branchId: number): Promise<ApiResponse<LoanInterestPostingInfoDTO>> {
-    return this.makeRequest(`/LoanInterestPosting/postable/${loanAccId}/${branchId}`);
+  async getPostableInterest(loanAccId: number, branchId: number, asOfDate?: string): Promise<ApiResponse<LoanInterestPostingInfoDTO>> {
+    const url = asOfDate
+      ? `/LoanInterestPosting/postable/${loanAccId}/${branchId}?asOfDate=${asOfDate}`
+      : `/LoanInterestPosting/postable/${loanAccId}/${branchId}`;
+    return this.makeRequest(url);
   }
 
   async postInterest(dto: LoanInterestPostingVoucherDTO): Promise<ApiResponse<any>> {
@@ -84,9 +87,10 @@ class LoanInterestPostingApiService extends ApiService {
     });
   }
 
-  async batchCalculate(brId: number, productId: number, accountId?: number): Promise<ApiResponse<LoanInterestBatchItemDTO[]>> {
+  async batchCalculate(brId: number, productId: number, accountId?: number, asOfDate?: string): Promise<ApiResponse<LoanInterestBatchItemDTO[]>> {
     let url = `/LoanInterestPosting/batch-calculate?brId=${brId}&productId=${productId}`;
     if (accountId) url += `&accountId=${accountId}`;
+    if (asOfDate) url += `&asOfDate=${asOfDate}`;
     return this.makeRequest(url);
   }
 

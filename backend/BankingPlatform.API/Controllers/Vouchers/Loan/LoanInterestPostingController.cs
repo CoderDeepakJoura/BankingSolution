@@ -44,11 +44,12 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
 
         /// <summary>Get unposted interest info for a loan account.</summary>
         [HttpGet("postable/{loanAccId}/{branchId}")]
-        public async Task<IActionResult> GetPostableInterest(int loanAccId, int branchId)
+        public async Task<IActionResult> GetPostableInterest(int loanAccId, int branchId, [FromQuery] string? asOfDate = null)
         {
             try
             {
-                var result = await _service.GetPostableInterestAsync(loanAccId, branchId);
+                DateTime? calcDate = DateTime.TryParse(asOfDate, out var d) ? d : null;
+                var result = await _service.GetPostableInterestAsync(loanAccId, branchId, calcDate);
                 if (result == null)
                     return NotFound(new { Success = false, Message = "Loan account not found." });
 
@@ -64,14 +65,15 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
 
         /// <summary>Batch-calculate unposted interest for all accounts of a product (or a single account).</summary>
         [HttpGet("batch-calculate")]
-        public async Task<IActionResult> BatchCalculate([FromQuery] int brId, [FromQuery] int productId, [FromQuery] int? accountId = null)
+        public async Task<IActionResult> BatchCalculate([FromQuery] int brId, [FromQuery] int productId, [FromQuery] int? accountId = null, [FromQuery] string? asOfDate = null)
         {
             try
             {
                 if (productId <= 0)
                     return BadRequest(new { Success = false, Message = "productId is required." });
 
-                var result = await _service.BatchCalculateInterestAsync(brId, productId, accountId);
+                DateTime? calcDate = DateTime.TryParse(asOfDate, out var d) ? d : null;
+                var result = await _service.BatchCalculateInterestAsync(brId, productId, accountId, calcDate);
                 return Ok(new { Success = true, Data = result });
             }
             catch (Exception ex)

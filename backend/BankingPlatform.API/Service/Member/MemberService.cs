@@ -126,62 +126,60 @@ namespace BankingPlatform.API.Services
                 await _context.accountmaster.AddAsync(accountMasterInfo);
                 await _context.SaveChangesAsync();
 
-                string narration = dto.Voucher.VoucherNarration!;
-                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(member.BranchId, member.JoiningDate);
-                bool isAutoVerification = await _commonfunctions.IsAutoVerification(member.BranchId);
                 decimal smAmount = dto.Voucher.smAmount ?? 0;
-                int admissionFeeAccountId = dto.Voucher.admissionFeesAccountId ?? 0;
-                decimal admissionFeeAmount = dto.Voucher.admissionFeeAmount ?? 0;
-                int debitAccountId = dto.Voucher.DebitAccountId ?? 0;
-                decimal TotalDebit = dto.Voucher.TotalDebit ?? 0;
                 decimal openingAmount = dto.Voucher.OpeningAmount ?? 0;
-                dto.Voucher = new VoucherDTO
+                bool isOpeningEntry = dto.Voucher.IsOpeningEntry;
+
+                if (!isOpeningEntry && smAmount > 0)
                 {
-                    ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-                    VoucherDate = DateTime.SpecifyKind(member.JoiningDate, DateTimeKind.Unspecified),
+                    string narration = dto.Voucher.VoucherNarration!;
+                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(member.BranchId, member.JoiningDate);
+                    bool isAutoVerification = await _commonfunctions.IsAutoVerification(member.BranchId);
+                    int admissionFeeAccountId = dto.Voucher.admissionFeesAccountId ?? 0;
+                    decimal admissionFeeAmount = dto.Voucher.admissionFeeAmount ?? 0;
+                    int debitAccountId = dto.Voucher.DebitAccountId ?? 0;
+                    decimal totalDebit = dto.Voucher.TotalDebit ?? 0;
 
-                    // Other non-DateTime fields
-                    AddedBy = Int32.Parse(userIdClaim!),
-                    BrID = member.BranchId,
-                    ModifiedBy = 0,
-                    VerifiedBy = isAutoVerification ? Int32.Parse(userIdClaim!) : 0,
-                    VoucherNarration = narration,
-                    OtherBrID = 0,
-                    VoucherNo = nextVrNo,
-                    VoucherStatus = isAutoVerification ? "V" : "A",
-                    VoucherType = (int)Enums.VoucherType.Member,
-                    VoucherSubType = (int)Enums.VoucherSubType.ShareMoney,
-                };
+                    dto.Voucher = new VoucherDTO
+                    {
+                        ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                        VoucherDate = DateTime.SpecifyKind(member.JoiningDate, DateTimeKind.Unspecified),
+                        AddedBy = Int32.Parse(userIdClaim!),
+                        BrID = member.BranchId,
+                        ModifiedBy = 0,
+                        VerifiedBy = isAutoVerification ? Int32.Parse(userIdClaim!) : 0,
+                        VoucherNarration = narration,
+                        OtherBrID = 0,
+                        VoucherNo = nextVrNo,
+                        VoucherStatus = isAutoVerification ? "V" : "A",
+                        VoucherType = (int)Enums.VoucherType.Member,
+                        VoucherSubType = (int)Enums.VoucherSubType.ShareMoney,
+                    };
 
-                var voucherInfo = MapToEntity(dto.Voucher!);
-                await _context.voucher.AddAsync(voucherInfo);
-                await _context.SaveChangesAsync();
-                DateTime valueDate = DateTime.SpecifyKind(dto.Member.JoiningDate, DateTimeKind.Utc);
-                int row = 1;
-                VoucherCreditDebitDetails voucherCreditInfo = voucherCreditDebitDetails(CommonFunctions.shareMoneyCapitalHeadCode, smAccountId, member.BranchId, Enums.VoucherStatus.MemberSM.ToString(), narration, smAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                    var voucherInfo = MapToEntity(dto.Voucher!);
+                    await _context.voucher.AddAsync(voucherInfo);
+                    await _context.SaveChangesAsync();
 
-                _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
-                row++;
-
-                if (admissionFeeAccountId > 0 && admissionFeeAmount > 0)
-                {
-                    VoucherCreditDebitDetails admissionFeeInfo = voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(admissionFeeAccountId, member.BranchId), (int)admissionFeeAccountId, member.BranchId, Enums.VoucherStatus.Cr.ToString(), "", admissionFeeAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
-                    _context.vouchercreditdebitdetails.Add(admissionFeeInfo);
+                    DateTime valueDate = DateTime.SpecifyKind(dto.Member.JoiningDate, DateTimeKind.Utc);
+                    int row = 1;
+                    VoucherCreditDebitDetails voucherCreditInfo = voucherCreditDebitDetails(CommonFunctions.shareMoneyCapitalHeadCode, smAccountId, member.BranchId, Enums.VoucherStatus.MemberSM.ToString(), narration, smAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                    _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
                     row++;
-                }
 
-                VoucherCreditDebitDetails voucherDebitInfo = voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(debitAccountId, member.BranchId), (int)debitAccountId, member.BranchId, Enums.VoucherStatus.Dr.ToString(), narration, TotalDebit, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
-                _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
+                    if (admissionFeeAccountId > 0 && admissionFeeAmount > 0)
+                    {
+                        VoucherCreditDebitDetails admissionFeeInfo = voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(admissionFeeAccountId, member.BranchId), (int)admissionFeeAccountId, member.BranchId, Enums.VoucherStatus.Cr.ToString(), "Admission Fee", admissionFeeAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(admissionFeeInfo);
+                        row++;
+                    }
+
+                    VoucherCreditDebitDetails voucherDebitInfo = voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(debitAccountId, member.BranchId), (int)debitAccountId, member.BranchId, Enums.VoucherStatus.Dr.ToString(), narration, totalDebit, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                    _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
+                }
 
                 if (openingAmount > 0)
                 {
                     AccOpeningBalance accOpeningBalance = AccOpeningBalance(openingAmount, (int)Enums.AccountTypes.ShareMoney, smAccountId, member.BranchId, "Cr");
-                    await _context.accopeningbalance.AddAsync(accOpeningBalance);
-
-                }
-                if (dto.Voucher.OpeningAmount > 0)
-                {
-                    AccOpeningBalance accOpeningBalance = AccOpeningBalance((decimal)dto.Voucher.OpeningAmount, (int)Enums.VoucherSubType.ShareMoney, smAccountId, member.BranchId, "Cr");
                     await _context.accopeningbalance.AddAsync(accOpeningBalance);
                 }
 

@@ -49,9 +49,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
         // ── Postable Interest Info ────────────────────────────────────────────────
 
-        public async Task<LoanInterestPostingInfoDTO?> GetPostableInterestAsync(int loanAccId, int branchId)
+        public async Task<LoanInterestPostingInfoDTO?> GetPostableInterestAsync(int loanAccId, int branchId, DateTime? asOfDate = null)
         {
-            var bal = await _recoveryService.GetLoanBalanceAsync(loanAccId, branchId);
+            var bal = await _recoveryService.GetLoanBalanceAsync(loanAccId, branchId, asOfDate);
             if (bal == null) return null;
 
             return new LoanInterestPostingInfoDTO
@@ -93,7 +93,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     return ("No interest amount to post.", 0);
 
                 // Validate against actual unposted interest
-                var info = await GetPostableInterestAsync(dto.LoanAccountId, dto.BrId);
+                var info = await GetPostableInterestAsync(dto.LoanAccountId, dto.BrId, dto.VoucherDate);
                 if (info == null)
                     return ("Loan account not found.", 0);
                 if (stdAmt > info.UnpostedStdInterest + 0.01m)
@@ -272,7 +272,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
         // ── Batch Calculate ───────────────────────────────────────────────────────
 
-        public async Task<List<LoanInterestBatchItemDTO>> BatchCalculateInterestAsync(int brId, int productId, int? accountId)
+        public async Task<List<LoanInterestBatchItemDTO>> BatchCalculateInterestAsync(int brId, int productId, int? accountId, DateTime? asOfDate = null)
         {
             var accounts = await _db.accountmaster.AsNoTracking()
                 .Where(x => x.BranchId == brId
@@ -287,7 +287,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             var result = new List<LoanInterestBatchItemDTO>();
             foreach (var acc in accounts)
             {
-                var bal = await _recoveryService.GetLoanBalanceAsync(acc.ID, brId);
+                var bal = await _recoveryService.GetLoanBalanceAsync(acc.ID, brId, asOfDate);
                 if (bal == null) continue;
 
                 result.Add(new LoanInterestBatchItemDTO

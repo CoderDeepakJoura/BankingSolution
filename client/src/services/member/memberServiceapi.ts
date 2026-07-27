@@ -142,6 +142,7 @@ export interface VoucherDTO {
   debitAccountName?: string;
   totalDebit?: number;
   openingAmount? : number;
+  isOpeningEntry?: boolean;
 }
 
 // Combined Member DTO (exactly matching your C# CombinedMemberDTO)

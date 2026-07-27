@@ -26,7 +26,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
         // ── Balance & Info ────────────────────────────────────────────────────────
 
-        public async Task<LoanRecoveryBalanceDTO?> GetLoanBalanceAsync(int loanAccId, int branchId)
+        public async Task<LoanRecoveryBalanceDTO?> GetLoanBalanceAsync(int loanAccId, int branchId, DateTime? asOfDate = null)
         {
             var acc = await _db.accountmaster.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.ID == loanAccId && x.BranchId == branchId);
@@ -136,7 +136,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     OverdueInstallments          = 0,
                     OverduePrincipal             = 0,
                     InterestCalcFromDate         = null,
-                    InterestCalcToDate           = DateTime.Today,
+                    InterestCalcToDate           = asOfDate ?? DateTime.Today,
                     IntCalcMethod                = intCalcMethod,
                     ActOnIntPosting              = actOnIntPosting,
                     IntRecDetail                 = new List<IntRecDetailRowDTO>(),
@@ -187,7 +187,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 .OrderBy(x => x.KistNumber)
                 .ToListAsync();
 
-            DateTime today = DateTime.Today;
+            DateTime today = asOfDate ?? DateTime.Today;
 
             var overdueKists = kistSchedule
                 .Where(x => x.Date.HasValue && x.Date.Value.Date < today)
