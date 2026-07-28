@@ -752,9 +752,10 @@ class commonService extends ApiService {
     );
   }
 
-  async fetch_rd_related_info(rdDate : string, periodInMonths: Number, productId: Number, amount: Number, branchId: Number, compoundingInterval: string): Promise<ApiResponse<any>> {
+  async fetch_rd_related_info(rdDate: string, periodInMonths: Number, productId: Number, amount: Number, branchId: Number, compoundingInterval: string, periodInDays?: number): Promise<ApiResponse<any>> {
+    const query = periodInDays && periodInDays > 0 ? `?periodInDays=${periodInDays}` : "";
     return this.makeRequest<AuthResponse>(
-      `/fetchdata/fetch-rd-related-info/${rdDate}/${periodInMonths}/${productId}/${amount}/${branchId}/${compoundingInterval}`,
+      `/fetchdata/fetch-rd-related-info/${rdDate}/${periodInMonths}/${productId}/${amount}/${branchId}/${compoundingInterval}${query}`,
       {
         method: "GET",
         headers: {

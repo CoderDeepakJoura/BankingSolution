@@ -1164,23 +1164,98 @@ namespace BankingPlatform.API.Service.AccountMasters
             return Math.Round(preMaturityAmount, 2);
         }
 
+        // Kept for backward compatibility only — not used for display maturity calculation.
         public async Task<decimal> CalculateMaturityAmount(decimal principal, decimal annualRate, DateTime rdDate, DateTime maturityDate, int productId, int branchId, int compoundingInterval)
         {
-            int daysInAYear = 360;
-            int actualDays = (maturityDate - rdDate).Days;
-            decimal timeInYears = (decimal)actualDays / daysInAYear;
-            decimal rate = annualRate / 100;
-            int n = compoundingInterval switch
+            return CalculateRDMaturityAmount(principal, 1, annualRate, compoundingInterval);
+        }
+
+        /// <summary>
+        /// RD maturity calculation using the formula configured in rdproductbranchwiserule.IntFormula.
+        ///
+        /// Formula 1 — Simple Interest on average balance:
+        ///   Interest = P × n(n+1)/24 × r/100
+        ///   M = P×n + Interest
+        ///
+        /// Formula 2 — Compound, Monthly compounding, Ordinary Annuity:
+        ///   r_m = r/100/12
+        ///   M = P × [(1+r_m)^n − 1] / r_m
+        ///
+        /// Formula 3 — Compound, Quarterly compounding, Ordinary Annuity:
+        ///   r_m = (1 + r/400)^(1/3) − 1
+        ///   M = P × [(1+r_m)^n − 1] / r_m
+        ///
+        /// Formula 4 — Compound, Half-Yearly compounding, Ordinary Annuity:
+        ///   r_m = (1 + r/200)^(1/6) − 1
+        ///   M = P × [(1+r_m)^n − 1] / r_m
+        ///
+        /// Formula 5 — Compound, Yearly compounding, Ordinary Annuity:
+        ///   r_m = (1 + r/100)^(1/12) − 1
+        ///   M = P × [(1+r_m)^n − 1] / r_m
+        ///
+        /// Formula 6 — Compound, Quarterly compounding, Annuity-Due (Standard Indian banking):
+        ///   r_m = (1 + r/400)^(1/3) − 1
+        ///   M = P × [(1+r_m)^n − 1] / r_m × (1+r_m)
+        ///   e.g. P=1000, n=12, r=7% → M = 12462
+        /// </summary>
+        public decimal CalculateRDMaturityAmount(decimal kistInstallment, int nInstallments, decimal annualRate, int intFormula)
+        {
+            double P = (double)kistInstallment;
+            int n = nInstallments;
+            double r = (double)annualRate / 100.0;
+
+            if (n <= 0 || P <= 0) return (decimal)(P * n);
+            if (r <= 0) return Math.Round((decimal)(P * n), 0);
+
+            switch (intFormula)
             {
-                (int)Enums.CompoundingInterval.Monthly => 12,
-                (int)Enums.CompoundingInterval.Quarterly => 4,
-                (int)Enums.CompoundingInterval.Half_Yearly => 2,
-                (int)Enums.CompoundingInterval.Yearly => 1,
-                (int)Enums.CompoundingInterval.Two_Yearly => 24,
-                _ => 4
-            };
-            decimal maturityAmount = principal * (decimal)Math.Pow((double)(1 + rate / n), (double)(n * timeInYears));
-            return Math.Round(maturityAmount, 0);
+                case 1:
+                    // Simple Interest on average balance
+                    double interest1 = P * n * (n + 1) / 24.0 * r;
+                    return Math.Round((decimal)(P * n + interest1), 0);
+
+                case 2:
+                    // Compound Monthly, Ordinary Annuity
+                    {
+                        double r_m = r / 12.0;
+                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m;
+                        return Math.Round((decimal)M, 0);
+                    }
+
+                case 3:
+                    // Compound Quarterly, Ordinary Annuity
+                    {
+                        double r_m = Math.Pow(1.0 + r / 4.0, 1.0 / 3.0) - 1.0;
+                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m;
+                        return Math.Round((decimal)M, 0);
+                    }
+
+                case 4:
+                    // Compound Half-Yearly, Ordinary Annuity
+                    {
+                        double r_m = Math.Pow(1.0 + r / 2.0, 1.0 / 6.0) - 1.0;
+                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m;
+                        return Math.Round((decimal)M, 0);
+                    }
+
+                case 5:
+                    // Compound Yearly, Ordinary Annuity
+                    {
+                        double r_m = Math.Pow(1.0 + r, 1.0 / 12.0) - 1.0;
+                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m;
+                        return Math.Round((decimal)M, 0);
+                    }
+
+                case 6:
+                default:
+                    // Compound Quarterly, Annuity-Due (Standard Indian banking)
+                    // Deposit at START of each month → earns one extra month of interest
+                    {
+                        double r_m = Math.Pow(1.0 + r / 4.0, 1.0 / 3.0) - 1.0;
+                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m * (1.0 + r_m);
+                        return Math.Round((decimal)M, 0);
+                    }
+            }
         }
 
         private async Task<int> GetPeriodInDays(DateTime rdDate, int periodInMonths, int periodInDays, DateTime maturityDate)
@@ -1195,24 +1270,27 @@ namespace BankingPlatform.API.Service.AccountMasters
         }
 
         public async Task<(decimal intRate, string slabName, string compoundingInterval, int intCompoundingInterval, int slabId)> SlabInfo(
-            decimal amount, int periodInMonths, DateTime rdDate, int productId, int paramCompoundingInterval = 0)
+            decimal amount, int periodInMonths, DateTime rdDate, int productId, int paramCompoundingInterval = 0, int periodInDays = 0)
         {
             decimal intRate = 0;
             string slabName = string.Empty;
             string compoundingInterval = Enums.CompoundingInterval.Quarterly.ToString();
             int intCompoundingInterval = 0, slabId = 0;
 
-            if (amount <= 0 || periodInMonths <= 0)
+            if (amount <= 0 || (periodInMonths <= 0 && periodInDays <= 0))
                 return (intRate, slabName, compoundingInterval, intCompoundingInterval, slabId);
 
-            int totalDays = await GetPeriodInDays(rdDate, periodInMonths, 0, DateTime.MinValue);
+            // For daily kist, convert days to approximate months for slab period matching
+            int approxMonths = periodInMonths > 0 ? periodInMonths : (int)Math.Ceiling(periodInDays / 30.0);
+
+            int totalDays = await GetPeriodInDays(rdDate, approxMonths, 0, DateTime.MinValue);
 
             var slab = await (from p in _context.rdinterestslabdetail.AsNoTracking()
                               join q in _context.rdinterestslab.AsNoTracking()
                               on new { slabId = p.RDIntSlabId, branchId = p.BranchId }
                               equals new { slabId = q.Id, branchId = q.BranchId }
                               where amount >= p.FromAmount && amount <= p.ToAmount
-                                 && periodInMonths >= p.PeriodFrom && periodInMonths <= p.PeriodTo
+                                 && approxMonths >= p.PeriodFrom && approxMonths <= p.PeriodTo
                                  && q.RDProductId == productId
                                  && q.ApplicableDate <= rdDate
                               orderby q.ApplicableDate descending

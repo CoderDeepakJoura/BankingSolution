@@ -8,6 +8,7 @@ export interface ResponseDto {
 export interface FDSlabs {
   id: number;
   slabName: string;
+  fdProductId: number;
 }
 
 export interface FDInterestSlabFilter {

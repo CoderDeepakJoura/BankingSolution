@@ -625,10 +625,9 @@ const FDInterestSlab = () => {
     value: product.id,
     label: product.productName,
   }));
-  const fdSlabOptions = fdSlabs.map((slabs) => ({
-    value: slabs.id,
-    label: slabs.slabName,
-  }));
+  const fdSlabOptions = fdSlabs
+    .filter((s) => !formData.fdProductId || s.fdProductId === formData.fdProductId)
+    .map((s) => ({ value: s.id, label: s.slabName }));
 
   return (
     <DashboardLayout
@@ -857,6 +856,8 @@ const FDInterestSlab = () => {
                                   }
                                   placeholder="Select Slab"
                                   isClearable
+                                  menuPortalTarget={document.body}
+                                  menuPosition="fixed"
                                   className="text-sm"
                                   styles={{
                                     menuPortal: (base) => ({ ...base, zIndex: 9999 }),
@@ -864,6 +865,7 @@ const FDInterestSlab = () => {
                                       ...base,
                                       minHeight: '38px',
                                       fontSize: '13px',
+                                      cursor: 'pointer',
                                     }),
                                   }}
                                 />

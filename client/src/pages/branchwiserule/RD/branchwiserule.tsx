@@ -53,10 +53,14 @@ interface ValidationErrors {
 
 
 // ─── Static Options ───────────────────────────────────────────────────────────
-const interestFormulaOptions = [1, 2, 3, 4, 5, 6].map((n) => ({
-  value: n,
-  label: `Formula${n}`,
-}));
+const interestFormulaOptions = [
+  { value: 1, label: "Formula 1 — Simple Interest" },
+  { value: 2, label: "Formula 2 — CI Monthly, Ordinary Annuity" },
+  { value: 3, label: "Formula 3 — CI Quarterly, Ordinary Annuity" },
+  { value: 4, label: "Formula 4 — CI Half-Yearly, Ordinary Annuity" },
+  { value: 5, label: "Formula 5 — CI Yearly, Ordinary Annuity" },
+  { value: 6, label: "Formula 6 — CI Quarterly, Annuity-Due (Standard)" },
+];
 
 
 const accNoGenerationOptions = [

@@ -22,3 +22,6 @@ client/dist/
 # System
 .DS_Store
 Thumbs.db
+
+# Auto-versioning hook — write a one-liner here before committing to set the changelog note
+.version-note

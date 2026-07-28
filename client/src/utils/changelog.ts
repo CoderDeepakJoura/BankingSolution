@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.3.4",
+    date: "2026-07-28",
+    changes: [
+      { type: "fix",         text: "Saving account withdrawal now shows correct available balance — opening balance from accopeningbalance is included" },
+      { type: "new",         text: "RD Account Master: Daily kist interval added — shows Period (Days) field and handles maturity/first-kist-date calculation correctly" },
+      { type: "fix",         text: "RD maturity amount now uses the correct annuity formula (Formula 6 — CI Quarterly, Annuity-Due) per RBI norms, configurable per product in Branch-wise Rules" },
+      { type: "improvement", text: "FD Interest Slab dropdown now filters by selected FD product — only matching slabs are shown" },
+    ],
+  },
+  {
     version: "1.3.3",
     date: "2026-07-28",
     changes: [

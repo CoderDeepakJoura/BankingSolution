@@ -24,6 +24,7 @@ using BankingPlatform.Infrastructure.Models.member;
 using BankingPlatform.Infrastructure.Models.ProductMasters.RD;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Identity.Client;
@@ -836,13 +837,12 @@ namespace BankingPlatform.API.Controllers
                          && x.VoucherEntryType == "Dr")
                 .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
 
-            // Add per-detail opening balance for FD accounts
             var accType = await _context.accountmaster
                 .Where(x => x.ID == accountId && x.BranchId == branchId)
                 .Select(x => x.AccTypeId)
                 .FirstOrDefaultAsync();
 
-            decimal fdOpeningBal = 0;
+            decimal openingBal = 0;
             if (accType == (int)Enums.AccountTypes.FD)
             {
                 var details = await _context.fdaccountdetail
@@ -850,13 +850,23 @@ namespace BankingPlatform.API.Controllers
                     .Select(x => new { x.OpeningBalance, x.OpeningBalanceType })
                     .ToListAsync();
 
-                fdOpeningBal = details.Sum(x =>
+                openingBal = details.Sum(x =>
                     x.OpeningBalanceType?.ToUpper() == "CR"
                         ? (x.OpeningBalance ?? 0)
                         : -(x.OpeningBalance ?? 0));
             }
+            else
+            {
+                // Saving, General, ShareMoney, RD — opening balance stored in accopeningbalance
+                var ob = await _context.accopeningbalance
+                    .Where(x => x.BranchId == branchId && x.AccountId == accountId)
+                    .FirstOrDefaultAsync();
 
-            return Ok(new { Success = true, data = crTotal - drTotal + fdOpeningBal });
+                if (ob != null)
+                    openingBal = ob.EntryType?.ToUpper() == "CR" ? ob.OpeningAmount : -ob.OpeningAmount;
+            }
+
+            return Ok(new { Success = true, data = crTotal - drTotal + openingBal });
         }
 
         [HttpGet("joint-acc-info/{accountId}/{branchId}")]
@@ -908,10 +918,11 @@ namespace BankingPlatform.API.Controllers
         [HttpGet("fd-slabs/{branchId}")]
         public async Task<IActionResult> GetFDSlabs([FromRoute] int branchId)
         {
-            var slabInfo = await _context.fdinterestslab.Where(x => x.BranchId == branchId).Select(x => new 
+            var slabInfo = await _context.fdinterestslab.Where(x => x.BranchId == branchId).Select(x => new
             {
                 SlabName = x.SlabName,
-                Id = x.Id
+                Id = x.Id,
+                FdProductId = x.FDProductId
             }).ToListAsync();
 
             return Ok(new
@@ -1150,12 +1161,24 @@ namespace BankingPlatform.API.Controllers
 
         }
 
-        [HttpGet("fetch-rd-related-info/{rdDate}/{periodInMonths}/{productId}/{kistAmount}/{branchId}/{intCompoundingInterval}")]
-        public async Task<IActionResult> CalculateRDRelatedInfo([FromRoute] DateTime rdDate, int periodInMonths, int productId, decimal kistAmount, int branchId, int intCompoundingInterval)
+        [HttpGet("fetch-rd-related-info/{rdDate}/{periodInMonths}/{productId}/{totalAmount}/{branchId}/{intCompoundingInterval}")]
+        public async Task<IActionResult> CalculateRDRelatedInfo([FromRoute] DateTime rdDate, int periodInMonths, int productId, decimal totalAmount, int branchId, int intCompoundingInterval, [FromQuery] int periodInDays = 0)
         {
-            DateTime maturityDate = await _rdAccountService.CalculateMaturityDate(rdDate, periodInMonths, 0);
-            (decimal intRate, string slabName, string compoundingInterval, int IcompoundingInterval, int slabId) = await _rdAccountService.SlabInfo(kistAmount, periodInMonths, rdDate, productId, intCompoundingInterval);
-            decimal maturityAmount = await _rdAccountService.CalculateMaturityAmount(kistAmount, intRate, rdDate, maturityDate, productId, branchId, intCompoundingInterval);
+            DateTime maturityDate = await _rdAccountService.CalculateMaturityDate(rdDate, periodInMonths, periodInDays);
+            (decimal intRate, string slabName, string compoundingInterval, int IcompoundingInterval, int slabId) = await _rdAccountService.SlabInfo(totalAmount, periodInMonths, rdDate, productId, intCompoundingInterval, periodInDays);
+
+            // Look up the IntFormula configured for this RD product in branchwiserule
+            int intFormula = await _context.rdproductbranchwiserule
+                .AsNoTracking()
+                .Where(r => r.RDProductId == productId && r.BrId == branchId)
+                .Select(r => r.IntFormula)
+                .FirstOrDefaultAsync();
+            if (intFormula == 0) intFormula = 6; // default to Formula 6 (standard Indian banking)
+
+            // RD annuity formula: each installment earns compound interest for its remaining period
+            int nInstallments = periodInDays > 0 ? periodInDays : periodInMonths;
+            decimal kistInstallment = nInstallments > 0 ? totalAmount / nInstallments : totalAmount;
+            decimal maturityAmount = _rdAccountService.CalculateRDMaturityAmount(kistInstallment, nInstallments, intRate, intFormula);
 
             return Ok(new
             {

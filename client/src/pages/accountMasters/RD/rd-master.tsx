@@ -91,6 +91,7 @@ const MAX = {
 
 const RDAccountMaster = () => {
   const KIST_INTERVAL_MAP: Record<string, number> = {
+    Daily: 0,
     Monthly: 1,
     Quarterly: 3,
     "Half-Yearly": 6,
@@ -169,6 +170,7 @@ const RDAccountMaster = () => {
     kistAmount: "",
     kistInterval: "",
     periodMonths: "",
+    periodDays: "",
     amount: "",
     interestRate: "",
     firstKistDate: sessionDate,
@@ -222,6 +224,7 @@ const RDAccountMaster = () => {
   const memberAccountNoRef = useRef<HTMLInputElement>(null);
 
   const kistIntervalOptions = [
+    { value: "Daily", label: "Daily" },
     { value: "Monthly", label: "Monthly" },
     { value: "Quarterly", label: "Quarterly" },
     { value: "Half-Yearly", label: "Half-Yearly" },
@@ -243,17 +246,19 @@ const RDAccountMaster = () => {
   const calculateFirstKistDate = (rdDate: string, kistInterval: string) => {
     if (!rdDate || !kistInterval) return "";
 
-    const monthsToAdd = KIST_INTERVAL_MAP[kistInterval];
-    if (!monthsToAdd) return "";
-
     const [year, month, day] = rdDate.split("-").map(Number);
     if (!year || !month || !day) return "";
 
-    const baseDate = new Date(year, month - 1, day);
-    if (Number.isNaN(baseDate.getTime())) return "";
-
     const calculatedDate = new Date(year, month - 1, day);
-    calculatedDate.setMonth(calculatedDate.getMonth() + monthsToAdd);
+    if (Number.isNaN(calculatedDate.getTime())) return "";
+
+    if (kistInterval === "Daily") {
+      calculatedDate.setDate(calculatedDate.getDate() + 1);
+    } else {
+      const monthsToAdd = KIST_INTERVAL_MAP[kistInterval];
+      if (!monthsToAdd) return "";
+      calculatedDate.setMonth(calculatedDate.getMonth() + monthsToAdd);
+    }
 
     const resultYear = calculatedDate.getFullYear();
     const resultMonth = String(calculatedDate.getMonth() + 1).padStart(2, "0");
@@ -381,17 +386,21 @@ useEffect(() => {
         if (rd) {
           // Reverse-map kistinterval number → string key
           const reverseKistMap: Record<number, string> = {
+            0: "Daily",
             1: "Monthly",
             3: "Quarterly",
             6: "Half-Yearly",
             12: "Yearly",
           };
+          const loadedKistInterval = reverseKistMap[rd.kistInterval] || "";
+          const isLoadedDaily = loadedKistInterval === "Daily";
           setRdDetailForm({
             rdDate: rd.rdDate?.split("T")[0] || sessionDate,
             rdNo: rd.rdNumber?.toString() || "",
             kistAmount: rd.kistAmt?.toString() || "",
-            kistInterval: reverseKistMap[rd.kistInterval] || "",
-            periodMonths: rd.noOfMonths?.toString() || "",
+            kistInterval: loadedKistInterval,
+            periodMonths: isLoadedDaily ? "" : (rd.noOfMonths?.toString() || ""),
+            periodDays: isLoadedDaily ? (rd.noOfDays?.toString() || "") : "",
             amount: rd.rdAmount?.toString() || "",
             interestRate: rd.interestRate?.toString() || "",
             firstKistDate: rd.firstKistDate?.split("T")[0] || sessionDate,
@@ -514,15 +523,25 @@ useEffect(() => {
   const handleRdDetailChange = async (field: string, value: any) => {
     const updated = { ...rdDetailForm, [field]: value };
 
+    // Clear the alternate period field when switching interval mode
+    if (field === "kistInterval") {
+      if (value === "Daily") updated.periodMonths = "";
+      else updated.periodDays = "";
+    }
+
+    const isDaily = updated.kistInterval === "Daily";
     const kistAmount =
       field === "kistAmount" ? parseFloat(value) || 0 : parseFloat(updated.kistAmount) || 0;
     const periodMonths =
       field === "periodMonths" ? parseInt(value) || 0 : parseInt(updated.periodMonths) || 0;
+    const periodDays =
+      field === "periodDays" ? parseInt(value) || 0 : parseInt(updated.periodDays) || 0;
+    const activePeriod = isDaily ? periodDays : periodMonths;
 
-    if (field === "kistAmount" || field === "periodMonths") {
+    if (field === "kistAmount" || field === "periodMonths" || field === "periodDays" || field === "kistInterval") {
       updated.amount =
-        kistAmount > 0 && periodMonths > 0
-          ? (kistAmount * periodMonths).toFixed(2)
+        kistAmount > 0 && activePeriod > 0
+          ? (kistAmount * activePeriod).toFixed(2)
           : "";
     }
 
@@ -541,21 +560,22 @@ useEffect(() => {
       field === "kistInterval" ||
       field === "kistAmount" ||
       field === "periodMonths" ||
+      field === "periodDays" ||
       field === "compoundingInterval"
     ) {
       const productId = Number(formData.accountMasterDTO.rdProductId);
       const amount = parseFloat(updated.amount) || 0;
 
-      if (updated.rdDate && productId && periodMonths > 0 && amount > 0 && kistAmount > 0 && updated.kistInterval) {
-        
+      if (updated.rdDate && productId && activePeriod > 0 && amount > 0 && kistAmount > 0 && updated.kistInterval) {
         await fetchRdCalculatedDetails(
           productId,
-          periodMonths,
+          isDaily ? 0 : periodMonths,
           amount,
           kistAmount,
           updated.kistInterval,
           updated.rdDate,
-          updated.compoundingInterval
+          updated.compoundingInterval,
+          isDaily ? periodDays : 0
         );
       } else {
         clearRdCalculatedFields();
@@ -570,9 +590,11 @@ useEffect(() => {
     kistAmount: number,
     kistInterval: string,
     rdDate: string,
-    compoundingInterval: string
+    compoundingInterval: string,
+    periodInDays: number = 0
   ) => {
-    if (!rdDate || !productId || months <= 0 || amount <= 0 || kistAmount <= 0 || !kistInterval) {
+    const isDaily = kistInterval === "Daily";
+    if (!rdDate || !productId || (isDaily ? periodInDays <= 0 : months <= 0) || amount <= 0 || kistAmount <= 0 || !kistInterval) {
       clearRdCalculatedFields();
       return;
     }
@@ -584,7 +606,8 @@ useEffect(() => {
         productId,
         amount,
         user.branchid,
-        compoundingInterval
+        compoundingInterval,
+        periodInDays > 0 ? periodInDays : undefined
       );
 
       if (!response.success || !response.data) {
@@ -958,6 +981,7 @@ useEffect(() => {
       kistAmount: "",
       kistInterval: "",
       periodMonths: "",
+      periodDays: "",
       amount: "",
       interestRate: "",
       firstKistDate: sessionDate,
@@ -1034,8 +1058,13 @@ useEffect(() => {
         add("kistAmount", "Kist Amount is required and must be greater than 0", "rdDetail");
       if (!rdDetailForm.kistInterval)
         add("kistInterval", "Kist Interval is required", "rdDetail");
-      if (!rdDetailForm.periodMonths || parseInt(rdDetailForm.periodMonths) <= 0)
-        add("periodMonths", "Period (Months) is required and must be greater than 0", "rdDetail");
+      if (rdDetailForm.kistInterval === "Daily") {
+        if (!rdDetailForm.periodDays || parseInt(rdDetailForm.periodDays) <= 0)
+          add("periodDays", "Period (Days) is required and must be greater than 0", "rdDetail");
+      } else {
+        if (!rdDetailForm.periodMonths || parseInt(rdDetailForm.periodMonths) <= 0)
+          add("periodMonths", "Period (Months) is required and must be greater than 0", "rdDetail");
+      }
       if (!rdDetailForm.amount || parseFloat(rdDetailForm.amount) <= 0)
         add("amount", "Amount is required and must be greater than 0", "rdDetail");
       if (!rdDetailForm.slabName?.trim())
@@ -1213,7 +1242,8 @@ useEffect(() => {
           rdnumber: parseInt(rdDetailForm.rdNo) || 0,
           rddate: rdDetailForm.rdDate,
           rdamount: parseFloat(rdDetailForm.amount) || 0,
-          noofmonths: parseInt(rdDetailForm.periodMonths) || 0,
+          noofmonths: rdDetailForm.kistInterval === "Daily" ? 0 : (parseInt(rdDetailForm.periodMonths) || 0),
+          noofdays: rdDetailForm.kistInterval === "Daily" ? (parseInt(rdDetailForm.periodDays) || 0) : 0,
           rdslabid: parseInt(rdDetailForm.slabId) || 0,
           interestrate: parseFloat(rdDetailForm.interestRate) || 0,
           maturitydate: rdDetailForm.matDate,
@@ -1879,27 +1909,50 @@ useEffect(() => {
                   )}
                 </div>
 
-                {/* Period (Months) */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Period (Months) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={rdDetailForm.periodMonths}
-                    onChange={(e) => handleRdDetailChange("periodMonths", e.target.value.replace(/[^0-9]/g, ""))}
-                    maxLength={MAX.periodMonths}
-                    placeholder="Enter Period"
-                    className={`w-full px-3 py-2.5 text-sm border rounded-lg outline-none transition-all cursor-pointer ${
-                      errorsByField.periodMonths ? "border-red-500 bg-red-50" : "border-gray-300 focus:border-blue-500"
-                    }`}
-                  />
-                  {errorsByField.periodMonths && (
-                    <p className="text-red-500 text-xs flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />{errorsByField.periodMonths[0]?.message}
-                    </p>
-                  )}
-                </div>
+                {/* Period (Months) or Period (Days) */}
+                {rdDetailForm.kistInterval === "Daily" ? (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Period (Days) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={rdDetailForm.periodDays}
+                      onChange={(e) => handleRdDetailChange("periodDays", e.target.value.replace(/[^0-9]/g, ""))}
+                      maxLength={6}
+                      placeholder="Enter Period in Days"
+                      className={`w-full px-3 py-2.5 text-sm border rounded-lg outline-none transition-all cursor-pointer ${
+                        errorsByField.periodDays ? "border-red-500 bg-red-50" : "border-gray-300 focus:border-blue-500"
+                      }`}
+                    />
+                    {errorsByField.periodDays && (
+                      <p className="text-red-500 text-xs flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />{errorsByField.periodDays[0]?.message}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Period (Months) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={rdDetailForm.periodMonths}
+                      onChange={(e) => handleRdDetailChange("periodMonths", e.target.value.replace(/[^0-9]/g, ""))}
+                      maxLength={MAX.periodMonths}
+                      placeholder="Enter Period"
+                      className={`w-full px-3 py-2.5 text-sm border rounded-lg outline-none transition-all cursor-pointer ${
+                        errorsByField.periodMonths ? "border-red-500 bg-red-50" : "border-gray-300 focus:border-blue-500"
+                      }`}
+                    />
+                    {errorsByField.periodMonths && (
+                      <p className="text-red-500 text-xs flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />{errorsByField.periodMonths[0]?.message}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Compounding Interval */}
                 <div className="space-y-2">

@@ -48,7 +48,8 @@ export interface RDDetailDTO {
   rdnumber?: number;
   rddate: string;           // rddate TIMESTAMP(3)
   rdamount: number;         // rdamount NUMERIC(18,2)
-  noofmonths: number;       // noofmonths INT
+  noofmonths: number | null; // noofmonths INT (null for daily kist)
+  noofdays?: number | null; // noofdays INT (used when kist interval is daily)
   rdslabid: number;         // rdslabid INT
   interestrate: number;     // interestrate DOUBLE PRECISION
   maturitydate: string;     // maturitydate TIMESTAMP(3)

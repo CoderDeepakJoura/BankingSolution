@@ -1,0 +1,47 @@
+#!/bin/bash
+# Auto-bump patch version on every commit.
+# Skips if config.ts is already staged (manual version bump by Claude).
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+CONFIG="$REPO_ROOT/client/src/constants/config.ts"
+CHANGELOG="$REPO_ROOT/client/src/utils/changelog.ts"
+NOTE_FILE="$REPO_ROOT/.version-note"
+
+# If config.ts already staged, Claude bumped it manually — skip auto-bump
+if git diff --cached --name-only | grep -q "client/src/constants/config.ts"; then
+  exit 0
+fi
+
+# Read current version
+CURRENT=$(grep -oP '(?<=APP_VERSION = ")[^"]+' "$CONFIG")
+if [ -z "$CURRENT" ]; then
+  echo "pre-commit: could not read APP_VERSION, skipping auto-bump"
+  exit 0
+fi
+
+MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+MINOR=$(echo "$CURRENT" | cut -d. -f2)
+PATCH=$(echo "$CURRENT" | cut -d. -f3)
+NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+TODAY_DISPLAY=$(date '+%d-%B-%Y')
+TODAY_ISO=$(date '+%Y-%m-%d')
+
+# Update APP_VERSION and APP_VERSION_DATE in config.ts
+sed -i "s/APP_VERSION = \"[^\"]*\"/APP_VERSION = \"$NEW_VERSION\"/" "$CONFIG"
+sed -i "s/APP_VERSION_DATE = \"[^\"]*\"/APP_VERSION_DATE = \"$TODAY_DISPLAY\"/" "$CONFIG"
+
+# Determine changelog note
+if [ -f "$NOTE_FILE" ]; then
+  NOTE=$(cat "$NOTE_FILE")
+  rm -f "$NOTE_FILE"
+else
+  NOTE="Minor updates and bug fixes"
+fi
+
+# Prepend entry to changelog.ts using Node.js helper
+node "$REPO_ROOT/scripts/prepend-changelog.js" "$NEW_VERSION" "$TODAY_ISO" "$NOTE" "$CHANGELOG"
+
+# Stage the two modified files so they are part of this commit
+git add "$CONFIG" "$CHANGELOG"
+
+echo "pre-commit: auto-bumped version to $NEW_VERSION"

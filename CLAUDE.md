@@ -334,6 +334,14 @@ All FK additions in the `REFERENTIAL INTEGRITY` section of Scripts.sql now inclu
 2. Update `APP_VERSION_DATE` in `constants/config.ts`
 3. Add new entry at top of `changelog` array in `utils/changelog.ts`
 
+### Auto-versioning Git Hook
+- **Hook location**: `.githooks/pre-commit` (tracked in git, not in `.git/`)
+- **Activation**: `git config core.hooksPath .githooks` (run once per clone; also wired to `npm run prepare` at repo root)
+- **Behavior**: On every `git commit`, if `client/src/constants/config.ts` is NOT already staged, the hook auto-bumps the patch version, updates the date, and prepends a changelog entry.
+- **Override**: If I (Claude) manually update `config.ts` before a commit (which I do when the changes warrant a proper changelog entry), the hook detects it is already staged and skips auto-bump.
+- **Custom note**: Write a one-liner to `.version-note` in the repo root before committing to use it as the auto-generated changelog text instead of the default "Minor updates and bug fixes".
+- **Helper script**: `scripts/prepend-changelog.js` — called by the hook to insert the new entry at the top of `changelog.ts`.
+
 ---
 
 ## RD Account Master — Known Casing Rules
@@ -341,6 +349,36 @@ All FK additions in the `REFERENTIAL INTEGRITY` section of Scripts.sql now inclu
 - Backend `RDAccountDetailDTO` property `RdSlabId` → serialized as `rdSlabId` (capital S preserved). Frontend must use `rd.rdSlabId`, NOT `rd.rdslabId`.
 - `compoundingInterval` in state stores numeric string values `"3"` / `"4"` / `"5"` / `"6"` matching native `<select>` option values — do NOT apply a reverse label map when loading in modify mode.
 - Default cash account (By Cash debit side) is fetched via `commonservice.default_cash_in_hand_account(branchId)` in `Promise.all` during `fetchData`, stored in `defaultCashAccountId` state, and restored on reset.
+
+### Daily Kist Interval
+- `kistinterval = 0` in DB represents Daily. All other intervals use standard month codes.
+- `noofdays` column on `rdaccountdetail` stores the period for daily-kist RDs; `noofmonths = 0` for daily.
+- `NoOfMonths` DTO validation: `[Range(0, 9999)]` — 0 is valid (daily kist).
+- Frontend (`rd-master.tsx`): when `kistInterval === "Daily"`, shows "Period (Days)" input instead of "Period (Months)". State has `periodDays` alongside `periodMonths`.
+- `calculateFirstKistDate`: Daily branch adds 1 day; monthly branch adds N months.
+- `fetchRdCalculatedDetails` / `commonservice.fetch_rd_related_info`: passes `periodInDays` query param when daily.
+- `reverseKistMap` includes `0: "Daily"` for edit-mode restore. Loads `rd.noOfDays` → `periodDays`.
+- Submit DTO: `noofmonths = 0` and `noofdays = periodDays` when daily; reversed for monthly.
+- Backend `SlabInfo`: guard changed from `periodInMonths <= 0` to `(periodInMonths <= 0 && periodInDays <= 0)`. Daily uses `approxMonths = ceil(days/30)` for slab lookup.
+
+### RD Maturity Amount Calculation
+- `RDAccountService.CalculateRDMaturityAmount(kistInstallment, nInstallments, annualRate, intFormula)` — the authoritative method.
+- `intFormula` is read from `rdproductbranchwiserule.IntFormula` at query time (defaults to 6 if 0).
+- Six formulas:
+
+| Formula | Description | Formula |
+|---|---|---|
+| 1 | Simple Interest on cumulative balance | `M = P×n + P×r×n(n+1)/2400` |
+| 2 | CI Monthly, Ordinary Annuity | `r_m = r/1200` |
+| 3 | CI Quarterly, Ordinary Annuity | `r_m = (1+r/400)^(1/3)−1` |
+| 4 | CI Half-Yearly, Ordinary Annuity | `r_m = (1+r/200)^(1/6)−1` |
+| 5 | CI Yearly, Ordinary Annuity | `r_m = (1+r/100)^(1/12)−1` |
+| 6 | CI Quarterly, Annuity-Due **(default)** | Same `r_m` as F3, multiply result by `(1+r_m)` |
+
+- Annuity-Due formula: `M = P × [(1+r_m)^n − 1] / r_m × (1+r_m)`
+- Formula 6 verification: P=1000, n=12, r=7% → **M = 12,462** ✓
+- Branch-wise rule labels in frontend (`branchwiserule.tsx`): `"Formula 6 — CI Quarterly, Annuity-Due (Standard)"` etc.
+- **DO NOT** use the old `CalculateMaturityAmount` (kept for backward compat only — it applied the FD lump-sum compound formula to the total RD amount, giving a wrong result).
 
 ---
 
@@ -373,3 +411,6 @@ Migrations live in `BankingPlatform.Infrastructure/Migrations/`. Recent ones:
 12. **Voucher Search modify showed generic "not supported" message** — now shows specific reason per voucher type from `MODIFY_BLOCKED_REASON` map in `voucherOperationsApi.ts`.
 13. **Header search required manual array maintenance** — `ALL_SCREENS` in `HeaderLandingPage.tsx` was a separate manually-maintained array. Fixed: `routeRegistry.tsx` is now the single source of truth; `SEARCHABLE_SCREENS` is derived automatically.
 14. **`/slab-operations` duplicate route** — App.tsx had two routes with same path; second one (FDInterestSlabOperations) was dead. Fixed in registry: FD interest slab operations now at unique path `/fd-interest-slab-operations`.
+15. **Account balance missing opening balance for Saving accounts** — `GetAccountBalance` in `FetchDataController` only added opening balance for FD accounts (from `fdaccountdetail`). For Saving/General/ShareMoney/RD accounts the opening balance from `accopeningbalance` was never included, so withdrawal forms showed a lower-than-actual balance. Fixed: added `else` branch that reads `accopeningbalance` for non-FD accounts.
+16. **RD maturity amount wrong formula** — Old `CalculateMaturityAmount` applied FD lump-sum compound interest on the total RD principal (e.g. 12000 at 7% for 1 year → 12867, wrong). Fixed: new `CalculateRDMaturityAmount` uses proper annuity formula keyed by `IntFormula` from `rdproductbranchwiserule`. Default Formula 6 (CI Quarterly, Annuity-Due) gives the correct 12,462.
+17. **FD slab dropdown showed all slabs regardless of product** — `fdinterestslab.tsx` listed every slab in the branch. Fixed: `fdSlabOptions` filtered by `s.fdProductId === formData.fdProductId` so only slabs matching the selected product are shown.

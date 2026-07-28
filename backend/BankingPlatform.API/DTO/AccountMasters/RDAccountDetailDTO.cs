@@ -13,7 +13,7 @@
         [Range(0.01, double.MaxValue, ErrorMessage = "RD Amount must be greater than 0.")]
         public decimal? RdAmount { get; set; }
 
-        [Range(1, 9999, ErrorMessage = "Number of months must be between 1 and 9999.")]
+        [Range(0, 9999, ErrorMessage = "Number of months must be between 0 and 9999.")]
         public int? NoOfMonths { get; set; }
         public int? RdSlabId { get; set; }
 
