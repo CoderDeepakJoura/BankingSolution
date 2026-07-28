@@ -17,11 +17,13 @@ namespace BankingPlatform.API.Controllers.Member
         private readonly MemberService _service;
         private readonly CommonFunctions _commonfunctions;
         private readonly ImageService _imageService;
-        public MemberController(MemberService service, CommonFunctions commonfunctions, ImageService imageService)
+        private readonly BankingDbContext _db;
+        public MemberController(MemberService service, CommonFunctions commonfunctions, ImageService imageService, BankingDbContext db)
         {
             _service = service;
             _commonfunctions = commonfunctions;
             _imageService = imageService;
+            _db = db;
         }
 
 
@@ -150,6 +152,34 @@ namespace BankingPlatform.API.Controllers.Member
                     Success = false,
                     Message = "Some error occured while deleting member."
                 });
+            }
+        }
+
+        [HttpGet("last-membership-no/{branchId}")]
+        public async Task<IActionResult> GetLastMembershipNo(int branchId)
+        {
+            try
+            {
+                var lastPermanent = await _db.member
+                    .AsNoTracking()
+                    .Where(m => m.BranchId == branchId && m.PermanentMembershipNo != null && m.PermanentMembershipNo != "")
+                    .OrderByDescending(m => m.Id)
+                    .Select(m => m.PermanentMembershipNo)
+                    .FirstOrDefaultAsync();
+
+                var lastNominal = await _db.member
+                    .AsNoTracking()
+                    .Where(m => m.BranchId == branchId && m.NominalMembershipNo != null && m.NominalMembershipNo != "")
+                    .OrderByDescending(m => m.Id)
+                    .Select(m => m.NominalMembershipNo)
+                    .FirstOrDefaultAsync();
+
+                return Ok(new { success = true, lastPermanentMembershipNo = lastPermanent, lastNominalMembershipNo = lastNominal });
+            }
+            catch (Exception ex)
+            {
+                await _commonfunctions.LogErrors(ex, nameof(GetLastMembershipNo), nameof(MemberController));
+                return StatusCode(500, new ResponseDto { Success = false, Message = "Error fetching last membership number." });
             }
         }
 

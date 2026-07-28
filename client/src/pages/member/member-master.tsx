@@ -251,6 +251,8 @@ const MemberMaster = () => {
   const [showValidationSummary, setShowValidationSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
   const [loading, setLoading] = useState(false);
+  const [lastPermanentNo, setLastPermanentNo] = useState<string | null>(null);
+  const [lastNominalNo, setLastNominalNo] = useState<string | null>(null);
   const [relationId, setRelationId] = useState<number | "">("");
   const [relations, setRelations] = useState<Relation[]>([]);
   const [villageId1, setVillageId1] = useState<number | "">("");
@@ -477,6 +479,16 @@ const MemberMaster = () => {
 
     fetchMemberData();
   }, [memberId, isEditMode, user.branchid, navigate]);
+
+  useEffect(() => {
+    if (!isEditMode) {
+      memberAPIService.getLastMembershipNo(user.branchid).then((res: any) => {
+        const data = res.data ?? res;
+        if (data?.lastPermanentMembershipNo) setLastPermanentNo(data.lastPermanentMembershipNo);
+        if (data?.lastNominalMembershipNo) setLastNominalNo(data.lastNominalMembershipNo);
+      });
+    }
+  }, [isEditMode, user.branchid]);
 
   const zoneData: OptionType[] = zones.map((zone) => ({
     value: zone.zoneId,
@@ -1530,6 +1542,11 @@ const isOpeningEntry = !!(
             maxLength={20}
             autoFocus
           />
+          {!isEditMode && lastPermanentNo && (
+            <span className="text-xs text-gray-500 mt-1 inline-block">
+              Last: <span className="font-semibold text-blue-600">{lastPermanentNo}</span>
+            </span>
+          )}
         </FormField>
       )}
 
@@ -1556,6 +1573,11 @@ const isOpeningEntry = !!(
             maxLength={20}
             autoFocus
           />
+          {!isEditMode && lastNominalNo && (
+            <span className="text-xs text-gray-500 mt-1 inline-block">
+              Last: <span className="font-semibold text-blue-600">{lastNominalNo}</span>
+            </span>
+          )}
         </FormField>
       )}
       <FormField

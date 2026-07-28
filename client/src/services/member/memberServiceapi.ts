@@ -252,6 +252,10 @@ class MemberApiService extends ApiService {
   /**
    * Get member by ID
    */
+  async getLastMembershipNo(branchId: number): Promise<ApiResponse<{ lastPermanentMembershipNo?: string; lastNominalMembershipNo?: string }>> {
+    return this.makeRequest(`/member/last-membership-no/${branchId}`);
+  }
+
   async getMemberById(
     memberId: number,
     branchId: number
