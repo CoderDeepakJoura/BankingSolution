@@ -382,6 +382,46 @@ All FK additions in the `REFERENTIAL INTEGRITY` section of Scripts.sql now inclu
 
 ---
 
+## Miscellaneous Masters — Deletion Protection
+
+14 masters are protected from deletion when referenced as a FK elsewhere:
+**Account Head Type, Account Head, Branch Master, Caste, Category, Occupation, Relation, State, Patwar, Post Office, Tehsil, Thana, Village, Zone**
+
+### Backend: `MasterUsageCheckerService`
+- File: `backend/BankingPlatform.API/Service/Masters/MasterUsageCheckerService.cs`
+- `MasterType` enum covers all 13 non-branch masters
+- `CheckAsync(type, id, branchId)` → returns `List<UsageInfo>` (screen name + count); empty list means safe to delete
+- All 13 controllers inject this service; delete method calls `CheckAsync` first and returns `Conflict(new { Success = false, InUse = true, Usages = usages })` (HTTP 409) if in use
+- Registered in `Program.cs` as `AddScoped<MasterUsageCheckerService>()`
+
+### Frontend
+- `client/src/services/api.ts` — `makeRequest` detects HTTP 409 + `inUse: true`, attaches `.inUse = true` and `.usages = [{ screen, count }]` to the thrown `Error`
+- `client/src/utils/masterDeleteUtils.ts` — exports:
+  - `isMasterInUseError(err)` — type guard
+  - `showMasterInUseError(usages, itemName?)` — shows SweetAlert2 table with "Used In" and "Records" columns
+- All 13 master data pages import from `masterDeleteUtils` and use the pattern:
+  ```typescript
+  if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+  else { Swal.fire("Error!", err.message || "Failed to delete.", "error"); }
+  ```
+
+---
+
+## CI/CD — Deploy Pipeline
+
+File: `.github/workflows/deploy.yml`
+
+- **Frontend job**: builds Vite → rsyncs `client/dist/` to `/var/www/banking-frontend/` on push to `main` when `client/**` changes
+- **Backend job**: publishes .NET → rsyncs to `/var/www/banking-api/` (excludes `appsettings.json`, `web.config`, `logs/`, `uploads/`) → restarts services
+- **Services restarted on every backend deploy** (stop → rsync → start + verify):
+  - `banking-api.service`
+  - `hindu-society-api.service`
+  - `krishna-society-api.service`
+- All three services share the same compiled binary at `/var/www/banking-api/`, running on different ports
+- Start step has `if: always()` — services restart even if rsync failed
+
+---
+
 ## EF Core Migrations
 
 Migrations live in `BankingPlatform.Infrastructure/Migrations/`. Recent ones:
@@ -414,3 +454,5 @@ Migrations live in `BankingPlatform.Infrastructure/Migrations/`. Recent ones:
 15. **Account balance missing opening balance for Saving accounts** — `GetAccountBalance` in `FetchDataController` only added opening balance for FD accounts (from `fdaccountdetail`). For Saving/General/ShareMoney/RD accounts the opening balance from `accopeningbalance` was never included, so withdrawal forms showed a lower-than-actual balance. Fixed: added `else` branch that reads `accopeningbalance` for non-FD accounts.
 16. **RD maturity amount wrong formula** — Old `CalculateMaturityAmount` applied FD lump-sum compound interest on the total RD principal (e.g. 12000 at 7% for 1 year → 12867, wrong). Fixed: new `CalculateRDMaturityAmount` uses proper annuity formula keyed by `IntFormula` from `rdproductbranchwiserule`. Default Formula 6 (CI Quarterly, Annuity-Due) gives the correct 12,462.
 17. **FD slab dropdown showed all slabs regardless of product** — `fdinterestslab.tsx` listed every slab in the branch. Fixed: `fdSlabOptions` filtered by `s.fdProductId === formData.fdProductId` so only slabs matching the selected product are shown.
+18. **Miscellaneous master deletion ignored FK references** — deleting a Caste, Zone, Village, etc. that was referenced in member or account records would silently succeed. Fixed: `MasterUsageCheckerService` checks all FK usages before delete; returns HTTP 409 with screen/count breakdown; frontend displays SweetAlert2 in-use table.
+19. **`accountheadtype-data.tsx` missing import** — `isMasterInUseError`/`showMasterInUseError` were called in the catch block but the import line was absent, causing TS2304 compile errors. Fixed: import added.
