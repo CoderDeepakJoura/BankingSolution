@@ -376,6 +376,20 @@ namespace BankingPlatform.API.Services
                 SMAccId = smAccInfo.ID
             };
 
+            var memberAccountIds = await _context.accountmaster
+                .Where(x => x.MemberId == id && x.MemberBranchID == branchId)
+                .Select(x => x.ID)
+                .ToListAsync();
+            bool hasTransactions = false;
+            if (memberAccountIds.Count > 0)
+            {
+                hasTransactions = await _context.accopeningbalance
+                    .AnyAsync(x => x.BranchId == branchId && memberAccountIds.Contains(x.AccountId));
+                if (!hasTransactions)
+                    hasTransactions = await _context.vouchercreditdebitdetails
+                        .AnyAsync(x => x.BrId == branchId && memberAccountIds.Contains(x.AccountId));
+            }
+
             return new CombinedMemberDTO
             {
                 Member = MapToDTO(member),
@@ -384,7 +398,8 @@ namespace BankingPlatform.API.Services
                 LocationDetails = MapToDTO(locationDetails),
                 Voucher = voucherDto,
                 VoucherId = voucherId,
-                AccMaster = accountMasterDTO
+                AccMaster = accountMasterDTO,
+                HasTransactions = hasTransactions
             };
         }
 
@@ -400,6 +415,31 @@ namespace BankingPlatform.API.Services
                 // Find existing member
                 var member = await _context.member.FirstOrDefaultAsync(m => m.Id == dto.Member.Id && m.BranchId == dto.Member.BranchId);
                 if (member == null) return false;
+
+                // Guard: block member type change if member has OB or voucher transactions
+                // Use same formula as the update line below: NominalMembershipNo != "" ? 1 : 2
+                int newMemberType = dto.Member.NominalMembershipNo != "" ? 1 : 2;
+                int currentMemberType = member.MemberType ?? 0;
+                if (currentMemberType != 0 && currentMemberType != newMemberType)
+                {
+                    var memberAccountIds = await _context.accountmaster
+                        .Where(x => x.MemberId == dto.Member.Id && x.MemberBranchID == dto.Member.BranchId)
+                        .Select(x => x.ID)
+                        .ToListAsync();
+
+                    if (memberAccountIds.Count > 0)
+                    {
+                        var hasOB = await _context.accopeningbalance
+                            .AnyAsync(x => x.BranchId == dto.Member.BranchId && memberAccountIds.Contains(x.AccountId));
+                        if (hasOB)
+                            throw new InvalidOperationException("Member type cannot be changed because this member has an opening balance entry.");
+
+                        var hasVouchers = await _context.vouchercreditdebitdetails
+                            .AnyAsync(x => x.BrId == dto.Member.BranchId && memberAccountIds.Contains(x.AccountId));
+                        if (hasVouchers)
+                            throw new InvalidOperationException("Member type cannot be changed because this member has voucher transactions.");
+                    }
+                }
 
                 // Update member entity with DateTime handling
                 dto.Member.JoiningDate = ToUnspecified(dto.Member.JoiningDate);
@@ -585,6 +625,27 @@ namespace BankingPlatform.API.Services
         // DELETE
         public async Task<bool> DeleteMemberAsync(int id, int branchId, int voucherId)
         {
+            // Guard: block deletion if the member has opening balance or voucher transactions
+            var memberAccountIds = await _context.accountmaster
+                .Where(x => x.MemberId == id && x.MemberBranchID == branchId)
+                .Select(x => x.ID)
+                .ToListAsync();
+
+            if (memberAccountIds.Count > 0)
+            {
+                var hasOpeningBalance = await _context.accopeningbalance
+                    .AnyAsync(x => x.BranchId == branchId && memberAccountIds.Contains(x.AccountId));
+                if (hasOpeningBalance)
+                    throw new InvalidOperationException("This member has an opening balance entry and cannot be deleted.");
+
+                var hasVouchers = await _context.vouchercreditdebitdetails
+                    .AnyAsync(x => x.BrId == branchId
+                                && memberAccountIds.Contains(x.AccountId)
+                                && (voucherId == 0 || x.VoucherID != voucherId));
+                if (hasVouchers)
+                    throw new InvalidOperationException("This member has voucher transactions and cannot be deleted.");
+            }
+
             using var transaction = await _context.Database.BeginTransactionAsync();
             var memberToDelete = await _context.member
                 .FirstOrDefaultAsync(m => m.Id == id && m.BranchId == branchId);

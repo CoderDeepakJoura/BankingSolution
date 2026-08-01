@@ -100,6 +100,7 @@ const CRUDMaster = <T,>({
     } finally {
       setIsLoading(false);
       setIsSearchLoading(false);
+      setTimeout(() => searchInputRef.current?.focus(), 0);
     }
   }, [pageNumber, searchTerm, pageSize, fetchData]);
 
@@ -110,11 +111,14 @@ const CRUDMaster = <T,>({
     };
   }, [loadData]);
 
-  const handleSearch = () => {
-    setIsSearchLoading(true);
-    setPageNumber(1);
-    setSearchTerm(pendingSearchTerm.trim());
-  };
+  // Auto-search: fire 400ms after the user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm(pendingSearchTerm.trim());
+      setPageNumber(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [pendingSearchTerm]);
 
   const handleClearSearch = () => {
     setPendingSearchTerm("");
@@ -127,8 +131,7 @@ const CRUDMaster = <T,>({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleSearch();
-    else if (e.key === "Escape") handleClearSearch();
+    if (e.key === "Escape") handleClearSearch();
   };
 
   const handleRetry = () => {

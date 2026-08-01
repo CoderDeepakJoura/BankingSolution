@@ -154,6 +154,7 @@ export interface CombinedMemberDTO {
   accMaster: AccountMasterDTO | null;
   voucher: VoucherDTO;
   voucherId?: Number | 0;
+  hasTransactions?: boolean;
 }
 
 // Member Response for list operations

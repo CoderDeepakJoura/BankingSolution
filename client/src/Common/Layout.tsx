@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   BarChart2,
   ShieldCheck,
+  Receipt,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Header from "../components/HeaderLandingPage";
@@ -313,13 +314,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           ],
         },
         {
-          label: "Vouchers",
-          path: "",
-          subItems: [
-            { label: "Voucher Operations", path: "/voucher-operations" },
-          ],
-        },
-        {
           label: "Inter Branch",
           path: "",
           ibOnly: true,
@@ -330,6 +324,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           ],
         },
       ],
+    },
+    {
+      icon: <Receipt size={18} />,
+      label: "Voucher Operations",
+      hasSubItems: false,
+      path: "/voucher-operations",
     },
     {
       icon: <BarChart2 size={18} />,

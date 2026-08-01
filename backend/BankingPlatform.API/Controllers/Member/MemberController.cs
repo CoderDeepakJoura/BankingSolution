@@ -124,6 +124,10 @@ namespace BankingPlatform.API.Controllers.Member
                     Message = "Member updated successfully."
                 });
             }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ResponseDto { Success = false, Message = ex.Message });
+            }
             catch (Exception ex)
             {
                 await _commonfunctions.LogErrors(ex, nameof(CreateMember), nameof(MemberController));
@@ -143,6 +147,10 @@ namespace BankingPlatform.API.Controllers.Member
                 var success = await _service.DeleteMemberAsync(id, branchId, voucherId);
                 if (!success) return NotFound();
                 return Ok(new { message = "Member deleted successfully" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ResponseDto { Success = false, Message = ex.Message });
             }
             catch (Exception ex)
             {

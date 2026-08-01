@@ -242,6 +242,7 @@ const MemberMaster = () => {
   const aadhaarRef = useRef(null);
   const PANref = useRef(null);
   const [membershipType, setMembershipType] = useState<string>(""); // 'P' or 'N'
+  const [typeChangeLocked, setTypeChangeLocked] = useState(false);
   const user = useSelector((state: RootState) => state.user);
   const sessionDate = user.workingdate
     ? commonservice.splitDate(user.workingdate)
@@ -447,6 +448,7 @@ const MemberMaster = () => {
 
             if (data.member.nominalMembershipNo != "") setMembershipType("N");
             else setMembershipType("P");
+            setTypeChangeLocked(data.hasTransactions ?? false);
 
             // Auto-detect which fields are missing so toggles match the member's actual data
             const hasPan     = !!data.documentDetails?.panCardNo?.trim();
@@ -1481,41 +1483,48 @@ const isOpeningEntry = !!(
         required
         errors={errorsByField.membershipType || []}
       >
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="membershipType"
-              value="P"
-              checked={membershipType === "P"}
-              onChange={(e) => {
-                setMembershipType("P");
-                setMemberData((prev) => ({
-                  ...prev,
-                  nominalMembershipNo: "",
-                }));
-              }}
-              className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm font-medium text-gray-700">Permanent</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="membershipType"
-              value="N"
-              checked={membershipType === "N"}
-              onChange={(e) => {
-                setMembershipType("N");
-                setMemberData((prev) => ({
-                  ...prev,
-                  permanentMembershipNo: "",
-                }));
-              }}
-              className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm font-medium text-gray-700">Nominal</span>
-          </label>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-4">
+            <label className={`flex items-center gap-2 ${isEditMode && typeChangeLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+              <input
+                type="radio"
+                name="membershipType"
+                value="P"
+                checked={membershipType === "P"}
+                disabled={isEditMode && typeChangeLocked}
+                onChange={(e) => {
+                  setMembershipType("P");
+                  setMemberData((prev) => ({
+                    ...prev,
+                    nominalMembershipNo: "",
+                  }));
+                }}
+                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Permanent</span>
+            </label>
+            <label className={`flex items-center gap-2 ${isEditMode && typeChangeLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+              <input
+                type="radio"
+                name="membershipType"
+                value="N"
+                checked={membershipType === "N"}
+                disabled={isEditMode && typeChangeLocked}
+                onChange={(e) => {
+                  setMembershipType("N");
+                  setMemberData((prev) => ({
+                    ...prev,
+                    permanentMembershipNo: "",
+                  }));
+                }}
+                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Nominal</span>
+            </label>
+          </div>
+          {isEditMode && typeChangeLocked && (
+            <p className="text-xs text-amber-600">Membership type cannot be changed — this member has existing transactions or opening balance.</p>
+          )}
         </div>
       </FormField>
 
@@ -3002,11 +3011,11 @@ const isOpeningEntry = !!(
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate("/member-operations")}
+                  onClick={() => navigate(isEditMode ? "/member-info" : "/member-operations")}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 font-medium"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Back to Operations
+                  {isEditMode ? "Back to Member Info" : "Back to Operations"}
                 </button>
               </div>
 

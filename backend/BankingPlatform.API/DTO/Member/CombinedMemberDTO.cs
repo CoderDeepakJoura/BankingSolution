@@ -22,6 +22,7 @@ namespace BankingPlatform.API.DTO.Member
         public IFormFile? MemberPhoto { get; set; }
         public IFormFile? MemberSignature { get; set; }
         public int? VoucherId { get; set; }
+        public bool HasTransactions { get; set; }
     }
     public class CreateMemberRequest
     {
