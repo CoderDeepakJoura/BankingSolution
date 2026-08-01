@@ -113,7 +113,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-            "systemctl stop banking-api.service hindu-society-api.service && echo 'Services stopped'"
+            "systemctl stop banking-api.service hindu-society-api.service krishna-society-api.service && echo 'Services stopped'"
 
       # appsettings.json  → server-specific (DB connection string, JWT secret, CORS, DocPaths)
       # appsettings.*.json → any environment override files
@@ -139,10 +139,10 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
             "
-            systemctl start banking-api.service hindu-society-api.service
+            systemctl start banking-api.service hindu-society-api.service krishna-society-api.service
             sleep 6
             FAILED=0
-            for svc in banking-api.service hindu-society-api.service; do
+            for svc in banking-api.service hindu-society-api.service krishna-society-api.service; do
               if systemctl is-active --quiet \$svc; then
                 echo \"✅ \$svc is running\"
               else

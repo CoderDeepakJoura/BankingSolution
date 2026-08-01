@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.3.7",
+    date: "2026-08-01",
+    changes: [
+      { type: "improvement", text: "CI/CD: restart krishna-society-api on backend deploy; fix missing import in accountheadtype-data" },
+    ],
+  },
+  {
     version: "1.3.6",
     date: "2026-08-01",
     changes: [

@@ -4,6 +4,7 @@ import AccountHeadTypeApiService, {
   AccountHeadTypeFilter,
 } from "../../../services/accountHead/accountheadtypeapi";
 import Swal from "sweetalert2";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import AccountHeadTypeTable from "./accountheadtype-table";
 import { useNavigate } from "react-router-dom";
