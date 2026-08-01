@@ -277,7 +277,7 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  if (isLoading || !favsLoaded) {
+  if (isLoading) {
     return <DashboardLayout mainContent={<DashboardSkeleton />} />;
   }
 
@@ -375,7 +375,13 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
 
-            {favourites.length === 0 ? (
+            {!favsLoaded ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 animate-pulse">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-16 rounded-2xl bg-slate-100" />
+                ))}
+              </div>
+            ) : favourites.length === 0 ? (
               <div
                 onClick={() => setShowModal(true)}
                 className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl py-10 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors"
