@@ -541,11 +541,8 @@ const deleteAccountHeadType = async (
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire(
-        "Error!",
-        err.message || "Failed to delete Account Head Type.",
-        "error"
-      );
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete Account Head Type.", "error"); }
     }
   }
 };

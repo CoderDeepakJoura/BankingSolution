@@ -1,5 +1,6 @@
 ﻿using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.AccountHead;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models.AccHeads;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,11 +14,13 @@ namespace BankingPlatform.API.Controllers.AccountHead
         private readonly BankingDbContext _appContext;
         private readonly CommonFunctions _commonFunctions;
         private readonly ILogger<AccountHeadTypeController> _logger;
-        public AccountHeadTypeController(BankingDbContext appcontext, ILogger<AccountHeadTypeController> logger, CommonFunctions commonFunctions)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public AccountHeadTypeController(BankingDbContext appcontext, ILogger<AccountHeadTypeController> logger, CommonFunctions commonFunctions, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonFunctions = commonFunctions;
+            _usageChecker = usageChecker;
         }
 
         [Authorize]
@@ -284,14 +287,10 @@ namespace BankingPlatform.API.Controllers.AccountHead
                         Message = "Account Head Type not found."
                     });
                 }
-                if(await _commonFunctions.CheckIfAccountHeadTypeInUse(accountheadtypeMasterDTO.AccountHeadTypeId, accountheadtypeMasterDTO.BranchId))
-                {
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = "Account Head Type is in use and cannot be deleted."
-                    });
-                }
+                var usages = await _usageChecker.CheckAsync(MasterType.AccountHeadType, accountheadtypeMasterDTO.AccountHeadTypeId, accountheadtypeMasterDTO.BranchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 _appContext.accountheadtype.Remove(existingAccountHeadType);
                 await _appContext.SaveChangesAsync();
 

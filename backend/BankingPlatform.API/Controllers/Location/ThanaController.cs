@@ -1,5 +1,6 @@
 ﻿using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.Location;
 using Microsoft.AspNetCore.Authorization;
@@ -17,11 +18,13 @@ namespace BankingPlatform.API.Controllers.Location
         private readonly BankingDbContext _appContext;
         private readonly ILogger<ThanaController> _logger;
         private readonly CommonFunctions _commonFunctions;
-        public ThanaController(BankingDbContext appcontext, ILogger<ThanaController> logger, CommonFunctions commonFunctions)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public ThanaController(BankingDbContext appcontext, ILogger<ThanaController> logger, CommonFunctions commonFunctions, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonFunctions = commonFunctions;
+            _usageChecker = usageChecker;
         }
 
         [Authorize]
@@ -284,12 +287,10 @@ namespace BankingPlatform.API.Controllers.Location
                         Message = "Thana not found."
                     });
                 }
-                if (await _commonFunctions.CheckIfLocationDataInUse(thanaMasterDTO.BranchId, 0, thanaMasterDTO.ThanaId))
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = "Thana is in use and cannot be deleted."
-                    });
+                var usages = await _usageChecker.CheckAsync(MasterType.Thana, thanaMasterDTO.ThanaId, thanaMasterDTO.BranchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 _appContext.thana.Remove(existingThana);
                 await _appContext.SaveChangesAsync();
 

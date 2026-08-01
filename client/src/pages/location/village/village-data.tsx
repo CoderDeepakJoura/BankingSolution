@@ -1,4 +1,5 @@
 import React from "react";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import VillageApiService, {
   Village,
   VillageFilter,
@@ -801,7 +802,8 @@ const deleteVillage = async (village: Village, branchId: number) => {
       });
     } catch (err: any) {
       console.error("Error deleting village:", err);
-      Swal.fire("Error!", err.message || "Failed to delete Village.", "error");
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete Village.", "error"); }
     }
   }
 };

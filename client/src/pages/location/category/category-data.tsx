@@ -1,4 +1,5 @@
 import React from "react";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import CategoryApiService, {
   Category,
   CategoryFilter,
@@ -401,7 +402,8 @@ const deleteCategory = async (Category: Category, branchId: number) => {
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire("Error!", err.message || "Failed to delete Category.", "error");
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete Category.", "error"); }
     }
   }
 };

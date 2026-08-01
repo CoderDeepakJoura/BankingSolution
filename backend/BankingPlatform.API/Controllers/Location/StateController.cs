@@ -1,6 +1,7 @@
 ﻿using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Location.State;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models.Location;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -16,12 +17,14 @@ namespace BankingPlatform.API.Controllers.Location
         private readonly ILogger<StateController> _logger;
         private readonly CommonFunctions _commonfns;
         private readonly IHttpContextAccessor _httpContextAccessor;
-        public StateController(BankingDbContext appcontext, ILogger<StateController> logger, CommonFunctions commonfns, IHttpContextAccessor httpContextAccessor)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public StateController(BankingDbContext appcontext, ILogger<StateController> logger, CommonFunctions commonfns, IHttpContextAccessor httpContextAccessor, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonfns = commonfns;
             _httpContextAccessor = httpContextAccessor;
+            _usageChecker = usageChecker;
         }
 
         /// <summary>
@@ -256,12 +259,11 @@ namespace BankingPlatform.API.Controllers.Location
                     });
                 }
                 var user = _httpContextAccessor.HttpContext!.User!;
-                if (await _commonfns.CheckIfStateInUse(id, int.Parse(user.FindFirst("branchId")?.Value!)))
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = "State is in use and cannot be deleted."
-                    });
+                int branchId = int.Parse(user.FindFirst("branchId")?.Value ?? "0");
+                var usages = await _usageChecker.CheckAsync(MasterType.State, id, branchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 _appContext.state.Remove(existingState);
                 await _appContext.SaveChangesAsync();
 

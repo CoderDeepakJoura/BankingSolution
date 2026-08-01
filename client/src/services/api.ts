@@ -89,6 +89,22 @@ export class ApiService {
       }
 
       if (!response.ok) {
+        if (response.status === 409) {
+          try {
+            const data = await response.json();
+            if (data.inUse || data.InUse) {
+              const err = new Error(data.message || data.Message || 'Record is in use and cannot be deleted.');
+              (err as any).inUse = true;
+              (err as any).usages = (data.usages || data.Usages || []).map((u: any) => ({
+                screen: u.screen || u.Screen,
+                count: u.count || u.Count,
+              }));
+              throw err;
+            }
+          } catch (parseErr) {
+            if ((parseErr as any).inUse) throw parseErr;
+          }
+        }
         throw new Error(await this.parseErrorMessage(response));
       }
 

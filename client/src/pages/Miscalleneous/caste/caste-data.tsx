@@ -1,4 +1,5 @@
 import React from "react";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import CasteApiService, {
   Caste,
   CasteFilter,
@@ -479,11 +480,8 @@ const deleteCaste = async (
       }
     } catch (err: any) {
       console.error("Error deleting caste:", err);
-      Swal.fire(
-        "Error!",
-        err.message || "Failed to delete Caste.",
-        "error"
-      );
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete Caste.", "error"); }
     }
   }
 };

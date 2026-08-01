@@ -4,6 +4,7 @@ using BankingPlatform.API.DTO.AccountMasters;
 using BankingPlatform.API.DTO.Miscalleneous;
 using BankingPlatform.API.Service.AccountMasters;
 using BankingPlatform.API.Service.Caste;
+using BankingPlatform.API.Service.Masters;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -17,11 +18,13 @@ namespace BankingPlatform.API.Controllers.Miscallenous
         private readonly CasteService _service;
         public ILogger<CasteController> _logger;
         private readonly CommonFunctions _commonFns;
-        public CasteController(CasteService service, ILogger<CasteController> logger, CommonFunctions commonFns)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public CasteController(CasteService service, ILogger<CasteController> logger, CommonFunctions commonFns, MasterUsageCheckerService usageChecker)
         {
             _service = service;
             _logger = logger;
             _commonFns = commonFns;
+            _usageChecker = usageChecker;
         }
 
         [HttpPost]
@@ -146,6 +149,10 @@ namespace BankingPlatform.API.Controllers.Miscallenous
                         Message = "Invalid request data: " + string.Join(", ", Modelerrors)
                     });
                 }
+                var usages = await _usageChecker.CheckAsync(MasterType.Caste, id, branchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 var result = await _service.DeleteCasteAsync(id, branchId);
                 if (result is not "Success") return NotFound(new ResponseDto
                 {

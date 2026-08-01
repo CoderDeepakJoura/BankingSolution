@@ -1,4 +1,5 @@
 import React from "react";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import AccountHeadApiService, {
   AccountHead,
   AccountHeadFilter,
@@ -664,11 +665,8 @@ const deleteAccountHead = async (
       });
     } catch (err: any) {
       console.error("Error deleting account head:", err);
-      Swal.fire(
-        "Error!",
-        err.message || "Failed to delete Account Head.",
-        "error"
-      );
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete Account Head.", "error"); }
     }
   }
 };

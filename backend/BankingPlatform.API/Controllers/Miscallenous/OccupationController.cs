@@ -1,5 +1,6 @@
 ﻿using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Miscalleneous;
+using BankingPlatform.API.Service.Masters;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,11 +14,13 @@ namespace BankingPlatform.API.Controllers.Miscallenous
         private readonly BankingDbContext _appContext;
         private readonly ILogger<OccupationController> _logger;
         private readonly CommonFunctions _commonFunctions;
-        public OccupationController(BankingDbContext appcontext, ILogger<OccupationController> logger, CommonFunctions commonFunctions)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public OccupationController(BankingDbContext appcontext, ILogger<OccupationController> logger, CommonFunctions commonFunctions, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonFunctions = commonFunctions;
+            _usageChecker = usageChecker;
         }
 
         
@@ -257,6 +260,10 @@ namespace BankingPlatform.API.Controllers.Miscallenous
                         Message = "Occupation not found."
                     });
                 }
+
+                var usages = await _usageChecker.CheckAsync(MasterType.Occupation, id, branchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
 
                 _appContext.occupation.Remove(existingOccupation);
                 await _appContext.SaveChangesAsync();

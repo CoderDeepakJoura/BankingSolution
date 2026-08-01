@@ -1,4 +1,5 @@
 import React from "react";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import RelationApiService, {
   RelationFilter,
   RelationResponse,
@@ -396,11 +397,8 @@ const deleteRelation = async (Relation: Relation) => {
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire(
-        "Error!",
-        err.message || "Failed to delete Relation.",
-        "error"
-      );
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete Relation.", "error"); }
     }
   }
 };

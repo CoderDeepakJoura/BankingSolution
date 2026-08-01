@@ -1,6 +1,7 @@
 ﻿using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Location.Tehsil;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.Location;
 using Microsoft.AspNetCore.Authorization;
@@ -18,11 +19,13 @@ namespace BankingPlatform.API.Controllers.Location
         private readonly BankingDbContext _appContext;
         private readonly ILogger<TehsilController> _logger;
         private readonly CommonFunctions _commonfunctions;
-        public TehsilController(BankingDbContext appcontext, ILogger<TehsilController> logger, CommonFunctions commonfunctions)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public TehsilController(BankingDbContext appcontext, ILogger<TehsilController> logger, CommonFunctions commonfunctions, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonfunctions = commonfunctions;
+            _usageChecker = usageChecker;
         }
 
         [Authorize]
@@ -281,12 +284,9 @@ namespace BankingPlatform.API.Controllers.Location
                         Message = "Tehsil not found."
                     });
                 }
-                if (await _commonfunctions.CheckIfLocationDataInUse(tehsilMasterDTO.BranchId, 0, 0, 0, tehsilMasterDTO.TehsilId))
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = "Tehsil is in use and cannot be deleted."
-                    });
+                var usages = await _usageChecker.CheckAsync(MasterType.Tehsil, tehsilMasterDTO.TehsilId, tehsilMasterDTO.BranchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
 
                 _appContext.tehsil.Remove(existingTehsil);
                 await _appContext.SaveChangesAsync();

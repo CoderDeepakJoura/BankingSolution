@@ -2,6 +2,7 @@
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Location.Patwar;
 using BankingPlatform.API.DTO.Miscalleneous;
+using BankingPlatform.API.Service.Masters;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,11 +15,13 @@ namespace BankingPlatform.API.Controllers.Location
         private readonly BankingDbContext _appContext;
         private readonly ILogger<PatwarController> _logger;
         private readonly CommonFunctions _commonFunctions;
-        public PatwarController(BankingDbContext appcontext, ILogger<PatwarController> logger, CommonFunctions commonFunctions)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public PatwarController(BankingDbContext appcontext, ILogger<PatwarController> logger, CommonFunctions commonFunctions, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonFunctions = commonFunctions;
+            _usageChecker = usageChecker;
         }
 
 
@@ -258,6 +261,10 @@ namespace BankingPlatform.API.Controllers.Location
                         Message = "Patwar not found."
                     });
                 }
+
+                var usages = await _usageChecker.CheckAsync(MasterType.Patwar, id, branchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
 
                 _appContext.patwar.Remove(existingPatwar);
                 await _appContext.SaveChangesAsync();

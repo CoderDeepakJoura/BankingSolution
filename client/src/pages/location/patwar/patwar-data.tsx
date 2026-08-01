@@ -1,4 +1,5 @@
 import React from "react";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import PatwarApiService, {
   Patwar,
   PatwarFilter,
@@ -399,7 +400,8 @@ const deletePatwar = async (Patwar: Patwar, branchId: number) => {
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire("Error!", err.message || "Failed to delete Patwar.", "error");
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete Patwar.", "error"); }
     }
   }
 };

@@ -1,6 +1,7 @@
 ﻿using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.AccountHead;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -15,11 +16,13 @@ namespace BankingPlatform.API.Controllers.AccountHead
         private readonly BankingDbContext _appContext;
         private readonly ILogger<AccountHeadController> _logger;
         private readonly CommonFunctions _commonfns;
-        public AccountHeadController(BankingDbContext appcontext, ILogger<AccountHeadController> logger, CommonFunctions commonfns)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public AccountHeadController(BankingDbContext appcontext, ILogger<AccountHeadController> logger, CommonFunctions commonfns, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonfns = commonfns;
+            _usageChecker = usageChecker;
         }
 
         [Authorize]
@@ -332,6 +335,10 @@ namespace BankingPlatform.API.Controllers.AccountHead
                         Message = "AccountHead not found."
                     });
                 }
+
+                var usages = await _usageChecker.CheckAsync(MasterType.AccountHead, accountheadMasterDTO.AccountHeadId, accountheadMasterDTO.BranchID);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
 
                 _appContext.accounthead.Remove(existingAccountHead);
                 await _appContext.SaveChangesAsync();

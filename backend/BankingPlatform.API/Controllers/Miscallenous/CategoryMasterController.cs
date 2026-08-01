@@ -1,5 +1,6 @@
 ﻿using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Miscalleneous;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
 using Microsoft.AspNetCore.Authorization;
@@ -17,11 +18,13 @@ namespace BankingPlatform.API.Controllers.Miscallenous
         private readonly BankingDbContext _appContext;
         private readonly ILogger<CategoryMasterController> _logger;
         private readonly CommonFunctions _commonFunctions;
-        public CategoryMasterController(BankingDbContext appcontext, ILogger<CategoryMasterController> logger, CommonFunctions commonFunctions)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public CategoryMasterController(BankingDbContext appcontext, ILogger<CategoryMasterController> logger, CommonFunctions commonFunctions, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonFunctions = commonFunctions;
+            _usageChecker = usageChecker;
         }
 
         [Authorize]
@@ -267,6 +270,10 @@ namespace BankingPlatform.API.Controllers.Miscallenous
                         Message = "Category not found."
                     });
                 }
+
+                var usages = await _usageChecker.CheckAsync(MasterType.Category, categoryMasterDTO.CategoryId, categoryMasterDTO.BranchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
 
                 _appContext.category.Remove(existingCategory);
                 await _appContext.SaveChangesAsync();

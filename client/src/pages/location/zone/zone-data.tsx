@@ -1,4 +1,5 @@
 import React from "react";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import ZoneApiService, {
   Zone,
   ZoneFilter,
@@ -458,7 +459,8 @@ const deleteZone = async (zone: Zone, branchId: number) => {
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire("Error!", err.message || "Failed to delete zone.", "error");
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete zone.", "error"); }
     }
   }
 };

@@ -1,4 +1,5 @@
 import React from "react";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import StateApiService, {
   State,
   StateFilter,
@@ -399,7 +400,8 @@ const deleteState = async (state: State) => {
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire("Error!", err.message || "Failed to delete state.", "error");
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete state.", "error"); }
     }
   }
 };

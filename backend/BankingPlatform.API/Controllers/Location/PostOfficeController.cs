@@ -1,5 +1,6 @@
 ﻿using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Location.PostOffice;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.Location;
 using Microsoft.AspNetCore.Authorization;
@@ -17,11 +18,13 @@ namespace BankingPlatform.API.Controllers.Location
         private readonly BankingDbContext _appContext;
         private readonly ILogger<PostOfficeController> _logger;
         private readonly CommonFunctions _commonFunctions;
-        public PostOfficeController(BankingDbContext appcontext, ILogger<PostOfficeController> logger, CommonFunctions commonFunctions)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public PostOfficeController(BankingDbContext appcontext, ILogger<PostOfficeController> logger, CommonFunctions commonFunctions, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonFunctions = commonFunctions;
+            _usageChecker = usageChecker;
         }
 
         [Authorize]
@@ -288,12 +291,10 @@ namespace BankingPlatform.API.Controllers.Location
                         Message = "Post Office not found."
                     });
                 }
-                if (await _commonFunctions.CheckIfLocationDataInUse(postOfficeMasterDTO.BranchId, 0, 0, postOfficeMasterDTO.PostOfficeId, 0))
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = "Post Office is in use and cannot be deleted."
-                    });
+                var usages = await _usageChecker.CheckAsync(MasterType.PostOffice, postOfficeMasterDTO.PostOfficeId, postOfficeMasterDTO.BranchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 _appContext.postoffice.Remove(existingPostOffice);
                 await _appContext.SaveChangesAsync();
 

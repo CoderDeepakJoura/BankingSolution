@@ -1,5 +1,6 @@
 ﻿using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Location.Village;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models.Location;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -14,11 +15,13 @@ namespace BankingPlatform.API.Controllers.Location
         private readonly BankingDbContext _appContext;
         private readonly ILogger<VillageController> _logger;
         private readonly CommonFunctions _commonfns;
-        public VillageController(BankingDbContext appcontext, ILogger<VillageController> logger, CommonFunctions commonfns)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public VillageController(BankingDbContext appcontext, ILogger<VillageController> logger, CommonFunctions commonfns, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonfns = commonfns;
+            _usageChecker = usageChecker;
         }
 
         
@@ -311,6 +314,10 @@ namespace BankingPlatform.API.Controllers.Location
                         Message = "Village not found."
                     });
                 }
+
+                var usages = await _usageChecker.CheckAsync(MasterType.Village, villageMasterDTO.VillageId, villageMasterDTO.BranchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
 
                 _appContext.village.Remove(existingVillage);
                 await _appContext.SaveChangesAsync();

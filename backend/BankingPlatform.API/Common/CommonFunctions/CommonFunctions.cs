@@ -14,7 +14,7 @@ namespace BankingPlatform.API.Common.CommonFunctions
     public class CommonFunctions
     {
         public const long shareMoneyCapitalHeadCode = 101103101000;
-        public const long dividendPayableHeadCode = 140101000000;
+        public const long dividendPayableHeadCode = 138101000000;
         private readonly BankingDbContext _appcontext;
         private readonly IHttpContextAccessor _httpContextAccessor;
         public CommonFunctions(

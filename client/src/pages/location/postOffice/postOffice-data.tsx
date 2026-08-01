@@ -1,4 +1,5 @@
 import React from "react";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import PostOfficeApiService, {
   PostOffice,
   PostOfficeFilter,
@@ -464,11 +465,8 @@ const deletePostOffice = async (PostOffice: PostOffice, branchId: number) => {
         showConfirmButton: false,
       });
     } catch (err: any) {
-      Swal.fire(
-        "Error!",
-        err.message || "Failed to delete Post Office.",
-        "error"
-      );
+      if (isMasterInUseError(err)) { await showMasterInUseError(err.usages); }
+      else { Swal.fire("Error!", err.message || "Failed to delete Post Office.", "error"); }
     }
   }
 };

@@ -1,5 +1,6 @@
 ﻿using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Location.Relation;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models.Miscalleneous;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,11 +14,15 @@ namespace BankingPlatform.API.Controllers.Miscallenous
         private readonly BankingDbContext _appContext;
         private readonly ILogger<RelationController> _logger;
         private readonly CommonFunctions _commonFunctions;
-        public RelationController(BankingDbContext appcontext, ILogger<RelationController> logger, CommonFunctions commonFunctions)
+        private readonly MasterUsageCheckerService _usageChecker;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        public RelationController(BankingDbContext appcontext, ILogger<RelationController> logger, CommonFunctions commonFunctions, MasterUsageCheckerService usageChecker, IHttpContextAccessor httpContextAccessor)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonFunctions = commonFunctions;
+            _usageChecker = usageChecker;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         [Authorize]
@@ -259,6 +264,12 @@ namespace BankingPlatform.API.Controllers.Miscallenous
                         Message = "Relation not found."
                     });
                 }
+
+                var user = _httpContextAccessor.HttpContext!.User!;
+                int branchId = int.Parse(user.FindFirst("branchId")?.Value ?? "0");
+                var usages = await _usageChecker.CheckAsync(MasterType.Relation, relationMasterDTO.RelationId, branchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
 
                 _appContext.relation.Remove(existingRelation);
                 await _appContext.SaveChangesAsync();

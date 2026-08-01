@@ -1,4 +1,5 @@
 ﻿using BankingPlatform.API.DTO;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.Location;
 using Microsoft.AspNetCore.Authorization;
@@ -16,11 +17,13 @@ namespace BankingPlatform.API.Controllers.Location
         private readonly BankingDbContext _appContext;
         private readonly ILogger<ZoneMasterController> _logger;
         private readonly CommonFunctions _commonfunctions;
-        public ZoneMasterController(BankingDbContext appcontext, ILogger<ZoneMasterController> logger, CommonFunctions commonfunctions)
+        private readonly MasterUsageCheckerService _usageChecker;
+        public ZoneMasterController(BankingDbContext appcontext, ILogger<ZoneMasterController> logger, CommonFunctions commonfunctions, MasterUsageCheckerService usageChecker)
         {
             _appContext = appcontext;
             _logger = logger;
             _commonfunctions = commonfunctions;
+            _usageChecker = usageChecker;
         }
 
         [Authorize]
@@ -276,12 +279,10 @@ namespace BankingPlatform.API.Controllers.Location
                         Message = "Zone not found."
                     });
                 }
-                if (await _commonfunctions.CheckIfLocationDataInUse(zoneMasterDTO.BranchId, zoneMasterDTO.ZoneId))
-                    return BadRequest(new ResponseDto
-                    {
-                        Success = false,
-                        Message = "Zone is in use and cannot be deleted."
-                    });
+                var usages = await _usageChecker.CheckAsync(MasterType.Zone, zoneMasterDTO.ZoneId, zoneMasterDTO.BranchId);
+                if (usages.Any())
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 _appContext.zone.Remove(existingZone);
                 await _appContext.SaveChangesAsync();
 
