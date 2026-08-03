@@ -394,11 +394,11 @@ const MemberMaster = () => {
                   nomineeName: nom.nomineeName || "",
                   relation: nom.relationId || 0,
                   relationWithMember: nom.relationWithMember || 0,
-                  age: nom.age?.toString() || "",
-                  isMinor: nom.isMinor === 1,
                   dob:
                     (nom.dob != null ? commonservice.splitDate(nom.dob) : "") ||
                     "",
+                  age: nom.dob ? calculateAge(commonservice.splitDate(nom.dob)) : (nom.age?.toString() || ""),
+                  isMinor: nom.isMinor === 1,
                   nameOfGuardian: nom.nameOfGuardian || "",
                   nameOfGuardianSL: nom.nameOfGuardianSL || "",
                   nominationDate:

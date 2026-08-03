@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.2",
+    date: "2026-08-03",
+    changes: [
+      { type: "improvement", text: "Nominee age now recalculated from DOB when loading in edit mode" },
+    ],
+  },
+  {
     version: "1.0.1",
     date: "2026-08-01",
     changes: [
