@@ -41,6 +41,10 @@ import {
   X,
   Image as ImageIcon,
   Settings,
+  ChevronRight,
+  ChevronLeft,
+  Lock,
+  Check,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import DashboardLayout from "../../Common/Layout";
@@ -251,6 +255,9 @@ const MemberMaster = () => {
     useFormValidation();
   const [showValidationSummary, setShowValidationSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
+  // Wizard state — tracks which tabs are accessible and which have been completed
+  const [unlockedTabs, setUnlockedTabs] = useState<string[]>(["basic"]);
+  const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [lastPermanentNo, setLastPermanentNo] = useState<string | null>(null);
   const [lastNominalNo, setLastNominalNo] = useState<string | null>(null);
@@ -461,6 +468,10 @@ const MemberMaster = () => {
             const hasPic  = !!data.documentDetails?.memberPicExt?.trim();
             const hasSign = !!data.documentDetails?.memberSignExt?.trim();
             setRequirePicSign(hasPic && hasSign);
+
+            // In edit mode unlock all tabs immediately — user can jump anywhere
+            setUnlockedTabs(["basic", "address", "contact", "documents", "voucher", "nominees"]);
+            setCompletedTabs(new Set(["basic", "address", "contact", "documents", "voucher", "nominees"]));
 
             Swal.close();
           } else {
@@ -1444,22 +1455,10 @@ const isOpeningEntry = !!(
     setCategory("");
 
     setActiveTab("basic");
+    setUnlockedTabs(["basic"]);
+    setCompletedTabs(new Set());
     clearErrors();
     setShowValidationSummary(false);
-  };
-
-  // Rest of the component functions remain the same...
-  const getTabClassName = (tabId: string) => {
-    const hasTabErrors = errorsByTab[tabId]?.length > 0;
-    const baseClassName = `flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200 relative`;
-
-    if (activeTab === tabId) {
-      return `${baseClassName} border-blue-500 text-blue-600 bg-blue-50`;
-    } else if (hasTabErrors) {
-      return `${baseClassName} border-red-300 text-red-600 hover:bg-red-50`;
-    } else {
-      return `${baseClassName} border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50`;
-    }
   };
 
   const tabs = [
@@ -1470,6 +1469,102 @@ const isOpeningEntry = !!(
     ...(!isOpeningEntry ? [{ id: "voucher", label: "Voucher Info", icon: FileText }] : []),
     { id: "nominees", label: "Nominees", icon: Users },
   ];
+
+  // Wizard helpers
+  const effectiveUnlockedTabs = isEditMode ? tabs.map(t => t.id) : unlockedTabs;
+  const effectiveCompletedTabs: Set<string> = isEditMode
+    ? new Set(tabs.map(t => t.id))
+    : completedTabs;
+  const currentTabIndex = tabs.findIndex(t => t.id === activeTab);
+  const isLastTab = activeTab === tabs[tabs.length - 1]?.id;
+
+  const validateCurrentTab = (): boolean => {
+    const errs: string[] = [];
+    switch (activeTab) {
+      case "basic":
+        if (!memberData.memberName?.trim()) errs.push("Member Name is required");
+        else if (memberData.memberName.trim().length < 2) errs.push("Member Name must be at least 2 characters");
+        else if (!/^[a-zA-Z\s]+$/.test(memberData.memberName)) errs.push("Member Name can only contain letters and spaces");
+        if (!memberData.relativeName?.trim()) errs.push("Relative Name is required");
+        else if (memberData.relativeName.trim().length < 2) errs.push("Relative Name must be at least 2 characters");
+        if (!memberData.relationId) errs.push("Relation is required");
+        if (!memberData.gender) errs.push("Gender is required");
+        if (!memberData.dob) errs.push("Date of Birth is required");
+        else { const a = parseInt(memberData.age || "0"); if (a < 18 || a > 120) errs.push("Age must be between 18 and 120 years"); }
+        if (!memberData.joiningDate) errs.push("Joining Date is required");
+        if (!memberData.casteId) errs.push("Caste is required");
+        if (!memberData.accountNumber?.trim()) errs.push("Account Number is required");
+        if (membershipType === "P" && !memberData.permanentMembershipNo?.trim()) errs.push("Permanent Membership No is required");
+        if (membershipType === "N" && !memberData.nominalMembershipNo?.trim()) errs.push("Nominal Membership No is required");
+        break;
+      case "address":
+        if (!villageId1) errs.push("Primary Village is required");
+        if (!memberData.addressLine1?.trim()) errs.push("Address Line 1 is required");
+        else if (memberData.addressLine1.trim().length < 10) errs.push("Address must be at least 10 characters");
+        break;
+      case "contact":
+        if (requireContact) {
+          if (!memberData.phoneType1) errs.push("Phone Type is required");
+          if (!memberData.phoneNo1?.trim()) errs.push("Phone Number is required");
+          else if (!/^[6-9]\d{9}$/.test(memberData.phoneNo1)) errs.push("Please enter a valid 10-digit mobile number starting with 6-9");
+        }
+        break;
+      case "documents":
+        if (requireAadhaarPan) {
+          if (!memberData.panCardNo?.trim()) errs.push("PAN Card is required");
+          else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(memberData.panCardNo)) errs.push("PAN format should be ABCDE1234F");
+          if (!memberData.aadhaarCardNo?.trim()) errs.push("Aadhaar Card is required");
+          else if (!/^\d{12}$/.test(memberData.aadhaarCardNo.replace(/\s/g, ""))) errs.push("Please enter a valid 12-digit Aadhaar number");
+        }
+        if (requirePicSign && !isEditMode) {
+          if (!memberPhoto) errs.push("Member Photo is required");
+          if (!memberSignature) errs.push("Member Signature is required");
+        }
+        break;
+      case "voucher":
+        if (!isOpeningEntry) {
+          if (!voucherData.smAmount || parseFloat(voucherData.smAmount) <= 0) errs.push("SM Amount is required and must be greater than 0");
+          if (!debitAccount) errs.push("Debit Account is required");
+        }
+        break;
+      case "nominees": {
+        nominees.forEach((nom, idx) => {
+          if (!nom.nomineeName?.trim()) errs.push(`Nominee ${idx + 1}: Name is required`);
+          if (!nom.nomRelativeName?.trim()) errs.push(`Nominee ${idx + 1}: Relative Name is required`);
+          if (!nom.relation) errs.push(`Nominee ${idx + 1}: Relation is required`);
+          if (!nom.dob?.trim()) errs.push(`Nominee ${idx + 1}: Date of Birth is required`);
+          if (!nom.percentageShare) errs.push(`Nominee ${idx + 1}: Share Percentage is required`);
+        });
+        const total = nominees.reduce((s, n) => s + (Number(n.percentageShare) || 0), 0);
+        if (total !== 100) errs.push(`Total nominee share must be exactly 100% (currently ${total}%)`);
+        break;
+      }
+    }
+    if (errs.length > 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please complete the required fields",
+        html: `<ul style="text-align:left;padding-left:1rem">${errs.map(e => `<li style="margin:4px 0">• ${e}</li>`).join("")}</ul>`,
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (!validateCurrentTab()) return;
+    setCompletedTabs(prev => new Set([...prev, activeTab]));
+    const next = tabs[currentTabIndex + 1];
+    if (next) {
+      setUnlockedTabs(prev => prev.includes(next.id) ? prev : [...prev, next.id]);
+      setActiveTab(next.id);
+    }
+  };
+
+  const handlePrev = () => {
+    const prev = tabs[currentTabIndex - 1];
+    if (prev) setActiveTab(prev.id);
+  };
 
   // Updated renderBasicInfo with readonly age and max date validation
   const renderBasicInfo = () => (
@@ -3108,64 +3203,144 @@ const isOpeningEntry = !!(
               onClose={() => setShowValidationSummary(false)}
             />
 
-            {/* Tab Navigation with Error Indicators */}
+            {/* Wizard Step Progress + Tab Content */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-              <div className="border-b border-gray-200">
-                <nav className="flex space-x-0 overflow-x-auto">
-                  {tabs.map((tab) => {
-                    const Icon = tab.icon;
-                    const tabErrorCount = errorsByTab[tab.id]?.length || 0;
+
+              {/* Step Progress Header */}
+              <div className="border-b border-gray-200 bg-gray-50 px-4 py-5 overflow-x-auto">
+                <div className="flex items-center min-w-max mx-auto w-fit">
+                  {tabs.map((tab, idx) => {
+                    const isUnlocked = effectiveUnlockedTabs.includes(tab.id);
+                    const isComplete = effectiveCompletedTabs.has(tab.id) && activeTab !== tab.id;
+                    const isActive = activeTab === tab.id;
+                    const isLast = idx === tabs.length - 1;
+                    const tabErrors = errorsByTab[tab.id]?.length || 0;
 
                     return (
-                      <button
-                        key={tab.id}
-                        data-tab-id={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={getTabClassName(tab.id)}
-                      >
-                        <Icon className="w-4 h-4" />
-                        {tab.label}
-                        {tabErrorCount > 0 && (
-                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                            {tabErrorCount}
+                      <div key={tab.id} className="flex items-center">
+                        <button
+                          onClick={() => isUnlocked ? setActiveTab(tab.id) : undefined}
+                          disabled={!isUnlocked}
+                          className={`flex flex-col items-center gap-1.5 px-3 py-1 rounded-lg transition-all duration-200 ${
+                            isUnlocked ? "cursor-pointer hover:bg-gray-100" : "cursor-not-allowed"
+                          }`}
+                          title={!isUnlocked ? "Complete previous steps first" : tab.label}
+                        >
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-200 relative ${
+                            isActive
+                              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200"
+                              : isComplete && tabErrors === 0
+                              ? "bg-green-500 border-green-500 text-white"
+                              : isComplete && tabErrors > 0
+                              ? "bg-red-500 border-red-500 text-white"
+                              : isUnlocked
+                              ? "bg-white border-gray-400 text-gray-600"
+                              : "bg-gray-100 border-gray-300 text-gray-400"
+                          }`}>
+                            {isComplete && tabErrors === 0 ? (
+                              <Check className="w-4 h-4" />
+                            ) : isComplete && tabErrors > 0 ? (
+                              <span className="text-xs font-bold">{tabErrors}</span>
+                            ) : !isUnlocked ? (
+                              <Lock className="w-3.5 h-3.5" />
+                            ) : (
+                              idx + 1
+                            )}
+                          </div>
+                          <span className={`text-xs font-medium whitespace-nowrap ${
+                            isActive
+                              ? "text-blue-600"
+                              : isComplete && tabErrors === 0
+                              ? "text-green-600"
+                              : isComplete && tabErrors > 0
+                              ? "text-red-500"
+                              : isUnlocked
+                              ? "text-gray-600"
+                              : "text-gray-400"
+                          }`}>
+                            {tab.label}
                           </span>
+                        </button>
+
+                        {!isLast && (
+                          <div className={`h-0.5 w-8 mx-1 rounded-full flex-shrink-0 transition-all duration-300 ${
+                            effectiveCompletedTabs.has(tab.id) && (errorsByTab[tab.id]?.length || 0) === 0
+                              ? "bg-green-400"
+                              : effectiveCompletedTabs.has(tab.id)
+                              ? "bg-red-300"
+                              : isUnlocked
+                              ? "bg-gray-300"
+                              : "bg-gray-200"
+                          }`} />
                         )}
-                      </button>
+                      </div>
                     );
                   })}
-                </nav>
+                </div>
+
+                {/* Step counter label */}
+                <p className="text-center text-xs text-gray-400 mt-3">
+                  Step {currentTabIndex + 1} of {tabs.length}
+                </p>
               </div>
 
               {/* Tab Content */}
               <div className="p-6 sm:p-8">{renderTabContent()}</div>
 
-              {/* Action Buttons */}
+              {/* Wizard Action Buttons */}
               <div className="border-t border-gray-200 p-6 bg-gray-50">
-                <div className="flex justify-end gap-4">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left: Reset */}
                   <button
                     onClick={isEditMode ? handleResetNotAllowed : handleReset}
-                    className="flex items-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition-all duration-200 hover:scale-105"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition-all duration-200"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    Reset Form
+                    Reset
                   </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 shadow-md"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save Member
-                      </>
+
+                  {/* Right: Prev / Next / Save */}
+                  <div className="flex items-center gap-3">
+                    {currentTabIndex > 0 && (
+                      <button
+                        onClick={handlePrev}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-semibold transition-all duration-200"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        Previous
+                      </button>
                     )}
-                  </button>
+
+                    {!isLastTab && (
+                      <button
+                        onClick={handleNext}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-sm"
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {isLastTab && (
+                      <button
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save Member
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
