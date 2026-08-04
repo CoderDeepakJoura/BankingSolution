@@ -34,6 +34,7 @@ import {
   CombinedLoanAccountDTO,
 } from "../../../services/accountMasters/loanaccount/loanaccountapi";
 import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
+import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../../services/vouchers/loan/loanRecoveryApi";
 
 const ACCOUNT_TYPES = { Loan: 1, Saving: 2, General: 3, RD: 5, FD: 6 };
 
@@ -117,6 +118,7 @@ const LoanAdvancementVoucher: React.FC = () => {
   const [loanAccounts, setLoanAccounts] = useState<LoanAccountOption[]>([]);
   const [creditAccountsForRow, setCreditAccountsForRow] = useState<{ accId: number; accountName: string }[]>([]);
   const [loanAccountData, setLoanAccountData] = useState<CombinedLoanAccountDTO | null>(null);
+  const [loanBalance, setLoanBalance] = useState<LoanRecoveryBalanceDTO | null>(null);
   const [guarantorNames, setGuarantorNames] = useState<Record<string, string>>({});
   const [creditItems, setCreditItems] = useState<CreditRow[]>([]);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
@@ -248,6 +250,7 @@ const LoanAdvancementVoucher: React.FC = () => {
     setFormData((p) => ({ ...p, loanProductId: id, loanAccountId: 0, loanAmountPassed: 0, totalAmount: "" }));
     setLoanAccounts([]);
     setLoanAccountData(null);
+    setLoanBalance(null);
     setCreditItems([]);
     setEditingRowId(null);
     setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
@@ -263,6 +266,7 @@ const LoanAdvancementVoucher: React.FC = () => {
     if (!sel) {
       setFormData((p) => ({ ...p, loanAccountId: 0, loanAmountPassed: 0, totalAmount: "" }));
       setLoanAccountData(null);
+      setLoanBalance(null);
       setGuarantorNames({});
       setCreditItems([]);
       setEditingRowId(null);
@@ -273,6 +277,7 @@ const LoanAdvancementVoucher: React.FC = () => {
     const acc = loanAccounts.find((a) => a.accId === sel.value);
     setFormData((p) => ({ ...p, loanAccountId: sel.value, loanAmountPassed: acc?.loanAmountPassed ?? 0, totalAmount: "" }));
     setLoanAccountData(null);
+    setLoanBalance(null);
     setGuarantorNames({});
     setCreditItems([]);
     setEditingRowId(null);
@@ -280,6 +285,9 @@ const LoanAdvancementVoucher: React.FC = () => {
     setCreditAccountsForRow([]);
     clearError("loanAccountId");
     await loadAccountDetails(sel.value);
+    loanRecoveryApi.getBalance(sel.value, user.branchid).then((res) => {
+      if (res.success && res.data) setLoanBalance(res.data);
+    });
   };
 
   const resetRowGst = () => {
@@ -398,6 +406,7 @@ const LoanAdvancementVoucher: React.FC = () => {
     });
     setLoanAccounts([]);
     setLoanAccountData(null);
+    setLoanBalance(null);
     setGuarantorNames({});
     setCreditItems([]);
     setEditingRowId(null);
@@ -536,6 +545,7 @@ const LoanAdvancementVoucher: React.FC = () => {
             <InfoCard icon={CreditCard} color="bg-green-50 text-green-600" label="Account No (Khata No)" value={acc?.accountNumber} />
             <InfoCard icon={FileText} color="bg-orange-50 text-orange-600" label="Loan No" value={kist?.loanNo} />
             <InfoCard icon={DollarSign} color="bg-emerald-50 text-emerald-600" label="Loan Amount Passed" value={kist?.loanAmountPassed != null ? `₹${Number(kist.loanAmountPassed).toFixed(2)}` : undefined} />
+            <InfoCard icon={DollarSign} color="bg-rose-50 text-rose-600" label="Principal Outstanding" value={loanBalance ? `₹${loanBalance.principalBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "Loading..."} />
             <InfoCard icon={Calendar} color="bg-indigo-50 text-indigo-600" label="Loan Date" value={kist?.loanDate ? formatDate(kist.loanDate) : undefined} />
             <InfoCard icon={Phone} color="bg-pink-50 text-pink-600" label="Phone No" value={acc?.phoneNo1} />
             <InfoCard icon={DollarSign} color="bg-yellow-50 text-yellow-600" label="Kist Amount" value={kist?.kistAmount != null ? `₹${Number(kist.kistAmount).toFixed(2)}` : undefined} />

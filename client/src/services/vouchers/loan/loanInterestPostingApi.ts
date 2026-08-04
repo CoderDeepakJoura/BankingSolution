@@ -44,6 +44,8 @@ export interface LoanInterestBatchItemDTO {
   stdInterestRate?: number;
   overdueInterestRate?: number;
   intCalcMethod: string;
+  actOnIntPosting?: number;
+  noInterestReason?: string;
 }
 
 export interface LoanInterestBatchPostItemDTO {

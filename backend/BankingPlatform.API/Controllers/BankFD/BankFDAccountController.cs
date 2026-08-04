@@ -42,6 +42,7 @@ namespace BankingPlatform.API.Controllers.BankFD
         public string AccPrefix { get; set; } = "BFD";
         public DateTime OpeningDate { get; set; }
         public bool IsOpeningEntry { get; set; }
+        public int HeadId { get; set; }
         public List<BankFDDetailItemDTO> Details { get; set; } = new();
     }
 
@@ -187,7 +188,8 @@ namespace BankingPlatform.API.Controllers.BankFD
                         accPrefix = account.AccPrefix ?? "BFD",
                         accSuffix = account.AccSuffix,
                         accNo = $"{account.AccPrefix ?? "BFD"}-{account.AccSuffix}",
-                        openingDate = account.AccOpeningDate
+                        openingDate = account.AccOpeningDate,
+                        headId = account.HeadId
                     },
                     details = detailResult
                 };
@@ -234,8 +236,8 @@ namespace BankingPlatform.API.Controllers.BankFD
                     IsAccClosed = false,
                     IsAccAddedManually = 0,
                     GeneralProductId = 0,
-                    HeadId = 0,
-                    HeadCode = 0,
+                    HeadId = dto.HeadId,
+                    HeadCode = dto.HeadId,
                     MemberId = null,
                     MemberBranchID = null
                 };
@@ -277,6 +279,8 @@ namespace BankingPlatform.API.Controllers.BankFD
                 account.AccountName = dto.AccountName.Trim();
                 account.AccPrefix = string.IsNullOrWhiteSpace(dto.AccPrefix) ? "BFD" : dto.AccPrefix.Trim();
                 account.AccOpeningDate = DateTime.SpecifyKind(dto.OpeningDate, DateTimeKind.Unspecified);
+                account.HeadId = dto.HeadId;
+                account.HeadCode = dto.HeadId;
 
                 // Delete existing details (and their opening balance/TDS rows first)
                 await DeleteDetailsForAccount(dto.BranchId, accId);

@@ -111,6 +111,9 @@ const BankFDAccountForm: React.FC = () => {
   const [editingRowKey, setEditingRowKey] = useState<number | null>(null);
   const [entry, setEntry] = useState<DetailRow>(emptyDetail(0));
 
+  // Account head selection
+  const [accountHeadId, setAccountHeadId] = useState<number>(0);
+
   // Dropdown data
   const [accountHeads, setAccountHeads] = useState<SelectOption[]>([]);
 
@@ -167,6 +170,7 @@ const BankFDAccountForm: React.FC = () => {
       );
       setAccPrefix(account.accPrefix ?? "BFD");
       setAccSuffix(account.accSuffix ?? null);
+      setAccountHeadId(account.headId ?? 0);
 
       let counter = 1;
       const rows: DetailRow[] = (detailList ?? []).map((d: any) => ({
@@ -283,6 +287,7 @@ const BankFDAccountForm: React.FC = () => {
     setOpeningDate(commonservice.getTodaysDate());
     setAccPrefix("BFD");
     setAccSuffix(null);
+    setAccountHeadId(0);
     setDetails([]);
     clearEntry();
   };
@@ -309,6 +314,7 @@ const BankFDAccountForm: React.FC = () => {
       accPrefix: accPrefix.trim() || "BFD",
       openingDate,
       isOpeningEntry,
+      headId: accountHeadId,
       details: details.map(d => ({
         id: d.id,
         ltdNo: d.ltdNo,
@@ -415,7 +421,7 @@ const BankFDAccountForm: React.FC = () => {
                 {/* ── Account Info Card ── */}
                 <div className="bg-white rounded-xl shadow border border-gray-200 p-6">
                   <h2 className="text-base font-semibold text-gray-700 mb-4">Account Information</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Account Name <span className="text-red-500">*</span>
@@ -463,6 +469,20 @@ const BankFDAccountForm: React.FC = () => {
                         value={accSuffix !== null ? `${accPrefix}-${accSuffix}` : `${accPrefix}-[auto]`}
                         readOnly
                         className={readonlyCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        Account Head
+                      </label>
+                      <Select
+                        classNamePrefix="react-select"
+                        options={accountHeads}
+                        value={accountHeads.find(h => h.value === accountHeadId) ?? null}
+                        onChange={opt => setAccountHeadId(opt?.value ?? 0)}
+                        placeholder="-- Select Head --"
+                        isClearable
+                        styles={{ control: b => ({ ...b, cursor: "pointer" }) }}
                       />
                     </div>
                   </div>

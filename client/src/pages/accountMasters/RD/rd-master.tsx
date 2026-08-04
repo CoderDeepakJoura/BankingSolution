@@ -243,28 +243,9 @@ const RDAccountMaster = () => {
     }));
   };
 
-  const calculateFirstKistDate = (rdDate: string, kistInterval: string) => {
-    if (!rdDate || !kistInterval) return "";
-
-    const [year, month, day] = rdDate.split("-").map(Number);
-    if (!year || !month || !day) return "";
-
-    const calculatedDate = new Date(year, month - 1, day);
-    if (Number.isNaN(calculatedDate.getTime())) return "";
-
-    if (kistInterval === "Daily") {
-      calculatedDate.setDate(calculatedDate.getDate() + 1);
-    } else {
-      const monthsToAdd = KIST_INTERVAL_MAP[kistInterval];
-      if (!monthsToAdd) return "";
-      calculatedDate.setMonth(calculatedDate.getMonth() + monthsToAdd);
-    }
-
-    const resultYear = calculatedDate.getFullYear();
-    const resultMonth = String(calculatedDate.getMonth() + 1).padStart(2, "0");
-    const resultDay = String(calculatedDate.getDate()).padStart(2, "0");
-
-    return `${resultYear}-${resultMonth}-${resultDay}`;
+  const calculateFirstKistDate = (rdDate: string, _kistInterval: string) => {
+    if (!rdDate) return "";
+    return rdDate;
   };
 
   // ─── Group Errors ────────────────────────────────────────────────────────────
@@ -555,6 +536,9 @@ useEffect(() => {
     setRdDetailForm(updated);
     setErrors((prev) => prev.filter((e) => e.field !== field));
 
+    const productId = Number(formData.accountMasterDTO.rdProductId);
+    const amount = parseFloat(updated.amount) || 0;
+
     if (
       field === "rdDate" ||
       field === "kistInterval" ||
@@ -563,9 +547,6 @@ useEffect(() => {
       field === "periodDays" ||
       field === "compoundingInterval"
     ) {
-      const productId = Number(formData.accountMasterDTO.rdProductId);
-      const amount = parseFloat(updated.amount) || 0;
-
       if (updated.rdDate && productId && activePeriod > 0 && amount > 0 && kistAmount > 0 && updated.kistInterval) {
         await fetchRdCalculatedDetails(
           productId,
@@ -581,6 +562,23 @@ useEffect(() => {
         clearRdCalculatedFields();
       }
     }
+
+    if (field === "interestRate") {
+      const rateOverride = parseFloat(value) || 0;
+      if (updated.rdDate && productId && activePeriod > 0 && amount > 0 && kistAmount > 0 && updated.kistInterval && rateOverride > 0) {
+        await fetchRdCalculatedDetails(
+          productId,
+          isDaily ? 0 : periodMonths,
+          amount,
+          kistAmount,
+          updated.kistInterval,
+          updated.rdDate,
+          updated.compoundingInterval,
+          isDaily ? periodDays : 0,
+          rateOverride
+        );
+      }
+    }
   };
 
   const fetchRdCalculatedDetails = async (
@@ -591,7 +589,8 @@ useEffect(() => {
     kistInterval: string,
     rdDate: string,
     compoundingInterval: string,
-    periodInDays: number = 0
+    periodInDays: number = 0,
+    interestRateOverride?: number
   ) => {
     const isDaily = kistInterval === "Daily";
     if (!rdDate || !productId || (isDaily ? periodInDays <= 0 : months <= 0) || amount <= 0 || kistAmount <= 0 || !kistInterval) {
@@ -607,7 +606,8 @@ useEffect(() => {
         amount,
         user.branchid,
         compoundingInterval,
-        periodInDays > 0 ? periodInDays : undefined
+        periodInDays > 0 ? periodInDays : undefined,
+        interestRateOverride
       );
 
       if (!response.success || !response.data) {
@@ -615,30 +615,41 @@ useEffect(() => {
         return;
       }
 
-      const interestRate = Number(response.data.interestRate) || 0;
-      const slabLabel = response.data.slabId
-        ? `${response.data.slabName}`
-        : "";
       const maturityDate = response.data?.maturityDate
         ? commonservice.splitDate(response.data.maturityDate)
         : "";
 
-      setRdDetailForm((prev) => ({
-        ...prev,
-        interestRate: interestRate ? interestRate.toString() : "",
-        matDate: maturityDate,
-        matAmount:
-          response.data?.maturityAmount !== undefined
-            ? Number(response.data.maturityAmount).toString()
-            : "",
-        slabName: slabLabel,
-        paymentDate: maturityDate || prev.paymentDate,
-        compoundingInterval:
-          COMPOUNDING_INTERVAL_MAP[response.data.compoundingInterval] ||
-          response.data.compoundingInterval?.toString() ||
-          prev.compoundingInterval,
-        slabId: response.data.slabId ? response.data.slabId.toString() : "",
-      }));
+      if (interestRateOverride != null) {
+        // Only update maturity amount/date; keep user's rate and slab fields unchanged
+        setRdDetailForm((prev) => ({
+          ...prev,
+          matDate: maturityDate,
+          matAmount:
+            response.data?.maturityAmount !== undefined
+              ? Number(response.data.maturityAmount).toString()
+              : "",
+          paymentDate: maturityDate || prev.paymentDate,
+        }));
+      } else {
+        const interestRate = Number(response.data.interestRate) || 0;
+        const slabLabel = response.data.slabId ? `${response.data.slabName}` : "";
+        setRdDetailForm((prev) => ({
+          ...prev,
+          interestRate: interestRate ? interestRate.toString() : "",
+          matDate: maturityDate,
+          matAmount:
+            response.data?.maturityAmount !== undefined
+              ? Number(response.data.maturityAmount).toString()
+              : "",
+          slabName: slabLabel,
+          paymentDate: maturityDate || prev.paymentDate,
+          compoundingInterval:
+            COMPOUNDING_INTERVAL_MAP[response.data.compoundingInterval] ||
+            response.data.compoundingInterval?.toString() ||
+            prev.compoundingInterval,
+          slabId: response.data.slabId ? response.data.slabId.toString() : "",
+        }));
+      }
     } catch (error) {
       console.error("Error fetching RD slab/maturity details:", error);
       clearRdCalculatedFields();
@@ -1992,15 +2003,17 @@ useEffect(() => {
                   )}
                 </div>
 
-                {/* Interest Rate (read-only) */}
+                {/* Interest Rate (editable — overrides slab rate for maturity calculation) */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Interest Rate</label>
+                  <label className="block text-sm font-medium text-gray-700">Interest Rate (%)</label>
                   <input
-                    type="text"
+                    type="number"
+                    step="0.01"
+                    min="0"
                     value={rdDetailForm.interestRate}
-                    readOnly
+                    onChange={(e) => handleRdDetailChange("interestRate", e.target.value)}
                     placeholder="Auto from slab"
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
+                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
 

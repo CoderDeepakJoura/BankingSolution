@@ -920,6 +920,9 @@ const LoanAccountMaster: React.FC = () => {
       + (m.nominalMembershipNo   ? ` · NM ${m.nominalMembershipNo}`   : ''),
   }));
 
+  // Exclude the account owner from guarantor/witness selection
+  const guarantorOptions = memberOptions.filter(o => o.value !== memberDetails?.memberId);
+
   // Search by name OR membership no (PM/NM numbers are in subLabel)
   const memberFilterOption = (option: { data: { label: string; subLabel: string } }, inputValue: string) => {
     const q = inputValue.toLowerCase();
@@ -1619,8 +1622,8 @@ const LoanAccountMaster: React.FC = () => {
                       <div>
                         <label className={labelCls}>Guarantor 1 <span className="text-red-500">*</span></label>
                         <Select
-                          options={memberOptions}
-                          value={memberOptions.find(o => o.value === guarantorData.guar1MemId) || null}
+                          options={guarantorOptions}
+                          value={guarantorOptions.find(o => o.value === guarantorData.guar1MemId) || null}
                           onChange={opt => setGuarantorData(p => ({ ...p, guar1MemId: opt?.value ?? 0, guar1MemBrId: opt?.brId ?? 0 }))}
                           filterOption={memberFilterOption}
                           formatOptionLabel={o => (
@@ -1640,8 +1643,8 @@ const LoanAccountMaster: React.FC = () => {
                       <div>
                         <label className={labelCls}>Guarantor 2 <span className="text-red-500">*</span></label>
                         <Select
-                          options={memberOptions}
-                          value={memberOptions.find(o => o.value === guarantorData.guar2MemId) || null}
+                          options={guarantorOptions}
+                          value={guarantorOptions.find(o => o.value === guarantorData.guar2MemId) || null}
                           onChange={opt => setGuarantorData(p => ({ ...p, guar2MemId: opt?.value ?? 0, guar2MemBrId: opt?.brId ?? 0 }))}
                           filterOption={memberFilterOption}
                           formatOptionLabel={o => (
@@ -1666,8 +1669,8 @@ const LoanAccountMaster: React.FC = () => {
                       <div>
                         <label className={labelCls}>Witness 1</label>
                         <Select
-                          options={memberOptions}
-                          value={memberOptions.find(o => o.value === guarantorData.witness1MemId) || null}
+                          options={guarantorOptions}
+                          value={guarantorOptions.find(o => o.value === guarantorData.witness1MemId) || null}
                           onChange={opt => setGuarantorData(p => ({ ...p, witness1MemId: opt?.value ?? 0, wit1MemBrId: opt?.brId ?? 0 }))}
                           filterOption={memberFilterOption}
                           formatOptionLabel={o => (
@@ -1687,8 +1690,8 @@ const LoanAccountMaster: React.FC = () => {
                       <div>
                         <label className={labelCls}>Witness 2</label>
                         <Select
-                          options={memberOptions}
-                          value={memberOptions.find(o => o.value === guarantorData.witness2MemId) || null}
+                          options={guarantorOptions}
+                          value={guarantorOptions.find(o => o.value === guarantorData.witness2MemId) || null}
                           onChange={opt => setGuarantorData(p => ({ ...p, witness2MemId: opt?.value ?? 0, wit2MemBrId: opt?.brId ?? 0 }))}
                           filterOption={memberFilterOption}
                           formatOptionLabel={o => (

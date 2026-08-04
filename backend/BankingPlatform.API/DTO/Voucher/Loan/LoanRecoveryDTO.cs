@@ -1,5 +1,16 @@
 namespace BankingPlatform.API.DTO.Voucher.Loan
 {
+    public class LoanLedgerRowDTO
+    {
+        public DateTime EntryDate { get; set; }
+        public int VoucherNo { get; set; }
+        public string EntryType { get; set; } = "";
+        public string Description { get; set; } = "";
+        public decimal Dr { get; set; }
+        public decimal Cr { get; set; }
+        public decimal Balance { get; set; }
+    }
+
     public class IntRecDetailRowDTO
     {
         public int Id { get; set; }

@@ -14,6 +14,7 @@ import commonservice from "../../../services/common/commonservice";
 import loanRecoveryApi, {
   LoanRecoveryBalanceDTO,
   IntRecDetailRowDTO,
+  LoanLedgerRowDTO,
 } from "../../../services/vouchers/loan/loanRecoveryApi";
 import {
   loanAccountApi,
@@ -150,6 +151,7 @@ const LoanRecovery: React.FC = () => {
   const [loanAccounts, setLoanAccounts] = useState<LoanAccountOption[]>([]);
   const [loanAccountData, setLoanAccountData] = useState<CombinedLoanAccountDTO | null>(null);
   const [loanBalance, setLoanBalance] = useState<LoanRecoveryBalanceDTO | null>(null);
+  const [loanLedger, setLoanLedger] = useState<LoanLedgerRowDTO[]>([]);
   const [guarantorNames, setGuarantorNames] = useState<Record<string, string>>({});
   const [kistSchedule, setKistSchedule] = useState<any[]>([]);
 
@@ -195,6 +197,7 @@ const LoanRecovery: React.FC = () => {
   const resetAccountState = () => {
     setLoanAccountData(null);
     setLoanBalance(null);
+    setLoanLedger([]);
     setGuarantorNames({});
     setDebitRows([]);
     setEditingRowId(null);
@@ -256,6 +259,11 @@ const LoanRecovery: React.FC = () => {
     // Balance (for outstanding + interest allocation)
     const balRes = await loanRecoveryApi.getBalance(sel.value, user.branchid);
     if (balRes.success && balRes.data) setLoanBalance(balRes.data);
+
+    // Ledger
+    loanRecoveryApi.getLedger(sel.value, user.branchid).then((res) => {
+      if (res.success && res.data) setLoanLedger(res.data);
+    });
   };
 
   // ── Debit row type change ─────────────────────────────────────────────────────
@@ -424,6 +432,7 @@ const LoanRecovery: React.FC = () => {
 
   const tabs = [
     { id: "account-info", label: "Account Information", icon: User },
+    { id: "ledger", label: "Ledger", icon: FileText },
     { id: "int-detail", label: "Interest Detail", icon: BarChart2 },
     { id: "inst-schedule", label: "Inst. Schedule", icon: Calendar },
     { id: "guar-detail", label: "Guarantor Detail", icon: Users },
@@ -481,6 +490,53 @@ const LoanRecovery: React.FC = () => {
             <InfoCard icon={UserCheck} color="bg-violet-50 text-violet-600" label="Std. Interest Rate" value={kist?.standardInterestRate != null ? `${kist.standardInterestRate}%` : undefined} />
             <InfoCard icon={UserCheck} color="bg-orange-50 text-orange-600" label="Overdue Interest Rate" value={loanBalance?.overdueInterestRate != null ? `${loanBalance.overdueInterestRate}%` : undefined} />
             <InfoCard icon={MapPin} color="bg-cyan-50 text-cyan-600" label="Address" value={acc?.addressLine} />
+          </div>
+        );
+
+      case "ledger":
+        if (!loanAccountData) return noAccountSelected;
+        if (loanLedger.length === 0)
+          return (
+            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <p className="text-sm text-gray-500">No transactions found for this loan account</p>
+            </div>
+          );
+        return (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Voucher No</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Description</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Dr (₹)</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Cr (₹)</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Balance (₹)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loanLedger.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(row.entryDate)}</td>
+                    <td className="px-4 py-3 text-gray-700">{row.voucherNo || "—"}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        row.entryType === "LA" ? "bg-green-100 text-green-700" :
+                        row.entryType === "LR" ? "bg-blue-100 text-blue-700" :
+                        row.entryType === "IP" ? "bg-amber-100 text-amber-700" :
+                        "bg-gray-100 text-gray-600"
+                      }`}>{row.entryType}</span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">{row.description}</td>
+                    <td className="px-4 py-3 text-right text-red-600 font-medium">{row.dr > 0 ? fmt(row.dr) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-green-600 font-medium">{row.cr > 0 ? fmt(row.cr) : "—"}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-800">{fmt(row.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         );
 

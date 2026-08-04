@@ -340,6 +340,74 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             };
         }
 
+        public async Task<List<LoanLedgerRowDTO>> GetLoanLedgerAsync(int loanAccId, int branchId)
+        {
+            var ob = await _db.loanaccopeningbalance.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.AccId == loanAccId && x.BranchId == branchId);
+
+            var rows = new List<LoanLedgerRowDTO>();
+
+            if (ob != null && ob.TotalBalance > 0)
+            {
+                rows.Add(new LoanLedgerRowDTO
+                {
+                    EntryDate   = ob.OverDueDate ?? DateTime.MinValue,
+                    VoucherNo   = 0,
+                    EntryType   = "OB",
+                    Description = "Opening Balance",
+                    Dr          = ob.TotalBalance ?? 0,
+                    Cr          = 0,
+                });
+            }
+
+            var vouchers = await _db.vouchercreditdebitdetails.AsNoTracking()
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "IP"))
+                .OrderBy(x => x.ValueDate)
+                .ThenBy(x => x.VoucherID)
+                .Select(x => new
+                {
+                    x.ValueDate,
+                    VoucherNo    = x.VoucherID,
+                    x.EntryStatus,
+                    x.VoucherEntryType,
+                    x.VoucherAmount,
+                    x.Narration,
+                })
+                .ToListAsync();
+
+            foreach (var v in vouchers)
+            {
+                string desc = v.EntryStatus switch
+                {
+                    "LA" => "Loan Advancement",
+                    "LR" => "Loan Recovery",
+                    "IP" => "Interest Posting",
+                    _    => v.EntryStatus ?? "",
+                };
+                rows.Add(new LoanLedgerRowDTO
+                {
+                    EntryDate   = v.ValueDate.Date,
+                    VoucherNo   = v.VoucherNo,
+                    EntryType   = v.EntryStatus ?? "",
+                    Description = !string.IsNullOrWhiteSpace(v.Narration) ? v.Narration : desc,
+                    Dr          = v.VoucherEntryType == "Dr" ? v.VoucherAmount : 0,
+                    Cr          = v.VoucherEntryType == "Cr" ? v.VoucherAmount : 0,
+                });
+            }
+
+            // Compute running balance (Dr = debit = balance increases for loans)
+            decimal balance = 0;
+            foreach (var r in rows)
+            {
+                balance += r.Dr - r.Cr;
+                r.Balance = balance;
+            }
+
+            return rows;
+        }
+
         public async Task<List<LoanAccountSearchDTO>> SearchLoanAccountsAsync(int branchId, string query)
         {
             var q = query.Trim().ToLower();

@@ -1162,7 +1162,7 @@ namespace BankingPlatform.API.Controllers
         }
 
         [HttpGet("fetch-rd-related-info/{rdDate}/{periodInMonths}/{productId}/{totalAmount}/{branchId}/{intCompoundingInterval}")]
-        public async Task<IActionResult> CalculateRDRelatedInfo([FromRoute] DateTime rdDate, int periodInMonths, int productId, decimal totalAmount, int branchId, int intCompoundingInterval, [FromQuery] int periodInDays = 0)
+        public async Task<IActionResult> CalculateRDRelatedInfo([FromRoute] DateTime rdDate, int periodInMonths, int productId, decimal totalAmount, int branchId, int intCompoundingInterval, [FromQuery] int periodInDays = 0, [FromQuery] decimal? interestRateOverride = null)
         {
             DateTime maturityDate = await _rdAccountService.CalculateMaturityDate(rdDate, periodInMonths, periodInDays);
             (decimal intRate, string slabName, string compoundingInterval, int IcompoundingInterval, int slabId) = await _rdAccountService.SlabInfo(totalAmount, periodInMonths, rdDate, productId, intCompoundingInterval, periodInDays);
@@ -1175,10 +1175,15 @@ namespace BankingPlatform.API.Controllers
                 .FirstOrDefaultAsync();
             if (intFormula == 0) intFormula = 6; // default to Formula 6 (standard Indian banking)
 
+            // Use caller-supplied rate override (user edited the field) or slab-derived rate
+            decimal effectiveRate = interestRateOverride.HasValue && interestRateOverride.Value > 0
+                ? interestRateOverride.Value
+                : intRate;
+
             // RD annuity formula: each installment earns compound interest for its remaining period
             int nInstallments = periodInDays > 0 ? periodInDays : periodInMonths;
             decimal kistInstallment = nInstallments > 0 ? totalAmount / nInstallments : totalAmount;
-            decimal maturityAmount = _rdAccountService.CalculateRDMaturityAmount(kistInstallment, nInstallments, intRate, intFormula);
+            decimal maturityAmount = _rdAccountService.CalculateRDMaturityAmount(kistInstallment, nInstallments, effectiveRate, intFormula);
 
             return Ok(new
             {

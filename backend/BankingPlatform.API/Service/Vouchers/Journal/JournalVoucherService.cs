@@ -304,21 +304,32 @@ namespace BankingPlatform.API.Service.Vouchers.Journal
                              && x.VoucherEntryType == "Dr")
                     .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
 
-                // For FD accounts, also include per-detail opening balance
-                decimal fdOpeningBal = 0;
+                // Include opening balance for all personal account types
+                decimal openingBal = 0;
                 if (entry.AccountType == (int)Enums.AccountTypes.FD)
                 {
                     var fdDetails = await _context.fdaccountdetail
                         .Where(x => x.AccountId == entry.AccountId && x.BranchId == branchId && x.OpeningBalance != null)
                         .Select(x => new { x.OpeningBalance, x.OpeningBalanceType })
                         .ToListAsync();
-                    fdOpeningBal = fdDetails.Sum(x =>
+                    openingBal = fdDetails.Sum(x =>
                         x.OpeningBalanceType?.ToUpper() == "CR"
                             ? (x.OpeningBalance ?? 0)
                             : -(x.OpeningBalance ?? 0));
                 }
+                else
+                {
+                    var ob = await _context.accopeningbalance
+                        .Where(x => x.AccountId == entry.AccountId && x.BranchId == branchId)
+                        .Select(x => new { x.OpeningAmount, x.EntryType })
+                        .FirstOrDefaultAsync();
+                    if (ob != null)
+                        openingBal = ob.EntryType?.ToUpper() == "CR"
+                            ? ob.OpeningAmount
+                            : -ob.OpeningAmount;
+                }
 
-                decimal bal = crTot - drTot + fdOpeningBal;
+                decimal bal = crTot - drTot + openingBal;
                 if (entry.Amount > bal)
                 {
                     var accName = await _context.accountmaster

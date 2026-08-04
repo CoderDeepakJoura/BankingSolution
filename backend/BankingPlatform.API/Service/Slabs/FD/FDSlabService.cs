@@ -19,9 +19,9 @@ namespace BankingPlatform.API.Service.Slabs.FD
         }
         public async Task<string> CreateInterestSlabAsync(CombinedFDIntDTO combinedDto)
         {
-            var slabNameExists = await _context.fdinterestslab.FirstOrDefaultAsync(x => x.SlabName == combinedDto.FDInterestSlab!.SlabName && x.BranchId == combinedDto.FDInterestSlab.BranchId);
+            var slabNameExists = await _context.fdinterestslab.FirstOrDefaultAsync(x => x.SlabName == combinedDto.FDInterestSlab!.SlabName && x.BranchId == combinedDto.FDInterestSlab.BranchId && x.FDProductId == combinedDto.FDInterestSlab.FDProductId);
             if (slabNameExists != null)
-                return "An entry with the same slab name already exists.";
+                return "An entry with the same slab name already exists for this product.";
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
@@ -124,9 +124,9 @@ namespace BankingPlatform.API.Service.Slabs.FD
         // UPDATE
         public async Task<string> ModifyInterestSlabAsync(CombinedFDIntDTO combinedDto)
         {
-            var slabNameExists = await _context.fdinterestslab.FirstOrDefaultAsync(x => x.SlabName == combinedDto.FDInterestSlab!.SlabName && x.BranchId == combinedDto.FDInterestSlab.BranchId && x.Id != combinedDto.FDInterestSlab.Id);
+            var slabNameExists = await _context.fdinterestslab.FirstOrDefaultAsync(x => x.SlabName == combinedDto.FDInterestSlab!.SlabName && x.BranchId == combinedDto.FDInterestSlab.BranchId && x.FDProductId == combinedDto.FDInterestSlab.FDProductId && x.Id != combinedDto.FDInterestSlab.Id);
             if (slabNameExists != null)
-                return "An entry with the same slab name already exists.";
+                return "An entry with the same slab name already exists for this product.";
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {

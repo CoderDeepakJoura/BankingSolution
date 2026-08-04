@@ -290,6 +290,20 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 var bal = await _recoveryService.GetLoanBalanceAsync(acc.ID, brId, asOfDate);
                 if (bal == null) continue;
 
+                decimal totalPostable = bal.StdInterestOutstanding + bal.PenalInterestOutstanding;
+                string? noReason = null;
+                if (totalPostable == 0)
+                {
+                    if (bal.ActOnIntPosting == 1)
+                        noReason = "Add-In-Balance loan — interest is embedded in principal";
+                    else if (bal.PrincipalBalance == 0)
+                        noReason = "No outstanding principal — disbursement voucher may be missing";
+                    else if (bal.StandardInterestRate == null || bal.StandardInterestRate == 0)
+                        noReason = "Interest rate not set for this account";
+                    else
+                        noReason = "No interest accrued yet (loan may be too new)";
+                }
+
                 result.Add(new LoanInterestBatchItemDTO
                 {
                     LoanAccId          = acc.ID,
@@ -300,12 +314,14 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     StdInterest        = bal.StdInterestOutstanding,
                     PenalInterest      = bal.PenalInterestOutstanding,
                     StdRecoverable     = bal.StdRecoverableOutstanding,
-                    TotalPostable      = bal.StdInterestOutstanding + bal.PenalInterestOutstanding,
+                    TotalPostable      = totalPostable,
                     CalcFromDate       = bal.InterestCalcFromDate,
                     CalcToDate         = bal.InterestCalcToDate,
                     StdInterestRate    = bal.StandardInterestRate,
                     OverdueInterestRate = bal.OverdueInterestRate,
                     IntCalcMethod      = bal.IntCalcMethod,
+                    ActOnIntPosting    = bal.ActOnIntPosting,
+                    NoInterestReason   = noReason,
                 });
             }
             return result;

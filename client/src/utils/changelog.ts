@@ -15,6 +15,22 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.3",
+    date: "2026-08-04",
+    changes: [
+      { type: "new",         text: "Loan Recovery: new Ledger tab shows the full transaction history of the loan account" },
+      { type: "new",         text: "Loan Advancement: account information panel now shows the current principal balance" },
+      { type: "new",         text: "Loan Interest Posting: all accounts are now shown with a reason when no interest is postable — making it easier to spot missing disbursements or wrong product setup" },
+      { type: "new",         text: "RD Account Master: interest rate field is now editable — changing it recalculates the maturity amount instantly" },
+      { type: "improvement", text: "RD Account Master: first kist date now defaults to the account opening date" },
+      { type: "improvement", text: "FD Interest Slab: slab name uniqueness is now enforced per-product, so different products can share slab names" },
+      { type: "fix",         text: "Transfer voucher was showing insufficient balance even when the account had enough funds — fixed by including opening balance in the check" },
+      { type: "fix",         text: "Bank FD: Account Head field added to the account form" },
+      { type: "fix",         text: "RD Slab: Daily kist option now available in the compounding interval dropdown" },
+      { type: "fix",         text: "Loan Master: guarantors and witnesses can no longer be added as their own guarantor/witness" },
+    ],
+  },
+  {
     version: "1.0.2",
     date: "2026-08-03",
     changes: [

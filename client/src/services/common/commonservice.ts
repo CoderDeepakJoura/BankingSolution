@@ -752,8 +752,11 @@ class commonService extends ApiService {
     );
   }
 
-  async fetch_rd_related_info(rdDate: string, periodInMonths: Number, productId: Number, amount: Number, branchId: Number, compoundingInterval: string, periodInDays?: number): Promise<ApiResponse<any>> {
-    const query = periodInDays && periodInDays > 0 ? `?periodInDays=${periodInDays}` : "";
+  async fetch_rd_related_info(rdDate: string, periodInMonths: Number, productId: Number, amount: Number, branchId: Number, compoundingInterval: string, periodInDays?: number, interestRateOverride?: number): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    if (periodInDays && periodInDays > 0) params.set("periodInDays", String(periodInDays));
+    if (interestRateOverride && interestRateOverride > 0) params.set("interestRateOverride", String(interestRateOverride));
+    const query = params.toString() ? `?${params.toString()}` : "";
     return this.makeRequest<AuthResponse>(
       `/fetchdata/fetch-rd-related-info/${rdDate}/${periodInMonths}/${productId}/${amount}/${branchId}/${compoundingInterval}${query}`,
       {

@@ -48,6 +48,10 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public double? StdInterestRate { get; set; }
         public double? OverdueInterestRate { get; set; }
         public string IntCalcMethod { get; set; } = "Schedule";
+        // 1=AddInBalance (interest embedded in principal), 2=Stand; null=unknown
+        public int? ActOnIntPosting { get; set; }
+        // Reason why TotalPostable is 0 (empty = has postable interest)
+        public string? NoInterestReason { get; set; }
     }
 
     public class LoanInterestBatchPostItemDTO

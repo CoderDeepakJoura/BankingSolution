@@ -166,16 +166,22 @@ const LoanInterestPostingVoucher: React.FC = () => {
       if (!Array.isArray(data)) {
         throw new Error((res as any).message ?? "Unexpected response from server.");
       }
-      const postable = data.filter((x) => x.totalPostable > 0);
-      setBatchItems(postable);
-      setCheckedIds(new Set(postable.map((x) => x.loanAccId)));
+      setBatchItems(data);
+      setCheckedIds(new Set(data.filter((x) => x.totalPostable > 0).map((x) => x.loanAccId)));
       setHasShown(true);
 
-      if (postable.length === 0) {
+      const postableCount = data.filter((x) => x.totalPostable > 0).length;
+      if (data.length === 0) {
+        Swal.fire({
+          icon: "info",
+          title: "No Accounts Found",
+          text: "No loan accounts found for the selected product.",
+        });
+      } else if (postableCount === 0) {
         Swal.fire({
           icon: "info",
           title: "No Interest to Post",
-          text: "No unposted interest found for the selected criteria.",
+          text: `${data.length} account(s) found but none have postable interest. See the reason column for details.`,
         });
       }
     } catch (err: any) {
@@ -187,12 +193,13 @@ const LoanInterestPostingVoucher: React.FC = () => {
 
   // ── Checkbox helpers ──────────────────────────────────────────────────────
 
-  const allChecked = batchItems.length > 0 && checkedIds.size === batchItems.length;
-  const someChecked = checkedIds.size > 0 && checkedIds.size < batchItems.length;
+  const postableItems = batchItems.filter((x) => x.totalPostable > 0);
+  const allChecked = postableItems.length > 0 && checkedIds.size === postableItems.length;
+  const someChecked = checkedIds.size > 0 && checkedIds.size < postableItems.length;
 
   const toggleAll = () => {
     if (allChecked) setCheckedIds(new Set());
-    else setCheckedIds(new Set(batchItems.map((x) => x.loanAccId)));
+    else setCheckedIds(new Set(postableItems.map((x) => x.loanAccId)));
   };
 
   const toggleOne = (id: number) => {
@@ -443,7 +450,7 @@ const LoanInterestPostingVoucher: React.FC = () => {
                       Interest Calculation Results
                     </h3>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {batchItems.length} account(s) with postable interest
+                      {batchItems.filter((x) => x.totalPostable > 0).length} of {batchItems.length} account(s) have postable interest
                       {checkedIds.size > 0 && (
                         <span className="ml-2 text-blue-700 font-medium">
                           · {checkedIds.size} selected · Total: ₹{fmt(totalSelected)}
@@ -475,8 +482,7 @@ const LoanInterestPostingVoucher: React.FC = () => {
                 {batchItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                     <AlertCircle className="w-12 h-12 mb-3" />
-                    <p className="text-sm font-medium">No unposted interest found</p>
-                    <p className="text-xs mt-1">All accounts are up-to-date for this product</p>
+                    <p className="text-sm font-medium">No accounts found for this product</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -525,17 +531,24 @@ const LoanInterestPostingVoucher: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {batchItems.map((item, idx) => {
+                          const isPostable = item.totalPostable > 0;
                           const checked = checkedIds.has(item.loanAccId);
                           return (
                             <tr
                               key={item.loanAccId}
-                              onClick={() => toggleOne(item.loanAccId)}
-                              className={`cursor-pointer transition-colors ${
-                                checked ? "bg-blue-50 hover:bg-blue-100" : "hover:bg-gray-50"
+                              onClick={() => isPostable && toggleOne(item.loanAccId)}
+                              className={`transition-colors ${
+                                !isPostable
+                                  ? "bg-gray-50 opacity-60"
+                                  : checked
+                                  ? "bg-blue-50 hover:bg-blue-100 cursor-pointer"
+                                  : "hover:bg-gray-50 cursor-pointer"
                               }`}
                             >
                               <td className="px-4 py-3">
-                                {checked ? (
+                                {!isPostable ? (
+                                  <Square className="w-4 h-4 text-gray-300" />
+                                ) : checked ? (
                                   <CheckSquare className="w-4 h-4 text-blue-600" />
                                 ) : (
                                   <Square className="w-4 h-4 text-gray-400" />
@@ -611,16 +624,20 @@ const LoanInterestPostingVoucher: React.FC = () => {
                                 ₹{fmt(getTotalPostable(item))}
                               </td>
                               <td className="px-4 py-3">
-                                <div className="text-xs text-gray-600 leading-relaxed">
-                                  <div>
-                                    {fmtDateShort(item.calcFromDate)} → {fmtDateShort(item.calcToDate)}
+                                {item.noInterestReason ? (
+                                  <span className="text-xs text-amber-600 font-medium">{item.noInterestReason}</span>
+                                ) : (
+                                  <div className="text-xs text-gray-600 leading-relaxed">
+                                    <div>
+                                      {fmtDateShort(item.calcFromDate)} → {fmtDateShort(item.calcToDate)}
+                                    </div>
+                                    <div className="text-gray-400">
+                                      Std {item.stdInterestRate ?? "—"}%
+                                      {item.overdueInterestRate ? ` · Penal ${item.overdueInterestRate}%` : ""}
+                                      {" · "}{item.intCalcMethod}
+                                    </div>
                                   </div>
-                                  <div className="text-gray-400">
-                                    Std {item.stdInterestRate ?? "—"}%
-                                    {item.overdueInterestRate ? ` · Penal ${item.overdueInterestRate}%` : ""}
-                                    {" · "}{item.intCalcMethod}
-                                  </div>
-                                </div>
+                                )}
                               </td>
                             </tr>
                           );
@@ -630,19 +647,19 @@ const LoanInterestPostingVoucher: React.FC = () => {
                       <tfoot className="bg-gray-50 border-t-2 border-gray-300">
                         <tr>
                           <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-gray-700">
-                            Totals ({batchItems.length} accounts)
+                            Totals ({postableItems.length} postable of {batchItems.length} accounts)
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-bold text-amber-700">
-                            ₹{fmt(batchItems.reduce((s, x) => s + getStd(x), 0))}
+                            ₹{fmt(postableItems.reduce((s, x) => s + getStd(x), 0))}
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-bold text-rose-700">
-                            ₹{fmt(batchItems.reduce((s, x) => s + getPenal(x), 0))}
+                            ₹{fmt(postableItems.reduce((s, x) => s + getPenal(x), 0))}
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-bold text-purple-700">
-                            ₹{fmt(batchItems.reduce((s, x) => s + x.stdRecoverable, 0))}
+                            ₹{fmt(postableItems.reduce((s, x) => s + x.stdRecoverable, 0))}
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-bold text-green-700">
-                            ₹{fmt(batchItems.reduce((s, x) => s + getTotalPostable(x), 0))}
+                            ₹{fmt(postableItems.reduce((s, x) => s + getTotalPostable(x), 0))}
                           </td>
                           <td />
                         </tr>

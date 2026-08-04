@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS branchmaster (
     branchmaster_pincode       VARCHAR(50)   NOT NULL,
     branchmaster_tehsilid      INT           NOT NULL,
     branchmaster_gstino        VARCHAR(25)   NOT NULL,
-    branchmaster_gstnoissueddate TIMESTAMP(3) NOT NULL,
+    branchmaster_gstnoissuedate TIMESTAMP(3) NOT NULL,
     branchmaster_stateid       INT           NOT NULL,
     CONSTRAINT branchmaster_pkey PRIMARY KEY (id)
 );
@@ -1488,7 +1488,7 @@ CREATE TABLE IF NOT EXISTS loanproductbranchwiserule (
     npaplanid                INT            NULL,
     legalplanid              INT            NULL,
     operatedby               VARCHAR(2)     NULL,
-    accnoornnamefirst        VARCHAR(2)     NULL,
+    accnoornamefirst         VARCHAR(2)     NULL,
     temprecaccid             INT            NULL,
     currentrecoverableintacc INT            NULL,
     intincomeacc             INT            NULL,
@@ -1524,7 +1524,7 @@ CREATE TABLE IF NOT EXISTS loanslabdetail (
     toamount         NUMERIC(18,2)    NULL,
     periodfrom       INT              NULL,
     periodto         INT              NULL,
-    periodfroomindays INT             NULL,
+    periodfromindays  INT             NULL,
     periodtoindays   INT              NULL,
     stdintrate       DOUBLE PRECISION NULL,
     penalintrate     DOUBLE PRECISION NULL,

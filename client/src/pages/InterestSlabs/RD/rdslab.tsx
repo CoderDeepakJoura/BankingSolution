@@ -21,6 +21,7 @@ import DatePicker from "../../../components/DatePicker";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const KIST_INTERVAL_OPTIONS = [
+  { value: "Daily",      label: "Daily"      },
   { value: "Monthly",    label: "Monthly"    },
   { value: "Quarterly",  label: "Quarterly"  },
   { value: "HalfYearly", label: "Half Yearly"},

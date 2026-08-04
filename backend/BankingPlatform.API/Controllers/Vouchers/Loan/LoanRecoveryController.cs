@@ -82,6 +82,23 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             }
         }
 
+        /// <summary>Get transaction ledger for a loan account.</summary>
+        [HttpGet("ledger/{loanAccId}/{branchId}")]
+        public async Task<IActionResult> GetLedger(int loanAccId, int branchId)
+        {
+            try
+            {
+                var entries = await _service.GetLoanLedgerAsync(loanAccId, branchId);
+                return Ok(new { Success = true, Data = entries });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching loan ledger");
+                await _cf.LogErrors(ex, nameof(GetLedger), nameof(LoanRecoveryController));
+                return StatusCode(500, new { Success = false, Message = ex.Message });
+            }
+        }
+
         /// <summary>Save a new loan recovery voucher.</summary>
         [HttpPost]
         public async Task<IActionResult> AddRecovery([FromBody] LoanRecoveryVoucherDTO dto)

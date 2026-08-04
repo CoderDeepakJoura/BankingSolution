@@ -75,6 +75,16 @@ export interface KistScheduleDTO {
   interestAmt: number;
 }
 
+export interface LoanLedgerRowDTO {
+  entryDate: string;
+  voucherNo: number;
+  entryType: string;
+  description: string;
+  dr: number;
+  cr: number;
+  balance: number;
+}
+
 class LoanRecoveryApiService extends ApiService {
   async searchAccounts(branchId: number, query: string): Promise<ApiResponse<LoanAccountSearchDTO[]>> {
     return this.makeRequest(`/LoanRecovery/search?branchId=${branchId}&query=${encodeURIComponent(query)}`);
@@ -86,6 +96,10 @@ class LoanRecoveryApiService extends ApiService {
 
   async getKistSchedule(loanAccId: number, branchId: number): Promise<ApiResponse<KistScheduleDTO[]>> {
     return this.makeRequest(`/LoanRecovery/kist-schedule/${loanAccId}/${branchId}`);
+  }
+
+  async getLedger(loanAccId: number, branchId: number): Promise<ApiResponse<LoanLedgerRowDTO[]>> {
+    return this.makeRequest(`/LoanRecovery/ledger/${loanAccId}/${branchId}`);
   }
 
   async addRecovery(dto: LoanRecoveryVoucherDTO): Promise<ApiResponse<any>> {
