@@ -2007,11 +2007,14 @@ useEffect(() => {
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700">Interest Rate (%)</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={rdDetailForm.interestRate}
-                    onChange={(e) => handleRdDetailChange("interestRate", e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "" || /^\d+(\.\d{0,2})?$/.test(v))
+                        handleRdDetailChange("interestRate", v);
+                    }}
                     placeholder="Auto from slab"
                     className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
