@@ -490,6 +490,13 @@ useEffect(() => {
       ...prev,
       accountMasterDTO: { ...prev.accountMasterDTO, [field]: value },
     }));
+    if (field === "accountOpeningDate" && value) {
+      setRdDetailForm((prev) => ({
+        ...prev,
+        rdDate: value,
+        firstKistDate: calculateFirstKistDate(value, prev.kistInterval),
+      }));
+    }
     if ((field === "memberAccountNo" || field === "membershipNo") && !isEditMode) {
       if (formData.memberDetails !== null) clearMemberDetails();
     }
@@ -1040,7 +1047,7 @@ useEffect(() => {
       add("rdProductId", "RD Product is required", "rdDetail");
 
     if (!formData.accountMasterDTO.accountOpeningDate)
-      add("accountOpeningDate", "RD Date is required", "rdDetail");
+      add("accountOpeningDate", "Account Opening Date is required", "rdDetail");
 
     if (!formData.memberDetails) {
       const memberField = inputMode === "account" ? "memberAccountNo" : "membershipNo";
@@ -1454,10 +1461,10 @@ useEffect(() => {
             />
           </FormField>
 
-          {/* RD Date */}
+          {/* Account Opening Date */}
           <FormField
             name="accountOpeningDate"
-            label="RD Date"
+            label="Account Opening Date"
             required
             errors={errorsByField.accountOpeningDate || []}
             icon={<Calendar className="w-4 h-4 text-orange-500" />}
@@ -2072,6 +2079,7 @@ useEffect(() => {
                   <DatePicker
                     value={rdDetailForm.paymentDate}
                     onChange={(val) => handleRdDetailChange("paymentDate", val)}
+                    min={rdDetailForm.matDate || undefined}
                     max={sessionDate}
                     workingDate={sessionDate}
                     className={`w-full px-3 py-2.5 text-sm border rounded-lg outline-none ${
@@ -2085,16 +2093,30 @@ useEffect(() => {
                   )}
                 </div>
 
-                {/* Mat Amount (read-only) */}
+                {/* Mat Amount (editable override) */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Mat Amount</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Mat Amount <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
+                    inputMode="decimal"
                     value={rdDetailForm.matAmount}
-                    readOnly
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "" || /^\d+(\.\d{0,2})?$/.test(v))
+                        handleRdDetailChange("matAmount", v);
+                    }}
                     placeholder="Auto calculated"
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
+                    className={`w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      errorsByField.matAmount ? "border-red-500 bg-red-50" : ""
+                    }`}
                   />
+                  {errorsByField.matAmount && (
+                    <p className="text-red-500 text-xs flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />{errorsByField.matAmount[0]?.message}
+                    </p>
+                  )}
                 </div>
 
                 {/* Penalty Amount */}

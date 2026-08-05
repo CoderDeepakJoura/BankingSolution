@@ -44,7 +44,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Saving
                 return Ok(new ResponseDto
                 {
                     Success = true,
-                    Message = "Voucher saved successfully with voucher No. " + voucherNo
+                    Message = $"Voucher saved successfully with voucher no. {voucherNo}"
                 });
             }
             catch (Exception ex)
@@ -70,7 +70,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Saving
                 (var result, int voucherNo) = await _service.UpdateSavingVoucher(voucherId, dto);
                 if (result != "Success")
                     return BadRequest(new ResponseDto { Success = false, Message = result });
-                return Ok(new { Success = true, Message = "Voucher updated successfully with voucher No. " + voucherNo, data = new { voucherNo } });
+                return Ok(new { Success = true, Message = $"Voucher updated successfully with voucher no. {voucherNo}" });
             }
             catch (Exception ex)
             {

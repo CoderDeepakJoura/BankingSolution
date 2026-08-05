@@ -503,7 +503,7 @@ const RDKistVoucher: React.FC = () => {
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
           text:
-            response.message || (isEditMode ? "RD Kist Voucher updated successfully." : "RD Kist Voucher saved successfully."),
+            response.message || (isEditMode ? "Voucher updated successfully." : "Voucher saved successfully."),
           confirmButtonColor: "#3B82F6",
         });
 

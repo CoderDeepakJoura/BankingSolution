@@ -457,7 +457,7 @@ const LoanAdvancementVoucher: React.FC = () => {
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
-          text: `Loan advancement voucher ${isEditMode ? "updated" : "saved"}. Voucher No: ${res.data?.voucherNo ?? ""}`,
+          text: res.message || (isEditMode ? "Voucher updated successfully." : "Voucher saved successfully."),
           confirmButtonColor: "#3B82F6",
         });
         if (isEditMode) {

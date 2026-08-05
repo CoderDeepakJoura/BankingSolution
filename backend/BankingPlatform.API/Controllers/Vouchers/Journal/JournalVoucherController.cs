@@ -35,7 +35,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Journal
                 if (result != "Success")
                     return BadRequest(new ResponseDto { Success = false, Message = result });
 
-                return Ok(new ResponseDto { Success = true, Message = "Journal voucher saved successfully with Voucher No. " + voucherNo });
+                return Ok(new ResponseDto { Success = true, Message = $"Voucher saved successfully with voucher no. {voucherNo}" });
             }
             catch (Exception ex)
             {
@@ -73,7 +73,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Journal
                 if (result != "Success")
                     return BadRequest(new ResponseDto { Success = false, Message = result });
 
-                return Ok(new ResponseDto { Success = true, Message = "Journal voucher updated successfully with Voucher No. " + voucherNo });
+                return Ok(new ResponseDto { Success = true, Message = $"Voucher updated successfully with voucher no. {voucherNo}" });
             }
             catch (Exception ex)
             {

@@ -175,6 +175,14 @@ namespace BankingPlatform.API.Service.Vouchers
             using var tx = await _context.Database.BeginTransactionAsync();
             try
             {
+                // Delete loan interest/recovery ledger rows (no FK to voucher — intentionally unconstrained)
+                if (vType == (int)Enums.VoucherType.Loan)
+                {
+                    var intRows = await _context.voucherrecintdetail
+                        .Where(x => x.VoucherId == voucher.Id).ToListAsync();
+                    if (intRows.Any()) _context.voucherrecintdetail.RemoveRange(intRows);
+                }
+
                 // Delete saving detail entries (no FK constraint to voucher)
                 var savingDetails = await _context.vouchersavingdetail
                     .Where(x => x.VoucherId == voucher.Id).ToListAsync();

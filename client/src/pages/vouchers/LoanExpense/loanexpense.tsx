@@ -224,11 +224,10 @@ const LoanExpensePage: React.FC = () => {
         ? await loanExpenseApi.update(editId, dto)
         : await loanExpenseApi.create(dto);
       if (res.success) {
-        const voucherNo = (res as any).data?.voucherNo;
         await Swal.fire({
           icon: "success",
           title: editId ? "Updated" : "Saved",
-          text: `Loan expense voucher #${voucherNo} ${editId ? "updated" : "created"} successfully.`,
+          text: res.message || (editId ? "Voucher updated successfully." : "Voucher saved successfully."),
           timer: 2000,
           showConfirmButton: false,
         });

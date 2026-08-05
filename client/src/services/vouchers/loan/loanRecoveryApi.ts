@@ -109,6 +109,14 @@ class LoanRecoveryApiService extends ApiService {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  async updateRecovery(voucherId: number, dto: LoanRecoveryVoucherDTO): Promise<ApiResponse<any>> {
+    return this.makeRequest(`/LoanRecovery/${voucherId}`, {
+      method: 'PUT',
+      body: JSON.stringify(dto),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 export default new LoanRecoveryApiService();

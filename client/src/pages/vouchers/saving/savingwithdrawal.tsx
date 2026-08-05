@@ -539,7 +539,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
           text:
-            response.message || (isEditMode ? "Saving Withdrawal Voucher updated successfully." : "Saving Withdrawal Voucher saved successfully."),
+            response.message || (isEditMode ? "Voucher updated successfully." : "Voucher saved successfully."),
           confirmButtonColor: "#3B82F6",
         });
 

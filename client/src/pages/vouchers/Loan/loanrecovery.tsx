@@ -5,7 +5,8 @@ import {
   UserCheck, Pencil, TrendingDown, AlertCircle, BarChart2,
 } from "lucide-react";
 import DashboardLayout from "../../../Common/Layout";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
 import Select from "react-select";
 import Swal from "sweetalert2";
 import { useSelector } from "react-redux";
@@ -141,9 +142,12 @@ const fmt = (n: number) =>
 
 const LoanRecovery: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
   const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("account-info");
 
@@ -183,6 +187,92 @@ const LoanRecovery: React.FC = () => {
     commonservice.fetch_loan_products(user.branchid).then((res) => {
       if (res.success) setLoanProducts(res.data ?? []);
     });
+  }, []);
+
+  // ── Edit mode: load from voucher-search state ─────────────────────────────────
+  useEffect(() => {
+    const editVoucher = (location.state as any)?.editVoucher as VoucherPreview | undefined;
+    if (!editVoucher) return;
+
+    setIsEditMode(true);
+    setEditVoucherId(editVoucher.voucherId);
+
+    // Cr entry (LR) = loan account; Dr entries = cash/saving accounts
+    const crEntry = editVoucher.entries.find(e => e.entryType === "Cr");
+    const drEntries = editVoucher.entries.filter(e => e.entryType === "Dr");
+    if (!crEntry) return;
+
+    const loanAccId = crEntry.accountId;
+    const totalAmt = drEntries.reduce((s, e) => s + e.amount, 0);
+    const narr = editVoucher.narration ?? "";
+
+    // Pre-populate debit rows from Dr entries
+    const rows: DebitRow[] = drEntries.map((e, idx) => ({
+      rowId: Date.now() + idx,
+      accountId: e.accountId,
+      accountType: e.accountType,
+      amount: e.amount,
+      narration: e.narration ?? "",
+      accountName: e.accountName,
+      accountTypeName: e.accountType === 2 ? "Saving" : "General (Cash)",
+    }));
+    setDebitRows(rows);
+    setFormData(p => ({
+      ...p,
+      voucherDate: editVoucher.voucherDate.split("T")[0],
+      loanAccountId: loanAccId,
+      totalAmount: totalAmt.toFixed(2),
+      narration: narr,
+    }));
+
+    // Load full account data for the loan
+    const loadAccount = async () => {
+      const detRes = await loanAccountApi.getLoanAccountById(loanAccId, user.branchid);
+      if (detRes.success && detRes.data) {
+        const data = detRes.data as any;
+        setLoanAccountData(data);
+        setKistSchedule(data.kistSchedule ?? []);
+
+        const prodId = data.accountMasterDTO?.generalProductId ?? 0;
+        setFormData(p => ({ ...p, loanProductId: prodId }));
+        setLoanAccounts([{ accId: loanAccId, accountName: crEntry.accountName, loanAmountPassed: 0 }]);
+
+        // Load products for dropdown display
+        commonservice.fetch_loan_products(user.branchid).then(res => {
+          if (res.success) setLoanProducts(res.data ?? []);
+        });
+
+        // Guarantor names
+        const g = data.guarantor;
+        if (g) {
+          const pairs: Array<{ key: string; memberId: number; branchId: number }> = [];
+          if (g.guar1MemId) pairs.push({ key: "guar1", memberId: g.guar1MemId, branchId: g.guar1MemBrId });
+          if (g.guar2MemId) pairs.push({ key: "guar2", memberId: g.guar2MemId, branchId: g.guar2MemBrId });
+          if (g.witness1MemId) pairs.push({ key: "wit1", memberId: g.witness1MemId, branchId: g.wit1MemBrId ?? g.guar1MemBrId });
+          if (g.witness2MemId) pairs.push({ key: "wit2", memberId: g.witness2MemId, branchId: g.wit2MemBrId });
+          const results = await Promise.all(pairs.map(p2 => commonservice.fetch_member_name(p2.memberId, p2.branchId)));
+          const names: Record<string, string> = {};
+          pairs.forEach((p2, i) => {
+            const d = results[i]?.data;
+            names[p2.key] = d?.memberName
+              ? `${d.memberName}${d.relativeName ? ` (${d.relativeName})` : ""}`
+              : `Member #${p2.memberId}`;
+          });
+          setGuarantorNames(names);
+        }
+      }
+
+      // Load balance
+      const balRes = await loanRecoveryApi.getBalance(loanAccId, user.branchid);
+      if (balRes.success && balRes.data) setLoanBalance(balRes.data);
+
+      // Ledger
+      loanRecoveryApi.getLedger(loanAccId, user.branchid).then(res => {
+        if (res.success && res.data) setLoanLedger(res.data);
+      });
+    };
+
+    loadAccount();
   }, []);
 
   useEffect(() => {
@@ -391,7 +481,7 @@ const LoanRecovery: React.FC = () => {
 
     setLoading(true);
     try {
-      const res = await loanRecoveryApi.addRecovery({
+      const dto = {
         brId: user.branchid,
         voucherDate: formData.voucherDate,
         loanAccountId: formData.loanAccountId,
@@ -403,15 +493,23 @@ const LoanRecovery: React.FC = () => {
           amount: r.amount,
           narration: r.narration || undefined,
         })),
-      });
+      };
+      const res = isEditMode && editVoucherId
+        ? await loanRecoveryApi.updateRecovery(editVoucherId, dto)
+        : await loanRecoveryApi.addRecovery(dto);
+
       if (res.success) {
         await Swal.fire({
           icon: "success",
-          title: "Success!",
-          text: res.data?.message ?? "Loan recovery voucher saved successfully.",
+          title: isEditMode ? "Updated!" : "Success!",
+          text: res.message || (isEditMode ? "Voucher updated successfully." : "Voucher saved successfully."),
           confirmButtonColor: "#3B82F6",
         });
-        handleReset();
+        if (isEditMode) {
+          navigate("/voucher-search");
+        } else {
+          handleReset();
+        }
       } else {
         throw new Error(res.message || "Failed to save voucher");
       }
@@ -873,12 +971,12 @@ const LoanRecovery: React.FC = () => {
               <div className="bg-gradient-to-r from-orange-50 to-red-50 border-b border-gray-200 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg flex items-center justify-center shadow-md">
-                      <TrendingDown className="w-5 h-5 text-white" />
+                    <div className={`w-10 h-10 bg-gradient-to-r ${isEditMode ? "from-amber-500 to-orange-500" : "from-orange-500 to-red-500"} rounded-lg flex items-center justify-center shadow-md`}>
+                      {isEditMode ? <Pencil className="w-5 h-5 text-white" /> : <TrendingDown className="w-5 h-5 text-white" />}
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-800">Loan Recovery Voucher</h2>
-                      <p className="text-sm text-gray-600">Enter recovery details below</p>
+                      <h2 className="text-xl font-bold text-gray-800">{isEditMode ? "Modify Loan Recovery Voucher" : "Loan Recovery Voucher"}</h2>
+                      <p className="text-sm text-gray-600">{isEditMode ? "Update the recovery details and save" : "Enter recovery details below"}</p>
                     </div>
                   </div>
                   <button
@@ -942,6 +1040,7 @@ const LoanRecovery: React.FC = () => {
                           onChange={handleProductChange}
                           placeholder="Select Loan Product"
                           isClearable
+                          isDisabled={isEditMode}
                           styles={selectStyles(!!errors.loanProductId)}
                         />
                         {errors.loanProductId && <p className="mt-1 text-xs text-red-600">{errors.loanProductId}</p>}
@@ -956,7 +1055,7 @@ const LoanRecovery: React.FC = () => {
                           onChange={handleAccountChange}
                           placeholder="Select Loan Account"
                           isClearable
-                          isDisabled={!formData.loanProductId}
+                          isDisabled={isEditMode || !formData.loanProductId}
                           noOptionsMessage={() =>
                             !formData.loanProductId ? "Select a product first" : "No accounts found"
                           }
@@ -1276,10 +1375,11 @@ const LoanRecovery: React.FC = () => {
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                   <button
-                    onClick={handleReset}
+                    onClick={isEditMode ? () => navigate("/voucher-search") : handleReset}
                     className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-all shadow-sm cursor-pointer"
                   >
-                    <RotateCcw className="w-4 h-4" /> Reset
+                    {isEditMode ? <X className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                    {isEditMode ? "Cancel" : "Reset"}
                   </button>
                   <button
                     onClick={handleSave}
@@ -1289,11 +1389,11 @@ const LoanRecovery: React.FC = () => {
                     {loading ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Saving...
+                        {isEditMode ? "Updating..." : "Saving..."}
                       </>
                     ) : (
                       <>
-                        <Save className="w-4 h-4" /> Save Recovery
+                        <Save className="w-4 h-4" /> {isEditMode ? "Update Recovery" : "Save Recovery"}
                       </>
                     )}
                   </button>

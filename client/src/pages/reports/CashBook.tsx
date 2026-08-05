@@ -103,9 +103,7 @@ const LRSide: React.FC<{
             <React.Fragment key={date}>
               <tr className="bg-yellow-50">
                 <TD className="text-center" />
-                <TD className="font-semibold text-yellow-800 text-center">{fmtDate(date)}</TD>
-                <TD className="text-right font-semibold text-yellow-800">{fmt(dateTotal)}</TD>
-                <TD className="text-right font-semibold text-yellow-800">{fmt(dateTotal)}</TD>
+                <TD colSpan={3} className="font-semibold text-yellow-800 text-center">{fmtDate(date)}</TD>
               </tr>
               {items.map((entry) => {
                 sno++;
@@ -118,6 +116,12 @@ const LRSide: React.FC<{
                   </tr>
                 );
               })}
+              <tr className="bg-yellow-100 border-t border-yellow-400">
+                <TD className="text-center" />
+                <TD className="font-semibold text-yellow-900">Total for "{fmtDate(date)}"</TD>
+                <TD className="text-right font-semibold text-yellow-900">{fmt(dateTotal)}</TD>
+                <TD className="text-right font-semibold text-yellow-900">{fmt(dateTotal)}</TD>
+              </tr>
             </React.Fragment>
           );
         })}
@@ -146,17 +150,26 @@ const LRSide: React.FC<{
 
 // ── Simple table ──────────────────────────────────────────────────────────────
 const SimpleTable: React.FC<{ data: CashBook; longNar: boolean }> = ({ data, longNar }) => {
-  const rows: { entry: CashBookEntry; side: "Dr" | "Cr" }[] = [
+  const allRows: { entry: CashBookEntry; side: "Dr" | "Cr" }[] = [
     ...data.receipts.map((e) => ({ entry: e, side: "Dr" as const })),
     ...data.payments.map((e) => ({ entry: e, side: "Cr" as const })),
   ];
-  rows.sort((a, b) => {
+  allRows.sort((a, b) => {
     const dd = fmtDateKey(a.entry.voucherDate).localeCompare(fmtDateKey(b.entry.voucherDate));
     return dd !== 0 ? dd : a.entry.voucherNo - b.entry.voucherNo;
   });
 
+  // Group into date buckets
+  const grouped: { date: string; items: { entry: CashBookEntry; side: "Dr" | "Cr" }[] }[] = [];
+  for (const row of allRows) {
+    const dk = fmtDateKey(row.entry.voucherDate);
+    if (!grouped.length || grouped[grouped.length - 1].date !== dk)
+      grouped.push({ date: dk, items: [] });
+    grouped[grouped.length - 1].items.push(row);
+  }
+
+  const multiDay = grouped.length > 1;
   let sno = 0;
-  let lastDate = "";
 
   return (
     <table className="w-full border-collapse text-xs">
@@ -170,27 +183,35 @@ const SimpleTable: React.FC<{ data: CashBook; longNar: boolean }> = ({ data, lon
         </tr>
       </thead>
       <tbody>
-        {rows.map(({ entry, side }, i) => {
-          const dateKey = fmtDateKey(entry.voucherDate);
-          const showDateRow = dateKey !== lastDate;
-          if (showDateRow) lastDate = dateKey;
-          sno++;
+        {grouped.map(({ date, items }) => {
+          const dayDr = items.filter(r => r.side === "Dr").reduce((s, r) => s + r.entry.amount, 0);
+          const dayCr = items.filter(r => r.side === "Cr").reduce((s, r) => s + r.entry.amount, 0);
           return (
-            <React.Fragment key={i}>
-              {showDateRow && (
-                <tr className="bg-yellow-50">
-                  <TD colSpan={5} className="text-center font-semibold text-yellow-800 py-0.5">
-                    {fmtDate(entry.voucherDate)}
-                  </TD>
+            <React.Fragment key={date}>
+              <tr className="bg-yellow-50">
+                <TD colSpan={5} className="text-center font-semibold text-yellow-800 py-0.5">
+                  {fmtDate(date)}
+                </TD>
+              </tr>
+              {items.map(({ entry, side }, i) => {
+                sno++;
+                return (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <TD className="text-center">{sno}</TD>
+                    <TD className="text-center">{entry.voucherNo}</TD>
+                    <TD>{particulars(entry, longNar)}</TD>
+                    <TD className="text-right text-green-700">{side === "Dr" ? fmt(entry.amount) : ""}</TD>
+                    <TD className="text-right text-red-700">{side === "Cr" ? fmt(entry.amount) : ""}</TD>
+                  </tr>
+                );
+              })}
+              {multiDay && (
+                <tr className="bg-yellow-100 border-t border-yellow-400">
+                  <TD colSpan={3} className="font-semibold text-yellow-900">Total for "{fmtDate(date)}"</TD>
+                  <TD className="text-right font-semibold text-green-700">{dayDr > 0 ? fmt(dayDr) : ""}</TD>
+                  <TD className="text-right font-semibold text-red-700">{dayCr > 0 ? fmt(dayCr) : ""}</TD>
                 </tr>
               )}
-              <tr className="hover:bg-gray-50">
-                <TD className="text-center">{sno}</TD>
-                <TD className="text-center">{entry.voucherNo}</TD>
-                <TD>{particulars(entry, longNar)}</TD>
-                <TD className="text-right text-green-700">{side === "Dr" ? fmt(entry.amount) : ""}</TD>
-                <TD className="text-right text-red-700">{side === "Cr" ? fmt(entry.amount) : ""}</TD>
-              </tr>
             </React.Fragment>
           );
         })}
@@ -300,9 +321,7 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
       const dateTotal = items.reduce((s, e) => s + e.amount, 0);
       rows += `<tr class="date-row">
         <td class="sno"></td>
-        <td>${fmtDate(date)}</td>
-        <td class="amt">${fmt(dateTotal)}</td>
-        <td class="amt">${fmt(dateTotal)}</td>
+        <td colspan="3">${fmtDate(date)}</td>
       </tr>`;
       items.forEach((e) => {
         sno++;
@@ -313,6 +332,12 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
           <td class="amt">—</td>
         </tr>`;
       });
+      rows += `<tr class="day-total-row">
+        <td class="sno"></td>
+        <td>Total for "${fmtDate(date)}"</td>
+        <td class="amt">${fmt(dateTotal)}</td>
+        <td class="amt">${fmt(dateTotal)}</td>
+      </tr>`;
     });
 
     if (side === "payments") {
@@ -343,33 +368,48 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
   };
 
   const buildSimpleTable = (): string => {
-    const rows: { entry: CashBookEntry; side: "Dr" | "Cr" }[] = [
+    const allRows: { entry: CashBookEntry; side: "Dr" | "Cr" }[] = [
       ...data.receipts.map((e) => ({ entry: e, side: "Dr" as const })),
       ...data.payments.map((e) => ({ entry: e, side: "Cr" as const })),
     ];
-    rows.sort((a, b) => {
+    allRows.sort((a, b) => {
       const dd = fmtDateKey(a.entry.voucherDate).localeCompare(fmtDateKey(b.entry.voucherDate));
       return dd !== 0 ? dd : a.entry.voucherNo - b.entry.voucherNo;
     });
 
+    const grouped: { date: string; items: { entry: CashBookEntry; side: "Dr" | "Cr" }[] }[] = [];
+    for (const row of allRows) {
+      const dk = fmtDateKey(row.entry.voucherDate);
+      if (!grouped.length || grouped[grouped.length - 1].date !== dk)
+        grouped.push({ date: dk, items: [] });
+      grouped[grouped.length - 1].items.push(row);
+    }
+
+    const multiDay = grouped.length > 1;
     let trs = "";
     let sno = 0;
-    let lastDate = "";
 
-    rows.forEach(({ entry, side }) => {
-      const dateKey = fmtDateKey(entry.voucherDate);
-      if (dateKey !== lastDate) {
-        lastDate = dateKey;
-        trs += `<tr class="date-row"><td colspan="5">${fmtDate(entry.voucherDate)}</td></tr>`;
+    grouped.forEach(({ items }) => {
+      const dayDr = items.filter(r => r.side === "Dr").reduce((s, r) => s + r.entry.amount, 0);
+      const dayCr = items.filter(r => r.side === "Cr").reduce((s, r) => s + r.entry.amount, 0);
+      trs += `<tr class="date-row"><td colspan="5">${fmtDate(items[0].entry.voucherDate)}</td></tr>`;
+      items.forEach(({ entry, side }) => {
+        sno++;
+        trs += `<tr>
+          <td style="text-align:center">${sno}</td>
+          <td style="text-align:center">${entry.voucherNo}</td>
+          <td>${par(entry)}</td>
+          <td class="amt" style="color:${side === "Dr" ? "#060" : ""}">${side === "Dr" ? fmt(entry.amount) : ""}</td>
+          <td class="amt" style="color:${side === "Cr" ? "#900" : ""}">${side === "Cr" ? fmt(entry.amount) : ""}</td>
+        </tr>`;
+      });
+      if (multiDay) {
+        trs += `<tr class="day-total-row">
+          <td colspan="3">Total for "${fmtDate(items[0].entry.voucherDate)}"</td>
+          <td class="amt">${dayDr > 0 ? fmt(dayDr) : ""}</td>
+          <td class="amt">${dayCr > 0 ? fmt(dayCr) : ""}</td>
+        </tr>`;
       }
-      sno++;
-      trs += `<tr>
-        <td style="text-align:center">${sno}</td>
-        <td style="text-align:center">${entry.voucherNo}</td>
-        <td>${par(entry)}</td>
-        <td class="amt" style="color:${side === "Dr" ? "#060" : ""}">${side === "Dr" ? fmt(entry.amount) : ""}</td>
-        <td class="amt" style="color:${side === "Cr" ? "#900" : ""}">${side === "Cr" ? fmt(entry.amount) : ""}</td>
-      </tr>`;
     });
 
     trs += `<tr class="total-row">
@@ -435,7 +475,8 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
          text-align:center; font-weight:bold; }
     td { border:1px solid #aaa; padding:2px 4px; vertical-align:top; }
 
-    .date-row td  { background:#fefce8; color:#854d0e; font-weight:bold; text-align:center; font-size:10px; }
+    .date-row td      { background:#fefce8; color:#854d0e; font-weight:bold; text-align:center; font-size:10px; }
+    .day-total-row td { background:#fef9c3; color:#713f12; font-weight:bold; border-top:1px solid #d97706; }
     .ob-row td    { background:#fef2f2; color:#b91c1c; font-weight:bold; }
     .cb-row td    { background:#f0fdf4; color:#166534; font-weight:bold; }
     .total-row td { background:#e5e7eb; font-weight:bold; border-top:2px solid #555; }

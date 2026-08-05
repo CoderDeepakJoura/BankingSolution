@@ -39,7 +39,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.RD
                 return Ok(new ResponseDto
                 {
                     Success = true,
-                    Message = "RD Kist Voucher saved successfully with voucher No. " + voucherNo
+                    Message = $"Voucher saved successfully with voucher no. {voucherNo}"
                 });
             }
             catch (Exception ex)
@@ -67,7 +67,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.RD
                 if (result != "Success")
                     return BadRequest(new ResponseDto { Success = false, Message = result });
 
-                return Ok(new { Success = true, Message = "RD Kist Voucher updated successfully with voucher No. " + voucherNo, data = new { voucherNo } });
+                return Ok(new { Success = true, Message = $"Voucher updated successfully with voucher no. {voucherNo}" });
             }
             catch (Exception ex)
             {

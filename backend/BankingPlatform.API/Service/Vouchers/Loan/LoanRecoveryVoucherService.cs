@@ -445,6 +445,44 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 .ToListAsync();
         }
 
+        // ── Update Recovery (delete old + create new) ─────────────────────────────
+
+        public async Task<(string result, int voucherNo)> UpdateLoanRecoveryVoucherAsync(int oldVoucherId, LoanRecoveryVoucherDTO dto)
+        {
+            using var tx = await _db.Database.BeginTransactionAsync();
+            try
+            {
+                // Delete voucherrecintdetail rows (no FK cascade from voucher)
+                var intRows = await _db.voucherrecintdetail
+                    .Where(x => x.VoucherId == oldVoucherId).ToListAsync();
+                if (intRows.Any()) _db.voucherrecintdetail.RemoveRange(intRows);
+
+                // Delete the old voucher (CASCADE removes vouchercreditdebitdetails)
+                var oldVoucher = await _db.voucher
+                    .FirstOrDefaultAsync(x => x.Id == oldVoucherId && x.BrID == dto.BrId);
+                if (oldVoucher == null)
+                    return ("Original voucher not found.", 0);
+
+                // Delete saving/RD/FD detail rows that have ON DELETE RESTRICT
+                var savingDetails = await _db.vouchersavingdetail
+                    .Where(x => x.VoucherId == oldVoucherId).ToListAsync();
+                if (savingDetails.Any()) _db.vouchersavingdetail.RemoveRange(savingDetails);
+
+                _db.voucher.Remove(oldVoucher);
+                await _db.SaveChangesAsync();
+
+                await tx.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                return (ex.Message, 0);
+            }
+
+            // Create the new voucher in a fresh call (has its own transaction)
+            return await AddLoanRecoveryVoucherAsync(dto);
+        }
+
         // ── Save Recovery ─────────────────────────────────────────────────────────
 
         public async Task<(string result, int voucherNo)> AddLoanRecoveryVoucherAsync(LoanRecoveryVoucherDTO dto)

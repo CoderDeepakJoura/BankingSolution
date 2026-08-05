@@ -99,6 +99,30 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             }
         }
 
+        /// <summary>Update an existing loan recovery voucher (delete old, create new).</summary>
+        [HttpPut("{voucherId:int}")]
+        public async Task<IActionResult> UpdateRecovery(int voucherId, [FromBody] LoanRecoveryVoucherDTO dto)
+        {
+            try
+            {
+                if (dto == null || voucherId <= 0)
+                    return BadRequest(new { Success = false, Message = "Invalid request." });
+
+                var (result, voucherNo) = await _service.UpdateLoanRecoveryVoucherAsync(voucherId, dto);
+
+                if (result != "Success")
+                    return BadRequest(new { Success = false, Message = result });
+
+                return Ok(new { Success = true, Message = $"Voucher updated successfully with voucher no. {voucherNo}" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating loan recovery voucher");
+                await _cf.LogErrors(ex, nameof(UpdateRecovery), nameof(LoanRecoveryController));
+                return StatusCode(500, new { Success = false, Message = ex.Message });
+            }
+        }
+
         /// <summary>Save a new loan recovery voucher.</summary>
         [HttpPost]
         public async Task<IActionResult> AddRecovery([FromBody] LoanRecoveryVoucherDTO dto)
@@ -113,7 +137,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
                 if (result != "Success")
                     return BadRequest(new { Success = false, Message = result });
 
-                return Ok(new { Success = true, Message = $"Recovery voucher #{voucherNo} saved successfully." });
+                return Ok(new { Success = true, Message = $"Voucher saved successfully with voucher no. {voucherNo}" });
             }
             catch (Exception ex)
             {

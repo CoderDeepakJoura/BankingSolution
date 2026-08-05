@@ -331,6 +331,7 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                 decimal monthlyInterest;
                 decimal effectiveBalance;
+                decimal monthRate = 0;
 
                 if (isMinBalance)
                 {
@@ -359,7 +360,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     effectiveBalance = minBal < 0 ? 0 : minBal;
 
                     // Resolve the applicable rate for this month's balance (slab-wise or fixed)
-                    decimal monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules);
+                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules);
 
                     // If a minimum balance requirement is configured and not met this month,
                     // record the month with zero interest and move on
@@ -407,7 +408,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     productSum += currentBal * remainDays;
 
                     effectiveBalance = productSum / daysInMonth; // avg balance for display
-                    decimal monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules);
+                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules);
                     monthlyInterest = productSum * monthRate / (100m * daysInYear);
                 }
 

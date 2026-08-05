@@ -118,7 +118,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
                 if (result != "Success")
                     return BadRequest(new { Success = false, Message = result });
 
-                return Ok(new { Success = true, Message = $"Interest posting voucher #{voucherNo} saved successfully." });
+                return Ok(new { Success = true, Message = $"Voucher saved successfully with voucher no. {voucherNo}" });
             }
             catch (Exception ex)
             {

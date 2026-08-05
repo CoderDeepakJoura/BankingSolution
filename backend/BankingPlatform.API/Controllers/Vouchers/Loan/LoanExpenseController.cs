@@ -90,7 +90,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
                 if (result != "Success")
                     return BadRequest(new ResponseDto { Success = false, Message = result });
 
-                return Ok(new { Success = true, Message = "Loan expense voucher created successfully.", Data = new { voucherNo } });
+                return Ok(new { Success = true, Message = $"Voucher saved successfully with voucher no. {voucherNo}" });
             }
             catch (Exception ex)
             {
@@ -134,7 +134,7 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
                 if (result != "Success")
                     return BadRequest(new ResponseDto { Success = false, Message = result });
 
-                return Ok(new { Success = true, Message = "Loan expense updated successfully.", Data = new { voucherNo } });
+                return Ok(new { Success = true, Message = $"Voucher updated successfully with voucher no. {voucherNo}" });
             }
             catch (Exception ex)
             {

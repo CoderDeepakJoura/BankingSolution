@@ -57,6 +57,11 @@ BankingPlatform/
 - Header search (`HeaderLandingPage.tsx`) imports `SEARCHABLE_SCREENS` — no manual `ALL_SCREENS` array exists anymore
 - Routes without `label`/`category` (param routes, detail/info pages) are registered in router but hidden from search
 
+### Voucher Success Messages
+- All backend controllers return the same format: `"Voucher saved successfully with voucher no. {N}"` / `"Voucher updated successfully with voucher no. {N}"`
+- All frontend screens use `res.message` (primary) with a generic fallback — never hardcode voucher-type-specific text
+- Do NOT use `res.data?.voucherNo` patterns; embed the number in the backend `Message` field instead
+
 ### Scripts.sql
 - Every new column must appear in BOTH the `CREATE TABLE` block AND the incremental `ALTER TABLE ADD COLUMN IF NOT EXISTS` section at the bottom
 - New FK constraints go in the incremental section using `DO $$ BEGIN IF NOT EXISTS ... END $$` pattern (idempotent)
@@ -233,6 +238,11 @@ User can edit before confirming. Passed as `dto.Narration` override.
 ### Modify Blocked Reasons (`voucherOperationsApi.ts`)
 `MODIFY_BLOCKED_REASON` map keyed by `"{voucherType}-{voucherSubType}"` provides specific explanations when a voucher can't be modified. Falls back to generic message using `voucherTypeName — voucherSubTypeName` if key not in map.
 
+`EDIT_ROUTE_MAP` keyed by `"{voucherType}-{voucherSubType}"` maps modifiable vouchers to their edit screen. Currently modifiable: Saving Deposit (`2-2`), Saving Withdrawal (`2-3`), RD Kist (`4-8`), RD Multiple Kist (`4-16`), Loan Advancement (`5-9`), **Loan Recovery (`5-10`)**, Loan Expense (`5-14`), Cash Voucher (`6-11`), Journal Voucher (`7-12`).
+
+### Loan Recovery Modify (`LoanRecoveryVoucherService.UpdateLoanRecoveryVoucherAsync`)
+Delete-and-recreate pattern: cleans up `voucherrecintdetail`, removes old voucher, then calls `AddLoanRecoveryVoucherAsync`. Edit mode in `loanrecovery.tsx` reads `location.state?.editVoucher` from Voucher Search navigate state.
+
 ### VoucherType / SubType Names (`VoucherOperationsService.cs`)
 `GetVoucherTypeName` and `GetVoucherSubTypeName` — used for display in Voucher Search. IB subtypes 19–23 are registered here.
 
@@ -349,6 +359,8 @@ All FK additions in the `REFERENTIAL INTEGRITY` section of Scripts.sql now inclu
 - Backend `RDAccountDetailDTO` property `RdSlabId` → serialized as `rdSlabId` (capital S preserved). Frontend must use `rd.rdSlabId`, NOT `rd.rdslabId`.
 - `compoundingInterval` in state stores numeric string values `"3"` / `"4"` / `"5"` / `"6"` matching native `<select>` option values — do NOT apply a reverse label map when loading in modify mode.
 - Default cash account (By Cash debit side) is fetched via `commonservice.default_cash_in_hand_account(branchId)` in `Promise.all` during `fetchData`, stored in `defaultCashAccountId` state, and restored on reset.
+- The account-level date field is labelled **"Account Opening Date"** (not "RD Date"). When this field changes, `handleFieldChange` in `rd-master.tsx` updates `rdDetailForm.rdDate` and `rdDetailForm.firstKistDate` to the new date automatically.
+- Payment Date DatePicker has `min={rdDetailForm.matDate}` — user cannot pick a date before the maturity date. Submit validation also enforces this with an error message.
 
 ### Daily Kist Interval
 - `kistinterval = 0` in DB represents Daily. All other intervals use standard month codes.
@@ -456,3 +468,6 @@ Migrations live in `BankingPlatform.Infrastructure/Migrations/`. Recent ones:
 17. **FD slab dropdown showed all slabs regardless of product** — `fdinterestslab.tsx` listed every slab in the branch. Fixed: `fdSlabOptions` filtered by `s.fdProductId === formData.fdProductId` so only slabs matching the selected product are shown.
 18. **Miscellaneous master deletion ignored FK references** — deleting a Caste, Zone, Village, etc. that was referenced in member or account records would silently succeed. Fixed: `MasterUsageCheckerService` checks all FK usages before delete; returns HTTP 409 with screen/count breakdown; frontend displays SweetAlert2 in-use table.
 19. **`accountheadtype-data.tsx` missing import** — `isMasterInUseError`/`showMasterInUseError` were called in the catch block but the import line was absent, causing TS2304 compile errors. Fixed: import added.
+20. **`monthRate` out of scope in `SavingInterestPostingService`** — variable declared inside both branches of an if/else block, then referenced after the block. Fixed: hoisted declaration to before the if/else.
+21. **Loan recovery delete left orphan `voucherrecintdetail` rows** — `DeleteVoucherAsync` did not clean up `voucherrecintdetail` for Loan voucher types (no FK to enforce it). Fixed: explicit cleanup added before voucher delete.
+22. **Voucher save messages inconsistent and missing voucher number** — each screen used different text; some showed no voucher number at all. Fixed: all backend controllers now return `"Voucher saved/updated successfully with voucher no. {N}"`, and all frontend screens use `res.message` uniformly.

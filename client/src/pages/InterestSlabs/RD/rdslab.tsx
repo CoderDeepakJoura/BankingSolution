@@ -592,7 +592,7 @@ const RDAccountInterestSlab = () => {
                   {/* Instructions */}
                   <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-700 space-y-1">
                     <p>1. Amount From is auto-filled based on previous row's Amount To.</p>
-                    <p>2. Period From / To are in <strong>months</strong> (integers only). Period To must be &gt; Period From.</p>
+                    <p>2. Period From / To are in <strong>months</strong> (integers only) — or <strong>days</strong> when Kist Interval is Daily. Period To must be &gt; Period From.</p>
                     <p>3. Interest Rate must be between 0 – 100%.</p>
                     <p>4. Click <strong>Add Slab</strong> to add more ranges, then <strong>Save</strong>.</p>
                   </div>
@@ -602,7 +602,7 @@ const RDAccountInterestSlab = () => {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                          {["Amount From", "Amount To", "Kist Interval", "Period From (mo)", "Period To (mo)", "Interest Rate (%)", "Action"].map((h) => (
+                          {["Amount From", "Amount To", "Kist Interval", "Period From", "Period To", "Interest Rate (%)", "Action"].map((h) => (
                             <th key={h} className="border border-gray-300 px-3 py-3 text-center text-sm font-semibold whitespace-nowrap">{h}</th>
                           ))}
                         </tr>
@@ -667,9 +667,13 @@ const RDAccountInterestSlab = () => {
                               <input type="text" value={slab.periodFrom}
                                 onChange={(e) => handleSlabChange(index, "periodFrom", e.target.value)}
                                 onBlur={() => handleSlabBlur(index, "periodFrom")}
-                                placeholder="e.g., 1" inputMode="numeric" maxLength={4}
+                                placeholder={slab.kistInterval === "Daily" ? "e.g., 1" : "e.g., 1"}
+                                inputMode="numeric" maxLength={4}
                                 className={inputCls(index, "periodFrom")}
                               />
+                              <p className="text-xs text-gray-400 mt-0.5 text-right">
+                                {slab.kistInterval === "Daily" ? "days" : "months"}
+                              </p>
                               {cellErr(index, "periodFrom") && (
                                 <p className="text-red-500 text-xs mt-0.5 flex items-center gap-1">
                                   <AlertCircle className="w-3 h-3 shrink-0" /> {cellErr(index, "periodFrom")}
@@ -682,9 +686,13 @@ const RDAccountInterestSlab = () => {
                               <input type="text" value={slab.periodTo}
                                 onChange={(e) => handleSlabChange(index, "periodTo", e.target.value)}
                                 onBlur={() => handleSlabBlur(index, "periodTo")}
-                                placeholder="e.g., 12" inputMode="numeric" maxLength={4}
+                                placeholder={slab.kistInterval === "Daily" ? "e.g., 30" : "e.g., 12"}
+                                inputMode="numeric" maxLength={4}
                                 className={inputCls(index, "periodTo")}
                               />
+                              <p className="text-xs text-gray-400 mt-0.5 text-right">
+                                {slab.kistInterval === "Daily" ? "days" : "months"}
+                              </p>
                               {cellErr(index, "periodTo") && (
                                 <p className="text-red-500 text-xs mt-0.5 flex items-center gap-1">
                                   <AlertCircle className="w-3 h-3 shrink-0" /> {cellErr(index, "periodTo")}

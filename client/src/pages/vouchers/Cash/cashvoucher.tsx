@@ -429,7 +429,7 @@ const CashPaymentReceiptVoucher: React.FC = () => {
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
-          text: res.message || (isEditMode ? "Cash voucher updated successfully." : "Cash voucher saved successfully."),
+          text: res.message || (isEditMode ? "Voucher updated successfully." : "Voucher saved successfully."),
           confirmButtonColor: "#3B82F6",
         });
         if (isEditMode) {

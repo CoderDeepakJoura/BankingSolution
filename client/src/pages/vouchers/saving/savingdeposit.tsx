@@ -527,7 +527,7 @@ const SavingDepositVoucher: React.FC = () => {
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
-          text: response.message || (isEditMode ? "Saving Deposit Voucher updated successfully." : "Saving Deposit Voucher saved successfully."),
+          text: response.message || (isEditMode ? "Voucher updated successfully." : "Voucher saved successfully."),
           confirmButtonColor: "#3B82F6",
         });
 

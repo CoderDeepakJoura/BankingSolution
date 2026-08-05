@@ -15,6 +15,17 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.7",
+    date: "2026-08-05",
+    changes: [
+      { type: "new",         text: "Loan Recovery vouchers can now be edited — open any recovery voucher from Voucher Search and modify it directly." },
+      { type: "improvement", text: "All voucher save and update messages now consistently show the voucher number, so you always know which entry was created." },
+      { type: "improvement", text: "RD Account Master: the opening date field is now correctly labelled 'Account Opening Date', and the First Kist Date automatically adjusts whenever you change the opening date." },
+      { type: "improvement", text: "RD Account Master: the Payment Date picker now prevents selecting a date before the Maturity Date, avoiding data errors." },
+      { type: "improvement", text: "Cash Book: when viewing multiple days at once, each day now shows a clear 'Total for [date]' summary row so daily receipts and payments are easy to spot." },
+    ],
+  },
+  {
     version: "1.0.6",
     date: "2026-08-05",
     changes: [

@@ -422,7 +422,7 @@ const JournalTransferVoucher: React.FC = () => {
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
-          text: res.message || (isEditMode ? "Journal voucher updated successfully." : "Journal voucher saved successfully."),
+          text: res.message || (isEditMode ? "Voucher updated successfully." : "Voucher saved successfully."),
           confirmButtonColor: "#3B82F6",
         });
         if (isEditMode) {
