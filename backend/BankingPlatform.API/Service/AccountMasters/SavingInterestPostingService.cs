@@ -221,7 +221,6 @@ namespace BankingPlatform.API.Service.AccountMasters
                 int branchId, int accountId, DateTime postingDate,
                 Infrastructure.Models.ProductMasters.Saving.SavingsProductInterestRules rules)
         {
-            decimal rate = rules.InterestRateMinValue;
             bool isMinBalance = rules.CalculationMethod == 1;
 
             // Days in year from branch-wise rule (360 or 365); default 365
@@ -359,6 +358,9 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                     effectiveBalance = minBal < 0 ? 0 : minBal;
 
+                    // Resolve the applicable rate for this month's balance (slab-wise or fixed)
+                    decimal monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules);
+
                     // If a minimum balance requirement is configured and not met this month,
                     // record the month with zero interest and move on
                     if (requiredMinBalance > 0 && effectiveBalance < requiredMinBalance)
@@ -368,7 +370,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                             Month = cursor.ToString("MMMM yyyy"),
                             EffectiveBalance = Math.Round(effectiveBalance, 2),
                             Days = daysInMonth,
-                            Rate = rate,
+                            Rate = monthRate,
                             Interest = 0,
                         });
                         cursor = cursor.AddMonths(1);
@@ -377,7 +379,7 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                     // Interest calculated on full month days
                     int fullMonthDays = DateTime.DaysInMonth(cursor.Year, cursor.Month);
-                    monthlyInterest = effectiveBalance * rate * fullMonthDays / (100m * daysInYear);
+                    monthlyInterest = effectiveBalance * monthRate * fullMonthDays / (100m * daysInYear);
                 }
                 else
                 {
@@ -405,7 +407,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                     productSum += currentBal * remainDays;
 
                     effectiveBalance = productSum / daysInMonth; // avg balance for display
-                    monthlyInterest = productSum * rate / (100m * daysInYear);
+                    decimal monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules);
+                    monthlyInterest = productSum * monthRate / (100m * daysInYear);
                 }
 
                 if (monthlyInterest < 0) monthlyInterest = 0;
@@ -416,7 +419,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     Month = cursor.ToString("MMMM yyyy"),
                     EffectiveBalance = Math.Round(effectiveBalance, 2),
                     Days = daysInMonth,
-                    Rate = rate,
+                    Rate = monthRate,
                     Interest = Math.Round(monthlyInterest, 2),
                 });
 
@@ -427,6 +430,44 @@ namespace BankingPlatform.API.Service.AccountMasters
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the interest rate for a given balance.
+        /// For slab-wise products (RateAppliedMethod == 3) looks up savinginterestslabdetail;
+        /// for fixed-rate products returns InterestRateMinValue directly.
+        /// </summary>
+        private async Task<decimal> GetRateForBalance(
+            int branchId, int productId, decimal balance, DateTime postingDate,
+            Infrastructure.Models.ProductMasters.Saving.SavingsProductInterestRules rules)
+        {
+            // Fixed rate or changed rate — use the configured minimum/fixed value
+            if (rules.RateAppliedMethod != 3)
+                return rules.InterestRateMinValue;
+
+            // Slab-wise: find the most recent applicable slab for this product
+            var slabId = await _context.savinginterestslab
+                .AsNoTracking()
+                .Where(s => s.BranchId == branchId
+                         && s.SavingProductId == productId
+                         && s.ApplicableDate.Date <= postingDate.Date)
+                .OrderByDescending(s => s.ApplicableDate)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
+
+            if (slabId == null) return rules.InterestRateMinValue;
+
+            // Find the slab detail whose balance range covers this balance
+            var detail = await _context.savinginterestslabdetail
+                .AsNoTracking()
+                .Where(d => d.BranchId == branchId
+                         && d.savingintslabId == slabId.Value
+                         && d.fromamount <= balance
+                         && (d.toamount == 0 || d.toamount >= balance))
+                .OrderByDescending(d => d.fromamount)
+                .FirstOrDefaultAsync();
+
+            return detail?.interestrate ?? rules.InterestRateMinValue;
+        }
 
         private async Task<decimal> GetOpeningBalance(int branchId, int accountId)
         {
