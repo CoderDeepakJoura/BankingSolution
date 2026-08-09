@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "./redux";
 import commonservice from "./services/common/commonservice";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Login } from "./pages";
 import SessionExpired from "./pages/session-expired";
 import { ROUTES } from "./routes/routeRegistry";
@@ -51,7 +51,11 @@ export default function App() {
         <Route path="/" element={<Login />} />
         <Route path="/session-expired" element={<SessionExpired />} />
         {ROUTES.map((r) => (
-          <Route key={r.path} path={r.path} element={r.element} />
+          <Route
+            key={r.path}
+            path={r.path}
+            element={r.suOnly && !user.isSu ? <Navigate to="/dashboard" replace /> : r.element}
+          />
         ))}
       </Routes>
     </BrowserRouter>

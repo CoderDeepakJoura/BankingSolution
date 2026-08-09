@@ -40,6 +40,8 @@ const selectStyles = (hasError = false) => ({
 const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const fmtWhole = (n: number) => Math.round(n).toLocaleString("en-IN");
+
 const fmtDateShort = (value?: string | null) => {
   if (!value) return "—";
   const d = new Date(value);
@@ -296,7 +298,8 @@ const LoanInterestPostingVoucher: React.FC = () => {
   const loanProductOptions = loanProducts.map((p) => ({ value: p.id, label: p.productName }));
   const loanAccountOptions = loanAccounts.map((a) => ({ value: a.accId, label: a.accountName }));
 
-  const getStd = (x: LoanInterestBatchItemDTO) => stdOverrides[x.loanAccId] ?? x.stdInterest;
+  const getStd = (x: LoanInterestBatchItemDTO) =>
+    stdOverrides[x.loanAccId] ?? (x.actOnIntPosting === 1 ? Math.round(x.stdInterest) : x.stdInterest);
   const getPenal = (x: LoanInterestBatchItemDTO) => penalOverrides[x.loanAccId] ?? x.penalInterest;
   const getTotalPostable = (x: LoanInterestBatchItemDTO) => getStd(x) + getPenal(x);
 
@@ -576,6 +579,8 @@ const LoanInterestPostingVoucher: React.FC = () => {
                                     value={
                                       stdDisplayValues[item.loanAccId] !== undefined
                                         ? stdDisplayValues[item.loanAccId]
+                                        : item.actOnIntPosting === 1
+                                        ? Math.round(item.stdInterest).toString()
                                         : parseFloat(item.stdInterest.toFixed(2)).toString()
                                     }
                                     onChange={(e) => {
@@ -589,7 +594,7 @@ const LoanInterestPostingVoucher: React.FC = () => {
                                     className="w-24 px-2 py-1 text-right border border-amber-300 rounded-lg text-sm font-semibold text-amber-700 bg-white outline-none focus:ring-2 focus:ring-amber-400"
                                   />
                                 ) : (
-                                  <>₹{fmt(getStd(item))}</>
+                                  <>₹{item.actOnIntPosting === 1 ? fmtWhole(getStd(item)) : fmt(getStd(item))}</>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right text-rose-700 font-semibold" onClick={(e) => e.stopPropagation()}>
@@ -621,7 +626,7 @@ const LoanInterestPostingVoucher: React.FC = () => {
                                 {item.stdRecoverable > 0 ? `₹${fmt(item.stdRecoverable)}` : "—"}
                               </td>
                               <td className="px-4 py-3 text-right text-green-700 font-bold">
-                                ₹{fmt(getTotalPostable(item))}
+                                ₹{item.actOnIntPosting === 1 ? fmtWhole(getTotalPostable(item)) : fmt(getTotalPostable(item))}
                               </td>
                               <td className="px-4 py-3">
                                 {item.noInterestReason ? (

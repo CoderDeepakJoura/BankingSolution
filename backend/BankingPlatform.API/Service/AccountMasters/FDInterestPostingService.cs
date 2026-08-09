@@ -184,7 +184,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             if (branchWise == null) return "Branch-wise rules not configured for this product.";
             if (branchWise.IntExpenseAccount <= 0)
                 return "Interest expense account is not configured in branch-wise rules.";
-            if (!dto.IsMIS && branchWise.IntPayableAccount <= 0)
+            if (dto.IsMIS && branchWise.IntPayableAccount <= 0)
                 return "Interest payable account is not configured in branch-wise rules.";
 
             var claimsPrincipal = _httpContextAccessor.HttpContext?.User;
@@ -339,10 +339,10 @@ namespace BankingPlatform.API.Service.AccountMasters
                     }
                     else
                     {
-                        // Cr: FD interest payable GL
-                        long payableHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(branchWise.IntPayableAccount, dto.BranchId);
+                        // Cr: FD account (customer's FD account — interest compounds into balance)
+                        long fdAccHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(accountId, dto.BranchId);
                         var crEntry = _memberService.voucherCreditDebitDetails(
-                            payableHeadCode, branchWise.IntPayableAccount, dto.BranchId,
+                            fdAccHeadCode, accountId, dto.BranchId,
                             Enums.VoucherStatus.Cr.ToString(),
                             "FD Interest Posting", totalInterest, voucherStatus,
                             valueDate, "Cr", voucherInfo.Id, row);

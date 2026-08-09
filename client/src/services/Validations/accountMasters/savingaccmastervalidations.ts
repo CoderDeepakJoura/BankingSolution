@@ -431,15 +431,6 @@ export const useFormValidation = () => {
           });
         }
 
-        if (!nominee.address || nominee.address.trim() === "") {
-          errors.push({
-            field: `nominees[${index}].address`,
-            message: `Nominee ${index + 1}: Address is required`,
-            type: "required",
-            tab: "nominee",
-          });
-        }
-
         if (nominee.isMinor && (!nominee.guardianName || nominee.guardianName.trim() === "")) {
           errors.push({
             field: `nominees[${index}].guardianName`,

@@ -22,11 +22,58 @@ interface AccountHeadType {
 export interface AccountHead {
   accountHeadId: number;
   accountHeadName: string;
+  headCode?: string;
 }
 
 export interface AccountHeadWithCode {
   headCode: string;
   accountHeadName: string;
+}
+
+function computeNextHeadCode(parentHeadCode: string, allHeads: AccountHead[]): string {
+  if (!parentHeadCode || parentHeadCode.length !== 12 || !/^\d{12}$/.test(parentHeadCode)) return "";
+
+  const segs = Array.from({ length: 4 }, (_, i) => parentHeadCode.slice(i * 3, i * 3 + 3));
+
+  let parentLevel = 0;
+  for (const seg of segs) {
+    if (parseInt(seg) > 0) parentLevel++;
+    else break;
+  }
+
+  if (parentLevel >= 4) return "";
+
+  const childSegIdx = parentLevel;
+  const prefix = parentHeadCode.slice(0, parentLevel * 3);
+
+  const children = allHeads.filter((h) => {
+    const code = h.headCode || "";
+    if (!code || code.length !== 12 || !/^\d{12}$/.test(code)) return false;
+    if (parentLevel > 0 && !code.startsWith(prefix)) return false;
+    const childSeg = parseInt(code.slice(childSegIdx * 3, childSegIdx * 3 + 3));
+    if (childSeg === 0) return false;
+    for (let i = childSegIdx + 1; i < 4; i++) {
+      if (parseInt(code.slice(i * 3, i * 3 + 3)) !== 0) return false;
+    }
+    return true;
+  });
+
+  if (children.length === 0) return "";
+
+  let maxSeg = 0;
+  for (const child of children) {
+    const code = child.headCode || "";
+    const seg = parseInt(code.slice(childSegIdx * 3, childSegIdx * 3 + 3));
+    if (seg > maxSeg) maxSeg = seg;
+  }
+
+  if (maxSeg >= 999) return "";
+
+  const nextSegs = [...segs];
+  nextSegs[childSegIdx] = String(maxSeg + 1).padStart(3, "0");
+  for (let i = childSegIdx + 1; i < 4; i++) nextSegs[i] = "000";
+
+  return nextSegs.join("");
 }
 
 const AccountHeadMaster: React.FC = () => {
@@ -37,6 +84,7 @@ const AccountHeadMaster: React.FC = () => {
   const [AccountHeadType, setAccountHeadType] = useState<number | "">("");
   const [accountHeadTypes, setAccountHeadTypes] = useState<AccountHeadType[]>([]);
   const [HeadCode, setHeadCode] = useState("");
+  const [headCodeAutoFilled, setHeadCodeAutoFilled] = useState(false);
   const [ParentId, setParentId] = useState("");
   const [parents, setParents] = useState<AccountHead[]>([]);
   const [IsAnnexure, setIsAnnexure] = useState(0);
@@ -63,7 +111,11 @@ const AccountHeadMaster: React.FC = () => {
         );
         if (!parentRes.success)
           throw new Error("Failed to load Parent Account Heads");
-        const parentData: AccountHead[] = parentRes.data || [];
+        const parentData: AccountHead[] = (parentRes.data || []).map((h: any) => ({
+          accountHeadId: h.accountHeadId,
+          accountHeadName: h.accountHeadName,
+          headCode: h.headCode || h.HeadCode || "",
+        }));
         setParents(parentData);
       } catch (err: any) {
         console.error(err);
@@ -85,11 +137,25 @@ const AccountHeadMaster: React.FC = () => {
     }
   };
 
+  const handleParentChange = (selected: any) => {
+    const headCode = selected ? (selected.headCode || "") : "";
+    setParentId(headCode);
+    if (headCode) {
+      const next = computeNextHeadCode(headCode, parents);
+      setHeadCode(next);
+      setHeadCodeAutoFilled(!!next);
+    } else {
+      setHeadCode("");
+      setHeadCodeAutoFilled(false);
+    }
+  };
+
   const handleReset = () => {
     setAccountHeadName("");
     setAccountHeadNameSL("");
     setAccountHeadType("");
     setHeadCode("");
+    setHeadCodeAutoFilled(false);
     setParentId("");
     setIsAnnexure(0);
     setShowInReport(0);
@@ -170,7 +236,8 @@ const AccountHeadMaster: React.FC = () => {
   }));
 
   const parentOptions = parents.map((parent) => ({
-    value: String(parent.accountHeadId),
+    value: parent.headCode || String(parent.accountHeadId),
+    headCode: parent.headCode || "",
     label: parent.accountHeadName,
   }));
 
@@ -298,6 +365,11 @@ const AccountHeadMaster: React.FC = () => {
                       className="text-sm font-semibold text-gray-700 mb-2"
                     >
                       Head Code <span className="text-red-500">*</span>
+                      {headCodeAutoFilled && (
+                        <span className="ml-2 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5">
+                          Auto-suggested
+                        </span>
+                      )}
                     </label>
                     <input
                       type="text"
@@ -308,16 +380,21 @@ const AccountHeadMaster: React.FC = () => {
                       maxLength={12}
                       pattern="^\d+$"
                       onChange={(e) => {
-                        const numericValue = e.target.value.replace(
-                          /[^0-9]/g,
-                          ""
-                        ); // strip non-numeric
+                        const numericValue = e.target.value.replace(/[^0-9]/g, "");
                         setHeadCode(numericValue);
+                        setHeadCodeAutoFilled(false);
                       }}
                       required
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                      placeholder="Enter Head Code"
+                      className={`w-full px-4 py-2 border-2 rounded-lg outline-none ${
+                        headCodeAutoFilled
+                          ? "border-blue-400 focus:border-blue-600 bg-blue-50"
+                          : "border-gray-200 focus:border-blue-500"
+                      }`}
+                      placeholder="Enter Head Code (12 digits)"
                     />
+                    {HeadCode.length > 0 && HeadCode.length < 12 && (
+                      <p className="text-xs text-amber-600 mt-1">Must be exactly 12 digits ({HeadCode.length}/12)</p>
+                    )}
                   </div>
 
                   <div className="flex flex-col">
@@ -325,7 +402,7 @@ const AccountHeadMaster: React.FC = () => {
                       htmlFor="ParentId"
                       className="text-sm font-semibold text-gray-700 mb-2"
                     >
-                      Parent Id
+                      Parent Head
                     </label>
                     <Select
                       id="ParentId"
@@ -333,14 +410,11 @@ const AccountHeadMaster: React.FC = () => {
                       value={parentOptions.find(
                         (option) => option.value === ParentId
                       ) || null}
-                      onChange={(selected) =>
-                        setParentId(selected ? selected.value : "")
-                      }
-                      placeholder="Select Parent Id"
+                      onChange={handleParentChange}
+                      placeholder="Select Parent Head"
                       isClearable
                       className="text-sm"
-
-
+                      styles={{ control: (base: any) => ({ ...base, cursor: "pointer" }) }}
                     />
                   </div>
 

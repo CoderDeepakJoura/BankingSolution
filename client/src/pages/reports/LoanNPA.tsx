@@ -304,6 +304,8 @@ const LoanNPAPage: React.FC = () => {
                     onChange={(opt) => { setSelectedProduct(opt?.value === 0 ? null : opt); setReport(null); }}
                     placeholder="All Products"
                     styles={selectStyles}
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
                   />
                 </div>
 

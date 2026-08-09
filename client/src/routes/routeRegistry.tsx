@@ -241,9 +241,9 @@ export const ROUTES: RouteEntry[] = [
   { path: "/patwar-info",          element: <PatwarData /> },
 
   // ── Miscellaneous Masters ─────────────────────────────────────────────────
-  { path: "/accountheadtype-operations", element: <AccountHeadTypeOperations />, label: "Account Head Type Master", category: "Miscellaneous Masters" },
-  { path: "/accountheadtype",            element: <AccountHeadTypeMaster /> },
-  { path: "/accountheadtype-info",       element: <AccountHeadTypeData /> },
+  { path: "/accountheadtype-operations", element: <AccountHeadTypeOperations />, label: "Account Head Type Master", category: "Miscellaneous Masters", suOnly: true },
+  { path: "/accountheadtype",            element: <AccountHeadTypeMaster />, suOnly: true },
+  { path: "/accountheadtype-info",       element: <AccountHeadTypeData />, suOnly: true },
 
   { path: "/accounthead-operations",     element: <AccountHeadOperations />,     label: "Account Head Master",      category: "Miscellaneous Masters" },
   { path: "/accounthead",                element: <AccountHeadMaster /> },

@@ -56,6 +56,8 @@ const LoanAccountMaster: React.FC = () => {
   const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [activeTab, setActiveTab] = useState("loan-detail");
+  const [unlockedTabs, setUnlockedTabs] = useState<string[]>(["loan-detail"]);
+  const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const submittingRef = useRef(false);
   const loanAccSuffixRef = useRef<HTMLInputElement>(null);
@@ -196,6 +198,78 @@ const LoanAccountMaster: React.FC = () => {
     { id: "rd-pledge", label: isUnsecure ? "RD Lock Detail" : "RD Pledge Detail", show: hasFDRDSecurity },
   ];
   const visibleTabs = allTabs.filter(t => t.show === undefined || t.show);
+
+  const currentTabIndex = visibleTabs.findIndex((t) => t.id === activeTab);
+  const isLastTab = currentTabIndex === visibleTabs.length - 1;
+  const effectiveUnlockedTabs = isEditMode ? visibleTabs.map((t) => t.id) : unlockedTabs;
+
+  const validateCurrentTab = (): boolean => {
+    const errs: string[] = [];
+    switch (activeTab) {
+      case "loan-detail":
+        if (!formData.selectedProductId || formData.selectedProductId === 0)
+          errs.push("Please select a Loan Product");
+        if (!formData.accSuffix?.trim())
+          errs.push("Loan Account Number is required");
+        if (!memberDetails)
+          errs.push("Please search and confirm a member before proceeding");
+        if (isInstallment && schedule.length === 0)
+          errs.push("Please generate the installment schedule before proceeding");
+        break;
+      case "nominee":
+        if (isNomineeRequired && nominees.length === 0) {
+          errs.push("At least one nominee is required");
+        } else {
+          nominees.forEach((n, i) => {
+            if (!n.nomineeName?.trim())
+              errs.push(`Nominee ${i + 1}: Name is required`);
+            if (!n.relationWithAccHolder || n.relationWithAccHolder === 0)
+              errs.push(`Nominee ${i + 1}: Relation is required`);
+            if (n.isMinor && !n.nameOfGuardian?.trim())
+              errs.push(`Nominee ${i + 1}: Guardian name is required for minor nominees`);
+          });
+        }
+        break;
+      case "opening-balance":
+        if (openingBalDetails.length > 0) {
+          const totalDr = openingBalDetails.reduce((s, r) => s + (r.amountDr || 0), 0);
+          const totalCr = openingBalDetails.reduce((s, r) => s + (r.amountCr || 0), 0);
+          const calculatedNet = Math.abs(totalDr - totalCr);
+          const enteredTotal = parseFloat(openingBal.totalBalance || "0");
+          if (!enteredTotal)
+            errs.push("Total Balance is required under Opening Balance Info");
+          else if (Math.abs(enteredTotal - calculatedNet) > 0.01)
+            errs.push(`Total Balance (₹${enteredTotal.toFixed(2)}) must match the net Dr − Cr from the detail entries (₹${calculatedNet.toFixed(2)})`);
+        }
+        break;
+      case "guarantors":
+        if (isUnsecure) {
+          if (!guarantorData.guar1MemId) errs.push("Guarantor 1 is mandatory for unsecured loans");
+          if (!guarantorData.guar2MemId) errs.push("Guarantor 2 is mandatory for unsecured loans");
+        }
+        break;
+    }
+    if (errs.length > 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please complete the required fields",
+        html: `<ul style="text-align:left;padding-left:1rem">${errs.map((e) => `<li style="margin:4px 0">• ${e}</li>`).join("")}</ul>`,
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (!validateCurrentTab()) return;
+    setCompletedTabs((prev) => new Set([...prev, activeTab]));
+    const next = visibleTabs[currentTabIndex + 1];
+    if (next) {
+      setUnlockedTabs((prev) => prev.includes(next.id) ? prev : [...prev, next.id]);
+      setActiveTab(next.id);
+    }
+  };
+  const handlePrev = () => { if (currentTabIndex > 0) setActiveTab(visibleTabs[currentTabIndex - 1].id); };
 
   // ── Load initial data ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -787,10 +861,25 @@ const LoanAccountMaster: React.FC = () => {
       if (!guarantorData.guar1MemId) { Swal.fire("Validation", "Guarantor 1 is mandatory for unsecured loans.", "warning"); setActiveTab("guarantors"); return; }
       if (!guarantorData.guar2MemId) { Swal.fire("Validation", "Guarantor 2 is mandatory for unsecured loans.", "warning"); setActiveTab("guarantors"); return; }
     }
-    if (openingBalDetails.length > 0 && !parseFloat(openingBal.totalBalance || "0")) {
-      Swal.fire("Validation", "Opening Balance Info is required when detail entries exist. Please enter the Total Balance.", "warning");
-      setActiveTab("opening-balance");
-      return;
+    if (openingBalDetails.length > 0) {
+      const totalDr = openingBalDetails.reduce((s, r) => s + (r.amountDr || 0), 0);
+      const totalCr = openingBalDetails.reduce((s, r) => s + (r.amountCr || 0), 0);
+      const calculatedNet = Math.abs(totalDr - totalCr);
+      const enteredTotal = parseFloat(openingBal.totalBalance || "0");
+      if (!enteredTotal) {
+        Swal.fire("Validation", "Total Balance is required under Opening Balance Info.", "warning");
+        setActiveTab("opening-balance");
+        return;
+      }
+      if (Math.abs(enteredTotal - calculatedNet) > 0.01) {
+        Swal.fire({
+          icon: "warning",
+          title: "Opening Balance Mismatch",
+          html: `Total Balance <strong>₹${enteredTotal.toFixed(2)}</strong> does not match the net Dr − Cr from the detail entries <strong>₹${calculatedNet.toFixed(2)}</strong>.<br><br>Please correct the Total Balance or adjust the detail entries.`,
+        });
+        setActiveTab("opening-balance");
+        return;
+      }
     }
     if (!isUnsecure && hasFDRDSecurity && fdPledges.length === 0 && rdPledges.length === 0) {
       Swal.fire("Validation", "At least one FD or RD must be pledged for secured loans.", "warning");
@@ -909,6 +998,8 @@ const LoanAccountMaster: React.FC = () => {
     setLoanSlabs([]);
     setManualIntRate(false); setManualLimitIntRate(false);
     setIsNomineeRequired(false);
+    setUnlockedTabs(["loan-detail"]);
+    setCompletedTabs(new Set());
   };
 
   const memberOptions = activeMembers.map(m => ({
@@ -1229,12 +1320,24 @@ const LoanAccountMaster: React.FC = () => {
           {/* Tabs — only visible after member is selected */}
           {memberDetails && <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
             <div className="flex overflow-x-auto border-b border-gray-200 bg-gray-50">
-              {visibleTabs.map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id ? "border-b-2 border-blue-600 text-blue-600 bg-white" : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"}`}>
-                  {tab.label}
-                </button>
-              ))}
+              {visibleTabs.map(tab => {
+                const isLocked = !effectiveUnlockedTabs.includes(tab.id);
+                return (
+                  <button key={tab.id}
+                    onClick={() => !isLocked && setActiveTab(tab.id)}
+                    disabled={isLocked}
+                    title={isLocked ? "Complete previous steps first" : tab.label}
+                    className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                      isLocked
+                        ? "text-gray-300 cursor-not-allowed opacity-50"
+                        : activeTab === tab.id
+                        ? "border-b-2 border-blue-600 text-blue-600 bg-white cursor-pointer"
+                        : "text-gray-600 hover:text-gray-800 hover:bg-gray-100 cursor-pointer"
+                    }`}>
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="p-6">
@@ -1827,14 +1930,29 @@ const LoanAccountMaster: React.FC = () => {
             </div>
 
             {/* Action buttons */}
-            <div className="border-t border-gray-200 p-5 bg-gray-50 flex justify-end gap-3">
+            <div className="border-t border-gray-200 p-5 bg-gray-50 flex justify-between items-center gap-3">
               <button onClick={handleReset} className="flex items-center gap-2 px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold text-sm">
                 <RotateCcw className="w-4 h-4" /> Reset
               </button>
-              <button onClick={handleSubmit} disabled={loading}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold text-sm disabled:opacity-50 shadow-md">
-                {loading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</> : <><Save className="w-4 h-4" /> Save Loan Account</>}
-              </button>
+              <div className="flex items-center gap-3">
+                {currentTabIndex > 0 && (
+                  <button type="button" onClick={handlePrev} disabled={loading}
+                    className="flex items-center gap-2 px-5 py-2.5 border-2 border-gray-400 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-100 disabled:opacity-50">
+                    ← Previous
+                  </button>
+                )}
+                {!isLastTab ? (
+                  <button type="button" onClick={handleNext} disabled={loading}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold text-sm disabled:opacity-50 shadow-md">
+                    Next →
+                  </button>
+                ) : (
+                  <button onClick={handleSubmit} disabled={loading}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold text-sm disabled:opacity-50 shadow-md">
+                    {loading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</> : <><Save className="w-4 h-4" /> Save Loan Account</>}
+                  </button>
+                )}
+              </div>
             </div>
           </div>}
         </div>

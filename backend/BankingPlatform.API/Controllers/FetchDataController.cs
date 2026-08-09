@@ -1104,7 +1104,7 @@ namespace BankingPlatform.API.Controllers
                                     && p.GeneralProductId == fdProductId && p.AccTypeId == accountType
                                     && q.FDStatus == openStatus
                                     && p.AccOpeningDate <= currentDate
-                                    && q.FDMaturityDate < currentDate
+                                    && q.FDMaturityDate > currentDate
                                     select new
                                     {
                                         AccId = p.ID,

@@ -220,7 +220,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: "Miscellaneous Masters",
           path: "",
           subItems: [
-            { label: "Account Head Type Master", path: "/accountheadtype-operations" },
+            { label: "Account Head Type Master", path: "/accountheadtype-operations", suOnly: true },
             { label: "Account Head Master", path: "/accounthead-operations" },
             { label: "Branch Master", path: "/branchmaster-operations", suOnly: true },
             { label: "Caste Master", path: "/caste-operations" },

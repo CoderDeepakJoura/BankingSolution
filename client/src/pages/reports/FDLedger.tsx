@@ -226,6 +226,117 @@ const buildPrintHTML = (data: FDLedger, longNar: boolean): string => {
 </body></html>`;
 };
 
+const ACCENT: Record<string, { border: string; badge: string; headerText: string }> = {
+  blue:   { border: "border-t-blue-500",   badge: "bg-blue-50 border-blue-100 text-blue-700",   headerText: "text-blue-700" },
+  indigo: { border: "border-t-indigo-500", badge: "bg-indigo-50 border-indigo-100 text-indigo-700", headerText: "text-indigo-700" },
+  violet: { border: "border-t-violet-500", badge: "bg-violet-50 border-violet-100 text-violet-700", headerText: "text-violet-700" },
+};
+
+interface LedgerSectionProps {
+  ledger: FDLedger;
+  longNar: boolean;
+  onPrint: () => void;
+  onPdf: () => void;
+  onExcel: () => void;
+  title: string;
+  accentColor: "blue" | "indigo" | "violet";
+}
+
+const LedgerSection: React.FC<LedgerSectionProps> = ({ ledger, longNar, onPrint, onPdf, onExcel, title, accentColor }) => {
+  const acc = ACCENT[accentColor];
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="text-center px-6 py-5 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
+        <p className="text-xs uppercase tracking-widest text-slate-400 font-medium mb-1">Statement of Account</p>
+        <h1 className="text-lg font-bold uppercase tracking-wider text-slate-900">{ledger.branchName}</h1>
+        <p className="text-xs text-slate-500 mt-0.5">{ledger.branchAddress}</p>
+        <div className="flex items-center gap-3 justify-center mt-3">
+          <div className="h-px bg-slate-200 flex-1 max-w-16" />
+          <span className={`text-xs font-semibold uppercase tracking-widest px-3 py-1 border rounded-full ${acc.badge}`}>{title}</span>
+          <div className="h-px bg-slate-200 flex-1 max-w-16" />
+        </div>
+      </div>
+
+      {/* Account info */}
+      <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+          {[
+            { label: "Name",         value: ledger.accountName },
+            { label: "Acc. No.",     value: ledger.accountIdentifier },
+            { label: "Address",      value: ledger.address },
+            { label: "Relative",     value: ledger.relativeName },
+            { label: "Contact",      value: ledger.contactNo },
+            { label: "Product",      value: ledger.productName },
+            { label: "Period",       value: `${fmtDate(ledger.fromDate)} to ${fmtDate(ledger.toDate)}` },
+          ].filter((f) => f.value).map(({ label, value }) => (
+            <div key={label} className="flex gap-1 min-w-0">
+              <span className="text-slate-400 font-medium shrink-0">{label}:</span>
+              <span className="font-semibold text-slate-800 truncate">{value}</span>
+            </div>
+          ))}
+        </div>
+        {(ledger.selectedDetailLabel || ledger.detailFDDate) && (
+          <div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+            {[
+              { label: "Receipt No.",   value: ledger.detailLtdNo != null ? String(ledger.detailLtdNo) : null },
+              { label: "FD Date",       value: ledger.detailFDDate ? fmtShort(ledger.detailFDDate) : null },
+              { label: "FD Amount",     value: ledger.detailFDAmount != null ? `₹${fmt(ledger.detailFDAmount)}` : null },
+              { label: "Int. Rate",     value: ledger.detailIntRate != null ? `${ledger.detailIntRate}%` : null },
+              { label: "FD Period",     value: ledger.detailPeriodMonths != null ? `${ledger.detailPeriodMonths} M / ${ledger.detailPeriodDays ?? 0} D` : null },
+              { label: "Maturity Date", value: ledger.detailMaturityDate ? fmtShort(ledger.detailMaturityDate) : null },
+              { label: "Maturity Amt.", value: ledger.detailMaturityAmount != null ? `₹${fmt(ledger.detailMaturityAmount)}` : null },
+              { label: "Detail",        value: ledger.selectedDetailLabel ?? "All FD Details" },
+            ].filter((f) => f.value).map(({ label, value }) => (
+              <div key={label} className="flex gap-1 min-w-0">
+                <span className="text-slate-400 font-medium shrink-0">{label}:</span>
+                <span className="font-semibold text-slate-800">{value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 sm:p-5">
+        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm overflow-x-auto overflow-y-auto max-h-[58vh]">
+          <LedgerTable data={ledger} longNar={longNar} />
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+            <div className={`bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-blue-500`}>
+              <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Opening Balance</p>
+              <p className="text-base font-bold text-blue-700 mt-1">₹{fmtBal(ledger.openingBalance)}</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-emerald-500">
+              <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Deposits</p>
+              <p className="text-base font-bold text-emerald-700 mt-1">₹{fmt(ledger.totalCr)}</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-red-500">
+              <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Withdrawals</p>
+              <p className="text-base font-bold text-red-700 mt-1">₹{fmt(ledger.totalDr)}</p>
+            </div>
+            <div className={`bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 ${acc.border}`}>
+              <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Closing Balance</p>
+              <p className={`text-base font-bold mt-1 ${acc.headerText}`}>₹{fmtBal(ledger.closingBalance)}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={onPrint} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-medium rounded-lg transition shadow-sm">
+              <Printer size={13} /> Print
+            </button>
+            <button onClick={onPdf} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition shadow-sm">
+              <FileText size={13} /> PDF
+            </button>
+            <button onClick={onExcel} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition shadow-sm">
+              <FileSpreadsheet size={13} /> Excel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FDLedgerPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
   const navigate = useNavigate();
@@ -248,6 +359,8 @@ const FDLedgerPage: React.FC = () => {
   const [withLongNarration, setWithLongNarration] = useState(false);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<FDLedger | null>(null);
+  const [perDetailLedgers, setPerDetailLedgers] = useState<FDLedger[]>([]);
+  const [consolidatedData, setConsolidatedData] = useState<FDLedger | null>(null);
 
   useEffect(() => {
     if (!user.branchid) return;
@@ -304,27 +417,53 @@ const FDLedgerPage: React.FC = () => {
     if (selectedAccount === "") { Swal.fire("Validation", "Please select an Account.", "warning"); return; }
     if (!effectiveFromDate || !toDate) { Swal.fire("Validation", "Please select the date range.", "warning"); return; }
     if (effectiveFromDate > toDate) { Swal.fire("Validation", "From Date cannot be after To Date.", "warning"); return; }
-    setLoading(true); setData(null);
+    setLoading(true); setData(null); setPerDetailLedgers([]); setConsolidatedData(null);
     try {
-      const res = await fdLedgerApi.getFDLedger(
-        user.branchid, selectedAccount as number, effectiveFromDate, toDate,
-        selectedDetail !== "" ? (selectedDetail as number) : undefined
-      );
-      if (res.success && res.data) setData(res.data);
-      else Swal.fire("Error", res.message || "Failed to load ledger.", "error");
+      if (selectedDetail !== "") {
+        // Single detail mode — existing behaviour
+        const res = await fdLedgerApi.getFDLedger(
+          user.branchid, selectedAccount as number, effectiveFromDate, toDate, selectedDetail as number
+        );
+        if (res.success && res.data) setData(res.data);
+        else Swal.fire("Error", res.message || "Failed to load ledger.", "error");
+      } else {
+        // No detail selected → fetch each detail separately + consolidated in parallel
+        const accId = selectedAccount as number;
+        const brId  = user.branchid;
+        const allRequests = [
+          ...details.map((d) => fdLedgerApi.getFDLedger(brId, accId, effectiveFromDate, toDate, d.id)),
+          fdLedgerApi.getFDLedger(brId, accId, effectiveFromDate, toDate),   // consolidated (no detailId)
+        ];
+        const results = await Promise.all(allRequests);
+        const ledgers: FDLedger[] = [];
+        results.slice(0, details.length).forEach((res) => {
+          if (res.success && res.data) ledgers.push(res.data);
+        });
+        setPerDetailLedgers(ledgers);
+        const consolidated = results[results.length - 1];
+        if (consolidated.success && consolidated.data) setConsolidatedData(consolidated.data);
+        else Swal.fire("Error", consolidated.message || "Failed to load consolidated ledger.", "error");
+      }
     } catch (e: any) {
       Swal.fire("Error", e?.message || "Unable to reach server.", "error");
     } finally { setLoading(false); }
   };
 
-  const handlePrint = () => {
-    if (!data) return;
+  const handlePrintLedger = (ledger: FDLedger) => {
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(buildPrintHTML(data, withLongNarration));
+    win.document.write(buildPrintHTML(ledger, withLongNarration));
     win.document.close(); win.focus();
     setTimeout(() => { win.print(); win.close(); }, 300);
   };
+
+  const handlePrint = () => {
+    const ledger = data ?? consolidatedData;
+    if (!ledger) return;
+    handlePrintLedger(ledger);
+  };
+
+  const activeExportData = data ?? consolidatedData;
 
   const selectClass = "w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm bg-white text-slate-800 shadow-sm disabled:bg-slate-50 disabled:text-slate-400";
   const dateClass  = "w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm shadow-sm";
@@ -452,15 +591,15 @@ const FDLedgerPage: React.FC = () => {
                     {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
                     {loading ? "Loading…" : "Show"}
                   </button>
-                  {data && (
+                  {activeExportData && (
                     <>
                       <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm">
                         <Printer size={15} /> Print
                       </button>
-                      <button onClick={() => exportToPdf(buildExportConfig(data, withLongNarration))} className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                      <button onClick={() => exportToPdf(buildExportConfig(activeExportData, withLongNarration))} className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
                         <FileText size={15} /> PDF
                       </button>
-                      <button onClick={() => exportToExcel(buildExportConfig(data, withLongNarration))} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
+                      <button onClick={() => exportToExcel(buildExportConfig(activeExportData, withLongNarration))} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
                         <FileSpreadsheet size={15} /> Excel
                       </button>
                     </>
@@ -472,82 +611,44 @@ const FDLedgerPage: React.FC = () => {
               </div>
             </div>
 
-            {/* ── Ledger Report ── */}
+            {/* ── Single-detail ledger (specific detail selected) ── */}
             {data && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="text-center px-6 py-6 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
-                  <p className="text-xs uppercase tracking-widest text-slate-400 font-medium mb-1">Statement of Account</p>
-                  <h1 className="text-lg font-bold uppercase tracking-wider text-slate-900">{data.branchName}</h1>
-                  <p className="text-xs text-slate-500 mt-0.5">{data.branchAddress}</p>
-                  <div className="flex items-center gap-3 justify-center mt-3">
-                    <div className="h-px bg-slate-200 flex-1 max-w-16" />
-                    <span className="text-xs font-semibold uppercase tracking-widest text-slate-600 px-3 py-1 bg-blue-50 border border-blue-100 rounded-full">Fixed Deposit Account Ledger</span>
-                    <div className="h-px bg-slate-200 flex-1 max-w-16" />
-                  </div>
-                </div>
+              <LedgerSection
+                ledger={data}
+                longNar={withLongNarration}
+                onPrint={() => handlePrintLedger(data)}
+                onPdf={() => exportToPdf(buildExportConfig(data, withLongNarration))}
+                onExcel={() => exportToExcel(buildExportConfig(data, withLongNarration))}
+                title="Fixed Deposit Account Ledger"
+                accentColor="blue"
+              />
+            )}
 
-                {/* Account info panel */}
-                <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
-                    {[
-                      { label: "Name",           value: data.accountName },
-                      { label: "Acc. No.",        value: data.accountIdentifier },
-                      { label: "Address",         value: data.address },
-                      { label: "Relative Name",   value: data.relativeName },
-                      { label: "Contact No.",     value: data.contactNo },
-                      { label: "Product",         value: data.productName },
-                      { label: "Period",          value: `${fmtDate(data.fromDate)} to ${fmtDate(data.toDate)}` },
-                    ].filter(f => f.value).map(({ label, value }) => (
-                      <div key={label} className="flex gap-1 min-w-0">
-                        <span className="text-slate-400 font-medium shrink-0">{label}:</span>
-                        <span className="font-semibold text-slate-800 truncate">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
-                    {[
-                      { label: "Receipt No.",     value: data.detailLtdNo != null ? String(data.detailLtdNo) : null },
-                      { label: "FD Date",         value: data.detailFDDate ? fmtShort(data.detailFDDate) : null },
-                      { label: "FD Amount",       value: data.detailFDAmount != null ? `₹${fmt(data.detailFDAmount)}` : null },
-                      { label: "Int. Rate",       value: data.detailIntRate != null ? `${data.detailIntRate}%` : null },
-                      { label: "Period",          value: data.detailPeriodMonths != null ? `${data.detailPeriodMonths} M / ${data.detailPeriodDays ?? 0} D` : null },
-                      { label: "Maturity Date",   value: data.detailMaturityDate ? fmtShort(data.detailMaturityDate) : null },
-                      { label: "Maturity Amt.",   value: data.detailMaturityAmount != null ? `₹${fmt(data.detailMaturityAmount)}` : null },
-                      { label: "Detail",          value: data.selectedDetailLabel ?? "All FD Details" },
-                    ].filter(f => f.value).map(({ label, value }) => (
-                      <div key={label} className="flex gap-1 min-w-0">
-                        <span className="text-slate-400 font-medium shrink-0">{label}:</span>
-                        <span className="font-semibold text-slate-800">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            {/* ── Per-detail ledgers (no detail selected) ── */}
+            {perDetailLedgers.map((ledger, idx) => (
+              <LedgerSection
+                key={ledger.selectedDetailId ?? idx}
+                ledger={ledger}
+                longNar={withLongNarration}
+                onPrint={() => handlePrintLedger(ledger)}
+                onPdf={() => exportToPdf(buildExportConfig(ledger, withLongNarration))}
+                onExcel={() => exportToExcel(buildExportConfig(ledger, withLongNarration))}
+                title={`FD Detail ${idx + 1}${ledger.selectedDetailLabel ? ` — ${ledger.selectedDetailLabel}` : ""}`}
+                accentColor="indigo"
+              />
+            ))}
 
-                <div className="p-4 sm:p-5">
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm overflow-x-auto overflow-y-auto max-h-[58vh]">
-                    <LedgerTable data={data} longNar={withLongNarration} />
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-blue-500">
-                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Opening Balance</p>
-                      <p className="text-lg font-bold text-blue-700 mt-1">₹{fmtBal(data.openingBalance)}</p>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-emerald-500">
-                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Deposits</p>
-                      <p className="text-lg font-bold text-emerald-700 mt-1">₹{fmt(data.totalCr)}</p>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-red-500">
-                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Withdrawals</p>
-                      <p className="text-lg font-bold text-red-700 mt-1">₹{fmt(data.totalDr)}</p>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-violet-500">
-                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Closing Balance</p>
-                      <p className="text-lg font-bold text-violet-700 mt-1">₹{fmtBal(data.closingBalance)}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {/* ── Consolidated ledger (no detail selected) ── */}
+            {consolidatedData && (
+              <LedgerSection
+                ledger={consolidatedData}
+                longNar={withLongNarration}
+                onPrint={() => handlePrintLedger(consolidatedData)}
+                onPdf={() => exportToPdf(buildExportConfig(consolidatedData, withLongNarration))}
+                onExcel={() => exportToExcel(buildExportConfig(consolidatedData, withLongNarration))}
+                title="Consolidated Ledger — All FD Details"
+                accentColor="violet"
+              />
             )}
           </div>
         </div>

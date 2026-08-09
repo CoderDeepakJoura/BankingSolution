@@ -659,18 +659,22 @@ const MatureFDPage: React.FC = () => {
       accountCredit.loanAmount;
 
     if (isRenewFD) {
-      // When renewing: total credited must be >= required amount.
-      // Account selection is NOT mandatory — user may leave all tabs empty
-      // and the renew amount itself covers the transaction.
+      // Debit = old FD (maturityAmt + postMaturity)
+      // Credit = new FD (renewAmt) + cash/GL/saving payout (totalCredited)
+      // Both sides must balance exactly.
+      const renewAmt = parseFloat(renewFDDetail.fdAmount) || 0;
       const baseAmount = Math.max(matureFDDetail.maturityAmt, matureFDDetail.balance);
       const postMaturity = parseFloat(matureFDDetail.postMaturityAmt || "0") || 0;
-      const totalRequired = baseAmount + postMaturity;
+      const totalDebit = baseAmount + postMaturity;
+      const totalCredit = renewAmt + totalCredited;
+      const diff = totalDebit - totalCredit;
 
-      if (totalCredited > 0 && totalCredited < totalRequired) {
-        // They started filling credit but didn't cover the full amount
+      if (Math.abs(diff) > 0.01) {
         Swal.fire({
-          title: "Insufficient Credit",
-          text: `Credited amount ₹${totalCredited.toFixed(2)} is less than required ₹${totalRequired.toFixed(2)}. Either credit the full amount or leave all credit fields empty.`,
+          title: "Debit / Credit Mismatch",
+          html: diff > 0
+            ? `Total Credit (New FD ₹${renewAmt.toFixed(2)} + payout ₹${totalCredited.toFixed(2)} = ₹${totalCredit.toFixed(2)}) is less than total Debit ₹${totalDebit.toFixed(2)} by ₹${diff.toFixed(2)}. Please add a payout amount of ₹${diff.toFixed(2)} in the credit section.`
+            : `Total Credit (New FD ₹${renewAmt.toFixed(2)} + payout ₹${totalCredited.toFixed(2)} = ₹${totalCredit.toFixed(2)}) exceeds total Debit ₹${totalDebit.toFixed(2)} by ₹${Math.abs(diff).toFixed(2)}. Please reduce the payout amount.`,
           icon: "warning",
         });
         return;

@@ -61,6 +61,8 @@ const SavingAccountMaster = () => {
   const user = useSelector((state: RootState) => state.user);
 
   const [activeTab, setActiveTab] = useState("basic");
+  const [unlockedTabs, setUnlockedTabs] = useState<string[]>(["basic"]);
+  const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [showValidationSummary, setShowValidationSummary] = useState(false);
 
@@ -1032,6 +1034,8 @@ const SavingAccountMaster = () => {
     setIsNomineeRequired(false);
     setInputMode("account");
     setActiveTab("basic");
+    setUnlockedTabs(["basic"]);
+    setCompletedTabs(new Set());
     clearErrors();
     setShowValidationSummary(false);
   };
@@ -1060,16 +1064,18 @@ const SavingAccountMaster = () => {
   }, {} as Record<string, any[]>);
 
   // Get tab class name with error indicators
-  const getTabClassName = (tabId: string) => {
+  const getTabClassName = (tabId: string, isLocked = false) => {
     const hasTabErrors = errorsByTab[tabId]?.length > 0;
     const baseClassName = `flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200 relative`;
 
-    if (activeTab === tabId) {
-      return `${baseClassName} border-blue-500 text-blue-600 bg-blue-50`;
+    if (isLocked) {
+      return `${baseClassName} border-transparent text-gray-300 cursor-not-allowed opacity-50`;
+    } else if (activeTab === tabId) {
+      return `${baseClassName} border-blue-500 text-blue-600 bg-blue-50 cursor-pointer`;
     } else if (hasTabErrors) {
-      return `${baseClassName} border-red-300 text-red-600 hover:bg-red-50`;
+      return `${baseClassName} border-red-300 text-red-600 hover:bg-red-50 cursor-pointer`;
     } else {
-      return `${baseClassName} border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50`;
+      return `${baseClassName} border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 cursor-pointer`;
     }
   };
 
@@ -1082,6 +1088,74 @@ const SavingAccountMaster = () => {
     { id: "nominee", label: "Nominee", icon: UserPlus },
     { id: "images", label: "Images", icon: ImageIcon },
   ];
+
+  const currentTabIndex = tabs.findIndex((t) => t.id === activeTab);
+  const isLastTab = currentTabIndex === tabs.length - 1;
+  const effectiveUnlockedTabs = isEditMode ? tabs.map((t) => t.id) : unlockedTabs;
+
+  const validateCurrentTab = (): boolean => {
+    const errs: string[] = [];
+    switch (activeTab) {
+      case "basic":
+        if (!formData.accountMasterDTO.savingProductId || formData.accountMasterDTO.savingProductId === 0)
+          errs.push("Saving Product is required");
+        if (!formData.accountMasterDTO.accountOpeningDate)
+          errs.push("Account Opening Date is required");
+        if (!formData.accountMasterDTO.suffix?.trim())
+          errs.push("Account Suffix is required");
+        if (!formData.memberDetails)
+          errs.push("Please search and confirm a member before proceeding");
+        break;
+      case "voucher":
+        if (!isEditMode && !showOpeningBalance) {
+          if (!voucherData.depositAmount || parseFloat(voucherData.depositAmount) <= 0)
+            errs.push("Deposit Amount is required and must be greater than 0");
+          if (!voucherData.debitAccountId || voucherData.debitAccountId === 0)
+            errs.push("Debit Account is required");
+        }
+        break;
+      case "nominee":
+        if (isNomineeRequired && nominees.length === 0) {
+          errs.push("At least one nominee is required");
+        } else {
+          nominees.forEach((n, i) => {
+            if (!n.nomineeName?.trim())
+              errs.push(`Nominee ${i + 1}: Name is required`);
+            if (!n.relationWithAccountHolder || n.relationWithAccountHolder === 0)
+              errs.push(`Nominee ${i + 1}: Relation is required`);
+            if (n.isMinor && !n.guardianName?.trim())
+              errs.push(`Nominee ${i + 1}: Guardian name is required for minor nominees`);
+          });
+        }
+        break;
+      case "images":
+        if (requirePicSign && !isEditMode) {
+          if (!pictureFile) errs.push("Member photo is required");
+          if (!signatureFile) errs.push("Member signature is required");
+        }
+        break;
+    }
+    if (errs.length > 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please complete the required fields",
+        html: `<ul style="text-align:left;padding-left:1rem">${errs.map((e) => `<li style="margin:4px 0">• ${e}</li>`).join("")}</ul>`,
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (!validateCurrentTab()) return;
+    setCompletedTabs((prev) => new Set([...prev, activeTab]));
+    const next = tabs[currentTabIndex + 1];
+    if (next) {
+      setUnlockedTabs((prev) => prev.includes(next.id) ? prev : [...prev, next.id]);
+      setActiveTab(next.id);
+    }
+  };
+  const handlePrev = () => { if (currentTabIndex > 0) setActiveTab(tabs[currentTabIndex - 1].id); };
 
   // Render Basic Info Tab
   const renderBasicInfo = () => (
@@ -2189,7 +2263,6 @@ const SavingAccountMaster = () => {
                   <div className="space-y-1 md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700">
                       Address
-                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -2536,15 +2609,18 @@ const SavingAccountMaster = () => {
                   {tabs.map((tab) => {
                     const TabIcon = tab.icon;
                     const tabErrorCount = errorsByTab[tab.id]?.length || 0;
+                    const isLocked = !effectiveUnlockedTabs.includes(tab.id);
                     return (
                       <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={getTabClassName(tab.id)}
+                        onClick={() => !isLocked && setActiveTab(tab.id)}
+                        disabled={isLocked}
+                        title={isLocked ? "Complete previous steps first" : tab.label}
+                        className={getTabClassName(tab.id, isLocked)}
                       >
                         <TabIcon className="w-4 h-4" />
                         {tab.label}
-                        {tabErrorCount > 0 && (
+                        {tabErrorCount > 0 && !isLocked && (
                           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                             {tabErrorCount}
                           </span>
@@ -2566,7 +2642,7 @@ const SavingAccountMaster = () => {
 
               {/* Action Buttons */}
               <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
-                <div className="flex justify-end gap-3">
+                <div className="flex justify-between items-center gap-3">
                   <button
                     type="button"
                     onClick={handleReset}
@@ -2576,24 +2652,47 @@ const SavingAccountMaster = () => {
                     <RotateCcw className="w-4 h-4" />
                     Reset
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        {isEditMode ? "Update" : "Save"} Account
-                      </>
+                  <div className="flex items-center gap-3">
+                    {currentTabIndex > 0 && (
+                      <button
+                        type="button"
+                        onClick={handlePrev}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-6 py-3 border-2 border-gray-400 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition-all disabled:opacity-50"
+                      >
+                        ← Previous
+                      </button>
                     )}
-                  </button>
+                    {!isLastTab ? (
+                      <button
+                        type="button"
+                        onClick={handleNext}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
+                      >
+                        Next →
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            {isEditMode ? "Update" : "Save"} Account
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

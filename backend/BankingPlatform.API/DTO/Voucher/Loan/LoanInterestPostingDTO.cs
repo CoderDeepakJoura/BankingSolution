@@ -28,6 +28,7 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public DateTime? InterestCalcFromDate { get; set; }
         public DateTime? InterestCalcToDate { get; set; }
         public string IntCalcMethod { get; set; } = "Schedule";
+        public int? ActOnIntPosting { get; set; }
     }
 
     // ── Batch calculation DTOs ────────────────────────────────────────────────────

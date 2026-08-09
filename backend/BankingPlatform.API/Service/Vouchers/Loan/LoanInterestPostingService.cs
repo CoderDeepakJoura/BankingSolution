@@ -72,6 +72,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 InterestCalcFromDate   = bal.InterestCalcFromDate,
                 InterestCalcToDate     = bal.InterestCalcToDate,
                 IntCalcMethod          = bal.IntCalcMethod,
+                ActOnIntPosting        = bal.ActOnIntPosting,
             };
         }
 
@@ -92,14 +93,18 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 if (total <= 0)
                     return ("No interest amount to post.", 0);
 
-                // Validate against actual unposted interest
+                // Validate against actual unposted interest (skipped for AddInBalance — no separate interest ledger)
                 var info = await GetPostableInterestAsync(dto.LoanAccountId, dto.BrId, dto.VoucherDate);
                 if (info == null)
                     return ("Loan account not found.", 0);
-                if (stdAmt > info.UnpostedStdInterest + 0.01m)
-                    return ($"Standard interest ({stdAmt:N2}) exceeds unposted amount ({info.UnpostedStdInterest:N2}).", 0);
-                if (penalAmt > info.UnpostedPenalInterest + 0.01m)
-                    return ($"Penal interest ({penalAmt:N2}) exceeds unposted amount ({info.UnpostedPenalInterest:N2}).", 0);
+                bool isAddInBalance = info.ActOnIntPosting == 1;
+                if (!isAddInBalance)
+                {
+                    if (stdAmt > info.UnpostedStdInterest + 0.01m)
+                        return ($"Standard interest ({stdAmt:N2}) exceeds unposted amount ({info.UnpostedStdInterest:N2}).", 0);
+                    if (penalAmt > info.UnpostedPenalInterest + 0.01m)
+                        return ($"Penal interest ({penalAmt:N2}) exceeds unposted amount ({info.UnpostedPenalInterest:N2}).", 0);
+                }
 
                 // ── Voucher header ────────────────────────────────────────────────
                 int nextVrNo    = await _cf.GetLatestVoucherNo(dto.BrId, dto.VoucherDate);
@@ -198,45 +203,48 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 await _db.SaveChangesAsync();
                 int crId = crEntry.Id;
 
-                // ── VoucherRecIntDetail — formal interest ledger entries ───────────
-                // IntDr records the formal posting (Cat 1 = standard, Cat 2 = penal).
-                // These become "StdRecoverable" (Cat 3) when recovered via recovery voucher.
-                if (stdAmt > 0)
+                // ── VoucherRecIntDetail — formal interest ledger entries (Stand loans only) ─
+                // AddInBalance doesn't use this table — interest is embedded in principal via
+                // loanaccountbalancedetail.IntDr written below.
+                if (!isAddInBalance)
                 {
-                    await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                    if (stdAmt > 0)
                     {
-                        BrId              = dto.BrId,
-                        VAccCrDrId        = crId,
-                        VoucherId         = voucherId,
-                        VoucherNo         = nextVrNo,
-                        EntryDate         = vrDate,
-                        ValueDate         = valDate,
-                        IntCatId          = CAT_STD,
-                        Pamt              = (double)info.PrincipalBalance,
-                        AccId             = dto.LoanAccountId,
-                        IntDr             = (double)stdAmt,
-                        IntCr             = 0,
-                        VoucherMainStatus = vrStatus,
-                    });
-                }
+                        await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                        {
+                            BrId              = dto.BrId,
+                            VAccCrDrId        = crId,
+                            VoucherId         = voucherId,
+                            VoucherNo         = nextVrNo,
+                            EntryDate         = vrDate,
+                            ValueDate         = valDate,
+                            IntCatId          = CAT_STD,
+                            Pamt              = (double)info.PrincipalBalance,
+                            AccId             = dto.LoanAccountId,
+                            IntDr             = (double)stdAmt,
+                            IntCr             = 0,
+                            VoucherMainStatus = vrStatus,
+                        });
+                    }
 
-                if (penalAmt > 0)
-                {
-                    await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                    if (penalAmt > 0)
                     {
-                        BrId              = dto.BrId,
-                        VAccCrDrId        = crId,
-                        VoucherId         = voucherId,
-                        VoucherNo         = nextVrNo,
-                        EntryDate         = vrDate,
-                        ValueDate         = valDate,
-                        IntCatId          = CAT_PENAL,
-                        Pamt              = (double)info.PrincipalBalance,
-                        AccId             = dto.LoanAccountId,
-                        IntDr             = (double)penalAmt,
-                        IntCr             = 0,
-                        VoucherMainStatus = vrStatus,
-                    });
+                        await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                        {
+                            BrId              = dto.BrId,
+                            VAccCrDrId        = crId,
+                            VoucherId         = voucherId,
+                            VoucherNo         = nextVrNo,
+                            EntryDate         = vrDate,
+                            ValueDate         = valDate,
+                            IntCatId          = CAT_PENAL,
+                            Pamt              = (double)info.PrincipalBalance,
+                            AccId             = dto.LoanAccountId,
+                            IntDr             = (double)penalAmt,
+                            IntCr             = 0,
+                            VoucherMainStatus = vrStatus,
+                        });
+                    }
                 }
 
                 // ── LoanAccountBalanceDetail — interest posting movement record ────
@@ -292,11 +300,57 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 decimal totalPostable = bal.StdInterestOutstanding + bal.PenalInterestOutstanding;
                 string? noReason = null;
-                if (totalPostable == 0)
+
+                decimal aibStdInt   = 0m;
+                DateTime? aibFrom   = null;
+                DateTime  aibTo     = asOfDate ?? DateTime.Today;
+
+                if (bal.ActOnIntPosting == 1)
                 {
-                    if (bal.ActOnIntPosting == 1)
-                        noReason = "Add-In-Balance loan — interest is embedded in principal";
-                    else if (bal.PrincipalBalance == 0)
+                    // AddInBalance: GetLoanBalanceAsync returns 0 for StdInterestOutstanding because
+                    // interest is embedded in principal. Compute the new accrued interest here using
+                    // the same method (Schedule/Balance/MinBalance) as configured on the product.
+                    DateTime? lastIpDate = await _db.loanaccountbalancedetail.AsNoTracking()
+                        .Where(x => x.AccountId == acc.ID && x.BrId == brId && x.Status == "IP")
+                        .OrderByDescending(x => x.Date)
+                        .Select(x => (DateTime?)x.Date)
+                        .FirstOrDefaultAsync();
+
+                    aibFrom = (lastIpDate?.Date ?? bal.LoanDate) ?? aibTo;
+                    int days = Math.Max(0, (aibTo - aibFrom.Value.Date).Days);
+
+                    if (days > 0 && bal.PrincipalBalance > 0 && (bal.StandardInterestRate ?? 0) > 0)
+                    {
+                        decimal rate = (decimal)bal.StandardInterestRate!.Value;
+
+                        if (bal.IntCalcMethod == "Schedule")
+                        {
+                            // Sum interest amounts from kist schedule entries due after the last IP date
+                            var schedKists = await _db.accountkistschedule.AsNoTracking()
+                                .Where(x => x.LoanAccId == acc.ID
+                                         && x.Date.HasValue
+                                         && x.Date.Value.Date > aibFrom.Value.Date
+                                         && x.Date.Value.Date <= aibTo)
+                                .ToListAsync();
+                            aibStdInt = schedKists.Sum(x => x.InterestAmt ?? 0m);
+                            // Fall back to Balance method when schedule has no interest entries
+                            if (aibStdInt == 0)
+                                aibStdInt = Math.Round(bal.PrincipalBalance * rate / 100m * days / 365m);
+                        }
+                        else
+                        {
+                            // Balance or MinBalance: use current outstanding principal
+                            aibStdInt = Math.Round(bal.PrincipalBalance * rate / 100m * days / 365m);
+                        }
+                    }
+
+                    totalPostable = aibStdInt;
+                    if (aibStdInt == 0)
+                        noReason = "No interest accrued yet";
+                }
+                else if (totalPostable == 0)
+                {
+                    if (bal.PrincipalBalance == 0)
                         noReason = "No outstanding principal — disbursement voucher may be missing";
                     else if (bal.StandardInterestRate == null || bal.StandardInterestRate == 0)
                         noReason = "Interest rate not set for this account";
@@ -306,22 +360,22 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 result.Add(new LoanInterestBatchItemDTO
                 {
-                    LoanAccId          = acc.ID,
-                    AccountNumber      = acc.AccountNumber,
-                    MemberName         = bal.MemberName,
-                    MemberRelativeName = bal.MemberRelativeName,
-                    PrincipalBalance   = bal.PrincipalBalance,
-                    StdInterest        = bal.StdInterestOutstanding,
-                    PenalInterest      = bal.PenalInterestOutstanding,
-                    StdRecoverable     = bal.StdRecoverableOutstanding,
-                    TotalPostable      = totalPostable,
-                    CalcFromDate       = bal.InterestCalcFromDate,
-                    CalcToDate         = bal.InterestCalcToDate,
-                    StdInterestRate    = bal.StandardInterestRate,
+                    LoanAccId           = acc.ID,
+                    AccountNumber       = acc.AccountNumber,
+                    MemberName          = bal.MemberName,
+                    MemberRelativeName  = bal.MemberRelativeName,
+                    PrincipalBalance    = bal.PrincipalBalance,
+                    StdInterest         = bal.ActOnIntPosting == 1 ? aibStdInt         : bal.StdInterestOutstanding,
+                    PenalInterest       = bal.ActOnIntPosting == 1 ? 0m                : bal.PenalInterestOutstanding,
+                    StdRecoverable      = bal.ActOnIntPosting == 1 ? 0m                : bal.StdRecoverableOutstanding,
+                    TotalPostable       = totalPostable,
+                    CalcFromDate        = bal.ActOnIntPosting == 1 ? aibFrom           : bal.InterestCalcFromDate,
+                    CalcToDate          = bal.ActOnIntPosting == 1 ? (DateTime?)aibTo  : bal.InterestCalcToDate,
+                    StdInterestRate     = bal.StandardInterestRate,
                     OverdueInterestRate = bal.OverdueInterestRate,
-                    IntCalcMethod      = bal.IntCalcMethod,
-                    ActOnIntPosting    = bal.ActOnIntPosting,
-                    NoInterestReason   = noReason,
+                    IntCalcMethod       = bal.IntCalcMethod,
+                    ActOnIntPosting     = bal.ActOnIntPosting,
+                    NoInterestReason    = noReason,
                 });
             }
             return result;

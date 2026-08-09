@@ -115,6 +115,8 @@ const RDAccountMaster = () => {
     : commonservice.getTodaysDate();
 
   const [activeTab, setActiveTab] = useState("rdDetail");
+  const [unlockedTabs, setUnlockedTabs] = useState<string[]>(["rdDetail"]);
+  const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [showValidationSummary, setShowValidationSummary] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
@@ -1031,6 +1033,8 @@ useEffect(() => {
     setIsNomineeRequired(false);
     setInputMode("account");
     setActiveTab("rdDetail");
+    setUnlockedTabs(["rdDetail"]);
+    setCompletedTabs(new Set());
     setErrors([]);
     setShowValidationSummary(false);
   };
@@ -1406,12 +1410,13 @@ useEffect(() => {
     savingAccounts.find((item) => item.accId === voucherSaving.savingAccountId) || null;
 
   // ─── Tab Class Helper ────────────────────────────────────────────────────────
-  const getTabClassName = (tabId: string) => {
+  const getTabClassName = (tabId: string, isLocked = false) => {
     const hasTabErrors = errorsByTab[tabId]?.length > 0;
     const base = `flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200 relative`;
-    if (activeTab === tabId) return `${base} border-blue-500 text-blue-600 bg-blue-50`;
-    if (hasTabErrors) return `${base} border-red-300 text-red-600 hover:bg-red-50`;
-    return `${base} border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50`;
+    if (isLocked) return `${base} border-transparent text-gray-300 cursor-not-allowed opacity-50`;
+    if (activeTab === tabId) return `${base} border-blue-500 text-blue-600 bg-blue-50 cursor-pointer`;
+    if (hasTabErrors) return `${base} border-red-300 text-red-600 hover:bg-red-50 cursor-pointer`;
+    return `${base} border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 cursor-pointer`;
   };
 
  const tabs = [
@@ -1422,6 +1427,90 @@ useEffect(() => {
     : []),
   { id: "joint", label: "Joint Account", icon: Users },
 ];
+
+  const currentTabIndex = tabs.findIndex((t) => t.id === activeTab);
+  const isLastTab = currentTabIndex === tabs.length - 1;
+  const effectiveUnlockedTabs = isEditMode ? tabs.map((t) => t.id) : unlockedTabs;
+
+  const validateCurrentTab = (): boolean => {
+    const errs: string[] = [];
+    switch (activeTab) {
+      case "rdDetail":
+        if (!formData.accountMasterDTO.rdProductId || formData.accountMasterDTO.rdProductId === 0)
+          errs.push("RD Product is required");
+        if (!formData.accountMasterDTO.accountOpeningDate)
+          errs.push("Account Opening Date is required");
+        if (!formData.accountMasterDTO.suffix?.trim())
+          errs.push("Account Suffix is required");
+        if (!formData.memberDetails)
+          errs.push("Please search and confirm a member before proceeding");
+        if (formData.memberDetails) {
+          if (!rdDetailForm.kistAmount || parseFloat(rdDetailForm.kistAmount) <= 0)
+            errs.push("Kist Amount is required and must be greater than 0");
+          if (!rdDetailForm.kistInterval)
+            errs.push("Kist Interval is required");
+          if (rdDetailForm.kistInterval === "Daily") {
+            if (!rdDetailForm.periodDays || parseInt(rdDetailForm.periodDays) <= 0)
+              errs.push("Period (Days) is required and must be greater than 0");
+          } else {
+            if (!rdDetailForm.periodMonths || parseInt(rdDetailForm.periodMonths) <= 0)
+              errs.push("Period (Months) is required and must be greater than 0");
+          }
+          if (!rdDetailForm.matDate)
+            errs.push("Maturity Date is required");
+          if (!rdDetailForm.matAmount || parseFloat(rdDetailForm.matAmount) <= 0)
+            errs.push("Maturity Amount is required — please fetch RD details");
+        }
+        break;
+      case "nominee":
+        if (isNomineeRequired && nominees.length === 0) {
+          errs.push("At least one nominee is required");
+        } else {
+          nominees.forEach((n, i) => {
+            if (!n.nomineeName?.trim())
+              errs.push(`Nominee ${i + 1}: Name is required`);
+            if (!n.relationWithAccountHolder || n.relationWithAccountHolder === 0)
+              errs.push(`Nominee ${i + 1}: Relation is required`);
+            if (n.isMinor && !n.guardianName?.trim())
+              errs.push(`Nominee ${i + 1}: Guardian name is required for minor nominees`);
+          });
+        }
+        break;
+      case "voucher":
+        if (!isEditMode && !isOpeningEntry) {
+          if (!voucherData.depositAmount || parseFloat(voucherData.depositAmount) <= 0)
+            errs.push("Deposit Amount is required and must be greater than 0");
+          if (voucherPaymentMode === "byCash") {
+            if (!voucherCash.debitAccountId || voucherCash.debitAccountId === 0)
+              errs.push("Debit (Cash) Account is required");
+          } else if (voucherPaymentMode === "bySaving") {
+            if (!voucherSaving.savingAccountId || voucherSaving.savingAccountId === 0)
+              errs.push("Saving Account is required");
+          }
+        }
+        break;
+    }
+    if (errs.length > 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please complete the required fields",
+        html: `<ul style="text-align:left;padding-left:1rem">${errs.map((e) => `<li style="margin:4px 0">• ${e}</li>`).join("")}</ul>`,
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (!validateCurrentTab()) return;
+    setCompletedTabs((prev) => new Set([...prev, activeTab]));
+    const next = tabs[currentTabIndex + 1];
+    if (next) {
+      setUnlockedTabs((prev) => prev.includes(next.id) ? prev : [...prev, next.id]);
+      setActiveTab(next.id);
+    }
+  };
+  const handlePrev = () => { if (currentTabIndex > 0) setActiveTab(tabs[currentTabIndex - 1].id); };
 
   // ═══════════════════════════════════════════════════════════════════════════
   // TAB 1: RD DETAIL
@@ -2959,15 +3048,18 @@ useEffect(() => {
                   {tabs.map((tab) => {
                     const TabIcon = tab.icon;
                     const tabErrorCount = errorsByTab[tab.id]?.length || 0;
+                    const isLocked = !effectiveUnlockedTabs.includes(tab.id);
                     return (
                       <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={getTabClassName(tab.id)}
+                        onClick={() => !isLocked && setActiveTab(tab.id)}
+                        disabled={isLocked}
+                        title={isLocked ? "Complete previous steps first" : tab.label}
+                        className={getTabClassName(tab.id, isLocked)}
                       >
                         <TabIcon className="w-4 h-4" />
                         {tab.label}
-                        {tabErrorCount > 0 && (
+                        {tabErrorCount > 0 && !isLocked && (
                           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                             {tabErrorCount}
                           </span>
@@ -2988,7 +3080,7 @@ useEffect(() => {
 
               {/* Action Buttons */}
               <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
-                <div className="flex justify-end gap-3">
+                <div className="flex justify-between items-center gap-3">
                   <button
                     type="button"
                     onClick={handleReset}
@@ -2998,19 +3090,42 @@ useEffect(() => {
                     <RotateCcw className="w-4 h-4" />
                     Reset
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    ) : (
-                      <Save className="w-4 h-4" />
+                  <div className="flex items-center gap-3">
+                    {currentTabIndex > 0 && (
+                      <button
+                        type="button"
+                        onClick={handlePrev}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-6 py-3 border-2 border-gray-400 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ← Previous
+                      </button>
                     )}
-                    {loading ? "Processing..." : isEditMode ? "Update RD Account" : "Save RD Account"}
-                  </button>
+                    {!isLastTab ? (
+                      <button
+                        type="button"
+                        onClick={handleNext}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next →
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        {loading ? "Processing..." : isEditMode ? "Update RD Account" : "Save RD Account"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
