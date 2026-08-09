@@ -15,10 +15,21 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
-    version: "1.0.8",
+    version: "1.0.9",
     date: "2026-08-09",
     changes: [
       { type: "improvement", text: "Minor updates and bug fixes" },
+    ],
+  },
+  {
+    version: "1.0.8",
+    date: "2026-08-09",
+    changes: [
+      { type: "improvement", text: "Account Masters (Saving, FD, RD, Loan): tabs now unlock step-by-step — each tab must pass validation before the next one becomes available. Edit mode still unlocks all tabs freely." },
+      { type: "fix",         text: "Nominee validation now correctly checks name and relation for every nominee row, not just whether at least one row exists." },
+      { type: "improvement", text: "Account Head Master: selecting a parent head auto-suggests the next available child head code based on the 4-segment (3 digits each) structure. The suggestion is editable." },
+      { type: "fix",         text: "FD Interest Posting: the Credit entry now correctly posts to the customer's FD account instead of the Interest Payable GL account." },
+      { type: "fix",         text: "Loan Interest Posting: Add-In-Balance loans now display the correct interest amount using the proper Balance / Min-Balance / Schedule method." },
     ],
   },
   {
