@@ -1180,10 +1180,12 @@ namespace BankingPlatform.API.Controllers
                 ? interestRateOverride.Value
                 : intRate;
 
-            // RD annuity formula: each installment earns compound interest for its remaining period
-            int nInstallments = periodInDays > 0 ? periodInDays : periodInMonths;
+            // RD annuity formula: each installment earns compound interest for its remaining period.
+            // Daily kist uses n = periodInDays and a daily-equivalent period rate (not monthly).
+            bool isDailyKist = periodInDays > 0 && periodInMonths == 0;
+            int nInstallments = isDailyKist ? periodInDays : periodInMonths;
             decimal kistInstallment = nInstallments > 0 ? totalAmount / nInstallments : totalAmount;
-            decimal maturityAmount = _rdAccountService.CalculateRDMaturityAmount(kistInstallment, nInstallments, effectiveRate, intFormula);
+            decimal maturityAmount = _rdAccountService.CalculateRDMaturityAmount(kistInstallment, nInstallments, effectiveRate, intFormula, isDailyKist);
 
             return Ok(new
             {

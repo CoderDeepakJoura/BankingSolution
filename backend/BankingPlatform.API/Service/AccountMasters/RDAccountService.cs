@@ -1198,7 +1198,7 @@ namespace BankingPlatform.API.Service.AccountMasters
         ///   M = P × [(1+r_m)^n − 1] / r_m × (1+r_m)
         ///   e.g. P=1000, n=12, r=7% → M = 12462
         /// </summary>
-        public decimal CalculateRDMaturityAmount(decimal kistInstallment, int nInstallments, decimal annualRate, int intFormula)
+        public decimal CalculateRDMaturityAmount(decimal kistInstallment, int nInstallments, decimal annualRate, int intFormula, bool isDailyKist = false)
         {
             double P = (double)kistInstallment;
             int n = nInstallments;
@@ -1207,52 +1207,69 @@ namespace BankingPlatform.API.Service.AccountMasters
             if (n <= 0 || P <= 0) return (decimal)(P * n);
             if (r <= 0) return Math.Round((decimal)(P * n), 0);
 
+            // For daily kist n = number of days; derive a daily-equivalent period rate
+            // so the annuity formula iterates over days, not months.
+            // r_period = (1 + compounding_rate)^(compounding_periods_per_day) - 1
             switch (intFormula)
             {
                 case 1:
-                    // Simple Interest on average balance
-                    double interest1 = P * n * (n + 1) / 24.0 * r;
-                    return Math.Round((decimal)(P * n + interest1), 0);
+                    // Simple Interest on cumulative balance
+                    // Monthly: M = P*n + P*r*n*(n+1)/24  (derives from avg balance × rate × time in years)
+                    // Daily:   M = P*n + P*r*n*(n+1)/730  (730 = 2 × 365)
+                    {
+                        double denom = isDailyKist ? 730.0 : 24.0;
+                        double interest1 = P * n * (n + 1) / denom * r;
+                        return Math.Round((decimal)(P * n + interest1), 0);
+                    }
 
                 case 2:
                     // Compound Monthly, Ordinary Annuity
                     {
-                        double r_m = r / 12.0;
-                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m;
+                        double r_p = isDailyKist
+                            ? Math.Pow(1.0 + r / 12.0, 12.0 / 365.0) - 1.0   // daily equiv of monthly rate
+                            : r / 12.0;
+                        double M = P * (Math.Pow(1.0 + r_p, n) - 1.0) / r_p;
                         return Math.Round((decimal)M, 0);
                     }
 
                 case 3:
                     // Compound Quarterly, Ordinary Annuity
                     {
-                        double r_m = Math.Pow(1.0 + r / 4.0, 1.0 / 3.0) - 1.0;
-                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m;
+                        double r_p = isDailyKist
+                            ? Math.Pow(1.0 + r / 4.0, 4.0 / 365.0) - 1.0     // daily equiv of quarterly rate
+                            : Math.Pow(1.0 + r / 4.0, 1.0 / 3.0) - 1.0;
+                        double M = P * (Math.Pow(1.0 + r_p, n) - 1.0) / r_p;
                         return Math.Round((decimal)M, 0);
                     }
 
                 case 4:
                     // Compound Half-Yearly, Ordinary Annuity
                     {
-                        double r_m = Math.Pow(1.0 + r / 2.0, 1.0 / 6.0) - 1.0;
-                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m;
+                        double r_p = isDailyKist
+                            ? Math.Pow(1.0 + r / 2.0, 2.0 / 365.0) - 1.0     // daily equiv of half-yearly rate
+                            : Math.Pow(1.0 + r / 2.0, 1.0 / 6.0) - 1.0;
+                        double M = P * (Math.Pow(1.0 + r_p, n) - 1.0) / r_p;
                         return Math.Round((decimal)M, 0);
                     }
 
                 case 5:
                     // Compound Yearly, Ordinary Annuity
                     {
-                        double r_m = Math.Pow(1.0 + r, 1.0 / 12.0) - 1.0;
-                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m;
+                        double r_p = isDailyKist
+                            ? Math.Pow(1.0 + r, 1.0 / 365.0) - 1.0            // daily equiv of yearly rate
+                            : Math.Pow(1.0 + r, 1.0 / 12.0) - 1.0;
+                        double M = P * (Math.Pow(1.0 + r_p, n) - 1.0) / r_p;
                         return Math.Round((decimal)M, 0);
                     }
 
                 case 6:
                 default:
                     // Compound Quarterly, Annuity-Due (Standard Indian banking)
-                    // Deposit at START of each month → earns one extra month of interest
                     {
-                        double r_m = Math.Pow(1.0 + r / 4.0, 1.0 / 3.0) - 1.0;
-                        double M = P * (Math.Pow(1.0 + r_m, n) - 1.0) / r_m * (1.0 + r_m);
+                        double r_p = isDailyKist
+                            ? Math.Pow(1.0 + r / 4.0, 4.0 / 365.0) - 1.0
+                            : Math.Pow(1.0 + r / 4.0, 1.0 / 3.0) - 1.0;
+                        double M = P * (Math.Pow(1.0 + r_p, n) - 1.0) / r_p * (1.0 + r_p);
                         return Math.Round((decimal)M, 0);
                     }
             }

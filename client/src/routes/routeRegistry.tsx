@@ -178,6 +178,7 @@ import FDMaturityPage from "../pages/reports/FDMaturity";
 import FDOpeningPage from "../pages/reports/FDOpening";
 import RDMaturityPage from "../pages/reports/RDMaturity";
 import RDKistReceivePage from "../pages/reports/RDKistReceive";
+import RDFinancialReportPage from "../pages/reports/RDFinancialReport";
 import MemberReportPage from "../pages/reports/MemberReport";
 import MemberAccountsPage from "../pages/reports/MemberAccounts";
 import MemberIntCertPage from "../pages/reports/MemberIntCert";
@@ -461,6 +462,7 @@ export const ROUTES: RouteEntry[] = [
   { path: "/profit-loss",                     element: <ProfitLossPage />,              label: "Profit & Loss",            category: "Financial Reports" },
   { path: "/trial-balance",                   element: <TrialBalancePage />,            label: "Trial Balance",            category: "Financial Reports" },
   { path: "/journal-book",                    element: <JournalBookPage />,             label: "Journal Book",             category: "Financial Reports" },
+  { path: "/rd-financial-report",             element: <RDFinancialReportPage />,       label: "RD Financial Report",      category: "Financial Reports" },
 
   // ── Loan Reports ──────────────────────────────────────────────────────────
   { path: "/loan-npa-report",                 element: <LoanNPAPage />,                 label: "Loan NPA Report",          category: "Loan Reports" },

@@ -15,6 +15,15 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.10",
+    date: "2026-08-10",
+    changes: [
+      { type: "fix",         text: "FD Maturity/Renewal/Pre-Maturity: interest amount now debits the Interest Paid account separately instead of being rolled into the FD account debit. Entries now correctly reflect Dr FD Account (principal) + Dr Interest Paid Account (interest) = Cr payout account (total)." },
+      { type: "new",         text: "RD Financial Report added under Financial Reports — shows period Dr/Cr movements and closing balances per account head, with print, PDF, and Excel export." },
+      { type: "improvement", text: "RD Branch-Wise Rule: formula captions now include a brief description of the interest method (e.g. 'CI Quarterly, Annuity-Due') for easier selection." },
+    ],
+  },
+  {
     version: "1.0.9",
     date: "2026-08-09",
     changes: [

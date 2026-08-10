@@ -351,7 +351,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Profit & Loss", path: "/profit-loss"   },
             { label: "Balance Sheet", path: "/balance-sheet" },
             { label: "Trial Balance", path: "/trial-balance" },
-            { label: "Journal Book",  path: "/journal-book"  },
+            { label: "Journal Book",         path: "/journal-book"         },
+            { label: "RD Financial Report",  path: "/rd-financial-report"  },
           ],
         },
         {

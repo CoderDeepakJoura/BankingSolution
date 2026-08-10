@@ -159,6 +159,7 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
   { path: "/profit-loss",                     label: "Profit & Loss",                   category: "Financial Reports" },
   { path: "/trial-balance",                   label: "Trial Balance",                   category: "Financial Reports" },
   { path: "/journal-book",                    label: "Journal Book",                    category: "Financial Reports" },
+  { path: "/rd-financial-report",             label: "RD Financial Report",             category: "Financial Reports" },
 
   // ── Loan Reports ──────────────────────────────────────────────────────────
   { path: "/loan-npa-report",                 label: "Loan NPA Report",                 category: "Loan Reports" },

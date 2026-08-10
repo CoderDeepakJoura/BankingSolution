@@ -54,12 +54,12 @@ interface ValidationErrors {
 
 // ─── Static Options ───────────────────────────────────────────────────────────
 const interestFormulaOptions = [
-  { value: 1, label: "Formula 1 — Simple Interest" },
-  { value: 2, label: "Formula 2 — CI Monthly, Ordinary Annuity" },
-  { value: 3, label: "Formula 3 — CI Quarterly, Ordinary Annuity" },
-  { value: 4, label: "Formula 4 — CI Half-Yearly, Ordinary Annuity" },
-  { value: 5, label: "Formula 5 — CI Yearly, Ordinary Annuity" },
-  { value: 6, label: "Formula 6 — CI Quarterly, Annuity-Due (Standard)" },
+  { value: 1, label: "Formula 1 — Simple Interest  [M = P×n + P×r×n(n+1)/2400]  Interest on cumulative balance, no compounding" },
+  { value: 2, label: "Formula 2 — CI Monthly, Ordinary Annuity  [deposit at END of each month, compounded monthly]" },
+  { value: 3, label: "Formula 3 — CI Quarterly, Ordinary Annuity  [deposit at END of each month, compounded quarterly]" },
+  { value: 4, label: "Formula 4 — CI Half-Yearly, Ordinary Annuity  [deposit at END of each month, compounded half-yearly]" },
+  { value: 5, label: "Formula 5 — CI Yearly, Ordinary Annuity  [deposit at END of each month, compounded yearly]" },
+  { value: 6, label: "Formula 6 — CI Quarterly, Annuity-Due (Standard)  [deposit at START of each month, one extra period of interest — Standard Indian banking]" },
 ];
 
 

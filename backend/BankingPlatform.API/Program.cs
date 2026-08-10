@@ -107,6 +107,7 @@ builder.Services.AddScoped<BankingPlatform.API.Service.AccountMasters.RDInterest
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.MemberAccountsService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.FDOpeningService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.RDMaturityService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.RDFinancialReportService>();
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");
