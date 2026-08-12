@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useFormValidation } from "../../../services/Validations/ProductMasters/Loan/useFormValidation";
 import { ValidationSummary } from "../../../components/Validations/ValidationSummary";
 import { FormField } from "../../../components/Validations/FormField";

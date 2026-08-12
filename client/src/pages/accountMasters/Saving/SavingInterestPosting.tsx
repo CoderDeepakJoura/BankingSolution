@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   IndianRupee, Calculator, Send,
   AlertCircle, FileText, ArrowLeft, X, BarChart2,

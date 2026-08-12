@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Save, X, FileText, User, Users, Phone, MapPin, CreditCard,
   Calendar, DollarSign, ArrowLeft, Plus, Trash2, RotateCcw,

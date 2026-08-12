@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import Select from "react-select";
 import { ArrowLeft, Plus, Trash2, Save, RotateCcw, PiggyBank, Pencil } from "lucide-react";

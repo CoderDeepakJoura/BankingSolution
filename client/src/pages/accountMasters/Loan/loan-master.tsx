@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import Select from "react-select";
 import { decryptId, encryptId } from "../../../utils/encryption";

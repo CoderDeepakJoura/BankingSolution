@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Select from "react-select";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux";
