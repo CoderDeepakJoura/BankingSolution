@@ -12,7 +12,7 @@ import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils
 import DatePicker from "../../components/DatePicker";
 import { getSessionFromDate } from "../../utils/sessionUtils";
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -50,7 +50,7 @@ const groupByDate = (entries: CashBookEntry[]) => {
   return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
 };
 
-// â”€â”€ TD helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── TD helpers ─────────────────────────────────────────────────────────────────
 const TD = ({ children, className = "", colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) => (
   <td colSpan={colSpan} className={`border border-gray-400 px-2 py-1 text-xs ${className}`}>{children}</td>
 );
@@ -61,7 +61,7 @@ const TDF = ({ children, className = "", colSpan }: { children?: React.ReactNode
   <td colSpan={colSpan} className={`border border-gray-400 px-2 py-1 text-xs sticky bottom-0 z-10 ${className}`}>{children}</td>
 );
 
-// â”€â”€ LR Side component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── LR Side component ─────────────────────────────────────────────────────────
 const LRSide: React.FC<{
   entries: CashBookEntry[];
   side: "receipts" | "payments";
@@ -88,7 +88,7 @@ const LRSide: React.FC<{
         </tr>
       </thead>
       <tbody>
-        {/* Opening Balance â€” Receipts only */}
+        {/* Opening Balance — Receipts only */}
         {side === "receipts" && (
           <tr className="bg-red-50">
             <TD className="text-center" />
@@ -113,7 +113,7 @@ const LRSide: React.FC<{
                     <TD className="text-center">{sno}</TD>
                     <TD>{particulars(entry, longNar)}</TD>
                     <TD className="text-right">{fmt(entry.amount)}</TD>
-                    <TD className="text-right text-gray-400">â€”</TD>
+                    <TD className="text-right text-gray-400">—</TD>
                   </tr>
                 );
               })}
@@ -127,7 +127,7 @@ const LRSide: React.FC<{
           );
         })}
 
-        {/* Closing Balance â€” Payments only */}
+        {/* Closing Balance — Payments only */}
         {side === "payments" && (
           <tr className="bg-green-50">
             <TD className="text-center" />
@@ -149,7 +149,7 @@ const LRSide: React.FC<{
   );
 };
 
-// â”€â”€ Simple table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Simple table ──────────────────────────────────────────────────────────────
 const SimpleTable: React.FC<{ data: CashBook; longNar: boolean }> = ({ data, longNar }) => {
   const allRows: { entry: CashBookEntry; side: "Dr" | "Cr" }[] = [
     ...data.receipts.map((e) => ({ entry: e, side: "Dr" as const })),
@@ -226,7 +226,7 @@ const SimpleTable: React.FC<{ data: CashBook; longNar: boolean }> = ({ data, lon
   );
 };
 
-// â”€â”€ Export config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Export config ─────────────────────────────────────────────────────────────
 const buildExportConfig = (data: CashBook, longNar: boolean): ExportConfig => {
   const columns = [
     { header: "S.No",        widthRatio: 0.05, align: "center" as const },
@@ -293,7 +293,7 @@ const buildExportConfig = (data: CashBook, longNar: boolean): ExportConfig => {
   };
 };
 
-// â”€â”€ Print HTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Print HTML ────────────────────────────────────────────────────────────────
 const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean): string => {
   const par = (e: CashBookEntry) => {
     const base = `V.No.:- ${e.voucherNo} ${e.contraAccountName} - ${e.contraAccountIdentifier}`;
@@ -330,7 +330,7 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
           <td class="sno">${sno}</td>
           <td>${par(e)}</td>
           <td class="amt">${fmt(e.amount)}</td>
-          <td class="amt">â€”</td>
+          <td class="amt">—</td>
         </tr>`;
       });
       rows += `<tr class="day-total-row">
@@ -503,7 +503,7 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
   </div>
 
   <div class="day-label">
-    Cash Book on : ${fmtShort(data.fromDate)}${data.fromDate !== data.toDate ? " â€” " + fmtShort(data.toDate) : ""}
+    Cash Book on : ${fmtShort(data.fromDate)}${data.fromDate !== data.toDate ? " — " + fmtShort(data.toDate) : ""}
   </div>
 
   ${bodyContent}
@@ -518,7 +518,7 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
 </html>`;
 };
 
-// â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main Component ────────────────────────────────────────────────────────────
 const CashBookPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
   const navigate = useNavigate();
@@ -609,7 +609,7 @@ const CashBookPage: React.FC = () => {
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 lg:p-8">
           <div className="w-full space-y-6">
 
-            {/* â”€â”€ Form Card â”€â”€ */}
+            {/* ── Form Card ── */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 px-6 py-4 flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
@@ -651,7 +651,7 @@ const CashBookPage: React.FC = () => {
                   </div>
                   {sessionMinDate && (
                     <div className="text-xs text-gray-500 pb-1">
-                      Session: {fmtDate(sessionMinDate)} â€” {fmtDate(sessionMaxDate)}
+                      Session: {fmtDate(sessionMinDate)} — {fmtDate(sessionMaxDate)}
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pb-0.5">
@@ -724,7 +724,7 @@ const CashBookPage: React.FC = () => {
               </div>
             </div>
 
-            {/* â”€â”€ Report â”€â”€ */}
+            {/* ── Report ── */}
             {data && (
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
                 <div className="text-center py-4 border-b border-gray-200 px-4 bg-gray-50">
@@ -740,7 +740,7 @@ const CashBookPage: React.FC = () => {
                 <div className="p-4">
                   <div className="text-center border border-gray-400 bg-gray-100 py-1.5 mb-3 text-sm font-semibold text-gray-800 rounded">
                     Cash Book on : {fmtShort(data.fromDate)}
-                    {data.fromDate !== data.toDate && ` â€” ${fmtShort(data.toDate)}`}
+                    {data.fromDate !== data.toDate && ` — ${fmtShort(data.toDate)}`}
                   </div>
 
                   {withLeftRight ? (
@@ -799,7 +799,7 @@ const CashBookPage: React.FC = () => {
                     ].map(({ label, value, color }) => (
                       <div key={label} className={`bg-${color}-50 border border-${color}-200 rounded-lg px-4 py-2.5 flex flex-col`}>
                         <span className="text-xs text-gray-500">{label}</span>
-                        <span className={`font-bold text-${color}-700 text-base`}>â‚¹{fmt(value)}</span>
+                        <span className={`font-bold text-${color}-700 text-base`}>₹{fmt(value)}</span>
                       </div>
                     ))}
                   </div>

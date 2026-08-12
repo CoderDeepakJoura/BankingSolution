@@ -98,7 +98,7 @@ const LedgerTable: React.FC<{ data: FDLedger; longNar: boolean }> = ({ data, lon
           <TD className="text-center text-slate-600">{entry.voucherNo}</TD>
           <TD className="text-slate-800">
             {entry.particulars}
-            {longNar && entry.narration && <span className="text-slate-400"> â€” {entry.narration}</span>}
+            {longNar && entry.narration && <span className="text-slate-400"> — {entry.narration}</span>}
           </TD>
           <TD className="text-right text-red-700 font-medium">{entry.dr != null ? fmt(entry.dr) : ""}</TD>
           <TD className="text-right text-emerald-700 font-medium">{entry.cr != null ? fmt(entry.cr) : ""}</TD>
@@ -149,14 +149,14 @@ const buildExportConfig = (data: FDLedger, longNar: boolean): ExportConfig => {
   if (info2) rows.push({ style: "info", spanFirst: 7, cells: [info2] });
   rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", fmtBal(data.openingBalance)] });
   data.entries.forEach((e, i) => {
-    const par = longNar && e.narration ? `${e.particulars} â€” ${e.narration}` : e.particulars;
+    const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
     rows.push({ style: "normal", cells: [String(i + 1), fmtShort(e.voucherDate), String(e.voucherNo), par, e.dr != null ? fmt(e.dr) : "", e.cr != null ? fmt(e.cr) : "", fmtBal(e.balance)] });
   });
   rows.push({ style: "total", spanFirst: 4, cells: ["Closing Balance", "", "", "", fmt(data.totalDr), fmt(data.totalCr), fmtBal(data.closingBalance)] });
   return {
     meta: {
       title: data.branchName, subtitle: data.branchAddress,
-      reportTitle: `FD Ledger â€” ${data.accountIdentifier} ${data.accountName}${detailSuffix} | ${fmtShort(data.fromDate)} to ${fmtShort(data.toDate)}`,
+      reportTitle: `FD Ledger — ${data.accountIdentifier} ${data.accountName}${detailSuffix} | ${fmtShort(data.fromDate)} to ${fmtShort(data.toDate)}`,
       fileName: `FDLedger_${data.accountIdentifier}${data.selectedDetailId ? "_D" + data.selectedDetailId : ""}_${isoDatePart(data.fromDate)}_${isoDatePart(data.toDate)}`,
       landscape: true,
     },
@@ -166,13 +166,13 @@ const buildExportConfig = (data: FDLedger, longNar: boolean): ExportConfig => {
 
 const buildPrintHTML = (data: FDLedger, longNar: boolean): string => {
   const detailInfo = data.selectedDetailLabel
-    ? `<span><span class="lbl">FD Detail:</span> <strong>${data.selectedDetailLabel}</strong> &nbsp;|&nbsp; ${fmtDate(data.detailFDDate!)} â†’ ${fmtDate(data.detailMaturityDate!)} &nbsp;|&nbsp; â‚¹${fmt(data.detailFDAmount!)}</span>`
+    ? `<span><span class="lbl">FD Detail:</span> <strong>${data.selectedDetailLabel}</strong> &nbsp;|&nbsp; ${fmtDate(data.detailFDDate!)} → ${fmtDate(data.detailMaturityDate!)} &nbsp;|&nbsp; ₹${fmt(data.detailFDAmount!)}</span>`
     : `<span><span class="lbl">FD Detail:</span> <strong>All Details</strong></span>`;
   let sno = 0;
   let rows = `<tr class="ob-row"><td></td><td style="text-align:center">${fmtShort(data.fromDate)}</td><td></td><td>Opening Balance</td><td></td><td></td><td class="amt">${fmtBal(data.openingBalance)}</td></tr>`;
   data.entries.forEach((e) => {
     sno++;
-    const par = longNar && e.narration ? `${e.particulars} â€” ${e.narration}` : e.particulars;
+    const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
     rows += `<tr class="${sno % 2 === 0 ? "even" : ""}"><td style="text-align:center">${sno}</td><td style="text-align:center;white-space:nowrap">${fmtShort(e.voucherDate)}</td><td style="text-align:center">${e.voucherNo}</td><td>${par}</td><td class="amt dr">${e.dr != null ? fmt(e.dr) : ""}</td><td class="amt cr">${e.cr != null ? fmt(e.cr) : ""}</td><td class="amt">${fmtBal(e.balance)}</td></tr>`;
   });
   rows += `<tr class="total-row"><td colspan="4" style="text-align:right">Total / Closing Balance</td><td class="amt dr">${fmt(data.totalDr)}</td><td class="amt cr">${fmt(data.totalCr)}</td><td class="amt">${fmtBal(data.closingBalance)}</td></tr>`;
@@ -219,10 +219,10 @@ const buildPrintHTML = (data: FDLedger, longNar: boolean): string => {
     <th style="text-align:left">Particulars</th><th style="width:90px">Withdrawals</th><th style="width:90px">Deposits</th><th style="width:90px">Balance</th>
   </tr></thead><tbody>${rows}</tbody></table>
   <div class="summary">
-    <div class="summary-card" style="border-top-color:#3b82f6"><div class="lbl">Opening Balance</div><div class="val" style="color:#1d4ed8">â‚¹${fmtBal(data.openingBalance)}</div></div>
-    <div class="summary-card" style="border-top-color:#10b981"><div class="lbl">Total Deposits</div><div class="val" style="color:#065f46">â‚¹${fmt(data.totalCr)}</div></div>
-    <div class="summary-card" style="border-top-color:#ef4444"><div class="lbl">Total Withdrawals</div><div class="val" style="color:#b91c1c">â‚¹${fmt(data.totalDr)}</div></div>
-    <div class="summary-card" style="border-top-color:#8b5cf6"><div class="lbl">Closing Balance</div><div class="val" style="color:#6d28d9">â‚¹${fmtBal(data.closingBalance)}</div></div>
+    <div class="summary-card" style="border-top-color:#3b82f6"><div class="lbl">Opening Balance</div><div class="val" style="color:#1d4ed8">₹${fmtBal(data.openingBalance)}</div></div>
+    <div class="summary-card" style="border-top-color:#10b981"><div class="lbl">Total Deposits</div><div class="val" style="color:#065f46">₹${fmt(data.totalCr)}</div></div>
+    <div class="summary-card" style="border-top-color:#ef4444"><div class="lbl">Total Withdrawals</div><div class="val" style="color:#b91c1c">₹${fmt(data.totalDr)}</div></div>
+    <div class="summary-card" style="border-top-color:#8b5cf6"><div class="lbl">Closing Balance</div><div class="val" style="color:#6d28d9">₹${fmtBal(data.closingBalance)}</div></div>
   </div>
 </body></html>`;
 };
@@ -281,11 +281,11 @@ const LedgerSection: React.FC<LedgerSectionProps> = ({ ledger, longNar, onPrint,
             {[
               { label: "Receipt No.",   value: ledger.detailLtdNo != null ? String(ledger.detailLtdNo) : null },
               { label: "FD Date",       value: ledger.detailFDDate ? fmtShort(ledger.detailFDDate) : null },
-              { label: "FD Amount",     value: ledger.detailFDAmount != null ? `â‚¹${fmt(ledger.detailFDAmount)}` : null },
+              { label: "FD Amount",     value: ledger.detailFDAmount != null ? `₹${fmt(ledger.detailFDAmount)}` : null },
               { label: "Int. Rate",     value: ledger.detailIntRate != null ? `${ledger.detailIntRate}%` : null },
               { label: "FD Period",     value: ledger.detailPeriodMonths != null ? `${ledger.detailPeriodMonths} M / ${ledger.detailPeriodDays ?? 0} D` : null },
               { label: "Maturity Date", value: ledger.detailMaturityDate ? fmtShort(ledger.detailMaturityDate) : null },
-              { label: "Maturity Amt.", value: ledger.detailMaturityAmount != null ? `â‚¹${fmt(ledger.detailMaturityAmount)}` : null },
+              { label: "Maturity Amt.", value: ledger.detailMaturityAmount != null ? `₹${fmt(ledger.detailMaturityAmount)}` : null },
               { label: "Detail",        value: ledger.selectedDetailLabel ?? "All FD Details" },
             ].filter((f) => f.value).map(({ label, value }) => (
               <div key={label} className="flex gap-1 min-w-0">
@@ -306,19 +306,19 @@ const LedgerSection: React.FC<LedgerSectionProps> = ({ ledger, longNar, onPrint,
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
             <div className={`bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-blue-500`}>
               <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Opening Balance</p>
-              <p className="text-base font-bold text-blue-700 mt-1">â‚¹{fmtBal(ledger.openingBalance)}</p>
+              <p className="text-base font-bold text-blue-700 mt-1">₹{fmtBal(ledger.openingBalance)}</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-emerald-500">
               <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Deposits</p>
-              <p className="text-base font-bold text-emerald-700 mt-1">â‚¹{fmt(ledger.totalCr)}</p>
+              <p className="text-base font-bold text-emerald-700 mt-1">₹{fmt(ledger.totalCr)}</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-red-500">
               <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Withdrawals</p>
-              <p className="text-base font-bold text-red-700 mt-1">â‚¹{fmt(ledger.totalDr)}</p>
+              <p className="text-base font-bold text-red-700 mt-1">₹{fmt(ledger.totalDr)}</p>
             </div>
             <div className={`bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 ${acc.border}`}>
               <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Closing Balance</p>
-              <p className={`text-base font-bold mt-1 ${acc.headerText}`}>â‚¹{fmtBal(ledger.closingBalance)}</p>
+              <p className={`text-base font-bold mt-1 ${acc.headerText}`}>₹{fmtBal(ledger.closingBalance)}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -421,14 +421,14 @@ const FDLedgerPage: React.FC = () => {
     setLoading(true); setData(null); setPerDetailLedgers([]); setConsolidatedData(null);
     try {
       if (selectedDetail !== "") {
-        // Single detail mode â€” existing behaviour
+        // Single detail mode — existing behaviour
         const res = await fdLedgerApi.getFDLedger(
           user.branchid, selectedAccount as number, effectiveFromDate, toDate, selectedDetail as number
         );
         if (res.success && res.data) setData(res.data);
         else Swal.fire("Error", res.message || "Failed to load ledger.", "error");
       } else {
-        // No detail selected â†’ fetch each detail separately + consolidated in parallel
+        // No detail selected → fetch each detail separately + consolidated in parallel
         const accId = selectedAccount as number;
         const brId  = user.branchid;
         const allRequests = [
@@ -477,7 +477,7 @@ const FDLedgerPage: React.FC = () => {
         <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
           <div className="w-full space-y-5">
 
-            {/* â”€â”€ Filter Card â”€â”€ */}
+            {/* ── Filter Card ── */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200">
                 <div className="w-1 self-stretch bg-blue-600 rounded-full" />
@@ -491,22 +491,22 @@ const FDLedgerPage: React.FC = () => {
               </div>
 
               <div className="p-5 space-y-5">
-                {/* Product â†’ Account â†’ Detail */}
+                {/* Product → Account → Detail */}
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Account Selection</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <label className={labelClass}>FD Product <span className="text-red-500 normal-case">*</span></label>
                       <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value === "" ? "" : Number(e.target.value))} className={selectClass}>
-                        <option value="">â€” Select Product â€”</option>
-                        {products.map((p) => <option key={p.id} value={p.id}>{p.productCode} â€” {p.productName}</option>)}
+                        <option value="">— Select Product —</option>
+                        {products.map((p) => <option key={p.id} value={p.id}>{p.productCode} — {p.productName}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className={labelClass}>Account <span className="text-red-500 normal-case">*</span></label>
                       <select value={selectedAccount} onChange={(e) => { setSelectedAccount(e.target.value === "" ? "" : Number(e.target.value)); setData(null); }} disabled={accounts.length === 0} className={selectClass}>
-                        <option value="">â€” Select Account â€”</option>
-                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.accountIdentifier} â€” {a.accountName}</option>)}
+                        <option value="">— Select Account —</option>
+                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.accountIdentifier} — {a.accountName}</option>)}
                       </select>
                     </div>
                     <div>
@@ -515,17 +515,17 @@ const FDLedgerPage: React.FC = () => {
                         <span className="ml-1.5 text-slate-400 normal-case font-normal">(optional)</span>
                       </label>
                       <select value={selectedDetail} onChange={(e) => setSelectedDetail(e.target.value === "" ? "" : Number(e.target.value))} disabled={details.length === 0} className={selectClass}>
-                        <option value="">â€” All FD Details â€”</option>
+                        <option value="">— All FD Details —</option>
                         {details.map((d) => (
                           <option key={d.id} value={d.id}>
-                            {d.detailLabel} | {fmtShort(d.fdDate)} â†’ {fmtShort(d.fdMaturityDate)} | â‚¹{fmt(d.fdAmount)} [{FD_STATUS_LABELS[d.fdStatus] ?? d.fdStatus}]
+                            {d.detailLabel} | {fmtShort(d.fdDate)} → {fmtShort(d.fdMaturityDate)} | ₹{fmt(d.fdAmount)} [{FD_STATUS_LABELS[d.fdStatus] ?? d.fdStatus}]
                           </option>
                         ))}
                       </select>
                     </div>
                   </div>
 
-                  {/* Detail preview badge â€” shown when a detail is chosen */}
+                  {/* Detail preview badge — shown when a detail is chosen */}
                   {selectedDetail !== "" && (() => {
                     const det = details.find((d) => d.id === selectedDetail);
                     if (!det) return null;
@@ -544,7 +544,7 @@ const FDLedgerPage: React.FC = () => {
                         </span>
                         <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2.5 py-1 text-xs shadow-sm">
                           <span className="text-slate-400">Amount</span>
-                          <span className="font-semibold text-slate-800">â‚¹{fmt(det.fdAmount)}</span>
+                          <span className="font-semibold text-slate-800">₹{fmt(det.fdAmount)}</span>
                         </span>
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${badgeClass}`}>
                           {statusLabel}
@@ -574,7 +574,7 @@ const FDLedgerPage: React.FC = () => {
                     </div>
                     {sessionMinDate && (
                       <div className="text-xs text-slate-400 pb-1">
-                        Session: <span className="text-slate-600 font-medium">{fmtDate(sessionMinDate)}</span> â€” <span className="text-slate-600 font-medium">{fmtDate(sessionMaxDate)}</span>
+                        Session: <span className="text-slate-600 font-medium">{fmtDate(sessionMinDate)}</span> — <span className="text-slate-600 font-medium">{fmtDate(sessionMaxDate)}</span>
                       </div>
                     )}
                     <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none pb-1">
@@ -590,7 +590,7 @@ const FDLedgerPage: React.FC = () => {
                 <div className="flex items-center gap-2 flex-wrap">
                   <button onClick={handleShow} disabled={loading} className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                     {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                    {loading ? "Loadingâ€¦" : "Show"}
+                    {loading ? "Loading…" : "Show"}
                   </button>
                   {activeExportData && (
                     <>
@@ -612,7 +612,7 @@ const FDLedgerPage: React.FC = () => {
               </div>
             </div>
 
-            {/* â”€â”€ Single-detail ledger (specific detail selected) â”€â”€ */}
+            {/* ── Single-detail ledger (specific detail selected) ── */}
             {data && (
               <LedgerSection
                 ledger={data}
@@ -625,7 +625,7 @@ const FDLedgerPage: React.FC = () => {
               />
             )}
 
-            {/* â”€â”€ Per-detail ledgers (no detail selected) â”€â”€ */}
+            {/* ── Per-detail ledgers (no detail selected) ── */}
             {perDetailLedgers.map((ledger, idx) => (
               <LedgerSection
                 key={ledger.selectedDetailId ?? idx}
@@ -634,12 +634,12 @@ const FDLedgerPage: React.FC = () => {
                 onPrint={() => handlePrintLedger(ledger)}
                 onPdf={() => exportToPdf(buildExportConfig(ledger, withLongNarration))}
                 onExcel={() => exportToExcel(buildExportConfig(ledger, withLongNarration))}
-                title={`FD Detail ${idx + 1}${ledger.selectedDetailLabel ? ` â€” ${ledger.selectedDetailLabel}` : ""}`}
+                title={`FD Detail ${idx + 1}${ledger.selectedDetailLabel ? ` — ${ledger.selectedDetailLabel}` : ""}`}
                 accentColor="indigo"
               />
             ))}
 
-            {/* â”€â”€ Consolidated ledger (no detail selected) â”€â”€ */}
+            {/* ── Consolidated ledger (no detail selected) ── */}
             {consolidatedData && (
               <LedgerSection
                 ledger={consolidatedData}
@@ -647,7 +647,7 @@ const FDLedgerPage: React.FC = () => {
                 onPrint={() => handlePrintLedger(consolidatedData)}
                 onPdf={() => exportToPdf(buildExportConfig(consolidatedData, withLongNarration))}
                 onExcel={() => exportToExcel(buildExportConfig(consolidatedData, withLongNarration))}
-                title="Consolidated Ledger â€” All FD Details"
+                title="Consolidated Ledger — All FD Details"
                 accentColor="violet"
               />
             )}

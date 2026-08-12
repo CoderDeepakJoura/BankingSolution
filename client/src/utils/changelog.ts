@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.12",
+    date: "2026-08-12",
+    changes: [
+      { type: "improvement", text: "Close Saving Account ledger view, RD Financial Report format selector (standard vs with-opening-closing), session fromDate fix in all 23 reports, FD Renew delete fix, CloseAccount voucher sub-type" },
+    ],
+  },
+  {
     version: "1.0.11",
     date: "2026-08-12",
     changes: [

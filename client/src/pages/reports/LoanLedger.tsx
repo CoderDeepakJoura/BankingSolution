@@ -89,7 +89,7 @@ const LedgerTable: React.FC<{ data: LoanLedger; longNar: boolean }> = ({ data, l
           <TD className="text-center text-slate-600">{entry.voucherNo}</TD>
           <TD className="text-slate-800">
             {entry.particulars}
-            {longNar && entry.narration && <span className="text-slate-400"> â€” {entry.narration}</span>}
+            {longNar && entry.narration && <span className="text-slate-400"> — {entry.narration}</span>}
           </TD>
           <TD className="text-right text-red-700 font-medium">{entry.dr != null ? fmt(entry.dr) : ""}</TD>
           <TD className="text-right text-emerald-700 font-medium">{entry.cr != null ? fmt(entry.cr) : ""}</TD>
@@ -140,14 +140,14 @@ const buildExportConfig = (data: LoanLedger, longNar: boolean): ExportConfig => 
   if (info2) rows.push({ style: "info", spanFirst: 7, cells: [info2] });
   rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", fmtBal(data.openingBalance)] });
   data.entries.forEach((e, i) => {
-    const par = longNar && e.narration ? `${e.particulars} â€” ${e.narration}` : e.particulars;
+    const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
     rows.push({ style: "normal", cells: [String(i + 1), fmtShort(e.voucherDate), String(e.voucherNo), par, e.dr != null ? fmt(e.dr) : "", e.cr != null ? fmt(e.cr) : "", fmtBal(e.balance)] });
   });
   rows.push({ style: "total", spanFirst: 4, cells: ["Closing Balance", "", "", "", fmt(data.totalDr), fmt(data.totalCr), fmtBal(data.closingBalance)] });
   return {
     meta: {
       title: data.branchName, subtitle: data.branchAddress,
-      reportTitle: `Loan Ledger â€” ${data.accountNumber} ${data.accountName} | ${fmtShort(data.fromDate)} to ${fmtShort(data.toDate)}`,
+      reportTitle: `Loan Ledger — ${data.accountNumber} ${data.accountName} | ${fmtShort(data.fromDate)} to ${fmtShort(data.toDate)}`,
       fileName: `LoanLedger_${data.accountNumber}_${isoDatePart(data.fromDate)}_${isoDatePart(data.toDate)}`,
       landscape: true,
     },
@@ -160,7 +160,7 @@ const buildPrintHTML = (data: LoanLedger, longNar: boolean): string => {
   let rows = `<tr class="ob-row"><td></td><td style="text-align:center">${fmtShort(data.fromDate)}</td><td></td><td>Opening Balance</td><td></td><td></td><td class="amt">${fmtBal(data.openingBalance)}</td></tr>`;
   data.entries.forEach((e) => {
     sno++;
-    const par = longNar && e.narration ? `${e.particulars} â€” ${e.narration}` : e.particulars;
+    const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
     rows += `<tr class="${sno % 2 === 0 ? "even" : ""}"><td style="text-align:center">${sno}</td><td style="text-align:center;white-space:nowrap">${fmtShort(e.voucherDate)}</td><td style="text-align:center">${e.voucherNo}</td><td>${par}</td><td class="amt dr">${e.dr != null ? fmt(e.dr) : ""}</td><td class="amt cr">${e.cr != null ? fmt(e.cr) : ""}</td><td class="amt">${fmtBal(e.balance)}</td></tr>`;
   });
   rows += `<tr class="total-row"><td colspan="4" style="text-align:right">Total / Closing Balance</td><td class="amt dr">${fmt(data.totalDr)}</td><td class="amt cr">${fmt(data.totalCr)}</td><td class="amt">${fmtBal(data.closingBalance)}</td></tr>`;
@@ -210,10 +210,10 @@ const buildPrintHTML = (data: LoanLedger, longNar: boolean): string => {
     <th style="text-align:left">Particulars</th><th style="width:100px">Advancement/Interest</th><th style="width:90px">Recovery</th><th style="width:90px">Balance</th>
   </tr></thead><tbody>${rows}</tbody></table>
   <div class="summary">
-    <div class="summary-card" style="border-top-color:#3b82f6"><div class="lbl">Opening Balance</div><div class="val" style="color:#1d4ed8">â‚¹${fmtBal(data.openingBalance)}</div></div>
-    <div class="summary-card" style="border-top-color:#ef4444"><div class="lbl">Total Advancement / Interest</div><div class="val" style="color:#b91c1c">â‚¹${fmt(data.totalDr)}</div></div>
-    <div class="summary-card" style="border-top-color:#10b981"><div class="lbl">Total Recovery</div><div class="val" style="color:#065f46">â‚¹${fmt(data.totalCr)}</div></div>
-    <div class="summary-card" style="border-top-color:#8b5cf6"><div class="lbl">Closing Balance</div><div class="val" style="color:#6d28d9">â‚¹${fmtBal(data.closingBalance)}</div></div>
+    <div class="summary-card" style="border-top-color:#3b82f6"><div class="lbl">Opening Balance</div><div class="val" style="color:#1d4ed8">₹${fmtBal(data.openingBalance)}</div></div>
+    <div class="summary-card" style="border-top-color:#ef4444"><div class="lbl">Total Advancement / Interest</div><div class="val" style="color:#b91c1c">₹${fmt(data.totalDr)}</div></div>
+    <div class="summary-card" style="border-top-color:#10b981"><div class="lbl">Total Recovery</div><div class="val" style="color:#065f46">₹${fmt(data.totalCr)}</div></div>
+    <div class="summary-card" style="border-top-color:#8b5cf6"><div class="lbl">Closing Balance</div><div class="val" style="color:#6d28d9">₹${fmtBal(data.closingBalance)}</div></div>
   </div>
 </body></html>`;
 };
@@ -304,7 +304,7 @@ const LoanLedgerPage: React.FC = () => {
         <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
           <div className="w-full space-y-5">
 
-            {/* â”€â”€ Filter Card â”€â”€ */}
+            {/* ── Filter Card ── */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200">
                 <div className="w-1 self-stretch bg-blue-600 rounded-full" />
@@ -324,15 +324,15 @@ const LoanLedgerPage: React.FC = () => {
                     <div>
                       <label className={labelClass}>Loan Product <span className="text-red-500 normal-case">*</span></label>
                       <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value === "" ? "" : Number(e.target.value))} className={selectClass}>
-                        <option value="">â€” Select Product â€”</option>
-                        {products.map((p) => <option key={p.id} value={p.id}>{p.productCode} â€” {p.productName}</option>)}
+                        <option value="">— Select Product —</option>
+                        {products.map((p) => <option key={p.id} value={p.id}>{p.productCode} — {p.productName}</option>)}
                       </select>
                     </div>
                     <div className="lg:col-span-2">
                       <label className={labelClass}>Account <span className="text-red-500 normal-case">*</span></label>
                       <select value={selectedAccount} onChange={(e) => { setSelectedAccount(e.target.value === "" ? "" : Number(e.target.value)); setData(null); }} disabled={accounts.length === 0} className={selectClass}>
-                        <option value="">â€” Select Account â€”</option>
-                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.accountNumber} â€” {a.accountName}</option>)}
+                        <option value="">— Select Account —</option>
+                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.accountNumber} — {a.accountName}</option>)}
                       </select>
                     </div>
                   </div>
@@ -357,7 +357,7 @@ const LoanLedgerPage: React.FC = () => {
                     </div>
                     {sessionMinDate && (
                       <div className="text-xs text-slate-400 pb-1">
-                        Session: <span className="text-slate-600 font-medium">{fmtDate(sessionMinDate)}</span> â€” <span className="text-slate-600 font-medium">{fmtDate(sessionMaxDate)}</span>
+                        Session: <span className="text-slate-600 font-medium">{fmtDate(sessionMinDate)}</span> — <span className="text-slate-600 font-medium">{fmtDate(sessionMaxDate)}</span>
                       </div>
                     )}
                     <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none pb-1">
@@ -373,7 +373,7 @@ const LoanLedgerPage: React.FC = () => {
                 <div className="flex items-center gap-2 flex-wrap">
                   <button onClick={handleShow} disabled={loading} className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                     {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                    {loading ? "Loadingâ€¦" : "Show"}
+                    {loading ? "Loading…" : "Show"}
                   </button>
                   {data && (
                     <>
@@ -395,7 +395,7 @@ const LoanLedgerPage: React.FC = () => {
               </div>
             </div>
 
-            {/* â”€â”€ Ledger Report â”€â”€ */}
+            {/* ── Ledger Report ── */}
             {data && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="text-center px-6 py-6 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
@@ -431,7 +431,7 @@ const LoanLedgerPage: React.FC = () => {
                   {(data.loanAmount != null || data.loanDate || data.loanPeriodMonths != null || data.standardIntRate != null) && (
                     <div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
                       {[
-                        { label: "Loan Amount",      value: data.loanAmount != null ? `â‚¹${data.loanAmount.toLocaleString("en-IN")}` : null },
+                        { label: "Loan Amount",      value: data.loanAmount != null ? `₹${data.loanAmount.toLocaleString("en-IN")}` : null },
                         { label: "Loan Date",        value: data.loanDate ? fmtShort(data.loanDate) : null },
                         { label: "Loan Period",      value: data.loanPeriodMonths != null ? `${data.loanPeriodMonths} M / ${data.loanPeriodDays ?? 0} D` : null },
                         { label: "Kist Period",      value: data.kistInterval != null ? `${data.kistInterval} M / ${data.kistIntervalDays ?? 0} D` : null },
@@ -461,19 +461,19 @@ const LoanLedgerPage: React.FC = () => {
                   <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-blue-500">
                       <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Opening Balance</p>
-                      <p className="text-lg font-bold text-blue-700 mt-1">â‚¹{fmtBal(data.openingBalance)}</p>
+                      <p className="text-lg font-bold text-blue-700 mt-1">₹{fmtBal(data.openingBalance)}</p>
                     </div>
                     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-red-500">
                       <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Advancement / Interest</p>
-                      <p className="text-lg font-bold text-red-700 mt-1">â‚¹{fmt(data.totalDr)}</p>
+                      <p className="text-lg font-bold text-red-700 mt-1">₹{fmt(data.totalDr)}</p>
                     </div>
                     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-emerald-500">
                       <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Recovery</p>
-                      <p className="text-lg font-bold text-emerald-700 mt-1">â‚¹{fmt(data.totalCr)}</p>
+                      <p className="text-lg font-bold text-emerald-700 mt-1">₹{fmt(data.totalCr)}</p>
                     </div>
                     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-violet-500">
                       <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Closing Balance</p>
-                      <p className="text-lg font-bold text-violet-700 mt-1">â‚¹{fmtBal(data.closingBalance)}</p>
+                      <p className="text-lg font-bold text-violet-700 mt-1">₹{fmtBal(data.closingBalance)}</p>
                     </div>
                   </div>
                 </div>

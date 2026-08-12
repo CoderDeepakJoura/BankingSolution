@@ -264,7 +264,7 @@ const LoanIntCertPage: React.FC = () => {
               <button onClick={handleLoad} disabled={loading || !accountId}
                 className="flex items-center gap-1.5 px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loadingâ€¦" : "Show"}
+                {loading ? "Loading…" : "Show"}
               </button>
               {cert && (
                 <>

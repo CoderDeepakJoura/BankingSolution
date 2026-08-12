@@ -13,16 +13,16 @@ import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils
 import DatePicker from "../../components/DatePicker";
 import { getSessionFromDate } from "../../utils/sessionUtils";
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Extract date part without any UTC conversion â€” avoids day-shift in UTC+5:30
+// Extract date part without any UTC conversion — avoids day-shift in UTC+5:30
 const isoDatePart = (iso: string) => iso.split("T")[0];
 
 const localDate = (iso: string) => {
   const [y, m, d] = isoDatePart(iso).split("-").map(Number);
-  return new Date(y, m - 1, d); // local time â€” no UTC shift
+  return new Date(y, m - 1, d); // local time — no UTC shift
 };
 
 const fmtDate = (iso: string) =>
@@ -53,19 +53,19 @@ const groupByDate = (entries: DayBookEntry[]) => {
   return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
 };
 
-// â”€â”€ TD helpers for screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── TD helpers for screen ─────────────────────────────────────────────────────
 const TD = ({ children, className = "", colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) => (
   <td colSpan={colSpan} className={`border border-gray-400 px-2 py-1 text-xs ${className}`}>{children}</td>
 );
 const TH = ({ children, className = "" }: { children?: React.ReactNode; className?: string }) => (
   <th className={`border border-gray-400 px-2 py-1 text-xs font-bold bg-blue-100 text-gray-800 sticky top-0 z-10 ${className}`}>{children}</th>
 );
-// Sticky tfoot cell â€” always visible at bottom of scroll container
+// Sticky tfoot cell — always visible at bottom of scroll container
 const TDF = ({ children, className = "", colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) => (
   <td colSpan={colSpan} className={`border border-gray-400 px-2 py-1 text-xs sticky bottom-0 z-10 ${className}`}>{children}</td>
 );
 
-// â”€â”€ Screen: Combined LR table (both sides zipped so Total rows always align) â”€â”€
+// ── Screen: Combined LR table (both sides zipped so Total rows always align) ──
 const LRCombinedScreen: React.FC<{
   data: DayBook;
   longNar: boolean;
@@ -140,7 +140,7 @@ const LRCombinedScreen: React.FC<{
   );
 };
 
-// â”€â”€ Screen: Simple format â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Screen: Simple format ─────────────────────────────────────────────────────
 const SimpleTable: React.FC<{ data: DayBook; longNar: boolean }> = ({ data, longNar }) => {
   const rows: { entry: DayBookEntry; side: "Dr" | "Cr" }[] = [];
   data.paymentGroups.forEach((g) => g.entries.forEach((e) => rows.push({ entry: e, side: "Dr" })));
@@ -199,7 +199,7 @@ const SimpleTable: React.FC<{ data: DayBook; longNar: boolean }> = ({ data, long
   );
 };
 
-// â”€â”€ LR PDF: two-column zipped layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── LR PDF: two-column zipped layout ─────────────────────────────────────────
 
 interface LRRow { type: "header" | "date" | "data" | "ob" | "cb" | "total" | "empty"; cells: string[]; }
 
@@ -232,7 +232,7 @@ const buildSideRows = (
     groupByDate(all).forEach(({ date, items }) => {
       const dateTotal = items.reduce((s, e) => s + e.amount, 0);
       rows.push({ type: "date", cells: ["", fmtDate(date), fmt(dateTotal), fmt(dateTotal)] });
-      items.forEach(e => { sno++; rows.push({ type: "data", cells: [String(sno), particulars(e, longNar), fmt(e.amount), "â€”"] }); });
+      items.forEach(e => { sno++; rows.push({ type: "data", cells: [String(sno), particulars(e, longNar), fmt(e.amount), "—"] }); });
     });
   } else {
     const allEntries = groups.flatMap(g => g.entries);
@@ -310,7 +310,7 @@ const exportDayBookLRPdf = (data: DayBook, longNar: boolean, filterMode: "date" 
   y += 8;
 
   // Day label box (matches screen)
-  const dayLabel = `DayBook on : ${fmtShort(data.fromDate)}${data.fromDate !== data.toDate ? " â€” " + fmtShort(data.toDate) : ""}`;
+  const dayLabel = `DayBook on : ${fmtShort(data.fromDate)}${data.fromDate !== data.toDate ? " — " + fmtShort(data.toDate) : ""}`;
   doc.setFillColor(245, 245, 245); doc.setDrawColor(170, 170, 170);
   doc.rect(margin, y, pageWidth - margin * 2, 6, "FD");
   doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(50, 50, 50);
@@ -328,7 +328,7 @@ const exportDayBookLRPdf = (data: DayBook, longNar: boolean, filterMode: "date" 
   doc.text("PAYMENTS", margin + sideW + divW + sideW / 2, y + 4.2, { align: "center" });
   doc.setTextColor(0,0,0); y += 7;
 
-  // Build & zip rows â€” keep Total pinned to the last row on both sides
+  // Build & zip rows — keep Total pinned to the last row on both sides
   const leftRows  = buildSideRows(data.receiptGroups, "receipts", data, longNar, filterMode);
   const rightRows = buildSideRows(data.paymentGroups, "payments", data, longNar, filterMode);
   const empty: LRRow = { type: "empty", cells: Array<string>(colsPerSide).fill("") };
@@ -343,7 +343,7 @@ const exportDayBookLRPdf = (data: DayBook, longNar: boolean, filterMode: "date" 
     [leftTotal, rightTotal],  // both Totals always on the same last row
   ];
 
-  // Column widths â€” total must equal usable (277mm)
+  // Column widths — total must equal usable (277mm)
   // Date-wise:  9+82+24+22.5 | 2 | 9+82+24+22.5  = 277
   // Head-wise:  9+17+72+22+17.5 | 2 | 9+17+72+22+17.5 = 277
   const dateColStyles: Record<number, object> = {
@@ -397,7 +397,7 @@ const exportDayBookLRPdf = (data: DayBook, longNar: boolean, filterMode: "date" 
   doc.save(`DayBook_${fmtDateKey(data.fromDate)}_${fmtDateKey(data.toDate)}.pdf`);
 };
 
-// â”€â”€ Export config builder (used by PDF + Excel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Export config builder (used by PDF + Excel) ───────────────────────────────
 const buildExportConfig = (data: DayBook, longNar: boolean): ExportConfig => {
   const columns = [
     { header: "S.No",        widthRatio: 0.05, align: "center" as const },
@@ -420,8 +420,8 @@ const buildExportConfig = (data: DayBook, longNar: boolean): ExportConfig => {
 
   // Build receipt rows (Cr)
   data.receiptGroups.forEach((g) => {
-    // spanFirst:5 â†’ first 5 cols merged for label, col 6 (Cr Amount) holds group total
-    rows.push({ style: "group", spanFirst: 5, cells: [`RECEIPTS â€” ${g.groupName}`, "", "", "", "", fmt(g.groupTotal)] });
+    // spanFirst:5 → first 5 cols merged for label, col 6 (Cr Amount) holds group total
+    rows.push({ style: "group", spanFirst: 5, cells: [`RECEIPTS — ${g.groupName}`, "", "", "", "", fmt(g.groupTotal)] });
     groupByDate(g.entries).forEach(({ date, items }) => {
       rows.push({ style: "date", spanFirst: 6, cells: [fmtDate(date), "", "", "", "", ""] });
       items.forEach((e) => {
@@ -436,8 +436,8 @@ const buildExportConfig = (data: DayBook, longNar: boolean): ExportConfig => {
 
   // Build payment rows (Dr)
   data.paymentGroups.forEach((g) => {
-    // spanFirst:5 â†’ first 5 cols merged for label, col 5 (Dr Amount) holds group total
-    rows.push({ style: "group", spanFirst: 5, cells: [`PAYMENTS â€” ${g.groupName}`, "", "", "", fmt(g.groupTotal), ""] });
+    // spanFirst:5 → first 5 cols merged for label, col 5 (Dr Amount) holds group total
+    rows.push({ style: "group", spanFirst: 5, cells: [`PAYMENTS — ${g.groupName}`, "", "", "", fmt(g.groupTotal), ""] });
     groupByDate(g.entries).forEach(({ date, items }) => {
       rows.push({ style: "date", spanFirst: 6, cells: [fmtDate(date), "", "", "", "", ""] });
       items.forEach((e) => {
@@ -477,7 +477,7 @@ const buildExportConfig = (data: DayBook, longNar: boolean): ExportConfig => {
   };
 };
 
-// â”€â”€ Print HTML generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Print HTML generator ──────────────────────────────────────────────────────
 const buildPrintHTML = (
   data: DayBook,
   withLeftRight: boolean,
@@ -536,7 +536,7 @@ const buildPrintHTML = (
             <td class="sno">${sno}</td>
             <td>${par(e)}</td>
             <td class="amt">${fmt(e.amount)}</td>
-            <td class="amt">â€”</td>
+            <td class="amt">—</td>
           </tr>`;
         });
       });
@@ -749,7 +749,7 @@ const buildPrintHTML = (
   </div>
 
   <div class="day-label">
-    DayBook on : ${fmtShort(data.fromDate)}${data.fromDate !== data.toDate ? " â€” " + fmtShort(data.toDate) : ""}
+    DayBook on : ${fmtShort(data.fromDate)}${data.fromDate !== data.toDate ? " — " + fmtShort(data.toDate) : ""}
   </div>
 
   ${bodyContent}
@@ -764,7 +764,7 @@ const buildPrintHTML = (
 </html>`;
 };
 
-// â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main Component ────────────────────────────────────────────────────────────
 const DayBookPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
   const navigate = useNavigate();
@@ -798,7 +798,7 @@ const DayBookPage: React.FC = () => {
         if (fromDate < minD) setFromDate(minD);
         if (toDate < minD) setToDate(minD);
       }
-    }).catch(() => {/* silently ignore â€” date pickers still work without bounds */});
+    }).catch(() => {/* silently ignore — date pickers still work without bounds */});
   }, [user.branchid]);
 
   const handleShow = async () => {
@@ -862,7 +862,7 @@ const DayBookPage: React.FC = () => {
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 lg:p-8">
           <div className="w-full space-y-6">
 
-            {/* â”€â”€ Form Card â”€â”€ */}
+            {/* ── Form Card ── */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 px-6 py-4 flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
@@ -904,7 +904,7 @@ const DayBookPage: React.FC = () => {
                   </div>
                   {sessionMinDate && (
                     <div className="text-xs text-gray-500 pb-1">
-                      Session: {fmtDate(sessionMinDate)} â€” {fmtDate(sessionMaxDate)}
+                      Session: {fmtDate(sessionMinDate)} — {fmtDate(sessionMaxDate)}
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pb-0.5">
@@ -1001,7 +1001,7 @@ const DayBookPage: React.FC = () => {
               </div>
             </div>
 
-            {/* â”€â”€ Report â”€â”€ */}
+            {/* ── Report ── */}
             {data && (
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
                 {/* Report header */}
@@ -1019,11 +1019,11 @@ const DayBookPage: React.FC = () => {
                   {/* Day label */}
                   <div className="text-center border border-gray-400 bg-gray-100 py-1.5 mb-3 text-sm font-semibold text-gray-800 rounded">
                     DayBook on : {fmtShort(data.fromDate)}
-                    {data.fromDate !== data.toDate && ` â€” ${fmtShort(data.toDate)}`}
+                    {data.fromDate !== data.toDate && ` — ${fmtShort(data.toDate)}`}
                   </div>
 
                   {withLeftRight ? (
-                    /* â”€â”€ Left / Right â”€â”€ */
+                    /* ── Left / Right ── */
                     <div className="border border-gray-400 rounded overflow-hidden">
                       <div className="flex">
                         <div className="flex-1 text-center bg-blue-700 text-white font-bold py-1.5 text-sm tracking-wide">
@@ -1043,7 +1043,7 @@ const DayBookPage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    /* â”€â”€ Simple / sequential â”€â”€ */
+                    /* ── Simple / sequential ── */
                     <div className="border border-gray-400 rounded overflow-hidden overflow-y-auto max-h-[65vh] overflow-x-auto">
                       <SimpleTable data={data} longNar={withLongNarration} />
                     </div>
@@ -1059,7 +1059,7 @@ const DayBookPage: React.FC = () => {
                     ].map(({ label, value, color }) => (
                       <div key={label} className={`bg-${color}-50 border border-${color}-200 rounded-lg px-4 py-2.5 flex flex-col`}>
                         <span className="text-xs text-gray-500">{label}</span>
-                        <span className={`font-bold text-${color}-700 text-base`}>â‚¹{fmt(value)}</span>
+                        <span className={`font-bold text-${color}-700 text-base`}>₹{fmt(value)}</span>
                       </div>
                     ))}
                   </div>

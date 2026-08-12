@@ -161,7 +161,7 @@ const LoanAdvancementPage: React.FC = () => {
               <div><label className={lbl}>To Date</label><input type="date" value={toDate} max={workingDate} onChange={e => { setToDate(e.target.value); setReport(null); }} className={inp} /></div>
               <button onClick={handleLoad} disabled={loading} className="flex items-center gap-1.5 px-5 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loadingâ€¦" : "Show"}
+                {loading ? "Loading…" : "Show"}
               </button>
               {report && <>
                 <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm"><Printer size={15} /> Print</button>
@@ -187,7 +187,7 @@ const LoanAdvancementPage: React.FC = () => {
               <div className="px-4 pt-4 pb-2">
                 <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
                   <span className="text-xs text-slate-500 uppercase font-medium">Grand Total Advancement</span>
-                  <span className="text-base font-bold text-green-700">â‚¹{fmt(report.totalAmount)}</span>
+                  <span className="text-base font-bold text-green-700">₹{fmt(report.totalAmount)}</span>
                 </div>
               </div>
 

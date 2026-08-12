@@ -174,7 +174,7 @@ const FDOpeningPage: React.FC = () => {
               <button onClick={handleLoad} disabled={loading}
                 className="flex items-center gap-1.5 px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loadingâ€¦" : "Show"}
+                {loading ? "Loading…" : "Show"}
               </button>
               {report && <>
                 <button onClick={handlePrint}
@@ -218,15 +218,15 @@ const FDOpeningPage: React.FC = () => {
               <div className="grid grid-cols-3 gap-3 p-4 bg-slate-50 border-b border-slate-200">
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-amber-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total FD Amount</p>
-                  <p className="text-base font-bold text-amber-700 mt-0.5">â‚¹{fmt(report.totalFDAmount)}</p>
+                  <p className="text-base font-bold text-amber-700 mt-0.5">₹{fmt(report.totalFDAmount)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-blue-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total Maturity Amount</p>
-                  <p className="text-base font-bold text-blue-700 mt-0.5">â‚¹{fmt(report.totalMaturityAmount)}</p>
+                  <p className="text-base font-bold text-blue-700 mt-0.5">₹{fmt(report.totalMaturityAmount)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-emerald-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total Opening Amount</p>
-                  <p className="text-base font-bold text-emerald-700 mt-0.5">â‚¹{fmt(report.totalOpeningAmount)}</p>
+                  <p className="text-base font-bold text-emerald-700 mt-0.5">₹{fmt(report.totalOpeningAmount)}</p>
                 </div>
               </div>
 

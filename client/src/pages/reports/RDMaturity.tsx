@@ -178,7 +178,7 @@ const RDMaturityPage: React.FC = () => {
               <button onClick={handleLoad} disabled={loading}
                 className="flex items-center gap-1.5 px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loadingâ€¦" : "Show"}
+                {loading ? "Loading…" : "Show"}
               </button>
               {report && <>
                 <button onClick={handlePrint}
@@ -222,11 +222,11 @@ const RDMaturityPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 border-b border-slate-200">
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-teal-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total RD Amount</p>
-                  <p className="text-base font-bold text-teal-700 mt-0.5">â‚¹{fmt(report.totalRDAmount)}</p>
+                  <p className="text-base font-bold text-teal-700 mt-0.5">₹{fmt(report.totalRDAmount)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-blue-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total Maturity Amount</p>
-                  <p className="text-base font-bold text-blue-700 mt-0.5">â‚¹{fmt(report.totalMaturityAmount)}</p>
+                  <p className="text-base font-bold text-blue-700 mt-0.5">₹{fmt(report.totalMaturityAmount)}</p>
                 </div>
               </div>
 

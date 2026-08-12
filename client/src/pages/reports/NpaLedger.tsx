@@ -15,7 +15,7 @@ import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
 import { getSessionFromDate } from "../../utils/sessionUtils";
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -28,14 +28,14 @@ const localDate = (iso: string) => {
 };
 
 const fmtDate = (iso: string | null) =>
-  iso ? localDate(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "â€”";
+  iso ? localDate(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
 const fmtLong = (iso: string) =>
   localDate(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 
 const toInputDate = (iso: string) => isoDatePart(iso);
 
-// â”€â”€ Group rows by category â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Group rows by category ─────────────────────────────────────────────────────
 
 interface CategoryGroup {
   categoryId: number;
@@ -66,7 +66,7 @@ const groupByCategory = (rows: NpaLedgerRow[]): CategoryGroup[] => {
   return Array.from(map.values());
 };
 
-// â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Export helpers ─────────────────────────────────────────────────────────────
 
 const buildExportConfig = (report: NpaLedgerData): ExportConfig => {
   const columns = [
@@ -123,7 +123,7 @@ const buildExportConfig = (report: NpaLedgerData): ExportConfig => {
     meta: {
       title: report.branchName,
       subtitle: report.branchAddress || undefined,
-      reportTitle: `NPA Ledger â€” ${report.planName} | ${fmtLong(report.fromDate)} to ${fmtLong(report.toDate)}`,
+      reportTitle: `NPA Ledger — ${report.planName} | ${fmtLong(report.fromDate)} to ${fmtLong(report.toDate)}`,
       fileName: `NpaLedger_${toInputDate(report.fromDate)}_${toInputDate(report.toDate)}`,
       landscape: true,
     },
@@ -150,7 +150,7 @@ const buildPrintHTML = (report: NpaLedgerData): string => {
         <td style="text-align:right">${fmt(row.loanAdvanced)}</td>
         <td style="text-align:right">${fmt(row.repaid)}</td>
         <td style="text-align:right;font-weight:600;color:#1d4ed8">${fmt(row.closingBalance)}</td>
-        <td style="text-align:right;color:#b91c1c;font-weight:600">${row.npaAmount > 0 ? fmt(row.npaAmount) : "â€”"}</td>
+        <td style="text-align:right;color:#b91c1c;font-weight:600">${row.npaAmount > 0 ? fmt(row.npaAmount) : "—"}</td>
         <td style="text-align:right">${row.daysOverdue}</td>
         <td style="text-align:right">${row.overdueInstallments}</td>
       </tr>`;
@@ -191,7 +191,7 @@ const buildPrintHTML = (report: NpaLedgerData): string => {
   <div class="rh">
     <h1>${report.branchName}</h1>
     ${report.branchAddress ? `<p>${report.branchAddress}</p>` : ""}
-    <h2>NPA Ledger â€” ${report.planName}</h2>
+    <h2>NPA Ledger — ${report.planName}</h2>
     <p>${fmtLong(report.fromDate)} to ${fmtLong(report.toDate)}</p>
   </div>
   <table>
@@ -215,7 +215,7 @@ const buildPrintHTML = (report: NpaLedgerData): string => {
 </body></html>`;
 };
 
-// â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main Component ─────────────────────────────────────────────────────────────
 
 const NpaLedgerPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
@@ -317,7 +317,7 @@ const NpaLedgerPage: React.FC = () => {
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-red-50 p-4 sm:p-6">
           <div className="w-full space-y-5">
 
-            {/* â”€â”€ Filter Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Filter Card ─────────────────────────────────────────────── */}
             <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden print:hidden">
               <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-red-50 to-rose-50 border-b border-gray-200">
                 <div className="w-9 h-9 bg-gradient-to-r from-red-600 to-rose-700 rounded-lg flex items-center justify-center shadow">
@@ -325,7 +325,7 @@ const NpaLedgerPage: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-gray-800">NPA Ledger</h2>
-                  <p className="text-xs text-gray-500">Non-Performing Assets â€” loan account ledger by NPA category</p>
+                  <p className="text-xs text-gray-500">Non-Performing Assets — loan account ledger by NPA category</p>
                 </div>
               </div>
 
@@ -385,7 +385,7 @@ const NpaLedgerPage: React.FC = () => {
                           {cat.periodFrom !== null && (
                             <span className="text-xs text-gray-400">
                               ({cat.periodFrom}
-                              {cat.periodTo && cat.periodTo > 0 ? `â€“${cat.periodTo}` : "+"}
+                              {cat.periodTo && cat.periodTo > 0 ? `—${cat.periodTo}` : “+”}
                               )
                             </span>
                           )}
@@ -403,7 +403,7 @@ const NpaLedgerPage: React.FC = () => {
                     className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 rounded-lg disabled:opacity-50 cursor-pointer shadow-sm transition-all"
                   >
                     {loading
-                      ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Loadingâ€¦</>
+                      ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Loading…</>
                       : <><Search className="w-4 h-4" /> Show</>
                     }
                   </button>
@@ -441,7 +441,7 @@ const NpaLedgerPage: React.FC = () => {
               </div>
             </div>
 
-            {/* â”€â”€ Report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Report ──────────────────────────────────────────────────── */}
             {report && report.rows.length > 0 && (
               <div className="space-y-4">
                 {/* Report header */}
@@ -449,7 +449,7 @@ const NpaLedgerPage: React.FC = () => {
                   <div className="text-center px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-red-50 to-rose-50 print:bg-white">
                     <h1 className="text-xl font-bold text-gray-900">{report.branchName}</h1>
                     {report.branchAddress && <p className="text-xs text-gray-500 mt-0.5">{report.branchAddress}</p>}
-                    <h2 className="text-base font-semibold text-red-800 mt-2">NPA Ledger â€” {report.planName}</h2>
+                    <h2 className="text-base font-semibold text-red-800 mt-2">NPA Ledger — {report.planName}</h2>
                     <p className="text-sm text-gray-600 mt-0.5">
                       {fmtLong(report.fromDate)} to {fmtLong(report.toDate)}
                     </p>
@@ -458,10 +458,10 @@ const NpaLedgerPage: React.FC = () => {
                   {/* Summary chips */}
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-4 bg-gray-50">
                     <SummaryChip label="Total Accounts" value={`${report.rows.length}`} color="gray" />
-                    <SummaryChip label="Opening Balance" value={`â‚¹${fmt(report.totalOpeningBalance)}`} color="blue" />
-                    <SummaryChip label="Loan Advanced" value={`â‚¹${fmt(report.totalLoanAdvanced)}`} color="blue" />
-                    <SummaryChip label="Closing Balance" value={`â‚¹${fmt(report.totalClosingBalance)}`} color="blue" />
-                    <SummaryChip label="Total NPA" value={`â‚¹${fmt(report.totalNpa)}`} color="red" />
+                    <SummaryChip label="Opening Balance" value={`₹${fmt(report.totalOpeningBalance)}`} color="blue" />
+                    <SummaryChip label="Loan Advanced" value={`₹${fmt(report.totalLoanAdvanced)}`} color="blue" />
+                    <SummaryChip label="Closing Balance" value={`₹${fmt(report.totalClosingBalance)}`} color="blue" />
+                    <SummaryChip label="Total NPA" value={`₹${fmt(report.totalNpa)}`} color="red" />
                   </div>
                 </div>
 
@@ -476,12 +476,12 @@ const NpaLedgerPage: React.FC = () => {
                           <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-left">Member / Account</th>
                           <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-left">Product</th>
                           <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-center">Loan Date</th>
-                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Loan Amt (â‚¹)</th>
-                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Opening Bal (â‚¹)</th>
-                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Advanced (â‚¹)</th>
-                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Repaid (â‚¹)</th>
-                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Closing Bal (â‚¹)</th>
-                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">NPA Amount (â‚¹)</th>
+                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Loan Amt (₹)</th>
+                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Opening Bal (₹)</th>
+                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Advanced (₹)</th>
+                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Repaid (₹)</th>
+                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Closing Bal (₹)</th>
+                          <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">NPA Amount (₹)</th>
                           <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">Days OD</th>
                           <th className="border border-gray-300 px-2 py-2 bg-red-800 text-white text-right">OD Inst.</th>
                         </tr>
@@ -512,7 +512,7 @@ const NpaLedgerPage: React.FC = () => {
                                 <td className="border border-gray-300 px-2 py-1.5 text-right text-gray-700">{fmt(row.loanAdvanced)}</td>
                                 <td className="border border-gray-300 px-2 py-1.5 text-right text-gray-700">{fmt(row.repaid)}</td>
                                 <td className="border border-gray-300 px-2 py-1.5 text-right font-semibold text-blue-700">{fmt(row.closingBalance)}</td>
-                                <td className="border border-gray-300 px-2 py-1.5 text-right font-semibold text-red-700">{row.npaAmount > 0 ? fmt(row.npaAmount) : "â€”"}</td>
+                                <td className="border border-gray-300 px-2 py-1.5 text-right font-semibold text-red-700">{row.npaAmount > 0 ? fmt(row.npaAmount) : "—"}</td>
                                 <td className="border border-gray-300 px-2 py-1.5 text-right text-gray-700">{row.daysOverdue}</td>
                                 <td className="border border-gray-300 px-2 py-1.5 text-right text-gray-700">{row.overdueInstallments}</td>
                               </tr>
@@ -570,7 +570,7 @@ const NpaLedgerPage: React.FC = () => {
   );
 };
 
-// â”€â”€ Helper component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helper component ───────────────────────────────────────────────────────────
 
 const SummaryChip: React.FC<{ label: string; value: string; color: "gray" | "blue" | "red" | "green" }> = ({ label, value, color }) => {
   const colors = {

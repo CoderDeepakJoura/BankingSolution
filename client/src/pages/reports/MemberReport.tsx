@@ -19,8 +19,8 @@ const fmtShort = (iso: string) => { try { return localDt(iso).toLocaleDateString
 const toInput  = (iso: string) => isoDate(iso);
 
 const buildExportConfig = (report: MemberReport): ExportConfig => {
-  // 16 columns â€” widthRatios must sum to exactly 1.00
-  // Using A3 landscape so each column has ~25mm on average (400mm usable Ã· 16)
+  // 16 columns — widthRatios must sum to exactly 1.00
+  // Using A3 landscape so each column has ~25mm on average (400mm usable ÷ 16)
   const columns = [
     { header: "S.No.",        widthRatio: 0.03, align: "center" as const },
     { header: "Branch Code",  widthRatio: 0.05, align: "center" as const },
@@ -329,7 +329,7 @@ const MemberReportPage: React.FC = () => {
                   {loading
                     ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     : <Search size={15} />}
-                  {loading ? "Loadingâ€¦" : "Generate"}
+                  {loading ? "Loading…" : "Generate"}
                 </button>
 
                 {report && report.rows.length > 0 && (
