@@ -11,8 +11,9 @@ import rdFinancialReportApi, {
 } from "../../services/reports/rdFinancialReportApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -23,136 +24,77 @@ const localDt = (iso: string) => {
 };
 const fmtShort = (iso: string) =>
   localDt(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-const fmtLong = (iso: string) =>
-  localDt(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 const toInput = (iso: string) => isoDate(iso);
 
-const TYPE_ORDER: Record<string, number> = {
-  Assets: 1, Liabilities: 2, Income: 3, Expenditure: 4,
+// positive = Cr, negative = Dr (standard banking convention used by this report)
+const fmtBal = (n: number): string => {
+  if (n === 0) return "";
+  return n < 0 ? `${fmt(Math.abs(n))} Dr` : `${fmt(n)} Cr`;
 };
 
-const closingLabel = (bal: number): string => {
-  if (bal === 0) return "—";
-  return `${fmt(Math.abs(bal))} ${bal > 0 ? "Cr" : "Dr"}`;
-};
+// opening = closing - periodCr + periodDr
+const openingBal = (r: RDFinRow): number => r.closingBalance - r.periodCr + r.periodDr;
 
-// ── Group the rows by TypeName then by HeadName ───────────────────────────────
+// -- Format type --------------------------------------------------------------
 
-interface GroupedSection {
-  typeName: string;
-  heads: {
-    headId: number;
-    headName: string;
-    rows: RDFinRow[];
-    subDr: number;
-    subCr: number;
-    subClBal: number;
-  }[];
-  totalDr: number;
-  totalCr: number;
-  totalClBal: number;
-}
+type ReportFormat = "standard" | "with-balance";
 
-const groupRows = (rows: RDFinRow[]): GroupedSection[] => {
-  const typeMap = new Map<string, Map<string, RDFinRow[]>>();
-  for (const r of rows) {
-    if (r.accOrHead === "") continue; // Cash Head special row — rendered separately
-    if (!typeMap.has(r.typeName)) typeMap.set(r.typeName, new Map());
-    const headMap = typeMap.get(r.typeName)!;
-    if (!headMap.has(r.headName)) headMap.set(r.headName, []);
-    headMap.get(r.headName)!.push(r);
-  }
+// -- Export config ------------------------------------------------------------
 
-  const sections: GroupedSection[] = [];
-  for (const [typeName, headMap] of typeMap) {
-    const heads: GroupedSection["heads"] = [];
-    for (const [headName, hRows] of headMap) {
-      const subDr    = hRows.reduce((s, r) => s + r.periodDr, 0);
-      const subCr    = hRows.reduce((s, r) => s + r.periodCr, 0);
-      const subClBal = hRows.reduce((s, r) => s + r.closingBalance, 0);
-      heads.push({ headId: hRows[0].headId, headName, rows: hRows, subDr, subCr, subClBal });
-    }
-    const totalDr    = heads.reduce((s, h) => s + h.subDr, 0);
-    const totalCr    = heads.reduce((s, h) => s + h.subCr, 0);
-    const totalClBal = heads.reduce((s, h) => s + h.subClBal, 0);
-    sections.push({ typeName, heads, totalDr, totalCr, totalClBal });
-  }
-  return sections.sort((a, b) => (TYPE_ORDER[a.typeName] ?? 9) - (TYPE_ORDER[b.typeName] ?? 9));
-};
+const buildExportConfig = (report: RDFinancialReport, format: ReportFormat): ExportConfig => {
+  const wb = format === "with-balance";
 
-// ── Export config ─────────────────────────────────────────────────────────────
-
-const buildExportConfig = (report: RDFinancialReport): ExportConfig => {
-  const columns = [
-    { header: "Name",            widthRatio: 0.50, align: "left"   as const },
-    { header: "Dr",              widthRatio: 0.15, align: "right"  as const },
-    { header: "Cr",              widthRatio: 0.15, align: "right"  as const },
-    { header: "Closing Balance", widthRatio: 0.20, align: "right"  as const },
-  ];
+  const columns = wb
+    ? [
+        { header: "Sr.No.",          widthRatio: 0.06, align: "right" as const },
+        { header: "Account Name",    widthRatio: 0.34, align: "left"  as const },
+        { header: "Opening Balance", widthRatio: 0.15, align: "right" as const },
+        { header: "Debit",           widthRatio: 0.15, align: "right" as const },
+        { header: "Credit",          widthRatio: 0.15, align: "right" as const },
+        { header: "Closing Balance", widthRatio: 0.15, align: "right" as const },
+      ]
+    : [
+        { header: "Sr.No.",       widthRatio: 0.08, align: "right" as const },
+        { header: "Account Name", widthRatio: 0.54, align: "left"  as const },
+        { header: "Debit",        widthRatio: 0.19, align: "right" as const },
+        { header: "Credit",       widthRatio: 0.19, align: "right" as const },
+      ];
 
   const rows: ExportRow[] = [];
-  const sections = groupRows(report.rows);
-
+  const infoExt = wb ? ["", "", "", ""] : ["", ""];
   rows.push({
     style: "info",
-    cells: [`Branch: ${report.branchName}`, `Period: ${fmtShort(report.fromDate)} to ${fmtShort(report.toDate)}`],
+    cells: [`Branch: ${report.branchName}`, `Period: ${fmtShort(report.fromDate)} to ${fmtShort(report.toDate)}`, ...infoExt],
   });
 
-  for (const sec of sections) {
-    rows.push({ style: "group", spanFirst: 4, cells: [sec.typeName, "", "", ""] });
-    for (const head of sec.heads) {
-      if (head.rows.some(r => r.accOrHead === "A")) {
-        // Non-annexure: show head subheader then accounts
-        rows.push({ style: "date", spanFirst: 4, cells: [head.headName, "", "", ""] });
-        for (const r of head.rows) {
-          rows.push({
-            style: "normal",
-            cells: [r.name, r.periodDr > 0 ? fmt(r.periodDr) : "", r.periodCr > 0 ? fmt(r.periodCr) : "", closingLabel(r.closingBalance)],
-          });
-        }
-        rows.push({
-          style: "subtotal",
-          cells: [`Total — ${head.headName}`, head.subDr > 0 ? fmt(head.subDr) : "", head.subCr > 0 ? fmt(head.subCr) : "", closingLabel(head.subClBal)],
-        });
-      } else {
-        // Annexure: single head-level row
-        rows.push({
-          style: "normal",
-          cells: [head.headName, head.subDr > 0 ? fmt(head.subDr) : "", head.subCr > 0 ? fmt(head.subCr) : "", closingLabel(head.subClBal)],
-        });
-      }
-    }
+  const cashHead = report.rows.find(r => r.accOrHead === "");
+  const mainRows = report.rows.filter(r => r.accOrHead !== "");
+  let srNo = 1;
+
+  if (cashHead) {
     rows.push({
-      style: "subtotal",
-      cells: [`Sub-Total — ${sec.typeName}`, sec.totalDr > 0 ? fmt(sec.totalDr) : "", sec.totalCr > 0 ? fmt(sec.totalCr) : "", closingLabel(sec.totalClBal)],
+      style: "normal",
+      cells: wb
+        ? [String(srNo++), "Opening Cash", "", cashHead.periodDr > 0 ? fmt(cashHead.periodDr) : "", cashHead.periodCr > 0 ? fmt(cashHead.periodCr) : "", ""]
+        : [String(srNo++), "Opening Cash", cashHead.periodDr > 0 ? fmt(cashHead.periodDr) : "", cashHead.periodCr > 0 ? fmt(cashHead.periodCr) : ""],
+    });
+  }
+
+  for (const r of mainRows) {
+    rows.push({
+      style: "normal",
+      cells: wb
+        ? [String(srNo++), r.name, fmtBal(openingBal(r)), r.periodDr > 0 ? fmt(r.periodDr) : "", r.periodCr > 0 ? fmt(r.periodCr) : "", fmtBal(r.closingBalance)]
+        : [String(srNo++), r.name, r.periodDr > 0 ? fmt(r.periodDr) : "", r.periodCr > 0 ? fmt(r.periodCr) : ""],
     });
   }
 
   rows.push({
     style: "total",
-    cells: [
-      "Grand Total",
-      fmt(report.totalPeriodDr),
-      fmt(report.totalPeriodCr),
-      (() => {
-        const net = report.totalClosingCr - report.totalClosingDr;
-        return net === 0 ? "—" : `${fmt(Math.abs(net))} ${net > 0 ? "Cr" : "Dr"}`;
-      })(),
-    ],
+    cells: wb
+      ? ["", "Grand Total", "", fmt(report.totalPeriodDr), fmt(report.totalPeriodCr), ""]
+      : ["", "Grand Total", fmt(report.totalPeriodDr), fmt(report.totalPeriodCr)],
   });
-
-  // Cash Head special row — Dr col = Closing Balance at ToDate, Cr col = Opening Balance at FromDate
-  for (const r of report.rows.filter(x => x.accOrHead === "")) {
-    rows.push({
-      style: "info",
-      cells: [
-        `${r.name}  (Dr = Closing Balance | Cr = Opening Balance)`,
-        closingLabel(r.periodDr),
-        closingLabel(r.periodCr),
-        "—",
-      ],
-    });
-  }
 
   return {
     meta: {
@@ -160,112 +102,81 @@ const buildExportConfig = (report: RDFinancialReport): ExportConfig => {
       subtitle: report.branchAddress || undefined,
       reportTitle: `RD Financial Report | ${fmtShort(report.fromDate)} to ${fmtShort(report.toDate)}`,
       fileName: `RDFinancialReport_${toInput(report.fromDate)}_${toInput(report.toDate)}`,
-      landscape: false,
+      landscape: wb,
     },
     columns,
     rows,
   };
 };
 
-// ── Print HTML ────────────────────────────────────────────────────────────────
+// -- Print HTML ---------------------------------------------------------------
 
-const buildPrintHTML = (report: RDFinancialReport): string => {
-  const sections = groupRows(report.rows);
+const buildPrintHTML = (report: RDFinancialReport, format: ReportFormat): string => {
+  const wb = format === "with-balance";
+  const cashHead = report.rows.find(r => r.accOrHead === "");
+  const mainRows = report.rows.filter(r => r.accOrHead !== "");
+  let srNo = 1;
   let tbody = "";
 
-  for (const sec of sections) {
-    tbody += `<tr class="group-row"><td colspan="4">${sec.typeName}</td></tr>`;
-    for (const head of sec.heads) {
-      if (head.rows.some(r => r.accOrHead === "A")) {
-        tbody += `<tr class="head-row"><td colspan="4">${head.headName}</td></tr>`;
-        head.rows.forEach((r, i) => {
-          tbody += `<tr style="background:${i % 2 === 0 ? "#fff" : "#f8fafc"}">
-            <td class="name-col">${r.name}</td>
-            <td class="amt">${r.periodDr > 0 ? fmt(r.periodDr) : ""}</td>
-            <td class="amt">${r.periodCr > 0 ? fmt(r.periodCr) : ""}</td>
-            <td class="amt bal ${r.closingBalance > 0 ? "cr" : r.closingBalance < 0 ? "dr" : ""}">${closingLabel(r.closingBalance)}</td>
-          </tr>`;
-        });
-        tbody += `<tr class="sub-row">
-          <td style="text-align:right">Total — ${head.headName}</td>
-          <td class="amt">${head.subDr > 0 ? fmt(head.subDr) : ""}</td>
-          <td class="amt">${head.subCr > 0 ? fmt(head.subCr) : ""}</td>
-          <td class="amt bal ${head.subClBal > 0 ? "cr" : head.subClBal < 0 ? "dr" : ""}">${closingLabel(head.subClBal)}</td>
-        </tr>`;
-      } else {
-        tbody += `<tr>
-          <td class="name-col"><strong>${head.headName}</strong></td>
-          <td class="amt">${head.subDr > 0 ? fmt(head.subDr) : ""}</td>
-          <td class="amt">${head.subCr > 0 ? fmt(head.subCr) : ""}</td>
-          <td class="amt bal ${head.subClBal > 0 ? "cr" : head.subClBal < 0 ? "dr" : ""}">${closingLabel(head.subClBal)}</td>
-        </tr>`;
-      }
-    }
-    tbody += `<tr class="sub-row">
-      <td style="text-align:right">Sub-Total — ${sec.typeName}</td>
-      <td class="amt">${sec.totalDr > 0 ? fmt(sec.totalDr) : ""}</td>
-      <td class="amt">${sec.totalCr > 0 ? fmt(sec.totalCr) : ""}</td>
-      <td class="amt bal ${sec.totalClBal > 0 ? "cr" : sec.totalClBal < 0 ? "dr" : ""}">${closingLabel(sec.totalClBal)}</td>
+  if (cashHead) {
+    tbody += `<tr>
+      <td class="sr">${srNo++}</td>
+      <td>Opening Cash</td>
+      ${wb ? "<td class=\"amt\"></td>" : ""}
+      <td class="amt">${cashHead.periodDr > 0 ? fmt(cashHead.periodDr) : ""}</td>
+      <td class="amt">${cashHead.periodCr > 0 ? fmt(cashHead.periodCr) : ""}</td>
+      ${wb ? "<td class=\"amt\"></td>" : ""}
     </tr>`;
   }
 
-  const netCl = report.totalClosingCr - report.totalClosingDr;
+  mainRows.forEach((r, i) => {
+    tbody += `<tr style="background:${i % 2 === 0 ? "#fff" : "#f8fafc"}">
+      <td class="sr">${srNo++}</td>
+      <td>${r.name}</td>
+      ${wb ? `<td class="amt">${fmtBal(openingBal(r))}</td>` : ""}
+      <td class="amt">${r.periodDr > 0 ? fmt(r.periodDr) : ""}</td>
+      <td class="amt">${r.periodCr > 0 ? fmt(r.periodCr) : ""}</td>
+      ${wb ? `<td class="amt">${fmtBal(r.closingBalance)}</td>` : ""}
+    </tr>`;
+  });
+
   tbody += `<tr class="total-row">
+    <td class="sr"></td>
     <td style="text-align:right">Grand Total</td>
+    ${wb ? "<td class=\"amt\"></td>" : ""}
     <td class="amt">${fmt(report.totalPeriodDr)}</td>
     <td class="amt">${fmt(report.totalPeriodCr)}</td>
-    <td class="amt">${netCl === 0 ? "—" : `${fmt(Math.abs(netCl))} ${netCl > 0 ? "Cr" : "Dr"}`}</td>
+    ${wb ? "<td class=\"amt\"></td>" : ""}
   </tr>`;
 
-  // Cash Head special row (Dr = Closing Balance at ToDate, Cr = Opening Balance at FromDate)
-  for (const r of report.rows.filter(x => x.accOrHead === "")) {
-    tbody += `<tr class="cash-head-row">
-      <td class="name-col">${r.name}<br/><span style="font-size:8px;font-style:italic;color:#93c5fd">Dr = Closing Balance &nbsp;|&nbsp; Cr = Opening Balance</span></td>
-      <td class="amt">${closingLabel(r.periodDr)}</td>
-      <td class="amt">${closingLabel(r.periodCr)}</td>
-      <td class="amt">—</td>
-    </tr>`;
-  }
+  const thExtra = wb
+    ? `<th style="width:110px">Opening Balance</th><th style="width:100px">Debit</th><th style="width:100px">Credit</th><th style="width:110px">Closing Balance</th>`
+    : `<th style="width:120px">Debit</th><th style="width:120px">Credit</th>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>RD Financial Report</title><style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:Arial,sans-serif;font-size:10.5px;padding:12px;}
 .rh{text-align:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #334155;}
-.rh h1{font-size:14px;font-weight:bold;text-transform:uppercase;}
-.rh p{font-size:10px;color:#64748b;}
+.rh h1{font-size:13px;font-weight:bold;text-transform:uppercase;text-decoration:underline;}
 .rh h2{font-size:11px;font-weight:600;margin-top:4px;}
-.acc-info{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;font-size:9px;color:#64748b;margin-top:4px;}
-.acc-info span{display:flex;gap:5px;align-items:center;}
 table{width:100%;border-collapse:collapse;}
-th{background:#475569;color:#fff;border:1px solid #64748b;padding:3px 6px;font-size:9.5px;text-transform:uppercase;}
-td{border:1px solid #e2e8f0;padding:2px 5px;font-size:10px;}
-.name-col{min-width:220px;}
-.group-row td{background:#dbeafe;color:#1e40af;font-weight:700;padding:4px 5px;}
-.head-row td{background:#fef3c7;color:#92400e;font-weight:600;padding:3px 5px;font-style:italic;}
-.sub-row td{background:#f1f5f9;font-weight:600;border-top:1px solid #94a3b8;}
-.total-row td{background:#475569;color:#fff;font-weight:700;}
+th{background:#c0c0c0;border:1px solid #999;padding:4px 6px;font-size:10px;text-align:center;}
+td{border:1px solid #ccc;padding:2px 5px;font-size:10px;}
+.sr{width:40px;text-align:right;}
 .amt{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
-.bal.cr{color:#166534;}
-.bal.dr{color:#b91c1c;}
-.cash-head-row td{background:#e0e7ff;color:#312e81;font-weight:600;}
-@media print{body{padding:6px;}@page{margin:10mm;size:A4 portrait;}}
+.total-row td{background:#c0c0c0;font-weight:700;}
+@media print{body{padding:6px;}@page{margin:10mm;size:A4 ${wb ? "landscape" : "portrait"};}}
 </style></head><body>
 <div class="rh">
   <h1>${report.branchName}</h1>
-  ${report.branchAddress ? `<p>${report.branchAddress}</p>` : ""}
-  <h2>RD Financial Report</h2>
-  <div class="acc-info">
-    <span><b>Period:</b> ${fmtLong(report.fromDate)} to ${fmtLong(report.toDate)}</span>
-    ${report.showAllClBal ? "<span><b>Mode:</b> All Closing Balances</span>" : ""}
-  </div>
+  <h2>RD Financial Report &nbsp;&nbsp; ${fmtShort(report.fromDate)} - ${fmtShort(report.toDate)}</h2>
 </div>
 <table>
   <thead>
     <tr>
-      <th style="text-align:left">Name</th>
-      <th style="width:110px">Dr</th>
-      <th style="width:110px">Cr</th>
-      <th style="width:130px">Closing Balance</th>
+      <th style="width:40px">Sr.No.</th>
+      <th style="text-align:left">Account Name</th>
+      ${thExtra}
     </tr>
   </thead>
   <tbody>${tbody}</tbody>
@@ -273,21 +184,22 @@ td{border:1px solid #e2e8f0;padding:2px 5px;font-size:10px;}
 </body></html>`;
 };
 
-// ── Page Component ────────────────────────────────────────────────────────────
+// -- Page Component -----------------------------------------------------------
 
 const RDFinancialReportPage: React.FC = () => {
   const user      = useSelector((state: RootState) => state.user);
   const navigate  = useNavigate();
   const workingDate = user.workingdate
-    ? toInput(commonservice.splitDate(user.workingdate))
-    : toInput(new Date().toISOString());
+    ? commonservice.parseWorkingDate(user.workingdate)
+    : new Date().toISOString().split("T")[0];
 
-  const [fromDate,     setFromDate]     = useState(workingDate);
-  const [toDate,       setToDate]       = useState(workingDate);
-  const [showAllClBal, setShowAllClBal] = useState(false);
-  const [loading,      setLoading]      = useState(false);
-  const [report,       setReport]       = useState<RDFinancialReport | null>(null);
-  const [dateError,    setDateError]    = useState("");
+  const [fromDate,      setFromDate]      = useState(getSessionFromDate(user.sessionInfo, workingDate));
+  const [toDate,        setToDate]        = useState(workingDate);
+  const [showAllClBal,  setShowAllClBal]  = useState(false);
+  const [reportFormat,  setReportFormat]  = useState<ReportFormat>("standard");
+  const [loading,       setLoading]       = useState(false);
+  const [report,        setReport]        = useState<RDFinancialReport | null>(null);
+  const [dateError,     setDateError]     = useState("");
 
   const validate = (): boolean => {
     if (!fromDate) { setDateError("From Date is required."); return false; }
@@ -317,9 +229,8 @@ const RDFinancialReportPage: React.FC = () => {
     setReport(null);
     try {
       const res = await rdFinancialReportApi.get(user.branchid, fromDate, toDate, showAllClBal);
-      const data = (res as any).data ?? (res as any).Data;
-      if (!data) throw new Error((res as any).message ?? "No data returned.");
-      setReport(data);
+      if (!res.data) throw new Error(res.message ?? "No data returned.");
+      setReport(res.data);
     } catch (e: any) {
       Swal.fire("Error", e?.message || "Failed to load report.", "error");
     } finally {
@@ -331,7 +242,7 @@ const RDFinancialReportPage: React.FC = () => {
     if (!report) return;
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(buildPrintHTML(report));
+    win.document.write(buildPrintHTML(report, reportFormat));
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); win.close(); }, 300);
@@ -340,16 +251,18 @@ const RDFinancialReportPage: React.FC = () => {
   const lbl = "block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5";
   const inp = "px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer";
 
-  const sections     = report ? groupRows(report.rows) : [];
-  const cashHeadRows = report ? report.rows.filter(r => r.accOrHead === "") : [];
-  const netCl = report ? report.totalClosingCr - report.totalClosingDr : 0;
+  const cashHead = report ? report.rows.find(r => r.accOrHead === "") : null;
+  const mainRows = report ? report.rows.filter(r => r.accOrHead !== "") : [];
+  const wb = reportFormat === "with-balance";
+
+  let srNo = 1;
 
   return (
     <DashboardLayout enableScroll mainContent={
       <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
         <div className="w-full space-y-5">
 
-          {/* ── Filter Card ── */}
+          {/* Filter Card */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200">
               <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center">
@@ -357,7 +270,7 @@ const RDFinancialReportPage: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-800">RD Financial Report</h2>
-                <p className="text-xs text-slate-500">Account head-wise Dr/Cr movements and closing balance for a period</p>
+                <p className="text-xs text-slate-500">Account head-wise Dr/Cr movements for a period</p>
               </div>
             </div>
 
@@ -386,6 +299,19 @@ const RDFinancialReportPage: React.FC = () => {
                 />
               </div>
 
+              {/* Format selector */}
+              <div>
+                <label className={lbl}>Report Format</label>
+                <select
+                  value={reportFormat}
+                  onChange={e => setReportFormat(e.target.value as ReportFormat)}
+                  className={`${inp} pr-8`}
+                >
+                  <option value="standard">Standard Format</option>
+                  <option value="with-balance">With Opening &amp; Closing Balance</option>
+                </select>
+              </div>
+
               {/* Show All Closing Balances toggle */}
               <label className="flex items-center gap-2.5 cursor-pointer pb-0.5">
                 <div
@@ -401,16 +327,16 @@ const RDFinancialReportPage: React.FC = () => {
               <button onClick={handleLoad} disabled={loading || !!dateError}
                 className="flex items-center gap-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50 cursor-pointer">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loading…" : "Show"}
+                {loading ? "Loading..." : "Show"}
               </button>
               {report && <>
                 <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm cursor-pointer">
                   <Printer size={15} /> Print
                 </button>
-                <button onClick={() => exportToPdf(buildExportConfig(report))} className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition shadow-sm cursor-pointer">
+                <button onClick={() => exportToPdf(buildExportConfig(report, reportFormat))} className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition shadow-sm cursor-pointer">
                   <FileText size={15} /> PDF
                 </button>
-                <button onClick={() => exportToExcel(buildExportConfig(report))} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-sm cursor-pointer">
+                <button onClick={() => exportToExcel(buildExportConfig(report, reportFormat))} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition shadow-sm cursor-pointer">
                   <FileSpreadsheet size={15} /> Excel
                 </button>
               </>}
@@ -427,150 +353,86 @@ const RDFinancialReportPage: React.FC = () => {
             )}
           </div>
 
-          {/* ── Summary Cards ── */}
-          {report && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { label: "Period Dr",     value: fmt(report.totalPeriodDr),  color: "text-red-700",     bg: "bg-red-50",     border: "border-red-200"   },
-                { label: "Period Cr",     value: fmt(report.totalPeriodCr),  color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
-                { label: "Closing Cr",   value: fmt(report.totalClosingCr), color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
-                { label: "Closing Dr",   value: fmt(report.totalClosingDr), color: "text-red-700",     bg: "bg-red-50",     border: "border-red-200"   },
-              ].map(({ label, value, color, bg, border }) => (
-                <div key={label} className={`${bg} ${border} border rounded-xl p-4`}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">{label}</p>
-                  <p className={`text-base font-bold font-mono ${color}`}>{value}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── Report Table ── */}
+          {/* Report Table */}
           {report && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              {/* Report header */}
-              <div className="text-center px-6 py-5 border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white">
-                <h1 className="text-lg font-bold uppercase tracking-wider text-slate-900">{report.branchName}</h1>
+              <div className="text-center px-6 py-5 border-b border-slate-200">
+                <h1 className="text-base font-bold uppercase tracking-wider text-slate-900 underline">{report.branchName}</h1>
                 {report.branchAddress && <p className="text-xs text-slate-500 mt-0.5">{report.branchAddress}</p>}
-                <div className="flex items-center gap-3 justify-center mt-3">
-                  <div className="h-px bg-slate-200 flex-1 max-w-16" />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-indigo-700 px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-full">RD Financial Report</span>
-                  <div className="h-px bg-slate-200 flex-1 max-w-16" />
-                </div>
-                <p className="text-sm text-slate-600 mt-2">
-                  Period: {fmtLong(report.fromDate)} to {fmtLong(report.toDate)}
-                  {report.showAllClBal && <span className="ml-2 text-xs text-indigo-600 font-medium">(Incl. non-zero closing balances)</span>}
+                <p className="text-sm font-semibold text-slate-700 mt-2">
+                  RD Financial Report &nbsp;&nbsp; {fmtShort(report.fromDate)} - {fmtShort(report.toDate)}
                 </p>
               </div>
 
               <div className="p-4 overflow-x-auto">
-                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                  <table className="w-full border-collapse text-xs">
-                    <thead>
-                      <tr>
-                        <th className="bg-slate-600 text-white px-3 py-3 text-left font-semibold uppercase tracking-wider border-r border-slate-500">Name</th>
-                        <th className="bg-slate-600 text-white px-3 py-3 text-right font-semibold uppercase tracking-wider border-r border-slate-500 w-32">Dr</th>
-                        <th className="bg-slate-600 text-white px-3 py-3 text-right font-semibold uppercase tracking-wider border-r border-slate-500 w-32">Cr</th>
-                        <th className="bg-slate-600 text-white px-3 py-3 text-right font-semibold uppercase tracking-wider w-36">Closing Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sections.map(sec => (
-                        <React.Fragment key={sec.typeName}>
-                          {/* Type group header */}
-                          <tr className="bg-indigo-50 border-l-4 border-indigo-400">
-                            <td colSpan={4} className="px-3 py-2 font-bold text-indigo-800 uppercase tracking-wide">{sec.typeName}</td>
-                          </tr>
-
-                          {sec.heads.map(head => (
-                            <React.Fragment key={head.headId}>
-                              {head.rows.some(r => r.accOrHead === "A") ? (
-                                <>
-                                  {/* Non-annexure: head subheader */}
-                                  <tr className="bg-amber-50 border-l-2 border-amber-300">
-                                    <td colSpan={4} className="px-4 py-1.5 font-semibold text-amber-800 text-xs italic">{head.headName}</td>
-                                  </tr>
-                                  {/* Individual account rows */}
-                                  {head.rows.map((r, i) => (
-                                    <tr key={r.accId ?? i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50/70"}>
-                                      <td className="border-b border-slate-100 px-5 py-2 text-slate-800">{r.name}</td>
-                                      <td className="border-b border-slate-100 px-3 py-2 text-right text-red-700 font-medium tabular-nums">{r.periodDr > 0 ? fmt(r.periodDr) : ""}</td>
-                                      <td className="border-b border-slate-100 px-3 py-2 text-right text-emerald-700 font-medium tabular-nums">{r.periodCr > 0 ? fmt(r.periodCr) : ""}</td>
-                                      <td className={`border-b border-slate-100 px-3 py-2 text-right font-medium tabular-nums ${r.closingBalance > 0 ? "text-emerald-700" : r.closingBalance < 0 ? "text-red-700" : "text-slate-400"}`}>
-                                        {closingLabel(r.closingBalance)}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                  {/* Head subtotal */}
-                                  <tr className="bg-amber-50/60 border-t border-amber-200">
-                                    <td className="px-3 py-1.5 text-right text-amber-900 font-semibold text-xs">Total — {head.headName}</td>
-                                    <td className="px-3 py-1.5 text-right text-red-700 font-bold tabular-nums">{head.subDr > 0 ? fmt(head.subDr) : ""}</td>
-                                    <td className="px-3 py-1.5 text-right text-emerald-700 font-bold tabular-nums">{head.subCr > 0 ? fmt(head.subCr) : ""}</td>
-                                    <td className={`px-3 py-1.5 text-right font-bold tabular-nums ${head.subClBal > 0 ? "text-emerald-700" : head.subClBal < 0 ? "text-red-700" : "text-slate-400"}`}>
-                                      {closingLabel(head.subClBal)}
-                                    </td>
-                                  </tr>
-                                </>
-                              ) : (
-                                /* Annexure: single head row */
-                                <tr className="bg-white hover:bg-slate-50/50">
-                                  <td className="border-b border-slate-100 px-3 py-2 font-medium text-slate-800">{head.headName}</td>
-                                  <td className="border-b border-slate-100 px-3 py-2 text-right text-red-700 font-medium tabular-nums">{head.subDr > 0 ? fmt(head.subDr) : ""}</td>
-                                  <td className="border-b border-slate-100 px-3 py-2 text-right text-emerald-700 font-medium tabular-nums">{head.subCr > 0 ? fmt(head.subCr) : ""}</td>
-                                  <td className={`border-b border-slate-100 px-3 py-2 text-right font-medium tabular-nums ${head.subClBal > 0 ? "text-emerald-700" : head.subClBal < 0 ? "text-red-700" : "text-slate-400"}`}>
-                                    {closingLabel(head.subClBal)}
-                                  </td>
-                                </tr>
-                              )}
-                            </React.Fragment>
-                          ))}
-
-                          {/* Type subtotal */}
-                          <tr className="bg-slate-100 border-t border-slate-300">
-                            <td className="px-3 py-2 text-right text-slate-700 font-semibold text-xs">Sub-Total — {sec.typeName}</td>
-                            <td className="px-3 py-2 text-right text-red-700 font-bold tabular-nums">{sec.totalDr > 0 ? fmt(sec.totalDr) : ""}</td>
-                            <td className="px-3 py-2 text-right text-emerald-700 font-bold tabular-nums">{sec.totalCr > 0 ? fmt(sec.totalCr) : ""}</td>
-                            <td className={`px-3 py-2 text-right font-bold tabular-nums ${sec.totalClBal > 0 ? "text-emerald-700" : sec.totalClBal < 0 ? "text-red-700" : "text-slate-400"}`}>
-                              {closingLabel(sec.totalClBal)}
-                            </td>
-                          </tr>
-                        </React.Fragment>
-                      ))}
-
-                      {/* Grand total */}
-                      <tr className="bg-slate-600">
-                        <td className="px-3 py-2.5 text-right text-white font-bold">Grand Total</td>
-                        <td className="px-3 py-2.5 text-right text-white font-bold tabular-nums">{fmt(report.totalPeriodDr)}</td>
-                        <td className="px-3 py-2.5 text-right text-white font-bold tabular-nums">{fmt(report.totalPeriodCr)}</td>
-                        <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${netCl > 0 ? "text-emerald-200" : netCl < 0 ? "text-red-200" : "text-slate-200"}`}>
-                          {netCl === 0 ? "—" : `${fmt(Math.abs(netCl))} ${netCl > 0 ? "Cr" : "Dr"}`}
-                        </td>
-                      </tr>
-
-                      {/* Cash Head special row — Dr col = Closing Balance at ToDate, Cr col = Opening Balance at FromDate */}
-                      {cashHeadRows.length > 0 && cashHeadRows.map((r, i) => (
-                        <tr key={`cash-${i}`} className="bg-indigo-100 border-t-2 border-indigo-300">
-                          <td className="px-3 py-2.5 text-indigo-900 font-semibold">
-                            {r.name}
-                            <span className="block text-xs text-indigo-500 font-normal italic">Dr = Closing Balance &nbsp;|&nbsp; Cr = Opening Balance</span>
-                          </td>
-                          <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${r.periodDr > 0 ? "text-emerald-700" : r.periodDr < 0 ? "text-red-700" : "text-slate-400"}`}>
-                            {closingLabel(r.periodDr)}
-                          </td>
-                          <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${r.periodCr > 0 ? "text-emerald-700" : r.periodCr < 0 ? "text-red-700" : "text-slate-400"}`}>
-                            {closingLabel(r.periodCr)}
-                          </td>
-                          <td className="px-3 py-2.5 text-center text-indigo-400">—</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {report.rows.length === 0 && (
+                {report.rows.length === 0 ? (
                   <div className="text-center py-12 text-slate-500">
                     <BarChart2 className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                     <p className="text-sm">No transactions found for this period.</p>
                   </div>
+                ) : (
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr>
+                        <th className="bg-slate-400 text-white border border-slate-500 px-3 py-2 text-right w-10">Sr.No.</th>
+                        <th className="bg-slate-400 text-white border border-slate-500 px-3 py-2 text-left">Account Name</th>
+                        {wb && <th className="bg-slate-400 text-white border border-slate-500 px-3 py-2 text-right w-36">Opening Balance</th>}
+                        <th className="bg-slate-400 text-white border border-slate-500 px-3 py-2 text-right w-32">Debit</th>
+                        <th className="bg-slate-400 text-white border border-slate-500 px-3 py-2 text-right w-32">Credit</th>
+                        {wb && <th className="bg-slate-400 text-white border border-slate-500 px-3 py-2 text-right w-36">Closing Balance</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Opening Cash (Cash Head) */}
+                      {cashHead && (
+                        <tr>
+                          <td className="border border-slate-200 px-3 py-2 text-right text-slate-600">{srNo++}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-800">Opening Cash</td>
+                          {wb && <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500"></td>}
+                          <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-800">
+                            {cashHead.periodDr > 0 ? fmt(cashHead.periodDr) : ""}
+                          </td>
+                          <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-800">
+                            {cashHead.periodCr > 0 ? fmt(cashHead.periodCr) : ""}
+                          </td>
+                          {wb && <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500"></td>}
+                        </tr>
+                      )}
+
+                      {mainRows.map((r, i) => (
+                        <tr key={r.accId ?? `h-${i}`} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                          <td className="border border-slate-200 px-3 py-2 text-right text-slate-600">{srNo++}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-800">{r.name}</td>
+                          {wb && (
+                            <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-700">
+                              {fmtBal(openingBal(r))}
+                            </td>
+                          )}
+                          <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-800">
+                            {r.periodDr > 0 ? fmt(r.periodDr) : ""}
+                          </td>
+                          <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-800">
+                            {r.periodCr > 0 ? fmt(r.periodCr) : ""}
+                          </td>
+                          {wb && (
+                            <td className="border border-slate-200 px-3 py-2 text-right tabular-nums font-medium text-slate-800">
+                              {fmtBal(r.closingBalance)}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+
+                      {/* Grand Total */}
+                      <tr className="bg-slate-400">
+                        <td className="border border-slate-500 px-3 py-2"></td>
+                        <td className="border border-slate-500 px-3 py-2 text-right text-white font-bold">Grand Total</td>
+                        {wb && <td className="border border-slate-500 px-3 py-2"></td>}
+                        <td className="border border-slate-500 px-3 py-2 text-right text-white font-bold tabular-nums">{fmt(report.totalPeriodDr)}</td>
+                        <td className="border border-slate-500 px-3 py-2 text-right text-white font-bold tabular-nums">{fmt(report.totalPeriodCr)}</td>
+                        {wb && <td className="border border-slate-500 px-3 py-2"></td>}
+                      </tr>
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>

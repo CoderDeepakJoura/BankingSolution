@@ -362,6 +362,12 @@ namespace BankingPlatform.API.Service.Reports
                 }
             }
 
+            // Sort rows in head-code order so A and H rows are interleaved (mirrors SP output)
+            var headCodeById = heads.ToDictionary(h => h.id, h => h.headcode);
+            rows = rows
+                .OrderBy(r => headCodeById.TryGetValue(r.HeadId, out var hc) ? hc : long.MaxValue)
+                .ToList();
+
             // Totals computed before Cash Head row so it doesn't inflate the period sums
             var totalDr  = rows.Sum(r => r.PeriodDr);
             var totalCr  = rows.Sum(r => r.PeriodCr);

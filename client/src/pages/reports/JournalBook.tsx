@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import { BookText, Search, Printer, FileText, FileSpreadsheet } from "lucide-rea
 import journalBookApi, { JournalBook } from "../../services/reports/journalBookApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isoDate = (iso: string) => iso.split("T")[0];
@@ -60,7 +61,7 @@ const JournalBookPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
   const navigate = useNavigate();
   const workingDate = user.workingdate ? toInput(commonservice.splitDate(user.workingdate)) : toInput(new Date().toISOString());
-  const [fromDate, setFromDate] = useState(workingDate);
+  const [fromDate, setFromDate] = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate, setToDate]     = useState(workingDate);
   const [sessionMin, setSessionMin] = useState("");
   const [loading, setLoading] = useState(false);
@@ -114,7 +115,7 @@ const JournalBookPage: React.FC = () => {
               <div><label className={lbl}>To Date</label><input type="date" value={toDate} min={sessionMin || undefined} max={workingDate} onChange={e => { setToDate(e.target.value); setReport(null); }} className={inp} /></div>
               <button onClick={handleLoad} disabled={loading} className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loading…" : "Show"}
+                {loading ? "Loadingâ€¦" : "Show"}
               </button>
               {report && <>
                 <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm"><Printer size={15} /> Print</button>
@@ -142,11 +143,11 @@ const JournalBookPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 border-b border-slate-200">
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-red-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total Dr</p>
-                  <p className="text-base font-bold text-red-700 mt-0.5">₹{fmt(report.totalDr)}</p>
+                  <p className="text-base font-bold text-red-700 mt-0.5">â‚¹{fmt(report.totalDr)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-emerald-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total Cr</p>
-                  <p className="text-base font-bold text-emerald-700 mt-0.5">₹{fmt(report.totalCr)}</p>
+                  <p className="text-base font-bold text-emerald-700 mt-0.5">â‚¹{fmt(report.totalCr)}</p>
                 </div>
               </div>
               <div className="p-4 overflow-x-auto">

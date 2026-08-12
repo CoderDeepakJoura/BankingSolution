@@ -54,17 +54,20 @@ namespace BankingPlatform.API.Controllers.AccountMasters
         {
             try
             {
-                if (dto.AccountIds == null || dto.AccountIds.Count == 0)
-                    return BadRequest(new ResponseDto { Success = false, Message = "No accounts selected." });
+                bool hasAccounts = dto.AccountIds != null && dto.AccountIds.Count > 0;
+                bool hasDetails  = dto.SelectedDetailIds != null && dto.SelectedDetailIds.Count > 0;
+                if (!hasAccounts && !hasDetails)
+                    return BadRequest(new ResponseDto { Success = false, Message = "No accounts or FD details selected." });
 
                 var result = await _service.PostInterestAsync(dto);
                 if (result != "Success")
                     return BadRequest(new ResponseDto { Success = false, Message = result });
 
+                int detailCount = dto.SelectedDetailIds?.Count ?? dto.AccountIds.Count;
                 return Ok(new ResponseDto
                 {
                     Success = true,
-                    Message = $"Interest posted successfully for {dto.AccountIds.Count} account(s)."
+                    Message = $"Interest posted successfully for {detailCount} FD detail(s)."
                 });
             }
             catch (Exception ex)

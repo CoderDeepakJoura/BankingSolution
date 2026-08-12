@@ -40,7 +40,11 @@ namespace BankingPlatform.API.Service.AccountMasters
         public int ProductId { get; set; }
         public DateTime PostingDate { get; set; }
         public List<int> AccountIds { get; set; } = new();
+        /// <summary>Per-detail selection: when set, only these fdaccountdetail IDs are posted.
+        /// Accounts to process are derived from the matching detail rows.</summary>
+        public List<int>? SelectedDetailIds { get; set; }
         public bool IsMIS { get; set; }
+        /// <summary>Interest override keyed by fdDetailId (fdaccountdetail.Id).</summary>
         public Dictionary<int, decimal>? InterestOverrides { get; set; }
     }
 
@@ -207,13 +211,29 @@ namespace BankingPlatform.API.Service.AccountMasters
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                foreach (var accountId in dto.AccountIds)
+                // When per-detail selection is used, derive the accounts to process from the detail IDs.
+                var accountIdsToProcess = dto.AccountIds;
+                if (dto.SelectedDetailIds != null && dto.SelectedDetailIds.Count > 0)
                 {
-                    var fdDetails = await _context.fdaccountdetail
+                    accountIdsToProcess = await _context.fdaccountdetail.AsNoTracking()
+                        .Where(x => dto.SelectedDetailIds.Contains(x.Id) && x.BranchId == dto.BranchId)
+                        .Select(x => x.AccountId)
+                        .Distinct()
+                        .ToListAsync();
+                }
+
+                foreach (var accountId in accountIdsToProcess)
+                {
+                    var fdDetailsQuery = _context.fdaccountdetail
                         .Where(x => x.AccountId == accountId && x.BranchId == dto.BranchId
                             && x.FDStatus == (int)Enums.FDStatus.Open
-                            && x.FDMaturityDate.Date >= dto.PostingDate.Date)
-                        .ToListAsync();
+                            && x.FDMaturityDate.Date >= dto.PostingDate.Date);
+
+                    // Filter to only the selected detail IDs when per-detail selection is active
+                    if (dto.SelectedDetailIds != null && dto.SelectedDetailIds.Count > 0)
+                        fdDetailsQuery = fdDetailsQuery.Where(x => dto.SelectedDetailIds.Contains(x.Id));
+
+                    var fdDetails = await fdDetailsQuery.ToListAsync();
 
                     if (!fdDetails.Any()) continue;
 
@@ -256,10 +276,46 @@ namespace BankingPlatform.API.Service.AccountMasters
                     }
 
                     if (!periodPostings.Any()) continue;
-                    decimal totalInterest = (dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(accountId, out var fdOv))
-                        ? Math.Round(fdOv, 2)
-                        : periodPostings.Sum(p => p.Interest);
+
+                    // Overrides are keyed by fdDetailId; sum per-detail overridden amounts
+                    decimal totalInterest;
+                    if (dto.InterestOverrides != null && dto.InterestOverrides.Count > 0)
+                    {
+                        totalInterest = 0;
+                        foreach (var dg in periodPostings.GroupBy(p => p.Detail.Id))
+                            totalInterest += dto.InterestOverrides.TryGetValue(dg.Key, out var dOvr)
+                                ? Math.Round(dOvr, 2)
+                                : dg.Sum(p => p.Interest);
+                    }
+                    else
+                    {
+                        totalInterest = periodPostings.Sum(p => p.Interest);
+                    }
                     if (totalInterest <= 0) continue;
+
+                    // Pre-compute effective per-period amounts so voucherfddetail.AmountCr / IntCr
+                    // stays in sync with the posted voucher Dr/Cr amount when an override is applied.
+                    var effectivePeriodAmts = new Dictionary<(int detId, DateTime periodEnd), decimal>();
+                    foreach (var dg in periodPostings.GroupBy(p => p.Detail.Id))
+                    {
+                        var dgList = dg.ToList();
+                        decimal calcDetTotal = dgList.Sum(p => p.Interest);
+                        decimal effDetTotal = dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(dg.Key, out var dOvr2)
+                            ? Math.Round(dOvr2, 2)
+                            : calcDetTotal;
+                        decimal dist = 0;
+                        for (int pi = 0; pi < dgList.Count; pi++)
+                        {
+                            decimal periodCalc = dgList[pi].Interest;
+                            decimal amt = pi == dgList.Count - 1
+                                ? effDetTotal - dist
+                                : (calcDetTotal > 0
+                                    ? Math.Round(effDetTotal * periodCalc / calcDetTotal, 2)
+                                    : Math.Round(effDetTotal / dgList.Count, 2));
+                            dist += amt;
+                            effectivePeriodAmts[(dgList[pi].Detail.Id, dgList[pi].To.Date)] = amt;
+                        }
+                    }
 
                     // Create voucher
                     var voucherEntity = new VoucherDTO
@@ -304,7 +360,19 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                         foreach (var grp in misGroups)
                         {
-                            decimal grpInterest = grp.Sum(p => p.Interest);
+                            decimal grpInterest;
+                            if (dto.InterestOverrides != null && dto.InterestOverrides.Count > 0)
+                            {
+                                grpInterest = 0;
+                                foreach (var dg in grp.GroupBy(p => p.Detail.Id))
+                                    grpInterest += dto.InterestOverrides.TryGetValue(dg.Key, out var dOvr)
+                                        ? Math.Round(dOvr, 2)
+                                        : dg.Sum(p => p.Interest);
+                            }
+                            else
+                            {
+                                grpInterest = grp.Sum(p => p.Interest);
+                            }
                             long misHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(grp.Key, dto.BranchId);
                             var crEntry = _memberService.voucherCreditDebitDetails(
                                 misHeadCode, grp.Key, dto.BranchId,
@@ -317,6 +385,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                             // Tag voucherfddetail entries for this MIS group
                             foreach (var (detail, from, to, interest) in grp)
                             {
+                                decimal effAmt = effectivePeriodAmts.GetValueOrDefault((detail.Id, to.Date), interest);
                                 _context.voucherfddetail.Add(new VoucherFDDetail
                                 {
                                     BrId = dto.BranchId,
@@ -324,12 +393,12 @@ namespace BankingPlatform.API.Service.AccountMasters
                                     VAccCrDrId = crEntry.Id,
                                     FDAccId = accountId,
                                     FDAccDetId = detail.Id,
-                                    AmountCr = interest,
+                                    AmountCr = effAmt,
                                     AmountDr = 0,
                                     Operation = operation,
                                     ValueDate = DateTime.SpecifyKind(to, DateTimeKind.Unspecified),
                                     VoucherDate = voucherDate,
-                                    IntCr = interest,
+                                    IntCr = effAmt,
                                     VoucherMainStatus = voucherStatus,
                                 });
                             }
@@ -352,6 +421,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                         // Tag voucherfddetail entries — each period posting
                         foreach (var (detail, from, to, interest) in periodPostings)
                         {
+                            decimal effAmt = effectivePeriodAmts.GetValueOrDefault((detail.Id, to.Date), interest);
                             _context.voucherfddetail.Add(new VoucherFDDetail
                             {
                                 BrId = dto.BranchId,
@@ -359,12 +429,12 @@ namespace BankingPlatform.API.Service.AccountMasters
                                 VAccCrDrId = crEntry.Id,
                                 FDAccId = accountId,
                                 FDAccDetId = detail.Id,
-                                AmountCr = interest,
+                                AmountCr = effAmt,
                                 AmountDr = 0,
                                 Operation = operation,
                                 ValueDate = DateTime.SpecifyKind(to, DateTimeKind.Unspecified),
                                 VoucherDate = voucherDate,
-                                IntCr = interest,
+                                IntCr = effAmt,
                                 VoucherMainStatus = voucherStatus,
                             });
                         }

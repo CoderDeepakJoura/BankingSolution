@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import loanDemandApi, { LoanDemand, LoanDemandRow } from "../../services/reports
 import { LoanProductItem } from "../../services/reports/loanAdvancementApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isoDate = (iso: string) => iso.split("T")[0];
@@ -94,7 +95,7 @@ const LoanDemandPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
   const navigate = useNavigate();
   const workingDate = user.workingdate ? toInput(commonservice.splitDate(user.workingdate)) : toInput(new Date().toISOString());
-  const [fromDate, setFromDate]   = useState(workingDate);
+  const [fromDate, setFromDate]   = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate, setToDate]       = useState(workingDate);
   const [products, setProducts]   = useState<LoanProductItem[]>([]);
   const [productId, setProductId] = useState(0);
@@ -158,7 +159,7 @@ const LoanDemandPage: React.FC = () => {
               </div>
               <button onClick={handleLoad} disabled={loading} className="flex items-center gap-1.5 px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loading…" : "Show"}
+                {loading ? "Loadingâ€¦" : "Show"}
               </button>
               {report && <>
                 <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm"><Printer size={15} /> Print</button>
@@ -179,7 +180,7 @@ const LoanDemandPage: React.FC = () => {
                 <div className="flex items-center gap-3 justify-center mt-3">
                   <div className="h-px bg-slate-200 flex-1 max-w-16" />
                   <span className="text-xs font-semibold uppercase tracking-widest text-violet-700 px-3 py-1 bg-violet-50 border border-violet-100 rounded-full">
-                    Loan Demand{pendingOnly ? " — Pending" : ""}
+                    Loan Demand{pendingOnly ? " â€” Pending" : ""}
                   </span>
                   <div className="h-px bg-slate-200 flex-1 max-w-16" />
                 </div>
@@ -190,15 +191,15 @@ const LoanDemandPage: React.FC = () => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 border-b border-slate-200">
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-violet-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total Kist Amount</p>
-                  <p className="text-base font-bold text-violet-700 mt-0.5">₹{fmt(report.totalKistAmount)}</p>
+                  <p className="text-base font-bold text-violet-700 mt-0.5">â‚¹{fmt(report.totalKistAmount)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-red-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total Principal</p>
-                  <p className="text-base font-bold text-red-700 mt-0.5">₹{fmt(report.totalPrincipal)}</p>
+                  <p className="text-base font-bold text-red-700 mt-0.5">â‚¹{fmt(report.totalPrincipal)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-orange-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total Interest</p>
-                  <p className="text-base font-bold text-orange-700 mt-0.5">₹{fmt(report.totalInterest)}</p>
+                  <p className="text-base font-bold text-orange-700 mt-0.5">â‚¹{fmt(report.totalInterest)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-slate-400 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Paid / Pending</p>

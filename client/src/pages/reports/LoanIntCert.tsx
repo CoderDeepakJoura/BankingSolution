@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -8,6 +8,7 @@ import { FileText, FileSpreadsheet, Printer, Search } from "lucide-react";
 import loanIntCertApi, { LoanIntCert, LoanIntCertAccount, LoanIntCertProduct } from "../../services/reports/loanIntCertApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isoDate = (iso: string) => iso.split("T")[0];
@@ -176,7 +177,7 @@ const LoanIntCertPage: React.FC = () => {
   const [productId, setProductId] = useState(0);
   const [accounts, setAccounts] = useState<LoanIntCertAccount[]>([]);
   const [accountId, setAccountId] = useState(0);
-  const [fromDate, setFromDate] = useState(workingDate.slice(0, 4) + "-04-01");
+  const [fromDate, setFromDate] = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate, setToDate] = useState(workingDate);
   const [loading, setLoading] = useState(false);
   const [cert, setCert] = useState<LoanIntCert | null>(null);
@@ -263,7 +264,7 @@ const LoanIntCertPage: React.FC = () => {
               <button onClick={handleLoad} disabled={loading || !accountId}
                 className="flex items-center gap-1.5 px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loading…" : "Show"}
+                {loading ? "Loadingâ€¦" : "Show"}
               </button>
               {cert && (
                 <>

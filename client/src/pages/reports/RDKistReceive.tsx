@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -11,8 +11,9 @@ import rdKistReceiveApi, {
 } from "../../services/reports/rdKistReceiveApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const fmt     = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isoDate = (iso: string) => iso.split("T")[0];
@@ -21,7 +22,7 @@ const fmtShort = (iso: string) => localDate(iso).toLocaleDateString("en-GB");
 const fmtLong  = (iso: string) => localDate(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 const toInput  = (iso: string) => isoDate(iso);
 
-// ── Export helpers ─────────────────────────────────────────────────────────────
+// â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const buildExportConfig = (report: RDKistReceive): ExportConfig => {
   const rows: ExportRow[] = [];
@@ -165,7 +166,7 @@ const buildPrintHTML = (report: RDKistReceive): string => {
   </body></html>`;
 };
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const RDKistReceivePage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
@@ -174,7 +175,7 @@ const RDKistReceivePage: React.FC = () => {
     ? toInput(commonservice.splitDate(user.workingdate))
     : toInput(new Date().toISOString());
 
-  const [fromDate, setFromDate]       = useState(workingDate);
+  const [fromDate, setFromDate]       = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate, setToDate]           = useState(workingDate);
   const [products, setProducts]       = useState<RDKistProductItem[]>([]);
   const [productId, setProductId]     = useState(0);
@@ -223,7 +224,7 @@ const RDKistReceivePage: React.FC = () => {
       <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
         <div className="w-full space-y-5">
 
-          {/* ── Filter card ────────────────────────────────────────────────── */}
+          {/* â”€â”€ Filter card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-teal-50 to-cyan-50">
               <div className="w-9 h-9 bg-teal-600 rounded-lg flex items-center justify-center">
@@ -281,7 +282,7 @@ const RDKistReceivePage: React.FC = () => {
                 className="flex items-center gap-1.5 px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 {loading
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Loading…</>
+                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Loadingâ€¦</>
                   : <><Search size={15} /> Show</>
                 }
               </button>
@@ -312,7 +313,7 @@ const RDKistReceivePage: React.FC = () => {
             </div>
           </div>
 
-          {/* ── Report ─────────────────────────────────────────────────────── */}
+          {/* â”€â”€ Report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           {report && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
 
@@ -329,7 +330,7 @@ const RDKistReceivePage: React.FC = () => {
               {/* Summary chips */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-slate-50 border-b border-slate-200">
                 <Chip label="Total Entries"  value={String(report.totalCount)}       color="slate" />
-                <Chip label="Grand Total"    value={`₹${fmt(report.grandTotal)}`}    color="teal"  />
+                <Chip label="Grand Total"    value={`â‚¹${fmt(report.grandTotal)}`}    color="teal"  />
                 {report.showDatewise && (
                   <Chip label="Date Groups"  value={String(report.dateGroups.length)} color="blue"  />
                 )}
@@ -338,10 +339,10 @@ const RDKistReceivePage: React.FC = () => {
               {/* Table */}
               <div className="p-4 overflow-x-auto">
                 {report.showDatewise ? (
-                  /* ── Datewise table ──────────────────────────────────────── */
+                  /* â”€â”€ Datewise table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
                   <DatewiseTable report={report} />
                 ) : (
-                  /* ── Non-datewise table ──────────────────────────────────── */
+                  /* â”€â”€ Non-datewise table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
                   <SummaryTable report={report} />
                 )}
               </div>
@@ -361,7 +362,7 @@ const RDKistReceivePage: React.FC = () => {
   );
 };
 
-// ── Non-datewise table ─────────────────────────────────────────────────────────
+// â”€â”€ Non-datewise table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SummaryTable: React.FC<{ report: RDKistReceive }> = ({ report }) => {
   const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -407,7 +408,7 @@ const SummaryTable: React.FC<{ report: RDKistReceive }> = ({ report }) => {
   );
 };
 
-// ── Datewise table ─────────────────────────────────────────────────────────────
+// â”€â”€ Datewise table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const DatewiseTable: React.FC<{ report: RDKistReceive }> = ({ report }) => {
   const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -480,7 +481,7 @@ const DatewiseTable: React.FC<{ report: RDKistReceive }> = ({ report }) => {
   );
 };
 
-// ── Small helpers ──────────────────────────────────────────────────────────────
+// â”€â”€ Small helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const Th: React.FC<{ children: React.ReactNode; center?: boolean; right?: boolean; sticky?: boolean }> = ({ children, center, right, sticky }) => (
   <th className={`bg-slate-800 text-white px-3 py-3 text-xs font-semibold uppercase tracking-wider border-r border-slate-700 last:border-r-0 whitespace-nowrap

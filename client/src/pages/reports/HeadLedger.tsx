@@ -9,6 +9,7 @@ import { BookOpen, Search, Printer, FileText, FileSpreadsheet } from "lucide-rea
 import headLedgerApi, { AccountHeadItem, HeadLedger } from "../../services/reports/headLedgerApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -97,7 +98,7 @@ const HeadLedgerPage: React.FC = () => {
 
   const [heads, setHeads]           = useState<AccountHeadItem[]>([]);
   const [selectedHead, setSelectedHead] = useState<{ value: number; label: string } | null>(null);
-  const [fromDate, setFromDate]     = useState(workingDate);
+  const [fromDate, setFromDate]     = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate, setToDate]         = useState(workingDate);
   const [loading, setLoading]       = useState(false);
   const [report, setReport]         = useState<HeadLedger | null>(null);

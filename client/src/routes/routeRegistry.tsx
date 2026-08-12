@@ -246,9 +246,9 @@ export const ROUTES: RouteEntry[] = [
   { path: "/accountheadtype",            element: <AccountHeadTypeMaster />, suOnly: true },
   { path: "/accountheadtype-info",       element: <AccountHeadTypeData />, suOnly: true },
 
-  { path: "/accounthead-operations",     element: <AccountHeadOperations />,     label: "Account Head Master",      category: "Miscellaneous Masters" },
-  { path: "/accounthead",                element: <AccountHeadMaster /> },
-  { path: "/accounthead-info",           element: <AccountHeadData /> },
+  { path: "/accounthead-operations",     element: <AccountHeadOperations />,     label: "Account Head Master",      category: "Miscellaneous Masters", suOnly: true },
+  { path: "/accounthead",                element: <AccountHeadMaster />, suOnly: true },
+  { path: "/accounthead-info",           element: <AccountHeadData />, suOnly: true },
 
   { path: "/branchmaster-operations",    element: <BranchMasterOperations />,    label: "Branch Master",            category: "Miscellaneous Masters" },
   { path: "/branchmaster",               element: <BranchMaster /> },

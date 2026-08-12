@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import { BookOpen, Search, Printer, FileText, FileSpreadsheet } from "lucide-rea
 import rdMaturityApi, { RDMaturity, RDMaturityProductItem } from "../../services/reports/rdMaturityApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
 const fmt      = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isoDate  = (iso: string) => iso.split("T")[0];
@@ -107,7 +108,7 @@ const RDMaturityPage: React.FC = () => {
   const navigate = useNavigate();
   const workingDate = user.workingdate ? toInput(commonservice.splitDate(user.workingdate)) : toInput(new Date().toISOString());
 
-  const [fromDate,  setFromDate]  = useState(workingDate);
+  const [fromDate,  setFromDate]  = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate,    setToDate]    = useState(workingDate);
   const [products,  setProducts]  = useState<RDMaturityProductItem[]>([]);
   const [productId, setProductId] = useState(0);
@@ -177,7 +178,7 @@ const RDMaturityPage: React.FC = () => {
               <button onClick={handleLoad} disabled={loading}
                 className="flex items-center gap-1.5 px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loading…" : "Show"}
+                {loading ? "Loadingâ€¦" : "Show"}
               </button>
               {report && <>
                 <button onClick={handlePrint}
@@ -221,11 +222,11 @@ const RDMaturityPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 border-b border-slate-200">
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-teal-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total RD Amount</p>
-                  <p className="text-base font-bold text-teal-700 mt-0.5">₹{fmt(report.totalRDAmount)}</p>
+                  <p className="text-base font-bold text-teal-700 mt-0.5">â‚¹{fmt(report.totalRDAmount)}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-blue-500 text-center">
                   <p className="text-xs text-slate-500 uppercase font-medium">Total Maturity Amount</p>
-                  <p className="text-base font-bold text-blue-700 mt-0.5">₹{fmt(report.totalMaturityAmount)}</p>
+                  <p className="text-base font-bold text-blue-700 mt-0.5">â‚¹{fmt(report.totalMaturityAmount)}</p>
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -10,8 +10,9 @@ import dayBookApi from "../../services/reports/dayBookApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
 import DatePicker from "../../components/DatePicker";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -49,7 +50,7 @@ const groupByDate = (entries: CashBookEntry[]) => {
   return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
 };
 
-// ── TD helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€ TD helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TD = ({ children, className = "", colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) => (
   <td colSpan={colSpan} className={`border border-gray-400 px-2 py-1 text-xs ${className}`}>{children}</td>
 );
@@ -60,7 +61,7 @@ const TDF = ({ children, className = "", colSpan }: { children?: React.ReactNode
   <td colSpan={colSpan} className={`border border-gray-400 px-2 py-1 text-xs sticky bottom-0 z-10 ${className}`}>{children}</td>
 );
 
-// ── LR Side component ─────────────────────────────────────────────────────────
+// â”€â”€ LR Side component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const LRSide: React.FC<{
   entries: CashBookEntry[];
   side: "receipts" | "payments";
@@ -87,7 +88,7 @@ const LRSide: React.FC<{
         </tr>
       </thead>
       <tbody>
-        {/* Opening Balance — Receipts only */}
+        {/* Opening Balance â€” Receipts only */}
         {side === "receipts" && (
           <tr className="bg-red-50">
             <TD className="text-center" />
@@ -112,7 +113,7 @@ const LRSide: React.FC<{
                     <TD className="text-center">{sno}</TD>
                     <TD>{particulars(entry, longNar)}</TD>
                     <TD className="text-right">{fmt(entry.amount)}</TD>
-                    <TD className="text-right text-gray-400">—</TD>
+                    <TD className="text-right text-gray-400">â€”</TD>
                   </tr>
                 );
               })}
@@ -126,7 +127,7 @@ const LRSide: React.FC<{
           );
         })}
 
-        {/* Closing Balance — Payments only */}
+        {/* Closing Balance â€” Payments only */}
         {side === "payments" && (
           <tr className="bg-green-50">
             <TD className="text-center" />
@@ -148,7 +149,7 @@ const LRSide: React.FC<{
   );
 };
 
-// ── Simple table ──────────────────────────────────────────────────────────────
+// â”€â”€ Simple table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SimpleTable: React.FC<{ data: CashBook; longNar: boolean }> = ({ data, longNar }) => {
   const allRows: { entry: CashBookEntry; side: "Dr" | "Cr" }[] = [
     ...data.receipts.map((e) => ({ entry: e, side: "Dr" as const })),
@@ -225,7 +226,7 @@ const SimpleTable: React.FC<{ data: CashBook; longNar: boolean }> = ({ data, lon
   );
 };
 
-// ── Export config ─────────────────────────────────────────────────────────────
+// â”€â”€ Export config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const buildExportConfig = (data: CashBook, longNar: boolean): ExportConfig => {
   const columns = [
     { header: "S.No",        widthRatio: 0.05, align: "center" as const },
@@ -292,7 +293,7 @@ const buildExportConfig = (data: CashBook, longNar: boolean): ExportConfig => {
   };
 };
 
-// ── Print HTML ────────────────────────────────────────────────────────────────
+// â”€â”€ Print HTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean): string => {
   const par = (e: CashBookEntry) => {
     const base = `V.No.:- ${e.voucherNo} ${e.contraAccountName} - ${e.contraAccountIdentifier}`;
@@ -329,7 +330,7 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
           <td class="sno">${sno}</td>
           <td>${par(e)}</td>
           <td class="amt">${fmt(e.amount)}</td>
-          <td class="amt">—</td>
+          <td class="amt">â€”</td>
         </tr>`;
       });
       rows += `<tr class="day-total-row">
@@ -502,7 +503,7 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
   </div>
 
   <div class="day-label">
-    Cash Book on : ${fmtShort(data.fromDate)}${data.fromDate !== data.toDate ? " — " + fmtShort(data.toDate) : ""}
+    Cash Book on : ${fmtShort(data.fromDate)}${data.fromDate !== data.toDate ? " â€” " + fmtShort(data.toDate) : ""}
   </div>
 
   ${bodyContent}
@@ -517,7 +518,7 @@ const buildPrintHTML = (data: CashBook, withLeftRight: boolean, longNar: boolean
 </html>`;
 };
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CashBookPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
   const navigate = useNavigate();
@@ -528,7 +529,7 @@ const CashBookPage: React.FC = () => {
 
   const [sessionMinDate, setSessionMinDate] = useState("");
   const [sessionMaxDate, setSessionMaxDate] = useState(workingDate);
-  const [fromDate, setFromDate] = useState(workingDate);
+  const [fromDate, setFromDate] = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate, setToDate] = useState(workingDate);
   const [withLongNarration, setWithLongNarration] = useState(false);
   const [withLeftRight, setWithLeftRight] = useState(true);
@@ -608,7 +609,7 @@ const CashBookPage: React.FC = () => {
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 lg:p-8">
           <div className="w-full space-y-6">
 
-            {/* ── Form Card ── */}
+            {/* â”€â”€ Form Card â”€â”€ */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 px-6 py-4 flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
@@ -650,7 +651,7 @@ const CashBookPage: React.FC = () => {
                   </div>
                   {sessionMinDate && (
                     <div className="text-xs text-gray-500 pb-1">
-                      Session: {fmtDate(sessionMinDate)} — {fmtDate(sessionMaxDate)}
+                      Session: {fmtDate(sessionMinDate)} â€” {fmtDate(sessionMaxDate)}
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pb-0.5">
@@ -723,7 +724,7 @@ const CashBookPage: React.FC = () => {
               </div>
             </div>
 
-            {/* ── Report ── */}
+            {/* â”€â”€ Report â”€â”€ */}
             {data && (
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
                 <div className="text-center py-4 border-b border-gray-200 px-4 bg-gray-50">
@@ -739,7 +740,7 @@ const CashBookPage: React.FC = () => {
                 <div className="p-4">
                   <div className="text-center border border-gray-400 bg-gray-100 py-1.5 mb-3 text-sm font-semibold text-gray-800 rounded">
                     Cash Book on : {fmtShort(data.fromDate)}
-                    {data.fromDate !== data.toDate && ` — ${fmtShort(data.toDate)}`}
+                    {data.fromDate !== data.toDate && ` â€” ${fmtShort(data.toDate)}`}
                   </div>
 
                   {withLeftRight ? (
@@ -798,7 +799,7 @@ const CashBookPage: React.FC = () => {
                     ].map(({ label, value, color }) => (
                       <div key={label} className={`bg-${color}-50 border border-${color}-200 rounded-lg px-4 py-2.5 flex flex-col`}>
                         <span className="text-xs text-gray-500">{label}</span>
-                        <span className={`font-bold text-${color}-700 text-base`}>₹{fmt(value)}</span>
+                        <span className={`font-bold text-${color}-700 text-base`}>â‚¹{fmt(value)}</span>
                       </div>
                     ))}
                   </div>

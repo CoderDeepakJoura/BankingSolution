@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from "react";
 import {
   ArrowLeft, RotateCcw, TrendingUp, Search, CheckSquare, Square,
-  Save, AlertCircle,
+  Save, AlertCircle, BarChart2, X,
 } from "lucide-react";
 import DashboardLayout from "../../../Common/Layout";
 import { useNavigate } from "react-router-dom";
@@ -54,6 +54,195 @@ interface LoanAccountOption {
   loanAmountPassed?: number;
 }
 
+// ── Interest Detail Popup ─────────────────────────────────────────────────────
+
+const LoanInterestDetailPopup = ({
+  item,
+  onClose,
+}: {
+  item: LoanInterestBatchItemDTO;
+  onClose: () => void;
+}) => {
+  const isAddInBalance = item.actOnIntPosting === 1;
+
+  const fromDate = item.calcFromDate ? new Date(item.calcFromDate) : null;
+  const toDate   = item.calcToDate   ? new Date(item.calcToDate)   : null;
+  const days = fromDate && toDate
+    ? Math.max(0, Math.round((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)))
+    : null;
+
+  const fmtDate = (d: Date | null) =>
+    d ? d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+  const fmtAmt = (n: number) =>
+    `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const totalInterest = item.totalPostable > 0
+    ? item.totalPostable
+    : item.stdInterest + item.penalInterest;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(15,23,42,0.55)", backdropFilter: "blur(2px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+        style={{ boxShadow: "0 25px 60px rgba(0,0,0,0.25)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="relative px-6 py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-500">
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 bg-white/15 border border-white/25 rounded-xl flex items-center justify-center shadow-inner">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-white font-bold text-lg leading-tight tracking-tight">Interest Calculation Detail</p>
+              <p className="text-blue-100 text-xs mt-0.5 font-medium">
+                {item.accountNumber} &nbsp;·&nbsp; {item.memberName}
+                {item.memberRelativeName && <span className="text-blue-200"> · {item.memberRelativeName}</span>}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/25 text-white/80 hover:text-white transition-all cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <div className="absolute bottom-0 left-0 right-0 h-3 bg-white" style={{ borderRadius: "50% 50% 0 0 / 100% 100% 0 0", transform: "scaleX(1.05)" }} />
+        </div>
+
+        {/* Summary cards */}
+        <div className="px-6 pt-5 pb-4 grid grid-cols-3 gap-3">
+          {[
+            { label: "Principal Balance",  value: fmtAmt(item.principalBalance), color: "text-slate-800", bg: "bg-slate-50 border-slate-200" },
+            { label: "Total Interest",     value: fmtAmt(totalInterest),         color: "text-blue-700",  bg: "bg-blue-50 border-blue-200"  },
+            { label: "Period (Days)",       value: days !== null ? `${days} days` : "—", color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200" },
+          ].map(({ label, value, color, bg }) => (
+            <div key={label} className={`rounded-xl border px-4 py-3 ${bg}`}>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+              <p className={`font-bold text-sm ${color}`}>{value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Main content */}
+        <div className="overflow-y-auto flex-1 mx-4 mb-2 rounded-xl border border-gray-200 shadow-inner">
+          {item.noInterestReason && totalInterest === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-amber-600 gap-3">
+              <AlertCircle className="w-10 h-10" />
+              <p className="text-sm font-semibold text-center px-6">{item.noInterestReason}</p>
+            </div>
+          ) : isAddInBalance ? (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gradient-to-r from-blue-600 to-indigo-500">
+                  {["From Date", "To Date", "Days", "Principal", "Rate", "Method", "Interest"].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="bg-white border-b border-gray-100">
+                  <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
+                  <td className="px-4 py-3 text-gray-600">{fmtDate(toDate)}</td>
+                  <td className="px-4 py-3 font-semibold text-gray-700">{days ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-700">{fmtAmt(item.principalBalance)}</td>
+                  <td className="px-4 py-3 text-gray-700">{item.stdInterestRate ?? "—"}%</td>
+                  <td className="px-4 py-3 text-gray-500">{item.intCalcMethod}</td>
+                  <td className="px-4 py-3 font-bold text-blue-700">₹{Math.round(item.stdInterest).toLocaleString("en-IN")}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr className="bg-blue-50 border-t-2 border-blue-200">
+                  <td colSpan={6} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total</td>
+                  <td className="px-4 py-3 font-extrabold text-blue-800">₹{Math.round(item.stdInterest).toLocaleString("en-IN")}</td>
+                </tr>
+              </tfoot>
+            </table>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gradient-to-r from-blue-600 to-indigo-500">
+                  {["Type", "From Date", "To Date", "Principal", "Rate", "Method", "Amount"].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {item.stdInterest > 0 && (
+                  <tr className="bg-white border-b border-gray-100 hover:bg-amber-50/40">
+                    <td className="px-4 py-3 font-semibold text-amber-700">Standard</td>
+                    <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
+                    <td className="px-4 py-3 text-gray-600">{fmtDate(toDate)}</td>
+                    <td className="px-4 py-3 text-gray-700">{fmtAmt(item.principalBalance)}</td>
+                    <td className="px-4 py-3 text-gray-700">{item.stdInterestRate ?? "—"}%</td>
+                    <td className="px-4 py-3 text-gray-500">{item.intCalcMethod}</td>
+                    <td className="px-4 py-3 font-bold text-amber-700">{fmtAmt(item.stdInterest)}</td>
+                  </tr>
+                )}
+                {item.penalInterest > 0 && (
+                  <tr className="bg-rose-50/30 border-b border-gray-100 hover:bg-rose-50/60">
+                    <td className="px-4 py-3 font-semibold text-rose-700">Penal</td>
+                    <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
+                    <td className="px-4 py-3 text-gray-600">{fmtDate(toDate)}</td>
+                    <td className="px-4 py-3 text-gray-700">{fmtAmt(item.principalBalance)}</td>
+                    <td className="px-4 py-3 text-gray-700">{item.overdueInterestRate ?? "—"}%</td>
+                    <td className="px-4 py-3 text-gray-500">—</td>
+                    <td className="px-4 py-3 font-bold text-rose-700">{fmtAmt(item.penalInterest)}</td>
+                  </tr>
+                )}
+                {item.stdRecoverable > 0 && (
+                  <tr className="bg-purple-50/30 border-b border-gray-100">
+                    <td className="px-4 py-3 font-semibold text-purple-700">Recoverable</td>
+                    <td colSpan={5} className="px-4 py-3 text-xs text-gray-400 italic">Previously accrued std interest not yet recovered</td>
+                    <td className="px-4 py-3 font-bold text-purple-700">{fmtAmt(item.stdRecoverable)}</td>
+                  </tr>
+                )}
+                {item.stdInterest === 0 && item.penalInterest === 0 && item.stdRecoverable === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">No interest components to display.</td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="bg-blue-50 border-t-2 border-blue-200">
+                  <td colSpan={6} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total Postable</td>
+                  <td className="px-4 py-3 font-extrabold text-blue-800">{fmtAmt(item.totalPostable)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
+
+        {/* Formula hint for AddInBalance (Balance/MinBalance method only) */}
+        {isAddInBalance && days !== null && item.stdInterestRate && item.intCalcMethod !== "Schedule" && (
+          <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700 font-mono">
+            {fmtAmt(item.principalBalance)} × {item.stdInterestRate}% / 100 × {days} / 365 = ₹{Math.round(item.stdInterest).toLocaleString("en-IN")}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="px-6 pb-5 flex justify-center">
+          <button
+            onClick={onClose}
+            className="group flex items-center gap-2 px-8 py-2.5 rounded-xl font-semibold text-sm text-white
+                       bg-gradient-to-r from-blue-500 to-indigo-500
+                       hover:from-blue-600 hover:to-indigo-600
+                       shadow-md hover:shadow-blue-200 hover:shadow-lg
+                       transition-all duration-200 cursor-pointer"
+          >
+            <X className="w-4 h-4 transition-transform duration-200 group-hover:rotate-90" />
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const LoanInterestPostingVoucher: React.FC = () => {
@@ -86,6 +275,7 @@ const LoanInterestPostingVoucher: React.FC = () => {
   const [stdDisplayValues, setStdDisplayValues] = useState<Record<number, string>>({});
   const [penalDisplayValues, setPenalDisplayValues] = useState<Record<number, string>>({});
   const [allowLoanInterestChange, setAllowLoanInterestChange] = useState(false);
+  const [popupItem, setPopupItem] = useState<LoanInterestBatchItemDTO | null>(null);
 
   // ── Load products on mount ────────────────────────────────────────────────
 
@@ -528,7 +718,7 @@ const LoanInterestPostingVoucher: React.FC = () => {
                             Total Postable
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Interest Detail
+                            Details
                           </th>
                         </tr>
                       </thead>
@@ -628,19 +818,17 @@ const LoanInterestPostingVoucher: React.FC = () => {
                               <td className="px-4 py-3 text-right text-green-700 font-bold">
                                 ₹{item.actOnIntPosting === 1 ? fmtWhole(getTotalPostable(item)) : fmt(getTotalPostable(item))}
                               </td>
-                              <td className="px-4 py-3">
-                                {item.noInterestReason ? (
-                                  <span className="text-xs text-amber-600 font-medium">{item.noInterestReason}</span>
-                                ) : (
-                                  <div className="text-xs text-gray-600 leading-relaxed">
-                                    <div>
-                                      {fmtDateShort(item.calcFromDate)} → {fmtDateShort(item.calcToDate)}
-                                    </div>
-                                    <div className="text-gray-400">
-                                      Std {item.stdInterestRate ?? "—"}%
-                                      {item.overdueInterestRate ? ` · Penal ${item.overdueInterestRate}%` : ""}
-                                      {" · "}{item.intCalcMethod}
-                                    </div>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => setPopupItem(item)}
+                                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors cursor-pointer"
+                                >
+                                  <BarChart2 className="w-3.5 h-3.5" />
+                                  View Details
+                                </button>
+                                {item.noInterestReason && (
+                                  <div className="mt-1 text-xs text-amber-600 font-medium leading-tight max-w-[160px]">
+                                    {item.noInterestReason}
                                   </div>
                                 )}
                               </td>
@@ -676,6 +864,11 @@ const LoanInterestPostingVoucher: React.FC = () => {
             )}
 
           </div>
+
+          {/* Interest detail popup */}
+          {popupItem && (
+            <LoanInterestDetailPopup item={popupItem} onClose={() => setPopupItem(null)} />
+          )}
         </div>
       }
     />

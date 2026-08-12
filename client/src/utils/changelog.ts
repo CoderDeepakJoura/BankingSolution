@@ -15,6 +15,18 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.11",
+    date: "2026-08-12",
+    changes: [
+      { type: "new",         text: "Close Saving Account: account ledger is now displayed immediately after selecting an account so you can verify all transactions before closure." },
+      { type: "new",         text: "RD Financial Report: new 'With Opening & Closing Balance' format — shows derived opening balance and running closing balance per row alongside period Dr/Cr. Format selector dropdown added to filter bar; print/PDF use landscape for the wider layout." },
+      { type: "fix",         text: "All reports now correctly pre-fill the From Date to the session start (April 1 of the fiscal year) instead of showing blank." },
+      { type: "fix",         text: "RD Financial Report: rows now appear in account-head code order, matching the legacy stored-procedure output." },
+      { type: "fix",         text: "FD Renew voucher deletion: now correctly removes the new detail row and reverts the original to Open status, instead of the previous approach that could resurrect wrong entries." },
+      { type: "improvement", text: "Close Saving Account: combined closing voucher now uses a dedicated CloseAccount sub-type (29); interest expense account is validated before the transaction begins." },
+    ],
+  },
+  {
     version: "1.0.10",
     date: "2026-08-10",
     changes: [

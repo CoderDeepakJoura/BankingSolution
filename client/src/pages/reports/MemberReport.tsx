@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +10,7 @@ import villageApi, { Village } from "../../services/location/village/villageapi"
 import postOfficeApi, { PostOffice } from "../../services/location/PostOffice/postOfficeapi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
 const fmt   = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isoDate  = (iso: string) => iso.split("T")[0];
@@ -18,8 +19,8 @@ const fmtShort = (iso: string) => { try { return localDt(iso).toLocaleDateString
 const toInput  = (iso: string) => isoDate(iso);
 
 const buildExportConfig = (report: MemberReport): ExportConfig => {
-  // 16 columns — widthRatios must sum to exactly 1.00
-  // Using A3 landscape so each column has ~25mm on average (400mm usable ÷ 16)
+  // 16 columns â€” widthRatios must sum to exactly 1.00
+  // Using A3 landscape so each column has ~25mm on average (400mm usable Ã· 16)
   const columns = [
     { header: "S.No.",        widthRatio: 0.03, align: "center" as const },
     { header: "Branch Code",  widthRatio: 0.05, align: "center" as const },
@@ -134,7 +135,7 @@ const MemberReportPage: React.FC = () => {
     ? toInput(commonservice.splitDate(user.workingdate))
     : toInput(new Date().toISOString());
 
-  const [fromDate,     setFromDate]     = useState(workingDate.slice(0, 4) + "-04-01");
+  const [fromDate,     setFromDate]     = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate,       setToDate]       = useState(workingDate);
   const [gender,       setGender]       = useState<0 | 1 | 2>(0);
   const [memberType,   setMemberType]   = useState<0 | 1 | 2>(0);
@@ -328,7 +329,7 @@ const MemberReportPage: React.FC = () => {
                   {loading
                     ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     : <Search size={15} />}
-                  {loading ? "Loading…" : "Generate"}
+                  {loading ? "Loadingâ€¦" : "Generate"}
                 </button>
 
                 {report && report.rows.length > 0 && (

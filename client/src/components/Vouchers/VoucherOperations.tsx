@@ -16,6 +16,7 @@ import {
   Landmark,
   Receipt,
   ChevronRight,
+  XCircle,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -73,6 +74,13 @@ const categories: VoucherCategory[] = [
         path: "/saving-interest-posting",
         icon: <TrendingUp size={26} className="text-teal-600" />,
         color: "bg-teal-50 border-teal-200",
+      },
+      {
+        label: "Close Saving Account",
+        description: "Close a saving account and pay out the final balance",
+        path: "/close-saving-account",
+        icon: <XCircle size={26} className="text-red-600" />,
+        color: "bg-red-50 border-red-200",
       },
     ],
   },

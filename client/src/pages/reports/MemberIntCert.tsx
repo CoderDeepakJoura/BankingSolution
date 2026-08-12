@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -8,6 +8,7 @@ import { FileText, FileSpreadsheet, Printer, Search } from "lucide-react";
 import memberIntCertApi, { MemberIntCert, MemberSearchResult } from "../../services/reports/memberIntCertApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isoDate = (iso: string) => iso.split("T")[0];
@@ -174,7 +175,7 @@ const MemberIntCertPage: React.FC = () => {
 
   const [members, setMembers]           = useState<MemberSearchResult[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<number | "">("");
-  const [fromDate, setFromDate]         = useState(workingDate.slice(0, 4) + "-04-01");
+  const [fromDate, setFromDate]         = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate, setToDate]             = useState(workingDate);
   const [loading, setLoading]           = useState(false);
   const [cert, setCert]                 = useState<MemberIntCert | null>(null);
@@ -268,7 +269,7 @@ const MemberIntCertPage: React.FC = () => {
               <button onClick={handleLoad} disabled={loading || !selectedMemberId}
                 className="flex items-center gap-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loading…" : "Generate"}
+                {loading ? "Loadingâ€¦" : "Generate"}
               </button>
 
               {cert && (

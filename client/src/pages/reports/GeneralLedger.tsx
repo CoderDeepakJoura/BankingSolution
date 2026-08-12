@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -10,6 +10,7 @@ import generalLedgerApi, { GeneralLedgerAccountItem, GeneralLedger } from "../..
 import headLedgerApi, { AccountHeadItem, HeadLedger, HeadInDetail } from "../../services/reports/headLedgerApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { getSessionFromDate } from "../../utils/sessionUtils";
 
 type LedgerMode = "ac" | "head-detail" | "head-consolidate" | "head-accounts";
 
@@ -20,12 +21,12 @@ const MODES: { value: LedgerMode; label: string }[] = [
   { value: "head-accounts",    label: "Head Ledger (Accounts)" },
 ];
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Mirrors SP display: ABS(value) + "Dr"/"Cr" label — never shows a raw negative sign
+// Mirrors SP display: ABS(value) + "Dr"/"Cr" label â€” never shows a raw negative sign
 const fmtBal = (n: number) =>
   `${Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${n < 0 ? "Cr" : "Dr"}`;
 
@@ -41,7 +42,7 @@ const fmtLong  = (iso: string) => localDate(iso).toLocaleDateString("en-GB", { d
 const toInput  = (iso: string) => isoDatePart(iso);
 const balCls   = (n: number)   => n >= 0 ? "text-red-600" : "text-green-700";
 
-// "01-Apr-2021" — safe and readable in a filename
+// "01-Apr-2021" â€” safe and readable in a filename
 const fileDate = (iso: string) =>
   localDate(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).replace(/ /g, "-");
 
@@ -54,7 +55,7 @@ const selectStyles = {
   control:    (b: any) => ({ ...b, cursor: "pointer" }),
 };
 
-// ── Export builders ────────────────────────────────────────────────────────────
+// â”€â”€ Export builders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const buildAcExportConfig = (data: GeneralLedger, isConsolidate: boolean): ExportConfig => {
   if (isConsolidate) {
@@ -98,7 +99,7 @@ const buildAcExportConfig = (data: GeneralLedger, isConsolidate: boolean): Expor
   };
 };
 
-// Head Ledger (In Detail) export — flat combined list
+// Head Ledger (In Detail) export â€” flat combined list
 const buildHeadInDetailExportConfig = (data: HeadInDetail, isConsolidate: boolean): ExportConfig => {
   const period  = `${fmtLong(data.fromDate)} to ${fmtLong(data.toDate)}`;
   const infoRow: ExportRow = { style: "info", cells: [`Head: ${data.headName}`, `Type: ${data.typeName}`, `Period: ${period}`] };
@@ -149,7 +150,7 @@ const buildHeadExportConfig = (data: HeadLedger, mode: LedgerMode): ExportConfig
   const period  = `${fmtLong(data.fromDate)} to ${fmtLong(data.toDate)}`;
   const infoRow: ExportRow = { style: "info", cells: [`Head: ${data.headName}`, `Type: ${data.typeName}`, `Period: ${period}`] };
 
-  // Head Ledger (Consolidate On Accounts) — summary table with cumulative Balance column
+  // Head Ledger (Consolidate On Accounts) â€” summary table with cumulative Balance column
   if (mode === "head-consolidate") {
     let running = 0;
     const accountRows: ExportRow[] = data.accounts.map((a, i) => {
@@ -176,7 +177,7 @@ const buildHeadExportConfig = (data: HeadLedger, mode: LedgerMode): ExportConfig
     };
   }
 
-  // Head Ledger (Accounts) — per-account sections
+  // Head Ledger (Accounts) â€” per-account sections
   const rows: ExportRow[] = [infoRow];
   for (const a of data.accounts) {
     rows.push({ style: "info", cells: [`Account: ${a.accountName}`, `No: ${a.accountNo}`] });
@@ -201,7 +202,7 @@ const buildHeadExportConfig = (data: HeadLedger, mode: LedgerMode): ExportConfig
   };
 };
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const GeneralLedgerPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
@@ -215,7 +216,7 @@ const GeneralLedgerPage: React.FC = () => {
   const [selectedHead, setSelectedHead]         = useState<{ value: number; label: string } | null>(null);
   const [generalAccounts, setGeneralAccounts]   = useState<GeneralLedgerAccountItem[]>([]);
   const [selectedAccount, setSelectedAccount]   = useState<{ value: number; label: string } | null>(null);
-  const [fromDate, setFromDate]                 = useState(workingDate);
+  const [fromDate, setFromDate]                 = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const [toDate, setToDate]                     = useState(workingDate);
   const [consolidate, setConsolidate]           = useState(false);
   const [nonZero, setNonZero]                   = useState(false);
@@ -257,8 +258,8 @@ const GeneralLedgerPage: React.FC = () => {
     if (m !== "ac") setSelectedHead(null);
   };
 
-  const headOptions    = heads.map((h) => ({ value: h.headCode,    label: `${h.headCode} — ${h.name} (${h.typeName})` }));
-  const accountOptions = generalAccounts.map((a) => ({ value: a.accountId, label: `${a.accountNo} — ${a.accountName}` }));
+  const headOptions    = heads.map((h) => ({ value: h.headCode,    label: `${h.headCode} â€” ${h.name} (${h.typeName})` }));
+  const accountOptions = generalAccounts.map((a) => ({ value: a.accountId, label: `${a.accountNo} â€” ${a.accountName}` }));
 
   const handleLoad = async () => {
     if (!isHeadMode && !selectedAccount) { Swal.fire("Validation", "Please select an account.", "warning"); return; }
@@ -308,7 +309,7 @@ const GeneralLedgerPage: React.FC = () => {
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6 print:min-h-0 print:bg-white print:p-0">
           <div className="w-full space-y-5">
 
-            {/* ── Filter Card ──────────────────────────────────────────────── */}
+            {/* â”€â”€ Filter Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden print:hidden">
 
               {/* Title bar */}
@@ -346,7 +347,7 @@ const GeneralLedgerPage: React.FC = () => {
                     <Select
                       options={accountOptions} value={selectedAccount}
                       onChange={(opt) => { setSelectedAccount(opt); clearReports(); }}
-                      placeholder="Search account…"
+                      placeholder="Search accountâ€¦"
                       isClearable styles={selectStyles}
                       menuPortalTarget={document.body}
                     />
@@ -364,7 +365,7 @@ const GeneralLedgerPage: React.FC = () => {
                     <Select
                       options={headOptions} value={selectedHead}
                       onChange={(opt) => { setSelectedHead(opt); clearReports(); }}
-                      placeholder="Select account head…" isClearable styles={selectStyles}
+                      placeholder="Select account headâ€¦" isClearable styles={selectStyles}
                       menuPortalTarget={document.body}
                     />
                   </div>
@@ -412,7 +413,7 @@ const GeneralLedgerPage: React.FC = () => {
                 <button onClick={handleLoad} disabled={loading}
                   className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 rounded-lg disabled:opacity-50 cursor-pointer shadow-sm transition-all">
                   {loading
-                    ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Loading…</>
+                    ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Loadingâ€¦</>
                     : <><Search className="w-4 h-4" /> Generate</>}
                 </button>
 
@@ -450,7 +451,7 @@ const GeneralLedgerPage: React.FC = () => {
               </div>
             </div>
 
-            {/* ── A/C Ledger Report ─────────────────────────────────────────── */}
+            {/* â”€â”€ A/C Ledger Report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {acReport && (
               <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden print:shadow-none print:border-none print:rounded-none">
                 <div className="text-center px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-amber-50 print:bg-white">
@@ -475,8 +476,8 @@ const GeneralLedgerPage: React.FC = () => {
                           <th className="border border-gray-300 px-3 py-2 bg-amber-50 text-left font-bold text-gray-800">Date</th>
                           {!consolidate && <th className="border border-gray-300 px-3 py-2 bg-amber-50 text-left font-bold text-gray-800">Voucher No</th>}
                           <th className="border border-gray-300 px-3 py-2 bg-amber-50 text-left font-bold text-gray-800">Narration</th>
-                          <th className="border border-gray-300 px-3 py-2 bg-amber-50 text-right font-bold text-gray-800">Dr (₹)</th>
-                          <th className="border border-gray-300 px-3 py-2 bg-amber-50 text-right font-bold text-gray-800">Cr (₹)</th>
+                          <th className="border border-gray-300 px-3 py-2 bg-amber-50 text-right font-bold text-gray-800">Dr (â‚¹)</th>
+                          <th className="border border-gray-300 px-3 py-2 bg-amber-50 text-right font-bold text-gray-800">Cr (â‚¹)</th>
                           <th className="border border-gray-300 px-3 py-2 bg-amber-50 text-right font-bold text-gray-800">Balance</th>
                         </tr>
                       </thead>
@@ -485,16 +486,16 @@ const GeneralLedgerPage: React.FC = () => {
                           <tr key={idx} className="hover:bg-amber-50/40">
                             <td className="border border-gray-300 px-3 py-1.5 text-gray-700">{fmtDate(row.valueDate)}</td>
                             {!consolidate && <td className="border border-gray-300 px-3 py-1.5 text-gray-600">{row.voucherNo}</td>}
-                            <td className="border border-gray-300 px-3 py-1.5 text-gray-600 max-w-xs truncate">{row.narration || "—"}</td>
-                            <td className="border border-gray-300 px-3 py-1.5 text-right text-red-600">{row.dr != null ? fmt(row.dr) : "—"}</td>
-                            <td className="border border-gray-300 px-3 py-1.5 text-right text-green-700">{row.cr != null ? fmt(row.cr) : "—"}</td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-gray-600 max-w-xs truncate">{row.narration || "â€”"}</td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-right text-red-600">{row.dr != null ? fmt(row.dr) : "â€”"}</td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-right text-green-700">{row.cr != null ? fmt(row.cr) : "â€”"}</td>
                             <td className={`border border-gray-300 px-3 py-1.5 text-right font-semibold ${balCls(row.runningBalance)}`}>{fmtBal(row.runningBalance)}</td>
                           </tr>
                         ))}
                         <tr className="bg-amber-700">
                           <td colSpan={consolidate ? 2 : 3} className="border border-amber-800 px-3 py-2 text-white font-bold">Total</td>
-                          <td className="border border-amber-800 px-3 py-2 text-right text-white font-bold">₹{fmt(acReport.totalDr)}</td>
-                          <td className="border border-amber-800 px-3 py-2 text-right text-white font-bold">₹{fmt(acReport.totalCr)}</td>
+                          <td className="border border-amber-800 px-3 py-2 text-right text-white font-bold">â‚¹{fmt(acReport.totalDr)}</td>
+                          <td className="border border-amber-800 px-3 py-2 text-right text-white font-bold">â‚¹{fmt(acReport.totalCr)}</td>
                           <td className="border border-amber-800 px-3 py-2" />
                         </tr>
                       </tbody>
@@ -515,14 +516,14 @@ const GeneralLedgerPage: React.FC = () => {
               </div>
             )}
 
-            {/* ── Head Ledger (In Detail) Report — flat combined list ──────────── */}
+            {/* â”€â”€ Head Ledger (In Detail) Report â€” flat combined list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {headInDetailReport && (
               <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden print:shadow-none print:border-none print:rounded-none">
                 <div className="text-center px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-violet-50 to-purple-50 print:bg-white">
                   <h1 className="text-xl font-bold text-gray-900">{headInDetailReport.branchName}</h1>
                   {headInDetailReport.branchAddress && <p className="text-xs text-gray-500 mt-0.5">{headInDetailReport.branchAddress}</p>}
                   <h2 className="text-base font-semibold text-purple-800 mt-2">
-                    Head Ledger (In Detail){consolidate ? " — Consolidated" : ""}
+                    Head Ledger (In Detail){consolidate ? " â€” Consolidated" : ""}
                   </h2>
                   <p className="text-sm text-gray-700 mt-0.5 font-medium">{headInDetailReport.headName}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{headInDetailReport.typeName}</p>
@@ -542,8 +543,8 @@ const GeneralLedgerPage: React.FC = () => {
                           {!consolidate && <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-center font-bold text-gray-800">#</th>}
                           <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-left font-bold text-gray-800">Date</th>
                           {!consolidate && <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-left font-bold text-gray-800">Particulars</th>}
-                          <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Dr (₹)</th>
-                          <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Cr (₹)</th>
+                          <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Dr (â‚¹)</th>
+                          <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Cr (â‚¹)</th>
                           <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Balance</th>
                         </tr>
                       </thead>
@@ -553,18 +554,18 @@ const GeneralLedgerPage: React.FC = () => {
                             {!consolidate && <td className="border border-gray-300 px-3 py-1.5 text-center text-gray-500">{idx + 1}</td>}
                             <td className="border border-gray-300 px-3 py-1.5 text-gray-700 whitespace-nowrap">{fmtDate(row.valueDate)}</td>
                             {!consolidate && (
-                              <td className="border border-gray-300 px-3 py-1.5 text-gray-600 max-w-sm truncate">{row.particulars || "—"}</td>
+                              <td className="border border-gray-300 px-3 py-1.5 text-gray-600 max-w-sm truncate">{row.particulars || "â€”"}</td>
                             )}
-                            <td className="border border-gray-300 px-3 py-1.5 text-right text-red-600">{row.dr != null ? fmt(row.dr) : "—"}</td>
-                            <td className="border border-gray-300 px-3 py-1.5 text-right text-green-700">{row.cr != null ? fmt(row.cr) : "—"}</td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-right text-red-600">{row.dr != null ? fmt(row.dr) : "â€”"}</td>
+                            <td className="border border-gray-300 px-3 py-1.5 text-right text-green-700">{row.cr != null ? fmt(row.cr) : "â€”"}</td>
                             <td className={`border border-gray-300 px-3 py-1.5 text-right font-semibold ${balCls(row.runningBalance)}`}>{fmtBal(row.runningBalance)}</td>
                           </tr>
                         ))}
                         <tr className="bg-purple-700">
                           <td colSpan={consolidate ? 1 : 2} className="border border-purple-800 px-3 py-2 text-white font-bold">Total</td>
                           {!consolidate && <td className="border border-purple-800 px-3 py-2" />}
-                          <td className="border border-purple-800 px-3 py-2 text-right text-white font-bold">₹{fmt(headInDetailReport.totalDr)}</td>
-                          <td className="border border-purple-800 px-3 py-2 text-right text-white font-bold">₹{fmt(headInDetailReport.totalCr)}</td>
+                          <td className="border border-purple-800 px-3 py-2 text-right text-white font-bold">â‚¹{fmt(headInDetailReport.totalDr)}</td>
+                          <td className="border border-purple-800 px-3 py-2 text-right text-white font-bold">â‚¹{fmt(headInDetailReport.totalCr)}</td>
                           <td className="border border-purple-800 px-3 py-2" />
                         </tr>
                       </tbody>
@@ -585,7 +586,7 @@ const GeneralLedgerPage: React.FC = () => {
               </div>
             )}
 
-            {/* ── Head Ledger (Consolidate On Accounts) + Head Ledger (Accounts) ─ */}
+            {/* â”€â”€ Head Ledger (Consolidate On Accounts) + Head Ledger (Accounts) â”€ */}
             {headReport && (
               <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden print:shadow-none print:border-none print:rounded-none">
                 <div className="text-center px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-violet-50 to-purple-50 print:bg-white">
@@ -599,7 +600,7 @@ const GeneralLedgerPage: React.FC = () => {
 
                 <div className="overflow-auto max-h-[calc(100vh-320px)] p-4 space-y-1 print:max-h-none print:overflow-visible">
 
-                  {/* ── Head Ledger (Consolidate On Accounts) — summary table with cumulative Balance ── */}
+                  {/* â”€â”€ Head Ledger (Consolidate On Accounts) â€” summary table with cumulative Balance â”€â”€ */}
                   {mode === "head-consolidate" && (() => {
                     let running = 0;
                     return (
@@ -610,8 +611,8 @@ const GeneralLedgerPage: React.FC = () => {
                             <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-left font-bold text-gray-800">Account Name</th>
                             <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-left font-bold text-gray-800">Account No</th>
                             <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Op. Balance</th>
-                            <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Dr (₹)</th>
-                            <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Cr (₹)</th>
+                            <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Dr (â‚¹)</th>
+                            <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Cr (â‚¹)</th>
                             <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Cl. Balance</th>
                             <th className="border border-gray-300 px-3 py-2 bg-purple-50 text-right font-bold text-gray-800">Balance</th>
                           </tr>
@@ -626,8 +627,8 @@ const GeneralLedgerPage: React.FC = () => {
                                 <td className="border border-gray-300 px-3 py-1.5 text-gray-800">{acc.accountName}</td>
                                 <td className="border border-gray-300 px-3 py-1.5 text-gray-600">{acc.accountNo}</td>
                                 <td className={`border border-gray-300 px-3 py-1.5 text-right font-medium ${balCls(acc.openingBalance)}`}>{fmtBal(acc.openingBalance)}</td>
-                                <td className="border border-gray-300 px-3 py-1.5 text-right text-red-600">{acc.periodDr !== 0 ? fmt(acc.periodDr) : "—"}</td>
-                                <td className="border border-gray-300 px-3 py-1.5 text-right text-green-700">{acc.periodCr !== 0 ? fmt(acc.periodCr) : "—"}</td>
+                                <td className="border border-gray-300 px-3 py-1.5 text-right text-red-600">{acc.periodDr !== 0 ? fmt(acc.periodDr) : "â€”"}</td>
+                                <td className="border border-gray-300 px-3 py-1.5 text-right text-green-700">{acc.periodCr !== 0 ? fmt(acc.periodCr) : "â€”"}</td>
                                 <td className={`border border-gray-300 px-3 py-1.5 text-right font-bold ${balCls(acc.closingBalance)}`}>{fmtBal(acc.closingBalance)}</td>
                                 <td className={`border border-gray-300 px-3 py-1.5 text-right font-bold ${balCls(rowRunning)}`}>{fmtBal(rowRunning)}</td>
                               </tr>
@@ -646,7 +647,7 @@ const GeneralLedgerPage: React.FC = () => {
                     );
                   })()}
 
-                  {/* ── Head Ledger (Accounts) — per-account individual sections ── */}
+                  {/* â”€â”€ Head Ledger (Accounts) â€” per-account individual sections â”€â”€ */}
                   {mode === "head-accounts" && headReport.accounts.map((acc, accIdx) => (
                     <div
                       key={acc.accountId}
@@ -667,8 +668,8 @@ const GeneralLedgerPage: React.FC = () => {
                               <th className="border border-gray-200 px-3 py-1.5 bg-purple-50/60 text-left font-bold text-gray-700">Date</th>
                               <th className="border border-gray-200 px-3 py-1.5 bg-purple-50/60 text-left font-bold text-gray-700">Voucher No</th>
                               <th className="border border-gray-200 px-3 py-1.5 bg-purple-50/60 text-left font-bold text-gray-700">Narration</th>
-                              <th className="border border-gray-200 px-3 py-1.5 bg-purple-50/60 text-right font-bold text-gray-700">Dr (₹)</th>
-                              <th className="border border-gray-200 px-3 py-1.5 bg-purple-50/60 text-right font-bold text-gray-700">Cr (₹)</th>
+                              <th className="border border-gray-200 px-3 py-1.5 bg-purple-50/60 text-right font-bold text-gray-700">Dr (â‚¹)</th>
+                              <th className="border border-gray-200 px-3 py-1.5 bg-purple-50/60 text-right font-bold text-gray-700">Cr (â‚¹)</th>
                               <th className="border border-gray-200 px-3 py-1.5 bg-purple-50/60 text-right font-bold text-gray-700">Balance</th>
                             </tr>
                           </thead>
@@ -676,10 +677,10 @@ const GeneralLedgerPage: React.FC = () => {
                             {(acc.rows ?? []).map((row, ri) => (
                               <tr key={ri} className="hover:bg-purple-50/30">
                                 <td className="border border-gray-200 px-3 py-1 text-gray-700 whitespace-nowrap">{fmtDate(row.valueDate)}</td>
-                                <td className="border border-gray-200 px-3 py-1 text-gray-600">{row.voucherNo || "—"}</td>
-                                <td className="border border-gray-200 px-3 py-1 text-gray-600 max-w-xs truncate">{row.narration || "—"}</td>
-                                <td className="border border-gray-200 px-3 py-1 text-right text-red-600">{row.dr != null ? fmt(row.dr) : "—"}</td>
-                                <td className="border border-gray-200 px-3 py-1 text-right text-green-700">{row.cr != null ? fmt(row.cr) : "—"}</td>
+                                <td className="border border-gray-200 px-3 py-1 text-gray-600">{row.voucherNo || "â€”"}</td>
+                                <td className="border border-gray-200 px-3 py-1 text-gray-600 max-w-xs truncate">{row.narration || "â€”"}</td>
+                                <td className="border border-gray-200 px-3 py-1 text-right text-red-600">{row.dr != null ? fmt(row.dr) : "â€”"}</td>
+                                <td className="border border-gray-200 px-3 py-1 text-right text-green-700">{row.cr != null ? fmt(row.cr) : "â€”"}</td>
                                 <td className={`border border-gray-200 px-3 py-1 text-right font-semibold ${balCls(row.runningBalance)}`}>{fmtBal(row.runningBalance)}</td>
                               </tr>
                             ))}

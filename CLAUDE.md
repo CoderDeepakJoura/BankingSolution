@@ -48,6 +48,8 @@ BankingPlatform/
 - `canEnterOpeningBalance(user, date)` — utility to check if opening balance entry is allowed (first session logic)
 - `isOpeningEntry` flag controls opening balance UI visibility throughout the app
 - react-select `control` style must always include `cursor: "pointer"` — react-select renders divs, not native selects, so the pointer cursor must be set explicitly
+- `user.workingdate` is stored as a long-form string like `"29-September-2025"` — use `commonservice.parseWorkingDate(user.workingdate)` to get `YYYY-MM-DD`; do NOT use `.slice(0, 10)` or `splitDate()` on it
+- `user.sessionInfo` is `"2025-2026"` — use `getSessionFromDate(user.sessionInfo, fallback)` from `client/src/utils/sessionUtils.ts` to derive `"2025-04-01"` (April 1 = Indian fiscal year start); do NOT use `user.sessionFromDate` which can be DateTime.MinValue or empty
 
 ### Route Registry — CRITICAL
 - **`client/src/routes/routeRegistry.tsx`** is the single source of truth for ALL app routes and the header search
@@ -123,6 +125,7 @@ Defined in `Enums.VoucherType` and `Enums.VoucherSubType`.
 | 26 | IB Saving Wdl — Source Branch Step 1 (BranchToBranch, Dr HO-Ref Cr Cash) |
 | 27 | IB Saving Wdl — HO Settlement (BranchToBranch, Dr Dest-Ref Cr Source-Ref) |
 | 28 | IB Saving Wdl — Dest Branch Debit (BranchToBranch final, Dr Customer Cr HO-Ref) |
+| 29 | Close Account — single combined closure voucher (Saving, RD, FD etc.) |
 
 ---
 
@@ -294,6 +297,30 @@ Three places updated to include per-detail opening balance:
 
 - `accountNumber` validation has NO `minLength` — single-digit account numbers like "1" are valid
 - Validation: `required`, `maxLength: 20`, `pattern: /^\d+$/`
+
+---
+
+## Close Saving Account
+
+- After selecting an account the ledger for the current session period is fetched and displayed so the operator can verify all transactions before closure
+- Ledger fetch uses `savingLedgerApi.getSavingLedger(branchId, accountId, fromDate, toDate)` where `fromDate = getSessionFromDate(user.sessionInfo, workingDate)` and `toDate = commonservice.parseWorkingDate(user.workingdate)`
+- Closing voucher uses `VoucherSubType.CloseAccount (29)` — a single combined voucher; interest component is posted to the Interest Expense account (looked up from saving product branch-wise rule) before the main payout debit
+
+---
+
+## Report Utilities
+
+### `client/src/utils/sessionUtils.ts`
+- `getSessionFromDate(sessionInfo, fallback)` — derives `"YYYY-04-01"` from `sessionInfo` like `"2025-2026"`. Used as the default `fromDate` in all 23 report pages.
+- **Do NOT use `user.sessionFromDate`** for reports — it can be `DateTime.MinValue` or empty from the JWT claim.
+
+### RD Financial Report (`client/src/pages/reports/RDFinancialReport.tsx`)
+- Format selector dropdown: `"standard"` (Sr.No, Account Name, Debit, Credit) or `"with-balance"` (Sr.No, Account Name, Opening Balance, Debit, Credit, Closing Balance)
+- Opening balance per row derived as: `openingBal = row.closingBalance - row.periodCr + row.periodDr`
+- `closingBalance` from API: positive = Cr, negative = Dr — `fmtBal(n)` displays with Cr/Dr suffix
+- Format change updates the table instantly — no re-fetch; same data, different column layout
+- Print/PDF use **landscape** for "with-balance" format, portrait for "standard"
+- Rows sorted by account-head code in `RDFinancialReportService.cs`
 
 ---
 
@@ -471,3 +498,6 @@ Migrations live in `BankingPlatform.Infrastructure/Migrations/`. Recent ones:
 20. **`monthRate` out of scope in `SavingInterestPostingService`** — variable declared inside both branches of an if/else block, then referenced after the block. Fixed: hoisted declaration to before the if/else.
 21. **Loan recovery delete left orphan `voucherrecintdetail` rows** — `DeleteVoucherAsync` did not clean up `voucherrecintdetail` for Loan voucher types (no FK to enforce it). Fixed: explicit cleanup added before voucher delete.
 22. **Voucher save messages inconsistent and missing voucher number** — each screen used different text; some showed no voucher number at all. Fixed: all backend controllers now return `"Voucher saved/updated successfully with voucher no. {N}"`, and all frontend screens use `res.message` uniformly.
+23. **Reports "From Date" showed blank** — `user.sessionFromDate` can be `DateTime.MinValue` (`"0001-01-01T00:00:00"`) or an empty string from JWT, causing date inputs to render empty. Fixed: all 23 report files now use `getSessionFromDate(user.sessionInfo, fallback)` from `client/src/utils/sessionUtils.ts` which derives `"YYYY-04-01"` from `user.sessionInfo` (e.g. `"2025-2026"`).
+24. **Close Saving Account ledger not showing (date format bug)** — `user.workingdate` is `"29-September-2025"` format; `.slice(0, 10)` produced `"29-Septembe"` (invalid date). Fixed: use `commonservice.parseWorkingDate(user.workingdate)` for all date conversions from `workingdate`.
+25. **FD Renew voucher deletion resurrected wrong entry** — `DeleteVoucherAsync` for Renew subtype reverted all non-Open FD details to Open, which incorrectly left the newly-created detail (Operation="RC") alive. Fixed: Renew delete now explicitly removes the RC entry and reverts only the original RP entry to Open.

@@ -68,6 +68,8 @@
             IBBrSavWdlStep1 = 26,       // Source Branch: Dr HO-Ref, Cr Cash
             IBBrSavWdlStep2 = 27,       // HO: Dr Dest-Ref, Cr Source-Ref
             IBBrSavWdlStep3 = 28,       // Dest Branch: Dr Customer Saving Acc, Cr HO-Ref
+
+            CloseAccount = 29,          // Account closure — single combined voucher (saving, RD, FD, etc.)
         }
 
         public enum VoucherStatus

@@ -206,11 +206,40 @@ namespace BankingPlatform.API.Service.Vouchers
                 {
                     var fdAccountIds = entries.Select(e => e.AccountId).Distinct().ToList();
 
-                    var fdDetails = await _context.fdaccountdetail
-                        .Where(x => fdAccountIds.Contains(x.AccountId) && x.FDStatus != (int)Enums.FDStatus.Open)
-                        .ToListAsync();
-                    foreach (var fd in fdDetails)
-                        fd.FDStatus = (int)Enums.FDStatus.Open;
+                    if (vSubType == (int)Enums.VoucherSubType.Renew)
+                    {
+                        // Renew creates a new fdaccountdetail (Operation="RC") and marks the original
+                        // as Renewed (Operation="RP"). On delete: remove the new detail entirely and
+                        // revert the original back to Open. The generic "set all non-Open to Open"
+                        // approach incorrectly resurrects the new detail instead of deleting it.
+                        var rcEntry = fdVoucherDetails.FirstOrDefault(x => x.Operation == "RC");
+                        var rpEntry = fdVoucherDetails.FirstOrDefault(x => x.Operation == "RP");
+
+                        if (rcEntry != null)
+                        {
+                            var newDetail = await _context.fdaccountdetail
+                                .FirstOrDefaultAsync(x => x.Id == rcEntry.FDAccDetId);
+                            if (newDetail != null)
+                                _context.fdaccountdetail.Remove(newDetail);
+                        }
+
+                        if (rpEntry != null)
+                        {
+                            var originalDetail = await _context.fdaccountdetail
+                                .FirstOrDefaultAsync(x => x.Id == rpEntry.FDAccDetId);
+                            if (originalDetail != null)
+                                originalDetail.FDStatus = (int)Enums.FDStatus.Open;
+                        }
+                    }
+                    else
+                    {
+                        // Mature / PreMature: revert FD status on all non-Open details
+                        var fdDetails = await _context.fdaccountdetail
+                            .Where(x => fdAccountIds.Contains(x.AccountId) && x.FDStatus != (int)Enums.FDStatus.Open)
+                            .ToListAsync();
+                        foreach (var fd in fdDetails)
+                            fd.FDStatus = (int)Enums.FDStatus.Open;
+                    }
 
                     var fdAccounts = await _context.accountmaster
                         .Where(x => fdAccountIds.Contains(x.ID) && x.IsAccClosed)

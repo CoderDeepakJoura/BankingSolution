@@ -27,8 +27,9 @@ export interface PostFDInterestDTO {
   productId: number;
   postingDate: string;
   accountIds: number[];
+  selectedDetailIds?: number[];
   isMIS: boolean;
-  interestOverrides?: Record<number, number>;
+  interestOverrides?: Record<number, number>; // keyed by fdDetailId
 }
 
 export interface FDProductOption {

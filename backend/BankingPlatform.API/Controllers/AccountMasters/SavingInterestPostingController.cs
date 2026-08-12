@@ -58,6 +58,32 @@ namespace BankingPlatform.API.Controllers.AccountMasters
         }
 
         /// <summary>
+        /// Returns current balance and accrued (unposted) interest for a specific account — used by the Close Saving Account screen.
+        /// </summary>
+        [HttpGet("closing-preview")]
+        public async Task<IActionResult> GetClosingPreview(
+            [FromQuery] int branchId,
+            [FromQuery] int accountId,
+            [FromQuery] int productId,
+            [FromQuery] DateTime asOfDate)
+        {
+            try
+            {
+                if (branchId <= 0 || accountId <= 0 || productId <= 0)
+                    return BadRequest(new ResponseDto { Success = false, Message = "BranchId, AccountId and ProductId are required." });
+
+                var (balance, interest) = await _service.GetClosingPreviewAsync(branchId, accountId, productId, asOfDate);
+                return Ok(new { Success = true, data = new { balance, calculatedInterest = interest } });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching closing preview for account {AccountId}.", accountId);
+                await _commonFunctions.LogErrors(ex, nameof(GetClosingPreview), nameof(SavingInterestPostingController));
+                return BadRequest(new ResponseDto { Success = false, Message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Posts saving interest for the specified accounts.
         /// Creates one voucher per account: Cr saving account, Dr interest expense account.
         /// </summary>

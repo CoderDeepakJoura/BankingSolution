@@ -37,6 +37,17 @@ class SavingInterestApiService extends ApiService {
     return this.makeRequest<SavingInterestAccountDTO[]>(url);
   }
 
+  async getClosingPreview(
+    branchId: number,
+    accountId: number,
+    productId: number,
+    asOfDate: string
+  ): Promise<ApiResponse<{ balance: number; calculatedInterest: number }>> {
+    return this.makeRequest<{ balance: number; calculatedInterest: number }>(
+      `/SavingInterestPosting/closing-preview?branchId=${branchId}&accountId=${accountId}&productId=${productId}&asOfDate=${asOfDate}`
+    );
+  }
+
   async postInterest(dto: PostSavingInterestDTO): Promise<ApiResponse<{ message: string }>> {
     return this.makeRequest<{ message: string }>('/SavingInterestPosting/post', {
       method: 'POST',

@@ -121,6 +121,18 @@ namespace BankingPlatform.API.Service.AccountMasters
             return result.Where(r => r.CalculatedInterest >= (rules.MinPostingIntAmt > 0 ? rules.MinPostingIntAmt : 0.01m)).ToList();
         }
 
+        // ── Closing preview ───────────────────────────────────────────────────────
+
+        public async Task<(decimal Balance, decimal CalculatedInterest)> GetClosingPreviewAsync(
+            int branchId, int accountId, int productId, DateTime asOfDate)
+        {
+            decimal balance = await GetCurrentBalance(branchId, accountId);
+            var rules = await GetInterestRules(branchId, productId);
+            if (rules == null) return (balance, 0);
+            var calc = await CalculateInterestForAccount(branchId, accountId, asOfDate, rules);
+            return (balance, Math.Round(calc.TotalInterest, 2));
+        }
+
         // ── Post interest ─────────────────────────────────────────────────────────
 
         public async Task<string> PostInterestAsync(PostSavingInterestDTO dto)

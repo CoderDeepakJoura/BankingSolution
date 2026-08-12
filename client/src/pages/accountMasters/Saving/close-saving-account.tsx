@@ -7,6 +7,8 @@ import Select from "react-select";
 import savingAccountService, {
   CloseSavingAccDTO,
 } from "../../../services/accountMasters/savingaccount/savingaccountapi";
+import savingInterestApi from "../../../services/accountMasters/saving/savingInterestApi";
+import savingLedgerApi, { SavingLedger } from "../../../services/reports/savingLedgerApi";
 import savingVoucherApi, {
   SavingVoucherDTO,
 } from "../../../services/vouchers/saving/savingVoucherApi";
@@ -90,6 +92,9 @@ const CloseSavingAccount: React.FC = () => {
   const [fieldErrors, setFieldErrors] = useState<ValidationError[]>([]);
   const [pictureFile, setPictureFile] = useState<any>(null);
   const [signatureFile, setSignatureFile] = useState<any>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [ledgerData, setLedgerData] = useState<SavingLedger | null>(null);
+  const [loadingLedger, setLoadingLedger] = useState(false);
 
   // Voucher Data State
   const [voucherData, setVoucherData] = useState({
@@ -226,6 +231,7 @@ const CloseSavingAccount: React.FC = () => {
     setJointHolders([]);
     setPictureFile(null);
     setSignatureFile(null);
+    setLedgerData(null);
 
     if (selected) {
       setFieldErrors((prev) =>
@@ -395,6 +401,7 @@ const CloseSavingAccount: React.FC = () => {
     setAccountData(null);
     setJointHolders([]);
     setSavingProductAccounts([]);
+    setLedgerData(null);
     setActiveTab("account-info");
     clearErrors();
     setPictureFile(null);
@@ -452,8 +459,8 @@ const CloseSavingAccount: React.FC = () => {
             </div>
           </div>
           <button
-            onClick={() => navigate("/account-operations")}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors duration-200"
+            onClick={() => navigate("/voucher-operations")}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors duration-200 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Operations
@@ -510,6 +517,7 @@ const CloseSavingAccount: React.FC = () => {
                   borderWidth: "2px",
                   borderColor: state.isFocused ? "#3b82f6" : "#e5e7eb",
                   borderRadius: "0.5rem",
+                  cursor: "pointer",
                   boxShadow: state.isFocused
                     ? "0 0 0 2px rgba(59, 130, 246, 0.2)"
                     : "none",
@@ -563,6 +571,49 @@ const CloseSavingAccount: React.FC = () => {
                       setAccountData(response.data);
                       setPictureFile(null);
                       setSignatureFile(null);
+
+                      // Fetch balance and accrued interest
+                      setLoadingPreview(true);
+                      try {
+                        const preview = await savingInterestApi.getClosingPreview(
+                          user.branchid,
+                          accountId,
+                          Number(voucherData.savingProduct),
+                          voucherData.voucherDate
+                        );
+                        if (preview.success && preview.data) {
+                          setVoucherData((prev) => ({
+                            ...prev,
+                            balance: preview.data!.balance.toFixed(2),
+                            interestPaid: preview.data!.calculatedInterest > 0
+                              ? preview.data!.calculatedInterest.toFixed(2)
+                              : "",
+                          }));
+                        }
+                      } catch {
+                        // silently ignore — user can enter manually
+                      } finally {
+                        setLoadingPreview(false);
+                      }
+
+                      // Fetch ledger for session period
+                      setLoadingLedger(true);
+                      try {
+                        const fromDate = user.sessionFromDate
+                          ? user.sessionFromDate.slice(0, 10)
+                          : (user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : new Date().toISOString().slice(0, 10));
+                        const toDate = user.workingdate
+                          ? commonservice.parseWorkingDate(user.workingdate)
+                          : new Date().toISOString().slice(0, 10);
+                        const ledgerRes = await savingLedgerApi.getSavingLedger(
+                          user.branchid, accountId, fromDate, toDate
+                        );
+                        setLedgerData(ledgerRes.success && ledgerRes.data ? ledgerRes.data : null);
+                      } catch {
+                        setLedgerData(null);
+                      } finally {
+                        setLoadingLedger(false);
+                      }
 
                       try {
                         const jointAccountResponse =
@@ -627,6 +678,8 @@ const CloseSavingAccount: React.FC = () => {
                   setJointHolders([]);
                   setPictureFile(null);
                   setSignatureFile(null);
+                  setLedgerData(null);
+                  setVoucherData((prev) => ({ ...prev, balance: "", interestPaid: "" }));
                 }
               }}
               onBlur={() => handleFieldBlur("accountId")}
@@ -648,6 +701,7 @@ const CloseSavingAccount: React.FC = () => {
                   borderWidth: "2px",
                   borderColor: state.isFocused ? "#3b82f6" : "#e5e7eb",
                   borderRadius: "0.5rem",
+                  cursor: "pointer",
                   boxShadow: state.isFocused
                     ? "0 0 0 2px rgba(59, 130, 246, 0.2)"
                     : "none",
@@ -668,17 +722,21 @@ const CloseSavingAccount: React.FC = () => {
             label="Balance"
             errors={errorsByField.balance || []}
           >
-            <input
-              type="text"
-              id="balance"
-              value={voucherData.balance}
-              onChange={handlebalanceChange}
-              onBlur={() => handleFieldBlur("balance")}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
-              placeholder="Enter Amount (e.g., 10500.00)"
-              inputMode="decimal"
-              maxLength={18}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                id="balance"
+                value={loadingPreview ? "" : voucherData.balance}
+                readOnly
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray-700 cursor-default outline-none"
+                placeholder={loadingPreview ? "Fetching..." : "Auto-filled on account selection"}
+              />
+              {loadingPreview && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
           </FormField>
 
           {/* Interest Paid */}
@@ -687,22 +745,30 @@ const CloseSavingAccount: React.FC = () => {
             label="Interest Paid"
             errors={errorsByField.interestPaid || []}
           >
-            <input
-              type="text"
-              id="interestPaid"
-              value={voucherData.interestPaid}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "" || /^\d*\.?\d{0,2}$/.test(value)) {
-                  handleInputChange("interestPaid", value);
-                }
-              }}
-              onBlur={() => handleFieldBlur("interestPaid")}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
-              placeholder="Enter Interest (e.g., 500.00)"
-              inputMode="decimal"
-              maxLength={18}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                id="interestPaid"
+                value={loadingPreview ? "" : voucherData.interestPaid}
+                onChange={(e) => {
+                  if (loadingPreview) return;
+                  const value = e.target.value;
+                  if (value === "" || /^\d*\.?\d{0,2}$/.test(value)) {
+                    handleInputChange("interestPaid", value);
+                  }
+                }}
+                onBlur={() => handleFieldBlur("interestPaid")}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200"
+                placeholder={loadingPreview ? "Fetching..." : "Enter Interest (e.g., 500.00)"}
+                inputMode="decimal"
+                maxLength={18}
+              />
+              {loadingPreview && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
           </FormField>
 
           {/* Closing Charges */}
@@ -764,6 +830,7 @@ const CloseSavingAccount: React.FC = () => {
                   borderWidth: "2px",
                   borderColor: state.isFocused ? "#3b82f6" : "#e5e7eb",
                   borderRadius: "0.5rem",
+                  cursor: "pointer",
                   boxShadow: state.isFocused
                     ? "0 0 0 2px rgba(59, 130, 246, 0.2)"
                     : "none",
@@ -814,6 +881,7 @@ const CloseSavingAccount: React.FC = () => {
                   borderWidth: "2px",
                   borderColor: state.isFocused ? "#3b82f6" : "#e5e7eb",
                   borderRadius: "0.5rem",
+                  cursor: "pointer",
                   boxShadow: state.isFocused
                     ? "0 0 0 2px rgba(59, 130, 246, 0.2)"
                     : "none",
@@ -1035,20 +1103,97 @@ const CloseSavingAccount: React.FC = () => {
     </div>
   );
 
-  const renderAccountLedger = () => (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <FileText className="w-5 h-5 text-blue-600" />
-        <h3 className="text-lg font-semibold text-gray-800">
-          Account Ledger View
-        </h3>
+  const renderAccountLedger = () => {
+    const fmt = (n: number) =>
+      n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtDate = (d: string) =>
+      d ? d.slice(0, 10).split("-").reverse().join("/") : "";
+    const fmtBal = (n: number) =>
+      n < 0 ? `${fmt(Math.abs(n))} Dr` : `${fmt(n)} Cr`;
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <FileText className="w-5 h-5 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-800">Account Ledger View</h3>
+        </div>
+
+        {loadingLedger ? (
+          <div className="text-center py-12">
+            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm text-gray-500">Loading ledger...</p>
+          </div>
+        ) : !voucherData.accountId ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm text-gray-500">Please select an account to view ledger</p>
+          </div>
+        ) : !ledgerData ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm text-gray-500">No ledger data available</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gradient-to-r from-blue-900 to-slate-800">
+                  <th className="px-3 py-3 text-center text-xs font-semibold text-white uppercase tracking-wider">S.No</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">Date</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold text-white uppercase tracking-wider">V.No</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Particulars</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">Withdrawals</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">Deposits</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-white uppercase tracking-wider">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="bg-amber-50 border-b border-amber-200">
+                  <td className="px-3 py-2 text-center text-amber-700"></td>
+                  <td className="px-3 py-2 text-center text-amber-700 whitespace-nowrap">{fmtDate(ledgerData.fromDate)}</td>
+                  <td className="px-3 py-2 text-center text-amber-700"></td>
+                  <td className="px-3 py-2 text-amber-800 font-semibold">Opening Balance</td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2 text-right font-semibold text-amber-800">{fmtBal(ledgerData.openingBalance)}</td>
+                </tr>
+                {ledgerData.entries.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-8 text-center text-gray-500">
+                      No transactions found for the selected period.
+                    </td>
+                  </tr>
+                ) : (
+                  ledgerData.entries.map((entry, i) => (
+                    <tr
+                      key={i}
+                      className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50"}`}
+                    >
+                      <td className="px-3 py-2 text-center text-gray-500">{i + 1}</td>
+                      <td className="px-3 py-2 text-center whitespace-nowrap text-gray-600">{fmtDate(entry.voucherDate)}</td>
+                      <td className="px-3 py-2 text-center text-gray-600">{entry.voucherNo}</td>
+                      <td className="px-3 py-2 text-gray-800">{entry.particulars}</td>
+                      <td className="px-3 py-2 text-right text-red-700 font-medium">{entry.dr != null ? fmt(entry.dr) : ""}</td>
+                      <td className="px-3 py-2 text-right text-emerald-700 font-medium">{entry.cr != null ? fmt(entry.cr) : ""}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-gray-800">{fmtBal(entry.balance)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-100 border-t-2 border-slate-400">
+                  <td colSpan={4} className="px-3 py-3 text-right font-bold text-gray-700">Total / Closing Balance</td>
+                  <td className="px-3 py-3 text-right font-bold text-red-700">{fmt(ledgerData.totalDr)}</td>
+                  <td className="px-3 py-3 text-right font-bold text-emerald-700">{fmt(ledgerData.totalCr)}</td>
+                  <td className="px-3 py-3 text-right font-bold text-gray-800">{fmtBal(ledgerData.closingBalance)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
-      <div className="text-center py-12 text-gray-500">
-        <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-        <p className="text-sm">Ledger view content will appear here</p>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderPhotoSignature = () => (
     <div className="space-y-6">
