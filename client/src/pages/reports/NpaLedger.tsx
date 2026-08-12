@@ -385,7 +385,7 @@ const NpaLedgerPage: React.FC = () => {
                           {cat.periodFrom !== null && (
                             <span className="text-xs text-gray-400">
                               ({cat.periodFrom}
-                              {cat.periodTo && cat.periodTo > 0 ? `—${cat.periodTo}` : “+”}
+                              {cat.periodTo && cat.periodTo > 0 ? `-${cat.periodTo}` : “+”}
                               )
                             </span>
                           )}
