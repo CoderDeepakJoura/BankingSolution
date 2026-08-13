@@ -27,6 +27,7 @@ export interface FDLedgerEntry {
   particulars: string;
   dr: number | null;
   cr: number | null;
+  interestPosted: number | null;
   balance: number;
   narration?: string;
 }
@@ -50,6 +51,7 @@ export interface FDLedger {
   entries: FDLedgerEntry[];
   totalDr: number;
   totalCr: number;
+  totalInterestPosted: number;
   closingBalance: number;
   relativeName?: string;
   contactNo?: string;

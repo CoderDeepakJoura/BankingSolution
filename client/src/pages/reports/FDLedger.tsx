@@ -72,6 +72,7 @@ const LedgerTable: React.FC<{ data: FDLedger; longNar: boolean }> = ({ data, lon
         <TH className="text-left">Particulars</TH>
         <TH className="w-28 text-right">Withdrawals (Dr)</TH>
         <TH className="w-28 text-right">Deposits (Cr)</TH>
+        <TH className="w-28 text-right">Interest Posted</TH>
         <TH className="w-28 text-right">Balance</TH>
       </tr>
     </thead>
@@ -83,11 +84,12 @@ const LedgerTable: React.FC<{ data: FDLedger; longNar: boolean }> = ({ data, lon
         <TD className="text-amber-800 font-semibold italic">Opening Balance</TD>
         <TD className="text-amber-800" />
         <TD className="text-amber-800" />
+        <TD className="text-amber-800" />
         <TD className="text-right text-amber-900 font-bold">{fmtBal(data.openingBalance)}</TD>
       </tr>
       {data.entries.length === 0 ? (
         <tr>
-          <td colSpan={7} className="text-center py-10 text-slate-400 italic text-xs">
+          <td colSpan={8} className="text-center py-10 text-slate-400 italic text-xs">
             No transactions found for the selected period.
           </td>
         </tr>
@@ -102,6 +104,7 @@ const LedgerTable: React.FC<{ data: FDLedger; longNar: boolean }> = ({ data, lon
           </TD>
           <TD className="text-right text-red-700 font-medium">{entry.dr != null ? fmt(entry.dr) : ""}</TD>
           <TD className="text-right text-emerald-700 font-medium">{entry.cr != null ? fmt(entry.cr) : ""}</TD>
+          <TD className="text-right text-blue-700 font-medium">{entry.interestPosted != null ? fmt(entry.interestPosted) : ""}</TD>
           <TD className="text-right font-semibold text-slate-800">{fmtBal(entry.balance)}</TD>
         </tr>
       ))}
@@ -111,6 +114,7 @@ const LedgerTable: React.FC<{ data: FDLedger; longNar: boolean }> = ({ data, lon
         <TDF colSpan={4} className="text-right text-slate-700">Total</TDF>
         <TDF className="text-right text-red-700">{fmt(data.totalDr)}</TDF>
         <TDF className="text-right text-emerald-700">{fmt(data.totalCr)}</TDF>
+        <TDF className="text-right text-blue-700">{fmt(data.totalInterestPosted ?? 0)}</TDF>
         <TDF className="text-right text-slate-800">{fmtBal(data.closingBalance)}</TDF>
       </tr>
     </tfoot>
@@ -124,9 +128,10 @@ const buildExportConfig = (data: FDLedger, longNar: boolean): ExportConfig => {
     { header: "Date",        widthRatio: 0.10, align: "center" as const },
     { header: "V.No",        widthRatio: 0.07, align: "center" as const },
     { header: "Particulars", widthRatio: 0.40, align: "left"   as const },
-    { header: "Withdrawals", widthRatio: 0.13, align: "right"  as const },
-    { header: "Deposits",    widthRatio: 0.13, align: "right"  as const },
-    { header: "Balance",     widthRatio: 0.12, align: "right"  as const },
+    { header: "Withdrawals",    widthRatio: 0.11, align: "right"  as const },
+    { header: "Deposits",       widthRatio: 0.11, align: "right"  as const },
+    { header: "Int. Posted",    widthRatio: 0.11, align: "right"  as const },
+    { header: "Balance",        widthRatio: 0.10, align: "right"  as const },
   ];
   const rows: ExportRow[] = [];
   const info1 = [
@@ -147,12 +152,12 @@ const buildExportConfig = (data: FDLedger, longNar: boolean): ExportConfig => {
   ].filter(Boolean).join("  |  ");
   if (info1) rows.push({ style: "info", spanFirst: 7, cells: [info1] });
   if (info2) rows.push({ style: "info", spanFirst: 7, cells: [info2] });
-  rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", fmtBal(data.openingBalance)] });
+  rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", "", fmtBal(data.openingBalance)] });
   data.entries.forEach((e, i) => {
     const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
-    rows.push({ style: "normal", cells: [String(i + 1), fmtShort(e.voucherDate), String(e.voucherNo), par, e.dr != null ? fmt(e.dr) : "", e.cr != null ? fmt(e.cr) : "", fmtBal(e.balance)] });
+    rows.push({ style: "normal", cells: [String(i + 1), fmtShort(e.voucherDate), String(e.voucherNo), par, e.dr != null ? fmt(e.dr) : "", e.cr != null ? fmt(e.cr) : "", e.interestPosted != null ? fmt(e.interestPosted) : "", fmtBal(e.balance)] });
   });
-  rows.push({ style: "total", spanFirst: 4, cells: ["Closing Balance", "", "", "", fmt(data.totalDr), fmt(data.totalCr), fmtBal(data.closingBalance)] });
+  rows.push({ style: "total", spanFirst: 4, cells: ["Closing Balance", "", "", "", fmt(data.totalDr), fmt(data.totalCr), fmt(data.totalInterestPosted ?? 0), fmtBal(data.closingBalance)] });
   return {
     meta: {
       title: data.branchName, subtitle: data.branchAddress,
@@ -169,13 +174,13 @@ const buildPrintHTML = (data: FDLedger, longNar: boolean): string => {
     ? `<span><span class="lbl">FD Detail:</span> <strong>${data.selectedDetailLabel}</strong> &nbsp;|&nbsp; ${fmtDate(data.detailFDDate!)} → ${fmtDate(data.detailMaturityDate!)} &nbsp;|&nbsp; ₹${fmt(data.detailFDAmount!)}</span>`
     : `<span><span class="lbl">FD Detail:</span> <strong>All Details</strong></span>`;
   let sno = 0;
-  let rows = `<tr class="ob-row"><td></td><td style="text-align:center">${fmtShort(data.fromDate)}</td><td></td><td>Opening Balance</td><td></td><td></td><td class="amt">${fmtBal(data.openingBalance)}</td></tr>`;
+  let rows = `<tr class="ob-row"><td></td><td style="text-align:center">${fmtShort(data.fromDate)}</td><td></td><td>Opening Balance</td><td></td><td></td><td></td><td class="amt">${fmtBal(data.openingBalance)}</td></tr>`;
   data.entries.forEach((e) => {
     sno++;
     const par = longNar && e.narration ? `${e.particulars} — ${e.narration}` : e.particulars;
-    rows += `<tr class="${sno % 2 === 0 ? "even" : ""}"><td style="text-align:center">${sno}</td><td style="text-align:center;white-space:nowrap">${fmtShort(e.voucherDate)}</td><td style="text-align:center">${e.voucherNo}</td><td>${par}</td><td class="amt dr">${e.dr != null ? fmt(e.dr) : ""}</td><td class="amt cr">${e.cr != null ? fmt(e.cr) : ""}</td><td class="amt">${fmtBal(e.balance)}</td></tr>`;
+    rows += `<tr class="${sno % 2 === 0 ? "even" : ""}"><td style="text-align:center">${sno}</td><td style="text-align:center;white-space:nowrap">${fmtShort(e.voucherDate)}</td><td style="text-align:center">${e.voucherNo}</td><td>${par}</td><td class="amt dr">${e.dr != null ? fmt(e.dr) : ""}</td><td class="amt cr">${e.cr != null ? fmt(e.cr) : ""}</td><td class="amt int">${e.interestPosted != null ? fmt(e.interestPosted) : ""}</td><td class="amt">${fmtBal(e.balance)}</td></tr>`;
   });
-  rows += `<tr class="total-row"><td colspan="4" style="text-align:right">Total / Closing Balance</td><td class="amt dr">${fmt(data.totalDr)}</td><td class="amt cr">${fmt(data.totalCr)}</td><td class="amt">${fmtBal(data.closingBalance)}</td></tr>`;
+  rows += `<tr class="total-row"><td colspan="4" style="text-align:right">Total / Closing Balance</td><td class="amt dr">${fmt(data.totalDr)}</td><td class="amt cr">${fmt(data.totalCr)}</td><td class="amt int">${fmt(data.totalInterestPosted ?? 0)}</td><td class="amt">${fmtBal(data.closingBalance)}</td></tr>`;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>FD Ledger</title><style>
     *{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:12px;}
     .report-header{text-align:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #334155;}
@@ -190,7 +195,7 @@ const buildPrintHTML = (data: FDLedger, longNar: boolean): string => {
     tbody tr.even td{background:#f8fafc;}
     .ob-row td{background:#fffbeb;color:#92400e;font-weight:600;border-color:#fde68a;}
     .total-row td{background:#f1f5f9;font-weight:700;border-top:2px solid #64748b;color:#1e293b;}
-    .amt{text-align:right;font-variant-numeric:tabular-nums;}.dr{color:#b91c1c;}.cr{color:#065f46;}
+    .amt{text-align:right;font-variant-numeric:tabular-nums;}.dr{color:#b91c1c;}.cr{color:#065f46;}.int{color:#1d4ed8;}
     .summary{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
     .summary-card{border:1px solid #e2e8f0;padding:6px 12px;border-radius:4px;border-top-width:3px;}
     .summary-card .lbl{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;}
@@ -216,12 +221,13 @@ const buildPrintHTML = (data: FDLedger, longNar: boolean): string => {
   </div>
   <table><thead><tr>
     <th style="width:28px">S.No</th><th style="width:72px">Date</th><th style="width:40px">V.No</th>
-    <th style="text-align:left">Particulars</th><th style="width:90px">Withdrawals</th><th style="width:90px">Deposits</th><th style="width:90px">Balance</th>
+    <th style="text-align:left">Particulars</th><th style="width:90px">Withdrawals</th><th style="width:90px">Deposits</th><th style="width:90px">Int. Posted</th><th style="width:90px">Balance</th>
   </tr></thead><tbody>${rows}</tbody></table>
   <div class="summary">
     <div class="summary-card" style="border-top-color:#3b82f6"><div class="lbl">Opening Balance</div><div class="val" style="color:#1d4ed8">₹${fmtBal(data.openingBalance)}</div></div>
     <div class="summary-card" style="border-top-color:#10b981"><div class="lbl">Total Deposits</div><div class="val" style="color:#065f46">₹${fmt(data.totalCr)}</div></div>
     <div class="summary-card" style="border-top-color:#ef4444"><div class="lbl">Total Withdrawals</div><div class="val" style="color:#b91c1c">₹${fmt(data.totalDr)}</div></div>
+    <div class="summary-card" style="border-top-color:#1d4ed8"><div class="lbl">Interest Posted</div><div class="val" style="color:#1d4ed8">₹${fmt(data.totalInterestPosted ?? 0)}</div></div>
     <div class="summary-card" style="border-top-color:#8b5cf6"><div class="lbl">Closing Balance</div><div class="val" style="color:#6d28d9">₹${fmtBal(data.closingBalance)}</div></div>
   </div>
 </body></html>`;
@@ -303,7 +309,7 @@ const LedgerSection: React.FC<LedgerSectionProps> = ({ ledger, longNar, onPrint,
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
             <div className={`bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-blue-500`}>
               <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Opening Balance</p>
               <p className="text-base font-bold text-blue-700 mt-1">₹{fmtBal(ledger.openingBalance)}</p>
@@ -315,6 +321,10 @@ const LedgerSection: React.FC<LedgerSectionProps> = ({ ledger, longNar, onPrint,
             <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-red-500">
               <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Withdrawals</p>
               <p className="text-base font-bold text-red-700 mt-1">₹{fmt(ledger.totalDr)}</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 border-t-blue-500">
+              <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Interest Posted</p>
+              <p className="text-base font-bold text-blue-700 mt-1">₹{fmt(ledger.totalInterestPosted ?? 0)}</p>
             </div>
             <div className={`bg-white border border-slate-200 rounded-xl p-3 shadow-sm border-t-4 ${acc.border}`}>
               <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Closing Balance</p>

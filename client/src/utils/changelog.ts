@@ -15,10 +15,18 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.18",
+    date: "2026-08-13",
+    changes: [
+      { type: "new", text: "FD Ledger: added 'Interest Posted' column — interest posting entries now appear in a separate highlighted column instead of the Deposits (Cr) column, with a dedicated total and summary card." },
+      { type: "new", text: "RD Ledger: added 'Interest Posted' column — same treatment as FD Ledger. Both ledgers now show 8 columns: S.No, Date, Voucher No., Particulars, Withdrawals (Dr), Deposits (Cr), Interest Posted, Balance." },
+    ],
+  },
+  {
     version: "1.0.17",
     date: "2026-08-13",
     changes: [
-      { type: "improvement", text: "Minor updates and bug fixes" },
+      { type: "fix", text: "FD Mature / Renew / Pre-Mature: the Interest Paid debit entry (maturity amount minus principal) is now correctly generated in the voucher and Day Book. Previously only the principal was debited while the full maturity amount was credited, leaving the voucher unbalanced." },
     ],
   },
   {

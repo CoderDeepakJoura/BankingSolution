@@ -35,6 +35,7 @@ namespace BankingPlatform.API.Service.Reports
         public string Particulars { get; set; } = "";
         public decimal? Dr { get; set; }
         public decimal? Cr { get; set; }
+        public decimal? InterestPosted { get; set; }
         public decimal Balance { get; set; }
         public string? Narration { get; set; }
     }
@@ -59,6 +60,7 @@ namespace BankingPlatform.API.Service.Reports
         public List<FDLedgerEntryDTO> Entries { get; set; } = new();
         public decimal TotalDr { get; set; }
         public decimal TotalCr { get; set; }
+        public decimal TotalInterestPosted { get; set; }
         public decimal ClosingBalance { get; set; }
         // Account detail fields
         public string? RelativeName { get; set; }
@@ -260,7 +262,7 @@ namespace BankingPlatform.API.Service.Reports
                 voucherQuery = voucherQuery.Where(x => detailVoucherIds.Contains(x.Id));
 
             var voucherData = await voucherQuery
-                .Select(x => new { x.Id, x.VoucherNo, x.VoucherDate })
+                .Select(x => new { x.Id, x.VoucherNo, x.VoucherDate, x.VoucherSubType })
                 .ToListAsync();
 
             if (!voucherData.Any())
@@ -269,7 +271,7 @@ namespace BankingPlatform.API.Service.Reports
             var voucherIdList = voucherData.Select(v => v.Id).ToList();
             var voucherInfoMap = voucherData.ToDictionary(
                 v => v.Id,
-                v => new FDLVoucherInfo(v.VoucherNo, v.VoucherDate.Date));
+                v => new FDLVoucherInfo(v.VoucherNo, v.VoucherDate.Date, v.VoucherSubType));
 
             // Account entries for this account in the filtered vouchers
             var accountEntries = await _context.vouchercreditdebitdetails.AsNoTracking()
@@ -321,6 +323,7 @@ namespace BankingPlatform.API.Service.Reports
 
                 decimal? dr = entry.VoucherEntryType == "Dr" ? entry.VoucherAmount : (decimal?)null;
                 decimal? cr = entry.VoucherEntryType == "Cr" ? entry.VoucherAmount : (decimal?)null;
+                bool isInterestPosting = info.VoucherSubType == (int)Enums.VoucherSubType.InterestPosting && cr.HasValue;
 
                 if (cr.HasValue) runningBalance += cr.Value;
                 else if (dr.HasValue) runningBalance -= dr.Value;
@@ -331,7 +334,8 @@ namespace BankingPlatform.API.Service.Reports
                     VoucherDate = info.VoucherDate,
                     Particulars = particulars,
                     Dr = dr,
-                    Cr = cr,
+                    Cr = isInterestPosting ? null : cr,
+                    InterestPosted = isInterestPosting ? cr : null,
                     Balance = runningBalance,
                     Narration = entry.Narration
                 });
@@ -339,6 +343,7 @@ namespace BankingPlatform.API.Service.Reports
 
             decimal totalDr = entries.Sum(e => e.Dr ?? 0);
             decimal totalCr = entries.Sum(e => e.Cr ?? 0);
+            decimal totalInterestPosted = entries.Sum(e => e.InterestPosted ?? 0);
 
             return (true, "Success", new FDLedgerDTO
             {
@@ -360,6 +365,7 @@ namespace BankingPlatform.API.Service.Reports
                 Entries = entries,
                 TotalDr = totalDr,
                 TotalCr = totalCr,
+                TotalInterestPosted = totalInterestPosted,
                 ClosingBalance = runningBalance,
                 RelativeName        = account.RelativeName,
                 ContactNo           = account.PhoneNo1,
@@ -372,7 +378,7 @@ namespace BankingPlatform.API.Service.Reports
             });
         }
 
-        private record FDLVoucherInfo(int VoucherNo, DateTime VoucherDate);
+        private record FDLVoucherInfo(int VoucherNo, DateTime VoucherDate, int VoucherSubType);
 
         private async Task<decimal> CalculateOpeningBalanceAsync(int branchId, int accountId, DateTime fromDate)
         {

@@ -18,6 +18,7 @@ export interface RDLedgerEntry {
   particulars: string;
   dr?: number;
   cr?: number;
+  interestPosted?: number;
   balance: number;
   narration?: string;
 }
@@ -36,6 +37,7 @@ export interface RDLedger {
   entries: RDLedgerEntry[];
   totalDr: number;
   totalCr: number;
+  totalInterestPosted: number;
   closingBalance: number;
   relativeName?: string;
   contactNo?: string;
