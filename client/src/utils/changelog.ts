@@ -15,10 +15,19 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.21",
+    date: "2026-08-13",
+    changes: [
+      { type: "fix", text: "Loan Recovery (Stand): Interest (Intt) field is now editable so the operator can specify the exact interest portion" },
+      { type: "fix", text: "Loan Recovery (Stand): Interest Recovered now appears as a separate Cr entry in the Day Book under the Interest Income account" },
+      { type: "fix", text: "Loan Recovery: Interest amounts now display as whole numbers (no decimals)" },
+    ],
+  },
+  {
     version: "1.0.20",
     date: "2026-08-13",
     changes: [
-      { type: "improvement", text: "Minor updates and bug fixes" },
+      { type: "fix", text: "MIS Interest Posting now posts the fixed monthly amount (e.g. ₹525 every month) instead of a day-count-based variable amount" },
     ],
   },
   {

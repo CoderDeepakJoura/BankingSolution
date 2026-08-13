@@ -39,6 +39,10 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public string? Narration { get; set; }
         public string? Agent { get; set; }
         public List<LoanRecoveryDebitItemDTO> DebitItems { get; set; } = new();
+        /// <summary>User-specified interest portion for Stand-type loans.
+        /// When provided, overrides the auto-computed interest allocation so that
+        /// exactly this amount is credited to the interest income account in the Day Book.</summary>
+        public decimal? IntAmount { get; set; }
     }
 
     public class LoanRecoveryBalanceDTO

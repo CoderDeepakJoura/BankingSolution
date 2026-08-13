@@ -25,6 +25,7 @@ export interface LoanRecoveryVoucherDTO {
   narration?: string;
   agent?: string;
   debitItems: LoanRecoveryDebitItemDTO[];
+  intAmount?: number;
 }
 
 export interface LoanRecoveryBalanceDTO {

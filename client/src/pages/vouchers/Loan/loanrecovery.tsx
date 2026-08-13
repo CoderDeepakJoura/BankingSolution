@@ -138,6 +138,8 @@ const formatDate = (value?: string | null) => {
 const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const fmtWhole = (n: number) => Math.round(n).toLocaleString("en-IN");
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const LoanRecovery: React.FC = () => {
@@ -180,6 +182,7 @@ const LoanRecovery: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [allocation, setAllocation] = useState<IntAllocation[]>([]);
+  const [intAmount, setIntAmount] = useState<string>("");
   const [rowSavingBalance, setRowSavingBalance] = useState<number | null>(null);
   const [rowBalanceLoading, setRowBalanceLoading] = useState(false);
 
@@ -276,9 +279,13 @@ const LoanRecovery: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!loanBalance || loanBalance.actOnIntPosting === 1) { setAllocation([]); return; }
+    if (!loanBalance || loanBalance.actOnIntPosting === 1) { setAllocation([]); setIntAmount(""); return; }
     const total = parseFloat(formData.totalAmount) || 0;
-    setAllocation(total > 0 ? computeAllocation(total, loanBalance) : []);
+    const alloc = total > 0 ? computeAllocation(total, loanBalance) : [];
+    setAllocation(alloc);
+    // Auto-fill Intt with computed interest (rounded to whole number)
+    const computedInt = alloc.reduce((s, a) => s + a.recovering, 0);
+    setIntAmount(computedInt > 0 ? String(Math.round(computedInt)) : "");
   }, [formData.totalAmount, loanBalance]);
 
   const clearError = (key: string) =>
@@ -295,6 +302,7 @@ const LoanRecovery: React.FC = () => {
     setDebitAccountsForRow([]);
     setRowSavingBalance(null);
     setAllocation([]);
+    setIntAmount("");
     setKistSchedule([]);
   };
 
@@ -374,7 +382,10 @@ const LoanRecovery: React.FC = () => {
   // ── Derived values ────────────────────────────────────────────────────────────
 
   const totalAmt = parseFloat(formData.totalAmount) || 0;
-  const intTotal = allocation.reduce((s, a) => s + a.recovering, 0);
+  const computedIntTotal = allocation.reduce((s, a) => s + a.recovering, 0);
+  const isStandLoan = loanBalance && loanBalance.actOnIntPosting !== 1;
+  const intAmtParsed = parseFloat(intAmount) || 0;
+  const intTotal = isStandLoan && intAmtParsed > 0 ? intAmtParsed : computedIntTotal;
   const principalRec = Math.max(0, Math.min(totalAmt - intTotal, loanBalance?.principalBalance ?? 0));
   const totalDebited = debitRows.reduce((s, r) => s + r.amount, 0);
   const otherDebited =
@@ -472,6 +483,12 @@ const LoanRecovery: React.FC = () => {
       errs.totalAmount = "Enter a valid recovery amount";
     else if (loanBalance && totalAmt > loanBalance.totalOutstanding + 0.01)
       errs.totalAmount = `Cannot exceed outstanding balance (₹${fmt(loanBalance.totalOutstanding)})`;
+    if (isStandLoan && intAmtParsed > 0) {
+      const totalIntOutstanding = (loanBalance?.stdInterestOutstanding ?? 0) + (loanBalance?.penalInterestOutstanding ?? 0)
+        + (loanBalance?.stdRecoverableOutstanding ?? 0) + (loanBalance?.overdueRecoverableOutstanding ?? 0);
+      if (intAmtParsed > totalIntOutstanding + 0.01)
+        errs.intAmount = `Interest cannot exceed outstanding interest (₹${fmtWhole(totalIntOutstanding)})`;
+    }
     if (debitRows.length === 0)
       errs.debitItems = "Add at least one debit account entry";
     else if (Math.abs(totalDebited - totalAmt) > 0.01)
@@ -493,6 +510,7 @@ const LoanRecovery: React.FC = () => {
           amount: r.amount,
           narration: r.narration || undefined,
         })),
+        intAmount: isStandLoan && intAmtParsed > 0 ? intAmtParsed : undefined,
       };
       const res = isEditMode && editVoucherId
         ? await loanRecoveryApi.updateRecovery(editVoucherId, dto)
@@ -733,10 +751,10 @@ const LoanRecovery: React.FC = () => {
                       <tr key={catId} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-sm font-medium text-gray-800">{label}</td>
                         <td className="px-6 py-4 text-xs text-gray-500">{desc}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-amber-700 text-right">₹{fmt(out)}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-amber-700 text-right">₹{fmtWhole(out)}</td>
                         {totalAmt > 0 && (
                           <td className={`px-6 py-4 text-sm font-semibold text-right ${rec > 0 ? "text-green-700" : "text-gray-400"}`}>
-                            ₹{fmt(rec)}
+                            ₹{fmtWhole(rec)}
                           </td>
                         )}
                       </tr>
@@ -746,9 +764,9 @@ const LoanRecovery: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-amber-800">Total Interest</td>
                     <td className="px-6 py-4"></td>
                     <td className="px-6 py-4 text-sm text-amber-700 text-right">
-                      ₹{fmt(loanBalance.stdInterestOutstanding + loanBalance.penalInterestOutstanding + loanBalance.stdRecoverableOutstanding + loanBalance.overdueRecoverableOutstanding)}
+                      ₹{fmtWhole(loanBalance.stdInterestOutstanding + loanBalance.penalInterestOutstanding + loanBalance.stdRecoverableOutstanding + loanBalance.overdueRecoverableOutstanding)}
                     </td>
-                    {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700 text-right">₹{fmt(intTotal)}</td>}
+                    {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700 text-right">₹{fmtWhole(intTotal)}</td>}
                   </tr>
                   <tr className="bg-blue-50 border-t border-blue-200 font-semibold">
                     <td className="px-6 py-4 text-sm text-blue-800">Principal Balance</td>
@@ -806,10 +824,10 @@ const LoanRecovery: React.FC = () => {
                             </span>
                           </td>
                           <td className={`px-4 py-2.5 text-right font-medium ${row.intDr > 0 ? "text-rose-700" : "text-gray-400"}`}>
-                            {row.intDr > 0 ? `₹${fmt(row.intDr)}` : "—"}
+                            {row.intDr > 0 ? `₹${fmtWhole(row.intDr)}` : "—"}
                           </td>
                           <td className={`px-4 py-2.5 text-right font-medium ${row.intCr > 0 ? "text-green-700" : "text-gray-400"}`}>
-                            {row.intCr > 0 ? `₹${fmt(row.intCr)}` : "—"}
+                            {row.intCr > 0 ? `₹${fmtWhole(row.intCr)}` : "—"}
                           </td>
                           <td className="px-4 py-2.5 text-center text-gray-600 font-mono">{row.voucherNo}</td>
                         </tr>
@@ -817,10 +835,10 @@ const LoanRecovery: React.FC = () => {
                       <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-sm">
                         <td colSpan={3} className="px-4 py-2.5 text-gray-700">Totals</td>
                         <td className="px-4 py-2.5 text-right text-rose-700">
-                          ₹{fmt((loanBalance.intRecDetail ?? []).reduce((s: number, r: IntRecDetailRowDTO) => s + r.intDr, 0))}
+                          ₹{fmtWhole((loanBalance.intRecDetail ?? []).reduce((s: number, r: IntRecDetailRowDTO) => s + r.intDr, 0))}
                         </td>
                         <td className="px-4 py-2.5 text-right text-green-700">
-                          ₹{fmt((loanBalance.intRecDetail ?? []).reduce((s: number, r: IntRecDetailRowDTO) => s + r.intCr, 0))}
+                          ₹{fmtWhole((loanBalance.intRecDetail ?? []).reduce((s: number, r: IntRecDetailRowDTO) => s + r.intCr, 0))}
                         </td>
                         <td></td>
                       </tr>
@@ -1096,6 +1114,39 @@ const LoanRecovery: React.FC = () => {
                         />
                         {errors.totalAmount && <p className="mt-1 text-xs text-red-600">{errors.totalAmount}</p>}
                       </div>
+
+                      {/* Intt (Interest) — editable for Stand loans */}
+                      {isStandLoan && totalAmt > 0 && (
+                        <div>
+                          <Label>
+                            Intt (₹)
+                            <span className="ml-2 text-xs font-normal text-amber-600">
+                              (Max: ₹{fmtWhole(loanBalance!.stdInterestOutstanding + loanBalance!.penalInterestOutstanding + loanBalance!.stdRecoverableOutstanding + loanBalance!.overdueRecoverableOutstanding)})
+                            </span>
+                          </Label>
+                          <input
+                            type="text"
+                            value={intAmount}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/[^0-9]/g, "");
+                              setIntAmount(v);
+                              clearError("intAmount");
+                            }}
+                            placeholder="0"
+                            className={`w-full px-4 py-3 border-2 rounded-lg outline-none transition-all ${
+                              errors.intAmount
+                                ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                                : "border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                            }`}
+                          />
+                          {errors.intAmount && <p className="mt-1 text-xs text-red-600">{errors.intAmount}</p>}
+                          {intAmtParsed > 0 && (
+                            <p className="mt-1 text-xs text-slate-500">
+                              Principal: ₹{fmtWhole(principalRec)}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Narration + allocation summary */}
@@ -1117,7 +1168,7 @@ const LoanRecovery: React.FC = () => {
                           </span>
                           {loanBalance.actOnIntPosting !== 1 && intTotal > 0 && (
                             <span className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium">
-                              Interest: ₹{fmt(intTotal)}
+                              Interest: ₹{fmtWhole(intTotal)}
                             </span>
                           )}
                           <span className="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-sm font-medium">

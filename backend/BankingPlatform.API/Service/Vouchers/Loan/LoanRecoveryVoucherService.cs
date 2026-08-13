@@ -507,6 +507,22 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 bool isAddInBalance = bal.ActOnIntPosting == 1;
 
+                // Fetch interest income account (needed for Stand loans Day Book Cr entry)
+                int intIncomeAccId = 0;
+                if (!isAddInBalance)
+                {
+                    var productId = await _db.accountmaster.AsNoTracking()
+                        .Where(x => x.ID == dto.LoanAccountId && x.BranchId == dto.BrId)
+                        .Select(x => (int?)x.GeneralProductId)
+                        .FirstOrDefaultAsync();
+                    if (productId.HasValue)
+                    {
+                        var bwr = await _db.loanproductbranchwiserule.AsNoTracking()
+                            .FirstOrDefaultAsync(x => x.ProductId == productId.Value && x.BrId == dto.BrId);
+                        intIncomeAccId = bwr?.IntIncomeAcc ?? 0;
+                    }
+                }
+
                 decimal principalRec;
                 Dictionary<int, decimal> intRec;
                 if (isAddInBalance)
@@ -514,6 +530,16 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     // AddInBalance: no interest allocation; all recovery reduces the principal balance
                     principalRec = Math.Min(dto.TotalAmount, bal.PrincipalBalance);
                     intRec = new Dictionary<int, decimal>();
+                }
+                else if (dto.IntAmount.HasValue && dto.IntAmount.Value >= 0)
+                {
+                    // User-specified interest override: allocate only up to that amount across categories
+                    decimal totalIntOutstanding = bal.StdInterestOutstanding + bal.PenalInterestOutstanding
+                        + bal.StdRecoverableOutstanding + bal.OverdueRecoverableOutstanding;
+                    decimal intOverride = Math.Min(Math.Round(dto.IntAmount.Value, 2), totalIntOutstanding);
+                    intRec = AllocateInt(intOverride, bal);
+                    decimal intTotal2 = intRec.Values.Sum();
+                    principalRec = Math.Max(0, dto.TotalAmount - intTotal2);
                 }
                 else
                 {
@@ -602,6 +628,31 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         HCL1 = 0, HCL2 = 0, HCL3 = 0,
                     };
                     await _db.vouchercreditdebitdetails.AddAsync(drEntry);
+                    row++;
+                }
+
+                // Cr entry — interest income account (Day Book "Interest Recovered" line)
+                if (!isAddInBalance && intTotal > 0 && intIncomeAccId > 0)
+                {
+                    long intHead = await _cf.GetAccountHeadCodeFromAccId(intIncomeAccId, dto.BrId);
+                    var intCrEntry = new VoucherCreditDebitDetails
+                    {
+                        BrId             = dto.BrId,
+                        VoucherID        = voucherId,
+                        AccountId        = intIncomeAccId,
+                        AccHeadCode      = intHead,
+                        VoucherAmount    = intTotal,
+                        VoucherEntryType = "Cr",
+                        EntryStatus      = "IR",   // Interest Recovered
+                        Narration        = narr,
+                        VoucherStatus    = vrStatus,
+                        ValueDate        = valDate,
+                        VoucherSeqNo     = row,
+                        IntDr = null, IntCr = null,
+                        ExpenseAmt = 0,
+                        HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                    };
+                    await _db.vouchercreditdebitdetails.AddAsync(intCrEntry);
                     row++;
                 }
 
@@ -703,6 +754,36 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
             decimal principalRec = Math.Min(rem, bal.PrincipalBalance);
             return (principalRec, intRec);
+        }
+
+        // Distributes a fixed interest amount across categories in recovery sequence order.
+        // Used when the user manually specifies the interest portion (Stand loans).
+        private static Dictionary<int, decimal> AllocateInt(decimal intAmount, LoanRecoveryBalanceDTO bal)
+        {
+            var outstanding = new Dictionary<int, decimal>
+            {
+                [CAT_STD]    = bal.StdInterestOutstanding,
+                [CAT_PENAL]  = bal.PenalInterestOutstanding,
+                [CAT_STDREC] = bal.StdRecoverableOutstanding,
+                [CAT_OVDREC] = bal.OverdueRecoverableOutstanding,
+            };
+            var seq = bal.RecoverySeq
+                .Split(',')
+                .Select(s => int.TryParse(s.Trim(), out int v) ? v : 0)
+                .Where(v => v >= 1 && v <= 4)
+                .ToList();
+            var result = new Dictionary<int, decimal>();
+            decimal rem = intAmount;
+            foreach (int catId in seq)
+            {
+                if (rem <= 0) break;
+                decimal out_ = outstanding.GetValueOrDefault(catId);
+                if (out_ <= 0) continue;
+                decimal rec = Math.Min(rem, out_);
+                result[catId] = rec;
+                rem -= rec;
+            }
+            return result;
         }
 
         // Reconstructs the daily principal balance from opening balance + dated movements,
