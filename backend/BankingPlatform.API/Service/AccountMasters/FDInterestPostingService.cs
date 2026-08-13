@@ -140,8 +140,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                         if (periodEnd > detail.FDMaturityDate.Date) break;
 
                         int days = (periodEnd - cursor).Days + 1;
-                        decimal interest = Math.Round(
-                            detail.FDAmount * (detail.IntRate / 100m) * days / daysInYear, 2);
+                        decimal interest = isMIS
+                            ? Math.Round(detail.FDAmount * (detail.IntRate / 100m) * GetIntervalMonths(interval) / 12m, 2)
+                            : Math.Round(detail.FDAmount * (detail.IntRate / 100m) * days / daysInYear, 2);
 
                         if (interest > 0)
                         {
@@ -265,8 +266,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                             if (periodEnd > detail.FDMaturityDate.Date) break;
 
                             int days = (periodEnd - cursor).Days + 1;
-                            decimal interest = Math.Round(
-                                detail.FDAmount * (detail.IntRate / 100m) * days / daysInYear, 2);
+                            decimal interest = dto.IsMIS
+                                ? Math.Round(detail.FDAmount * (detail.IntRate / 100m) * GetIntervalMonths(interval) / 12m, 2)
+                                : Math.Round(detail.FDAmount * (detail.IntRate / 100m) * days / daysInYear, 2);
 
                             if (interest > 0)
                                 periodPostings.Add((detail, cursor, periodEnd, interest));
@@ -466,6 +468,19 @@ namespace BankingPlatform.API.Service.AccountMasters
                 (int)Enums.CompoundingInterval.Yearly => from.AddMonths(12).AddDays(-1),
                 (int)Enums.CompoundingInterval.Two_Yearly => from.AddMonths(24).AddDays(-1),
                 _ => from.AddMonths(1).AddDays(-1),
+            };
+
+        // MIS interest is a fixed amount per period (independent of days in the month).
+        // Formula: Principal × Rate / 100 × periodMonths / 12
+        private static int GetIntervalMonths(int interval) =>
+            interval switch
+            {
+                (int)Enums.CompoundingInterval.Monthly => 1,
+                (int)Enums.CompoundingInterval.Quarterly => 3,
+                (int)Enums.CompoundingInterval.Half_Yearly => 6,
+                (int)Enums.CompoundingInterval.Yearly => 12,
+                (int)Enums.CompoundingInterval.Two_Yearly => 24,
+                _ => 1,
             };
     }
 }
