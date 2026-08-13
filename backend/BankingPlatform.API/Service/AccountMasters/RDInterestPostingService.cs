@@ -161,7 +161,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     kistNo++;
                 }
 
-                interest = Math.Round(interest, 2);
+                interest = Math.Round(interest, 0);
                 if (interest <= 0) continue;
 
                 result.Accounts.Add(new RDInterestAccountDTO
@@ -236,8 +236,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                     }
 
                     interest = (dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(accountId, out var rdOv))
-                        ? Math.Round(rdOv, 2)
-                        : Math.Round(interest, 2);
+                        ? Math.Round(rdOv, 0)
+                        : Math.Round(interest, 0);
                     if (interest <= 0) continue;
 
                     // Create voucher

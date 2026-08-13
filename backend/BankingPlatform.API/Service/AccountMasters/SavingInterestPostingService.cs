@@ -130,7 +130,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             var rules = await GetInterestRules(branchId, productId);
             if (rules == null) return (balance, 0);
             var calc = await CalculateInterestForAccount(branchId, accountId, asOfDate, rules);
-            return (balance, Math.Round(calc.TotalInterest, 2));
+            return (balance, Math.Round(calc.TotalInterest, 0));
         }
 
         // ── Post interest ─────────────────────────────────────────────────────────
@@ -166,8 +166,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                     if (calc.TotalInterest <= 0 && !(dto.InterestOverrides?.ContainsKey(accountId) == true)) continue;
 
                     decimal interestAmt = (dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(accountId, out var ov))
-                        ? Math.Round(ov, 2)
-                        : Math.Round(calc.TotalInterest, 2);
+                        ? Math.Round(ov, 0)
+                        : Math.Round(calc.TotalInterest, 0);
                     if (interestAmt <= 0) continue;
 
                     // Create voucher
@@ -440,7 +440,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     EffectiveBalance = Math.Round(effectiveBalance, 2),
                     Days = daysInMonth,
                     Rate = monthRate,
-                    Interest = Math.Round(monthlyInterest, 2),
+                    Interest = Math.Round(monthlyInterest, 0),
                 });
 
                 cursor = cursor.AddMonths(1);

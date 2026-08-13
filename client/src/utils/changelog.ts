@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.22",
+    date: "2026-08-13",
+    changes: [
+      { type: "fix", text: "FD, RD, and Saving interest posting now rounds the posted interest amount to the nearest whole number (no paisa)" },
+    ],
+  },
+  {
     version: "1.0.21",
     date: "2026-08-13",
     changes: [

@@ -141,8 +141,8 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                         int days = (periodEnd - cursor).Days + 1;
                         decimal interest = isMIS
-                            ? Math.Round(detail.FDAmount * (detail.IntRate / 100m) * GetIntervalMonths(interval) / 12m, 2)
-                            : Math.Round(detail.FDAmount * (detail.IntRate / 100m) * days / daysInYear, 2);
+                            ? Math.Round(detail.FDAmount * (detail.IntRate / 100m) * GetIntervalMonths(interval) / 12m, 0)
+                            : Math.Round(detail.FDAmount * (detail.IntRate / 100m) * days / daysInYear, 0);
 
                         if (interest > 0)
                         {
@@ -267,8 +267,8 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                             int days = (periodEnd - cursor).Days + 1;
                             decimal interest = dto.IsMIS
-                                ? Math.Round(detail.FDAmount * (detail.IntRate / 100m) * GetIntervalMonths(interval) / 12m, 2)
-                                : Math.Round(detail.FDAmount * (detail.IntRate / 100m) * days / daysInYear, 2);
+                                ? Math.Round(detail.FDAmount * (detail.IntRate / 100m) * GetIntervalMonths(interval) / 12m, 0)
+                                : Math.Round(detail.FDAmount * (detail.IntRate / 100m) * days / daysInYear, 0);
 
                             if (interest > 0)
                                 periodPostings.Add((detail, cursor, periodEnd, interest));
@@ -286,7 +286,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                         totalInterest = 0;
                         foreach (var dg in periodPostings.GroupBy(p => p.Detail.Id))
                             totalInterest += dto.InterestOverrides.TryGetValue(dg.Key, out var dOvr)
-                                ? Math.Round(dOvr, 2)
+                                ? Math.Round(dOvr, 0)
                                 : dg.Sum(p => p.Interest);
                     }
                     else
@@ -303,7 +303,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                         var dgList = dg.ToList();
                         decimal calcDetTotal = dgList.Sum(p => p.Interest);
                         decimal effDetTotal = dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(dg.Key, out var dOvr2)
-                            ? Math.Round(dOvr2, 2)
+                            ? Math.Round(dOvr2, 0)
                             : calcDetTotal;
                         decimal dist = 0;
                         for (int pi = 0; pi < dgList.Count; pi++)
@@ -312,8 +312,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                             decimal amt = pi == dgList.Count - 1
                                 ? effDetTotal - dist
                                 : (calcDetTotal > 0
-                                    ? Math.Round(effDetTotal * periodCalc / calcDetTotal, 2)
-                                    : Math.Round(effDetTotal / dgList.Count, 2));
+                                    ? Math.Round(effDetTotal * periodCalc / calcDetTotal, 0)
+                                    : Math.Round(effDetTotal / dgList.Count, 0));
                             dist += amt;
                             effectivePeriodAmts[(dgList[pi].Detail.Id, dgList[pi].To.Date)] = amt;
                         }
@@ -368,7 +368,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                                 grpInterest = 0;
                                 foreach (var dg in grp.GroupBy(p => p.Detail.Id))
                                     grpInterest += dto.InterestOverrides.TryGetValue(dg.Key, out var dOvr)
-                                        ? Math.Round(dOvr, 2)
+                                        ? Math.Round(dOvr, 0)
                                         : dg.Sum(p => p.Interest);
                             }
                             else
