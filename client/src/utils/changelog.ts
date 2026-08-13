@@ -15,10 +15,18 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
-    version: "1.0.15",
+    version: "1.0.16",
     date: "2026-08-13",
     changes: [
       { type: "improvement", text: "Minor updates and bug fixes" },
+    ],
+  },
+  {
+    version: "1.0.15",
+    date: "2026-08-13",
+    changes: [
+      { type: "fix", text: "Saving Interest Posting: when an account has no prior interest posting and its opening date is before the branch's first session start date, interest is now calculated from the first session start date rather than the account opening date." },
+      { type: "fix", text: "FD Mature / Renew / Pre-Mature: the Interest Paid debit entry (₹maturity - ₹principal) is now correctly included in the voucher. Previously the voucher was unbalanced — only the principal was debited from the FD account while the full maturity amount was credited to the payout account." },
     ],
   },
   {
