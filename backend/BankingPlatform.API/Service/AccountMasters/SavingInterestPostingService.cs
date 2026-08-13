@@ -272,7 +272,14 @@ namespace BankingPlatform.API.Service.AccountMasters
                     .Where(x => x.ID == accountId)
                     .Select(x => (DateTime?)x.AccOpeningDate)
                     .FirstOrDefaultAsync();
-                periodStart = accOpenDate?.Date ?? postingDate.Date;
+
+                DateTime baseDate = accOpenDate?.Date ?? postingDate.Date;
+
+                // Never calculate interest before the branch's first session start date
+                var (firstSessionFrom, _) = await _commonFunctions.FirstSessionFromDateAndToDate(branchId);
+                periodStart = (firstSessionFrom != DateTime.MinValue && firstSessionFrom.Date > baseDate)
+                    ? firstSessionFrom.Date
+                    : baseDate;
             }
 
             if (periodStart > postingDate.Date)
