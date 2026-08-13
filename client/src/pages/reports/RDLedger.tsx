@@ -93,7 +93,7 @@ const LedgerTable: React.FC<{ data: RDLedger; longNar: boolean }> = ({ data, lon
             {longNar && entry.narration && <span className="text-slate-400"> — {entry.narration}</span>}
           </TD>
           <TD className="text-right text-red-700 font-medium">{entry.dr != null ? fmt(entry.dr) : ""}</TD>
-          <TD className="text-right text-emerald-700 font-medium">{entry.cr != null ? fmt(entry.cr) : ""}</TD>;
+          <TD className="text-right text-emerald-700 font-medium">{entry.cr != null ? fmt(entry.cr) : ""}</TD>
           <TD className="text-right text-blue-700 font-medium">{entry.interestPosted != null ? fmt(entry.interestPosted) : ""}</TD>
           <TD className="text-right font-semibold text-slate-800">{fmtBal(entry.balance)}</TD>
         </tr>
