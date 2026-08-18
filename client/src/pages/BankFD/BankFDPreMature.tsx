@@ -200,10 +200,10 @@ const BankFDPreMaturePage: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate(-1)}
+                  onClick={() => navigate("/voucher-operations")}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium text-sm"
                 >
-                  <ArrowLeft className="w-4 h-4" /> Back
+                  <ArrowLeft className="w-4 h-4" /> Back to Operations
                 </button>
               </div>
             </div>
