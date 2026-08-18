@@ -527,14 +527,15 @@ const BankFDAccountForm: React.FC = () => {
                         FD Amount <span className="text-red-500">*</span>
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={entry.fdAmount || ""}
-                        onChange={e => setEntryField("fdAmount", parseFloat(e.target.value) || 0)}
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (/^\d*\.?\d{0,2}$/.test(v)) setEntryField("fdAmount", v === "" ? 0 : parseFloat(v) || 0);
+                        }}
                         className={numInputCls}
                         placeholder="0.00"
-                        min={0}
-                        max={999999999999999}
-                        step="0.01"
                       />
                     </div>
                     <div>
@@ -543,22 +544,26 @@ const BankFDAccountForm: React.FC = () => {
                       </label>
                       <div className="flex gap-2">
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           value={entry.fdPeriodMonths || ""}
-                          onChange={e => setEntryField("fdPeriodMonths", parseInt(e.target.value) || 0)}
+                          onChange={e => {
+                            const v = e.target.value;
+                            if (/^\d*$/.test(v)) setEntryField("fdPeriodMonths", v === "" ? 0 : parseInt(v) || 0);
+                          }}
                           className={numInputCls}
                           placeholder="Months"
-                          min={0}
-                          max={9999}
                         />
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           value={entry.fdPeriodDays || ""}
-                          onChange={e => setEntryField("fdPeriodDays", parseInt(e.target.value) || 0)}
+                          onChange={e => {
+                            const v = e.target.value;
+                            if (/^\d*$/.test(v)) setEntryField("fdPeriodDays", v === "" ? 0 : parseInt(v) || 0);
+                          }}
                           className={numInputCls}
                           placeholder="Days"
-                          min={0}
-                          max={365}
                         />
                       </div>
                     </div>
@@ -571,14 +576,15 @@ const BankFDAccountForm: React.FC = () => {
                         Int. Rate (%) <span className="text-red-500">*</span>
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={entry.intRate || ""}
-                        onChange={e => setEntryField("intRate", parseFloat(e.target.value) || 0)}
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (/^\d*\.?\d{0,2}$/.test(v)) setEntryField("intRate", v === "" ? 0 : parseFloat(v) || 0);
+                        }}
                         className={numInputCls}
                         placeholder="0.00"
-                        min={0}
-                        max={100}
-                        step="0.01"
                       />
                     </div>
                     <div>
@@ -638,14 +644,15 @@ const BankFDAccountForm: React.FC = () => {
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">Serial No</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={entry.serialNo ?? ""}
-                        onChange={e =>
-                          setEntryField("serialNo", e.target.value ? parseFloat(e.target.value) : undefined)
-                        }
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (/^\d*$/.test(v)) setEntryField("serialNo", v === "" ? undefined : parseInt(v));
+                        }}
                         className={numInputCls}
                         placeholder="Optional"
-                        min={0}
                       />
                     </div>
                   </div>
@@ -660,15 +667,15 @@ const BankFDAccountForm: React.FC = () => {
                             Opening Balance
                           </label>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             value={entry.openingBalance || ""}
-                            onChange={e =>
-                              setEntryField("openingBalance", parseFloat(e.target.value) || 0)
-                            }
+                            onChange={e => {
+                              const v = e.target.value;
+                              if (/^\d*\.?\d{0,2}$/.test(v)) setEntryField("openingBalance", v === "" ? 0 : parseFloat(v) || 0);
+                            }}
                             className={numInputCls}
                             placeholder="0.00"
-                            min={0}
-                            step="0.01"
                           />
                         </div>
                         <div>
@@ -724,15 +731,15 @@ const BankFDAccountForm: React.FC = () => {
                             TDS Balance
                           </label>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             value={entry.openingTDS || ""}
-                            onChange={e =>
-                              setEntryField("openingTDS", parseFloat(e.target.value) || 0)
-                            }
+                            onChange={e => {
+                              const v = e.target.value;
+                              if (/^\d*\.?\d{0,2}$/.test(v)) setEntryField("openingTDS", v === "" ? 0 : parseFloat(v) || 0);
+                            }}
                             className={numInputCls}
                             placeholder="0.00"
-                            min={0}
-                            step="0.01"
                           />
                         </div>
                         <div>
@@ -942,12 +949,6 @@ const BankFDAccountForm: React.FC = () => {
                     >
                       <RotateCcw className="w-4 h-4" />
                       Reset
-                    </button>
-                    <button
-                      onClick={() => navigate("/bank-fd-account")}
-                      className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
-                    >
-                      Back to List
                     </button>
                   </div>
                 </div>
