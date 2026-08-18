@@ -66,9 +66,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 StandardInterestRate   = bal.StandardInterestRate,
                 OverdueInterestRate    = bal.OverdueInterestRate,
                 PrincipalBalance       = bal.PrincipalBalance,
-                UnpostedStdInterest    = Math.Round(bal.StdInterestOutstanding, 0),
-                UnpostedPenalInterest  = Math.Round(bal.PenalInterestOutstanding, 0),
-                TotalPostable          = Math.Round(bal.StdInterestOutstanding + bal.PenalInterestOutstanding, 0),
+                UnpostedStdInterest    = Math.Round(bal.StdInterestOutstanding, 0, MidpointRounding.AwayFromZero),
+                UnpostedPenalInterest  = Math.Round(bal.PenalInterestOutstanding, 0, MidpointRounding.AwayFromZero),
+                TotalPostable          = Math.Round(bal.StdInterestOutstanding + bal.PenalInterestOutstanding, 0, MidpointRounding.AwayFromZero),
                 InterestCalcFromDate   = bal.InterestCalcFromDate,
                 InterestCalcToDate     = bal.InterestCalcToDate,
                 IntCalcMethod          = bal.IntCalcMethod,
@@ -86,8 +86,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 if (dto.LoanAccountId <= 0)
                     return ("Invalid loan account.", 0);
 
-                decimal stdAmt   = Math.Round(dto.StdInterestAmount, 0);
-                decimal penalAmt = Math.Round(dto.PenalInterestAmount, 0);
+                decimal stdAmt   = Math.Round(dto.StdInterestAmount, 0, MidpointRounding.AwayFromZero);
+                decimal penalAmt = Math.Round(dto.PenalInterestAmount, 0, MidpointRounding.AwayFromZero);
                 decimal total    = stdAmt + penalAmt;
 
                 if (total <= 0)
@@ -365,10 +365,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     MemberName          = bal.MemberName,
                     MemberRelativeName  = bal.MemberRelativeName,
                     PrincipalBalance    = bal.PrincipalBalance,
-                    StdInterest         = Math.Round(bal.ActOnIntPosting == 1 ? aibStdInt         : bal.StdInterestOutstanding, 0),
-                    PenalInterest       = Math.Round(bal.ActOnIntPosting == 1 ? 0m                : bal.PenalInterestOutstanding, 0),
-                    StdRecoverable      = Math.Round(bal.ActOnIntPosting == 1 ? 0m                : bal.StdRecoverableOutstanding, 0),
-                    TotalPostable       = Math.Round(totalPostable, 0),
+                    StdInterest         = Math.Round(bal.ActOnIntPosting == 1 ? aibStdInt         : bal.StdInterestOutstanding, 0, MidpointRounding.AwayFromZero),
+                    PenalInterest       = Math.Round(bal.ActOnIntPosting == 1 ? 0m                : bal.PenalInterestOutstanding, 0, MidpointRounding.AwayFromZero),
+                    StdRecoverable      = Math.Round(bal.ActOnIntPosting == 1 ? 0m                : bal.StdRecoverableOutstanding, 0, MidpointRounding.AwayFromZero),
+                    TotalPostable       = Math.Round(totalPostable, 0, MidpointRounding.AwayFromZero),
                     CalcFromDate        = bal.ActOnIntPosting == 1 ? aibFrom           : bal.InterestCalcFromDate,
                     CalcToDate          = bal.ActOnIntPosting == 1 ? (DateTime?)aibTo  : bal.InterestCalcToDate,
                     StdInterestRate     = bal.StandardInterestRate,

@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.24",
+    date: "2026-08-18",
+    changes: [
+      { type: "improvement", text: "Minor updates and bug fixes" },
+    ],
+  },
+  {
     version: "1.0.23",
     date: "2026-08-13",
     changes: [
