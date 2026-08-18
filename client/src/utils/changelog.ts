@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.23",
+    date: "2026-08-13",
+    changes: [
+      { type: "fix", text: "Loan Interest Posting now rounds posted interest amounts to whole numbers (no paisa); display values in the batch screen also show whole numbers" },
+    ],
+  },
+  {
     version: "1.0.22",
     date: "2026-08-13",
     changes: [
