@@ -424,6 +424,20 @@ const BankFDAccountForm: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        Account Head
+                      </label>
+                      <Select
+                        classNamePrefix="react-select"
+                        options={accountHeads}
+                        value={accountHeads.find(h => h.value === accountHeadId) ?? null}
+                        onChange={opt => setAccountHeadId(opt?.value ?? 0)}
+                        placeholder="-- Select Head --"
+                        isClearable
+                        styles={{ control: b => ({ ...b, cursor: "pointer" }) }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Account Name <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -469,20 +483,6 @@ const BankFDAccountForm: React.FC = () => {
                         value={accSuffix !== null ? `${accPrefix}-${accSuffix}` : `${accPrefix}-[auto]`}
                         readOnly
                         className={readonlyCls}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Account Head
-                      </label>
-                      <Select
-                        classNamePrefix="react-select"
-                        options={accountHeads}
-                        value={accountHeads.find(h => h.value === accountHeadId) ?? null}
-                        onChange={opt => setAccountHeadId(opt?.value ?? 0)}
-                        placeholder="-- Select Head --"
-                        isClearable
-                        styles={{ control: b => ({ ...b, cursor: "pointer" }) }}
                       />
                     </div>
                   </div>

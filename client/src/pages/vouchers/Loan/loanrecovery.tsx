@@ -187,10 +187,11 @@ const LoanRecovery: React.FC = () => {
   const [rowBalanceLoading, setRowBalanceLoading] = useState(false);
 
   useEffect(() => {
-    commonservice.fetch_loan_products(user.branchid).then((res) => {
+    if (isEditMode || !formData.voucherDate) return;
+    commonservice.fetch_loan_products(user.branchid, formData.voucherDate).then((res) => {
       if (res.success) setLoanProducts(res.data ?? []);
     });
-  }, []);
+  }, [formData.voucherDate]);
 
   // ── Edit mode: load from voucher-search state ─────────────────────────────────
   useEffect(() => {

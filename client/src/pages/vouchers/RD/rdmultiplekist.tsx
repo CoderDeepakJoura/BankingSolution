@@ -63,7 +63,7 @@ const RDMultipleKistVoucher: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       const [prodRes, debitRes] = await Promise.all([
-        commonservice.fetch_rd_products(user.branchid),
+        commonservice.fetch_rd_products(user.branchid, workingDateISO),
         commonservice.general_accmasters_info(user.branchid),
       ]);
       if (prodRes.success) setRDProducts(prodRes.data ?? []);
@@ -99,7 +99,7 @@ const RDMultipleKistVoucher: React.FC = () => {
     if (productId) {
       setSelectedProduct(productId);
       // Load product accounts so Edit button can show full details
-      rdMultipleKistApi.getAccountsForKist(user.branchid, productId).then(res => {
+      rdMultipleKistApi.getAccountsForKist(user.branchid, productId, workingDateISO).then(res => {
         if (res.success) setProductAccounts(res.data ?? []);
       });
     }
@@ -114,7 +114,7 @@ const RDMultipleKistVoucher: React.FC = () => {
     setRows([]);
 
     if (productId) {
-      const res = await rdMultipleKistApi.getAccountsForKist(user.branchid, productId);
+      const res = await rdMultipleKistApi.getAccountsForKist(user.branchid, productId, workingDateISO);
       if (res.success) {
         setProductAccounts(res.data ?? []);
         const cih = await commonservice.default_cash_in_hand_account(user.branchid);

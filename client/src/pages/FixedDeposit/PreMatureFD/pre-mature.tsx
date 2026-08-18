@@ -206,7 +206,7 @@ const PrePreMatureFDPage: React.FC = () => {
     const fetchData = async () => {
       setIsLoadingProducts(true);
       try {
-        const fdProductsRes = await commonservice.fetch_fd_products(user.branchid);
+        const fdProductsRes = await commonservice.fetch_fd_products(user.branchid, sessionDate);
         if (fdProductsRes.data && Array.isArray(fdProductsRes.data)) {
           setFdProducts(fdProductsRes.data);
         } else {

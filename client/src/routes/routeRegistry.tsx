@@ -151,6 +151,8 @@ import FDTDSSlabList from "../pages/BankFD/FDTDSSlabList";
 import FDTDSSlabForm from "../pages/BankFD/FDTDSSlabForm";
 import BankFDAccountTable from "../pages/BankFD/BankFDAccountTable";
 import BankFDAccountForm from "../pages/BankFD/BankFDAccountForm";
+import BankFDMaturePage from "../pages/BankFD/BankFDMature";
+import BankFDPreMaturePage from "../pages/BankFD/BankFDPreMature";
 import CRUDDashboard from "../components/Location/CRUDDashboard";
 import OtherBranchAccounts from "../pages/interbranch/OtherBranchAccounts";
 import IBPendingVouchers from "../pages/interbranch/IBPendingVouchers";
@@ -439,6 +441,8 @@ export const ROUTES: RouteEntry[] = [
   { path: "/bank-fd-account",                 element: <BankFDAccountTable />,          label: "Bank FD Account",          category: "Bank FD" },
   { path: "/bank-fd-account/create",          element: <BankFDAccountForm /> },
   { path: "/bank-fd-account/edit/:accountId", element: <BankFDAccountForm /> },
+  { path: "/bank-fd-mature",                  element: <BankFDMaturePage />,            label: "Bank FD Mature/Renew",     category: "Bank FD" },
+  { path: "/bank-fd-premature",               element: <BankFDPreMaturePage />,         label: "Bank FD Pre-Mature",       category: "Bank FD" },
 
   // ── Inter Branch ──────────────────────────────────────────────────────────
   { path: "/other-branch-accounts",           element: <OtherBranchAccounts />,         label: "Other Branch Accounts",    category: "Inter Branch" },

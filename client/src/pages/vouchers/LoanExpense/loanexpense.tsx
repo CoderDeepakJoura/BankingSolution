@@ -107,7 +107,7 @@ const LoanExpensePage: React.FC = () => {
   // Initial load
   useEffect(() => {
     if (!user.branchid) return;
-    commonservice.fetch_loan_products(user.branchid).then((res) => {
+    commonservice.fetch_loan_products(user.branchid, sessionDate).then((res) => {
       if (res.success) setLoanProducts(res.data ?? []);
     });
     expenseCategoryApi.getList(user.branchid).then((res) => {

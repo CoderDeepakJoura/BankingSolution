@@ -19,5 +19,6 @@ namespace BankingPlatform.Infrastructure.Models.BankFD
         public double IntRate { get; set; }
         public int IntCompInterval { get; set; } = 1;
         [Column(TypeName = "decimal(18,0)")] public decimal? SerialNo { get; set; }
+        [Column("tdsamount", TypeName = "decimal(18,2)")] public decimal TdsAmount { get; set; } = 0;
     }
 }

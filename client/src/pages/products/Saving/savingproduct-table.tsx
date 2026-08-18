@@ -56,9 +56,9 @@ const SavingsProductTable: React.FC<SavingsProductTableProps> = ({
 
   const getRateAppliedMethodText = (type: number): string => {
     switch (type) {
-      case 1: return "Changed Rate";
+      case 1: return "Slab wise/Change Rate";
       case 2: return "Fixed Rate";
-      case 3: return "Slab Wise Rate";
+      case 3: return "Slab wise/Change Rate";
       default: return "—";
     }
   };

@@ -34,14 +34,15 @@ namespace BankingPlatform.API.Controllers.AccountMasters
             [FromQuery] int branchId,
             [FromQuery] int productId,
             [FromQuery] DateTime postingDate,
-            [FromQuery] int? accountId = null)
+            [FromQuery] int? accountId = null,
+            [FromQuery] decimal? fixedRate = null)
         {
             try
             {
                 if (branchId <= 0 || productId <= 0)
                     return BadRequest(new ResponseDto { Success = false, Message = "BranchId and ProductId are required." });
 
-                var accounts = await _service.GetEligibleAccountsAsync(branchId, productId, postingDate);
+                var accounts = await _service.GetEligibleAccountsAsync(branchId, productId, postingDate, fixedRate);
 
                 // If a specific account was requested, filter to just that one
                 if (accountId.HasValue && accountId.Value > 0)
@@ -53,6 +54,30 @@ namespace BankingPlatform.API.Controllers.AccountMasters
             {
                 _logger.LogError(ex, "Error fetching eligible accounts for saving interest posting.");
                 await _commonFunctions.LogErrors(ex, nameof(GetEligibleAccounts), nameof(SavingInterestPostingController));
+                return BadRequest(new ResponseDto { Success = false, Message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Returns the RateAppliedMethod for a product so the frontend knows whether to show a Fixed Rate input.
+        /// </summary>
+        [HttpGet("rate-method")]
+        public async Task<IActionResult> GetRateMethod(
+            [FromQuery] int branchId,
+            [FromQuery] int productId)
+        {
+            try
+            {
+                if (branchId <= 0 || productId <= 0)
+                    return BadRequest(new ResponseDto { Success = false, Message = "BranchId and ProductId are required." });
+
+                var rateMethod = await _service.GetRateMethodAsync(branchId, productId);
+                return Ok(new { Success = true, data = new { rateAppliedMethod = rateMethod } });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching rate method for product {ProductId}.", productId);
+                await _commonFunctions.LogErrors(ex, nameof(GetRateMethod), nameof(SavingInterestPostingController));
                 return BadRequest(new ResponseDto { Success = false, Message = ex.Message });
             }
         }

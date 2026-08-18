@@ -21,7 +21,8 @@
       "Read(//c//**)",
       "Read(//e/Codes/AHDSolution/BankingPlatform.API/Service/Reports/**)",
       "Bash(git -C \"e:\\\\Codes\\\\AHDSolution\\\\BankingPlatform\\\\client\" status)",
-      "Bash(git -C \"e:\\\\Codes\\\\AHDSolution\\\\BankingPlatform\\\\backend\" status)"
+      "Bash(git -C \"e:\\\\Codes\\\\AHDSolution\\\\BankingPlatform\\\\backend\" status)",
+      "Read(//e/Codes/AHDSolution/BankingPlatform/backend/BankingPlatform.API/Service/AccountMasters/**)"
     ],
     "additionalDirectories": [
       "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.API\\Common",
@@ -38,7 +39,8 @@
       "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Migrations",
       "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Models\\NPA",
       "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Models\\GST",
-      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Models\\Services"
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Models\\Services",
+      "e:\\Codes\\AHDSolution\\BankingPlatform\\backend\\BankingPlatform.Infrastructure\\Models\\AccMasters"
     ]
   }
 }

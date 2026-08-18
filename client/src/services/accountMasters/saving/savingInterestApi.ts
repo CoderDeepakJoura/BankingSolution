@@ -23,6 +23,7 @@ export interface PostSavingInterestDTO {
   postingDate: string;
   accountIds: number[];
   interestOverrides?: Record<number, number>;
+  fixedRate?: number;
 }
 
 class SavingInterestApiService extends ApiService {
@@ -30,11 +31,22 @@ class SavingInterestApiService extends ApiService {
     branchId: number,
     productId: number,
     postingDate: string,
-    accountId?: number
+    accountId?: number,
+    fixedRate?: number
   ): Promise<ApiResponse<SavingInterestAccountDTO[]>> {
     let url = `/SavingInterestPosting/eligible-accounts?branchId=${branchId}&productId=${productId}&postingDate=${postingDate}`;
     if (accountId && accountId > 0) url += `&accountId=${accountId}`;
+    if (fixedRate && fixedRate > 0) url += `&fixedRate=${fixedRate}`;
     return this.makeRequest<SavingInterestAccountDTO[]>(url);
+  }
+
+  async getRateMethod(
+    branchId: number,
+    productId: number
+  ): Promise<ApiResponse<{ rateAppliedMethod: number }>> {
+    return this.makeRequest<{ rateAppliedMethod: number }>(
+      `/SavingInterestPosting/rate-method?branchId=${branchId}&productId=${productId}`
+    );
   }
 
   async getClosingPreview(

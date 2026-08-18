@@ -84,7 +84,7 @@ const PrematureRDPage: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       const [products, generals, savings] = await Promise.all([
-        commonservice.fetch_rd_products(user.branchid),
+        commonservice.fetch_rd_products(user.branchid, sessionDate),
         commonservice.general_accmasters_info(user.branchid),
         commonservice.fetch_Saving_Accounts(user.branchid, sessionDate),
       ]);

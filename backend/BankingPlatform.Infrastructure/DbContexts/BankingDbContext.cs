@@ -160,6 +160,7 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<BankFDAccountDetail> bankfdaccountdetail { get; set; }
     public virtual DbSet<BankFDAccountOpeningBalance> bankfdaccountopeningbalance { get; set; }
     public virtual DbSet<BankFDAccountOpeningTDS> bankfdaccountopeningtds { get; set; }
+    public virtual DbSet<VoucherBFDDetail> voucherbfddetail { get; set; }
     public virtual DbSet<OtherBranchAccount> otherbranchaccounts { get; set; }
     public virtual DbSet<InterBranchVoucher> interbranchvoucher { get; set; }
     public virtual DbSet<UserFavourite> userfavourites { get; set; }
@@ -337,6 +338,7 @@ public partial class BankingDbContext : DbContext
         modelBuilder.Entity<BankFDAccountDetail>().HasKey(x => new { x.ID, x.BrId });
         modelBuilder.Entity<BankFDAccountOpeningBalance>().HasKey(x => new { x.ID, x.BranchID });
         modelBuilder.Entity<BankFDAccountOpeningTDS>().HasKey(x => new { x.ID, x.BranchID });
+        modelBuilder.Entity<VoucherBFDDetail>().HasKey(x => new { x.Id, x.BrId });
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BankingDbContext).Assembly);
         foreach (var entity in modelBuilder.Model.GetEntityTypes())

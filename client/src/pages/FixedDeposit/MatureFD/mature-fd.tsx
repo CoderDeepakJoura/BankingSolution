@@ -464,7 +464,7 @@ const MatureFDPage: React.FC = () => {
     const fetchData = async () => {
       setIsLoadingProducts(true);
       try {
-        const fdProductsRes = await commonservice.fetch_fd_products(user.branchid);
+        const fdProductsRes = await commonservice.fetch_fd_products(user.branchid, sessionDate);
         setFdProducts(
           fdProductsRes.data && Array.isArray(fdProductsRes.data) ? fdProductsRes.data : [],
         );

@@ -38,6 +38,8 @@ namespace BankingPlatform.API.Service.AccountMasters
         public List<int> AccountIds { get; set; } = new();
         // Key = accountId, Value = SU-overridden interest amount (null = use calculated)
         public Dictionary<int, decimal>? InterestOverrides { get; set; }
+        // For Fixed Rate products: user-entered rate (RateAppliedMethod == 2)
+        public decimal? FixedRate { get; set; }
     }
 
     // ── Service ──────────────────────────────────────────────────────────────────
@@ -64,7 +66,7 @@ namespace BankingPlatform.API.Service.AccountMasters
         // ── Get eligible accounts ─────────────────────────────────────────────────
 
         public async Task<List<SavingInterestAccountDTO>> GetEligibleAccountsAsync(
-            int branchId, int productId, DateTime postingDate)
+            int branchId, int productId, DateTime postingDate, decimal? fixedRate = null)
         {
             var rules = await GetInterestRules(branchId, productId);
             if (rules == null) return new();
@@ -106,7 +108,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             var result = new List<SavingInterestAccountDTO>();
             foreach (var acc in eligible)
             {
-                var calc = await CalculateInterestForAccount(branchId, acc.ID, postingDate, rules);
+                var calc = await CalculateInterestForAccount(branchId, acc.ID, postingDate, rules, fixedRate);
                 result.Add(new SavingInterestAccountDTO
                 {
                     AccountId = acc.ID,
@@ -162,7 +164,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             {
                 foreach (var accountId in dto.AccountIds)
                 {
-                    var calc = await CalculateInterestForAccount(dto.BranchId, accountId, dto.PostingDate, rules);
+                    var calc = await CalculateInterestForAccount(dto.BranchId, accountId, dto.PostingDate, rules, dto.FixedRate);
                     if (calc.TotalInterest <= 0 && !(dto.InterestOverrides?.ContainsKey(accountId) == true)) continue;
 
                     decimal interestAmt = (dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(accountId, out var ov))
@@ -231,7 +233,8 @@ namespace BankingPlatform.API.Service.AccountMasters
         private async Task<(decimal TotalInterest, List<MonthlyInterestBreakdownDTO> Breakdown)>
             CalculateInterestForAccount(
                 int branchId, int accountId, DateTime postingDate,
-                Infrastructure.Models.ProductMasters.Saving.SavingsProductInterestRules rules)
+                Infrastructure.Models.ProductMasters.Saving.SavingsProductInterestRules rules,
+                decimal? fixedRate = null)
         {
             bool isMinBalance = rules.CalculationMethod == 1;
 
@@ -379,7 +382,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     effectiveBalance = minBal < 0 ? 0 : minBal;
 
                     // Resolve the applicable rate for this month's balance (slab-wise or fixed)
-                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules);
+                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules, fixedRate);
 
                     // If a minimum balance requirement is configured and not met this month,
                     // record the month with zero interest and move on
@@ -427,7 +430,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     productSum += currentBal * remainDays;
 
                     effectiveBalance = productSum / daysInMonth; // avg balance for display
-                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules);
+                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules, fixedRate);
                     monthlyInterest = productSum * monthRate / (100m * daysInYear);
                 }
 
@@ -453,18 +456,19 @@ namespace BankingPlatform.API.Service.AccountMasters
 
         /// <summary>
         /// Returns the interest rate for a given balance.
-        /// For slab-wise products (RateAppliedMethod == 3) looks up savinginterestslabdetail;
-        /// for fixed-rate products returns InterestRateMinValue directly.
+        /// RateAppliedMethod 2 = Fixed Rate (user supplies rate via UI).
+        /// RateAppliedMethod 1 or 3 = Slab wise — looks up savinginterestslabdetail.
         /// </summary>
         private async Task<decimal> GetRateForBalance(
             int branchId, int productId, decimal balance, DateTime postingDate,
-            Infrastructure.Models.ProductMasters.Saving.SavingsProductInterestRules rules)
+            Infrastructure.Models.ProductMasters.Saving.SavingsProductInterestRules rules,
+            decimal? fixedRate = null)
         {
-            // Fixed rate or changed rate — use the configured minimum/fixed value
-            if (rules.RateAppliedMethod != 3)
-                return rules.InterestRateMinValue;
+            // Fixed Rate — use the value entered by the user in the UI
+            if (rules.RateAppliedMethod == 2)
+                return fixedRate > 0 ? fixedRate.Value : rules.InterestRateMinValue;
 
-            // Slab-wise: find the most recent applicable slab for this product
+            // Slab wise (method 1 or 3): find the most recent applicable slab for this product
             var slabId = await _context.savinginterestslab
                 .AsNoTracking()
                 .Where(s => s.BranchId == branchId
@@ -512,6 +516,12 @@ namespace BankingPlatform.API.Service.AccountMasters
                     && x.VoucherEntryType == "Dr")
                 .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
             return ob + cr - dr;
+        }
+
+        public async Task<int> GetRateMethodAsync(int branchId, int productId)
+        {
+            var rules = await GetInterestRules(branchId, productId);
+            return rules?.RateAppliedMethod ?? 3;
         }
 
         private async Task<Infrastructure.Models.ProductMasters.Saving.SavingsProductInterestRules?> GetInterestRules(

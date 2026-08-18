@@ -171,43 +171,64 @@ const SavingInterestPosting: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
+  const [rateAppliedMethod, setRateAppliedMethod] = useState<number>(0);
+  const [fixedRateInput, setFixedRateInput] = useState("");
 
   useEffect(() => {
-    commonservice.fetch_saving_products(user.branchid).then((res) => {
+    commonservice.fetch_saving_products(user.branchid, postingDate || undefined).then((res) => {
       if (res.success && res.data)
         setProducts(res.data.map((p: any) => ({ value: p.id, label: p.productName })));
     });
     superUserSettingsApi.getInterestPostingSettings(user.branchid).then((res) => {
       if (res.success && res.data) setAllowInterestChange(res.data.allowSavingInterestChange);
     });
-  }, [user.branchid]);
+  }, [user.branchid, postingDate]);
 
   useEffect(() => {
-    if (!selectedProduct) { setAccounts([]); setSelectedAccount(null); return; }
-    commonservice.fetch_deposit_accounts(user.branchid, selectedProduct.value, 2, false).then((res) => {
+    if (!selectedProduct) {
+      setAccounts([]);
+      setSelectedAccount(null);
+      setRateAppliedMethod(0);
+      setFixedRateInput("");
+      return;
+    }
+    commonservice.fetch_deposit_accounts(user.branchid, selectedProduct.value, 2, false, postingDate || undefined).then((res) => {
       if (res.success && res.data)
         setAccounts(res.data.map((a: any) => ({
           value: a.accId,
           label: `${a.accountNumber || a.accId} — ${a.accountName}`,
         })));
     });
+    savingInterestApi.getRateMethod(user.branchid, selectedProduct.value).then((res) => {
+      if (res.success && res.data) setRateAppliedMethod(res.data.rateAppliedMethod);
+    });
     setSelectedAccount(null);
     setGridData([]);
     setSelectedIds(new Set());
-  }, [selectedProduct]);
+    setFixedRateInput("");
+  }, [selectedProduct, postingDate]);
 
   const handleCalculate = async () => {
     if (!selectedProduct) { setError("Please select a saving product."); return; }
+    if (rateAppliedMethod === 2) {
+      const r = parseFloat(fixedRateInput);
+      if (!fixedRateInput || isNaN(r) || r <= 0) {
+        setError("Please enter a valid fixed interest rate.");
+        return;
+      }
+    }
     setError("");
     setLoading(true);
     setGridData([]);
     setSelectedIds(new Set());
+    const fixedRate = rateAppliedMethod === 2 ? parseFloat(fixedRateInput) : undefined;
     try {
       const res = await savingInterestApi.getEligibleAccounts(
         user.branchid,
         selectedProduct.value,
         postingDate,
-        selectedAccount?.value
+        selectedAccount?.value,
+        fixedRate
       );
       if (res.success && res.data) {
         setGridData(res.data);
@@ -245,12 +266,14 @@ const SavingInterestPosting: React.FC = () => {
     setPosting(true);
     try {
       const overrides = Object.keys(interestOverrides).length > 0 ? interestOverrides : undefined;
+      const fixedRate = rateAppliedMethod === 2 ? parseFloat(fixedRateInput) : undefined;
       const res = await savingInterestApi.postInterest({
         branchId: user.branchid,
         productId: selectedProduct!.value,
         postingDate,
         accountIds: Array.from(selectedIds),
         interestOverrides: overrides,
+        fixedRate: fixedRate && fixedRate > 0 ? fixedRate : undefined,
       });
       if (res.success) {
         await Swal.fire({
@@ -358,6 +381,28 @@ const SavingInterestPosting: React.FC = () => {
                       className="text-sm"
                     />
                   </div>
+
+                  {rateAppliedMethod === 2 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Fixed Rate (%) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={fixedRateInput}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === "" || /^\d*\.?\d{0,4}$/.test(v)) {
+                            setFixedRateInput(v);
+                            setGridData([]);
+                          }
+                        }}
+                        placeholder="e.g. 3.5"
+                        className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg outline-none focus:border-emerald-400 text-sm"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">

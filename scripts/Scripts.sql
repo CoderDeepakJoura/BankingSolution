@@ -1778,6 +1778,7 @@ CREATE TABLE IF NOT EXISTS bankfdaccountdetail (
     intrate          FLOAT NOT NULL DEFAULT 0,
     intcompinterval  INT NOT NULL DEFAULT 1,
     serialno         NUMERIC(18,0) NULL,
+    tdsamount        NUMERIC(18,2) NOT NULL DEFAULT 0,
     CONSTRAINT pk_bankfdaccountdetail PRIMARY KEY (id, brid)
 );
 
@@ -1802,6 +1803,22 @@ CREATE TABLE IF NOT EXISTS bankfdaccountopeningtds (
     balance    NUMERIC(18,2) NOT NULL DEFAULT 0,
     headcode   BIGINT NULL,
     CONSTRAINT pk_bankfdaccountopeningtds PRIMARY KEY (id, branchid)
+);
+
+-- Bank FD voucher detail (tracks each FD maturity / pre-mature closure voucher entry)
+CREATE TABLE IF NOT EXISTS voucherbfddetail (
+    id                INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid              INT NOT NULL,
+    vacccrdrid        INT NOT NULL DEFAULT 0,
+    fdaccid           INT NOT NULL DEFAULT 0,
+    fdaccdetid        INT NOT NULL DEFAULT 0,
+    amountcr          NUMERIC(18,2) NOT NULL DEFAULT 0,
+    amountdr          NUMERIC(18,2) NOT NULL DEFAULT 0,
+    operation         VARCHAR(5) NOT NULL DEFAULT '',
+    valuedate         TIMESTAMP(3) NOT NULL DEFAULT now(),
+    voucherdate       TIMESTAMP(3) NOT NULL DEFAULT now(),
+    vouchermainstatus VARCHAR(2) NULL,
+    CONSTRAINT pk_voucherbfddetail PRIMARY KEY (id, brid)
 );
 
 CREATE TABLE IF NOT EXISTS otherbranchaccounts (
@@ -2100,3 +2117,16 @@ CREATE TABLE IF NOT EXISTS superusersettings (
 
 ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS enableibtransactions BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS allowgstdeduction    BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE bankfdaccountdetail ADD COLUMN IF NOT EXISTS tdsamount NUMERIC(18,2) NOT NULL DEFAULT 0;
+
+-- voucherbfddetail incremental columns
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS vacccrdrid        INT NOT NULL DEFAULT 0;
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS fdaccid           INT NOT NULL DEFAULT 0;
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS fdaccdetid        INT NOT NULL DEFAULT 0;
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS amountcr          NUMERIC(18,2) NOT NULL DEFAULT 0;
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS amountdr          NUMERIC(18,2) NOT NULL DEFAULT 0;
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS operation         VARCHAR(5) NOT NULL DEFAULT '';
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS valuedate         TIMESTAMP(3) NOT NULL DEFAULT now();
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS voucherdate       TIMESTAMP(3) NOT NULL DEFAULT now();
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS vouchermainstatus VARCHAR(2) NULL;

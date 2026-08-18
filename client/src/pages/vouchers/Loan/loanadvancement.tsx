@@ -235,12 +235,17 @@ const LoanAdvancementVoucher: React.FC = () => {
       });
     } else {
       // ── Create mode ────────────────────────────────────────────
+      // Products loaded by the voucherDate-dependent useEffect below
       setFormData((p) => ({ ...p, voucherDate: sessionDate }));
-      commonservice.fetch_loan_products(user.branchid).then((res) => {
-        if (res.success) setLoanProducts(res.data ?? []);
-      });
     }
   }, []);
+
+  useEffect(() => {
+    if (isEditMode || !formData.voucherDate) return;
+    commonservice.fetch_loan_products(user.branchid, formData.voucherDate).then((res) => {
+      if (res.success) setLoanProducts(res.data ?? []);
+    });
+  }, [formData.voucherDate]);
 
   const clearError = (key: string) =>
     setErrors((p) => { const n = { ...p }; delete n[key]; return n; });

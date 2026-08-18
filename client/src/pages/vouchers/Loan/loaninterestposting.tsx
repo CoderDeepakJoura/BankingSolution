@@ -285,7 +285,7 @@ const LoanInterestPostingVoucher: React.FC = () => {
     });
     setProductsLoading(true);
     commonservice
-      .fetch_loan_products(user.branchid)
+      .fetch_loan_products(user.branchid, sessionDate)
       .then((res) => {
         const list = res.data ?? (res as any).Data ?? [];
         setLoanProducts(Array.isArray(list) ? list : []);

@@ -177,7 +177,7 @@ const RDInterestPosting: React.FC = () => {
   const [allowInterestChange, setAllowInterestChange] = useState(false);
 
   useEffect(() => {
-    commonservice.fetch_rd_products(user.branchid).then((res: any) => {
+    commonservice.fetch_rd_products(user.branchid, voucherDate || undefined).then((res: any) => {
       if (res.success && res.data)
         setProducts(res.data.map((p: any) => ({ value: p.id, label: p.productName })));
     });
@@ -188,7 +188,7 @@ const RDInterestPosting: React.FC = () => {
 
   useEffect(() => {
     if (!selectedProduct) { setAccounts([]); setSelectedAccount(null); return; }
-    commonservice.fetch_deposit_accounts(user.branchid, selectedProduct.value, 5, false).then((res: any) => {
+    commonservice.fetch_deposit_accounts(user.branchid, selectedProduct.value, 5, false, voucherDate || undefined).then((res: any) => {
       if (res.success && res.data)
         setAccounts(res.data.map((a: any) => ({
           value: a.accId,

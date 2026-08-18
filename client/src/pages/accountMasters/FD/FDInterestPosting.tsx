@@ -248,7 +248,7 @@ const FDInterestPosting: React.FC<Props> = ({ isMIS = false }) => {
 
   useEffect(() => {
     if (!selectedProduct) { setAccounts([]); setSelectedAccount(null); return; }
-    commonservice.fetch_deposit_accounts(user.branchid, selectedProduct.value, 6, false).then((res: any) => {
+    commonservice.fetch_deposit_accounts(user.branchid, selectedProduct.value, 6, false, postingDate || undefined).then((res: any) => {
       if (res.success && res.data)
         setAccounts(res.data.map((a: any) => ({
           value: a.accId,
@@ -258,7 +258,7 @@ const FDInterestPosting: React.FC<Props> = ({ isMIS = false }) => {
     setSelectedAccount(null);
     setGridData([]);
     setSelectedIds(new Set());
-  }, [selectedProduct]);
+  }, [selectedProduct, postingDate]);
 
   const handleCalculate = async () => {
     if (!selectedProduct) { setError("Please select an FD product."); return; }

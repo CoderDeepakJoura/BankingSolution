@@ -474,36 +474,41 @@ namespace BankingPlatform.API.Controllers
         }
 
         [HttpGet("saving-products/{branchId}")]
-        public async Task<IActionResult> SavingProducts([FromRoute] int branchId)
+        public async Task<IActionResult> SavingProducts([FromRoute] int branchId, [FromQuery] DateTime? voucherDate = null)
         {
-            var productInfo = await _context.savingproduct.Where(x => x.BranchId == branchId).Select(x=> new SavingsProductDTO
+            var query = _context.savingproduct.Where(x => x.BranchId == branchId);
+            if (voucherDate.HasValue)
+            {
+                var d = voucherDate.Value.Date;
+                query = query.Where(x => x.EffectiveFrom.Date <= d
+                    && (x.EffectiveTill == null || x.EffectiveTill.Value.Date >= d));
+            }
+            var productInfo = await query.Select(x => new SavingsProductDTO
             {
                 ProductName = x.ProductCode + "-" + x.ProductName,
                 Id = x.Id
             }).ToListAsync();
 
-            return Ok(new
-            {
-                Success = true,
-                data = productInfo
-
-            });
+            return Ok(new { Success = true, data = productInfo });
         }
 
         [HttpGet("fd-products/{branchId}")]
-        public async Task<IActionResult> FDProducts([FromRoute] int branchId)
+        public async Task<IActionResult> FDProducts([FromRoute] int branchId, [FromQuery] DateTime? voucherDate = null)
         {
-            var productInfo = await _context.fdproduct.Where(x => x.BranchId == branchId).Select(x => new SavingsProductDTO
+            var query = _context.fdproduct.Where(x => x.BranchId == branchId);
+            if (voucherDate.HasValue)
+            {
+                var d = voucherDate.Value.Date;
+                query = query.Where(x => x.EffectiveFrom.Date <= d
+                    && (x.EffectiveTill == null || x.EffectiveTill.Value.Date >= d));
+            }
+            var productInfo = await query.Select(x => new SavingsProductDTO
             {
                 ProductName = x.ProductCode + "-" + x.ProductName,
                 Id = x.Id
             }).ToListAsync();
 
-            return Ok(new
-            {
-                Success = true,
-                data = productInfo
-            });
+            return Ok(new { Success = true, data = productInfo });
         }
 
         // intAccountType: 1 = SameAccount (cumulative FD), 2 = OtherAccount (MIS)
@@ -639,12 +644,16 @@ namespace BankingPlatform.API.Controllers
         }
 
         [HttpGet("deposit-accounts-info/{branchId}/{productId}/{accountType}/{isClosed}")]
-        public async Task<IActionResult> DepositAccountsInfo([FromRoute] int branchId, int productId, int accountType, bool isClosed = false)
+        public async Task<IActionResult> DepositAccountsInfo([FromRoute] int branchId, int productId, int accountType, bool isClosed = false, [FromQuery] DateTime? voucherDate = null)
         {
             if (branchId > 0 && productId > 0)
             {
-                var depositAccountInfo = await _context.accountmaster.AsNoTracking()
-                    .Where(x => x.BranchId == branchId && x.GeneralProductId == productId && x.AccTypeId == accountType && x.IsAccClosed == isClosed)
+                var query = _context.accountmaster.AsNoTracking()
+                    .Where(x => x.BranchId == branchId && x.GeneralProductId == productId && x.AccTypeId == accountType && x.IsAccClosed == isClosed);
+                if (voucherDate.HasValue)
+                    query = query.Where(x => x.AccOpeningDate.Date <= voucherDate.Value.Date);
+
+                var depositAccountInfo = await query
                     .Select(x => new
                     {
                         AccId = x.ID,
@@ -1120,25 +1129,27 @@ namespace BankingPlatform.API.Controllers
         }
 
         [HttpGet("rd-products/{branchId}")]
-        public async Task<IActionResult> RDProducts([FromRoute] int branchId)
+        public async Task<IActionResult> RDProducts([FromRoute] int branchId, [FromQuery] DateTime? voucherDate = null)
         {
-            var productInfo = await _context.rdproduct.Where(x => x.BrId == branchId).Select(x => new RDProductDTO
+            var query = _context.rdproduct.Where(x => x.BrId == branchId);
+            if (voucherDate.HasValue)
+                query = query.Where(x => x.EffectiveFrom.Date <= voucherDate.Value.Date);
+            var productInfo = await query.Select(x => new RDProductDTO
             {
                 ProductName = x.ProductCode + "-" + x.ProductName,
                 Id = x.Id
             }).ToListAsync();
 
-            return Ok(new
-            {
-                Success = true,
-                data = productInfo
-            });
+            return Ok(new { Success = true, data = productInfo });
         }
 
         [HttpGet("loan-products/{branchId}")]
-        public async Task<IActionResult> LoanProducts([FromRoute] int branchId)
+        public async Task<IActionResult> LoanProducts([FromRoute] int branchId, [FromQuery] DateTime? voucherDate = null)
         {
-            var productInfo = await _context.loanproduct.Where(x => x.BrId == branchId)
+            var query = _context.loanproduct.Where(x => x.BrId == branchId);
+            if (voucherDate.HasValue)
+                query = query.Where(x => x.EffectiveFrom.Date <= voucherDate.Value.Date);
+            var productInfo = await query
                 .Select(x => new { id = x.Id, productName = x.Code + "-" + x.ProductName })
                 .ToListAsync();
             return Ok(new { Success = true, data = productInfo });
@@ -1229,14 +1240,15 @@ namespace BankingPlatform.API.Controllers
         }
 
         [HttpGet("rd-accounts-for-kist/{branchId}/{rdProductId}")]
-        public async Task<IActionResult> RDAccountsForKist([FromRoute] int branchId, int rdProductId)
+        public async Task<IActionResult> RDAccountsForKist([FromRoute] int branchId, int rdProductId, [FromQuery] DateTime? voucherDate = null)
         {
-            var accounts = await (
+            var query =
                 from p in _context.accountmaster.AsNoTracking()
                 join q in _context.rdaccountdetail.AsNoTracking()
                     on new { p.ID, p.BranchId } equals new { ID = (int)q.AccId!, BranchId = q.BrId }
                 where p.BranchId == branchId && p.GeneralProductId == rdProductId
                     && p.AccTypeId == (int)Enums.AccountTypes.RD && q.Status == 1 && !p.IsAccClosed
+                    && (!voucherDate.HasValue || p.AccOpeningDate.Date <= voucherDate.Value.Date)
                 orderby p.AccSuffix
                 select new
                 {
@@ -1249,8 +1261,8 @@ namespace BankingPlatform.API.Controllers
                     MaturityDate = q.MaturityDate,
                     RdAmount = q.RdAmount,
                     FirstKistDate = q.FirstKistDate,
-                }
-            ).ToListAsync();
+                };
+            var accounts = await query.ToListAsync();
             return Ok(new { Success = true, data = accounts });
         }
 

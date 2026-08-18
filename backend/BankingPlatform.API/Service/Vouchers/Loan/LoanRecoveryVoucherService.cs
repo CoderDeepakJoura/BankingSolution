@@ -518,7 +518,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     if (productId.HasValue)
                     {
                         var bwr = await _db.loanproductbranchwiserule.AsNoTracking()
-                            .FirstOrDefaultAsync(x => x.ProductId == productId.Value && x.BrId == dto.BrId);
+                            .FirstOrDefaultAsync(x => x.LoanProductId == productId.Value && x.BranchId == dto.BrId);
                         intIncomeAccId = bwr?.IntIncomeAcc ?? 0;
                     }
                 }

@@ -15,6 +15,31 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.28",
+    date: "2026-08-18",
+    changes: [
+      { type: "new", text: "Bank FD Mature/Renew: new screen to close a matured Bank Fixed Deposit. Shows only genuinely matured certificates. Supports TDS deduction (only when a TDS account is linked to the FD's account head). Includes a Renew toggle to roll over into a new FD." },
+      { type: "new", text: "Bank FD Pre-Mature: new screen to close a Bank FD before its maturity date. Applies a configurable penalty rate to derive the effective interest rate. Calculates pre-mature payout and optionally deducts TDS." },
+    ],
+  },
+  {
+    version: "1.0.27",
+    date: "2026-08-18",
+    changes: [
+      { type: "fix", text: "Vouchers: accounts opened after the voucher date no longer appear in account dropdowns — e.g. an account opened April 5 will not show up in a voucher dated April 2." },
+      { type: "fix", text: "Vouchers: products whose effective date is after the voucher date are now filtered out. When you change the voucher date, the product list refreshes automatically." },
+    ],
+  },
+  {
+    version: "1.0.26",
+    date: "2026-08-18",
+    changes: [
+      { type: "fix", text: "Saving Interest Posting: fixed a bug where all accounts always showed 1% interest rate regardless of the configured slab. Slab wise products now correctly look up the rate from the interest slab table." },
+      { type: "new", text: "Saving Interest Posting: Fixed Rate products now prompt the user to enter the rate before calculating — the entered rate is applied uniformly to all accounts." },
+      { type: "improvement", text: "Saving Product Master: rate method options simplified to 'Fixed Rate' and 'Slab wise/Change Rate' — the redundant 'Changed Rate' option has been removed." },
+    ],
+  },
+  {
     version: "1.0.25",
     date: "2026-08-18",
     changes: [

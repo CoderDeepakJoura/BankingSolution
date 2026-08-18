@@ -403,27 +403,19 @@ class commonService extends ApiService {
     });
   };
 
-  async fetch_saving_products(branchId: number): Promise<ApiResponse<any>> {
+  async fetch_saving_products(branchId: number, voucherDate?: string): Promise<ApiResponse<any>> {
+    const qs = voucherDate ? `?voucherDate=${voucherDate}` : "";
     return this.makeRequest<AuthResponse>(
-      `/fetchdata/saving-products/${branchId}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
+      `/fetchdata/saving-products/${branchId}${qs}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
     );
   }
 
-  async fetch_fd_products(branchId: number): Promise<ApiResponse<any>> {
+  async fetch_fd_products(branchId: number, voucherDate?: string): Promise<ApiResponse<any>> {
+    const qs = voucherDate ? `?voucherDate=${voucherDate}` : "";
     return this.makeRequest<AuthResponse>(
-      `/fetchdata/fd-products/${branchId}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
+      `/fetchdata/fd-products/${branchId}${qs}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
     );
   }
 
@@ -505,15 +497,11 @@ class commonService extends ApiService {
       }
     );
   }
-  async fetch_deposit_accounts(branchId: number, productId: Number, accountType: Number, isClosed: boolean = false ): Promise<ApiResponse<any>> {
+  async fetch_deposit_accounts(branchId: number, productId: Number, accountType: Number, isClosed: boolean = false, voucherDate?: string): Promise<ApiResponse<any>> {
+    const qs = voucherDate ? `?voucherDate=${voucherDate}` : "";
     return this.makeRequest<AuthResponse>(
-      `/fetchdata/deposit-accounts-info/${branchId}/${productId}/${accountType}/${isClosed}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
+      `/fetchdata/deposit-accounts-info/${branchId}/${productId}/${accountType}/${isClosed}${qs}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
     );
   }
   async fetch_deposit_account_info_from_accountId(branchId: number, accountId: Number, accountType: Number, isClosed: boolean = false ): Promise<ApiResponse<any>> {
@@ -686,25 +674,19 @@ class commonService extends ApiService {
       }
     );
   }
-  async fetch_rd_products(branchId: number): Promise<ApiResponse<any>> {
+  async fetch_rd_products(branchId: number, voucherDate?: string): Promise<ApiResponse<any>> {
+    const qs = voucherDate ? `?voucherDate=${voucherDate}` : "";
     return this.makeRequest<AuthResponse>(
-      `/fetchdata/rd-products/${branchId}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
+      `/fetchdata/rd-products/${branchId}${qs}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
     );
   }
 
-  async fetch_loan_products(branchId: number): Promise<ApiResponse<any>> {
+  async fetch_loan_products(branchId: number, voucherDate?: string): Promise<ApiResponse<any>> {
+    const qs = voucherDate ? `?voucherDate=${voucherDate}` : "";
     return this.makeRequest<AuthResponse>(
-      `/fetchdata/loan-products/${branchId}`,
-      {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      }
+      `/fetchdata/loan-products/${branchId}${qs}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
     );
   }
   async fetch_fd_accounts_for_pledge(branchId: number, openingDate: string): Promise<ApiResponse<any>> {

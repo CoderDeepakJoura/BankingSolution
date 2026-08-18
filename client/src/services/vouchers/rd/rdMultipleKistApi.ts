@@ -26,9 +26,10 @@ export interface RDMultipleKistVoucherDTO {
 }
 
 class RDMultipleKistApiService extends ApiService {
-  async getAccountsForKist(branchId: number, productId: number): Promise<ApiResponse<RDAccountForKist[]>> {
+  async getAccountsForKist(branchId: number, productId: number, voucherDate?: string): Promise<ApiResponse<RDAccountForKist[]>> {
+    const qs = voucherDate ? `?voucherDate=${voucherDate}` : "";
     return this.makeRequest<RDAccountForKist[]>(
-      `/fetchdata/rd-accounts-for-kist/${branchId}/${productId}`
+      `/fetchdata/rd-accounts-for-kist/${branchId}/${productId}${qs}`
     );
   }
 
