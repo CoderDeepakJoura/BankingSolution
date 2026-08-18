@@ -335,12 +335,12 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                             aibStdInt = schedKists.Sum(x => x.InterestAmt ?? 0m);
                             // Fall back to Balance method when schedule has no interest entries
                             if (aibStdInt == 0)
-                                aibStdInt = Math.Round(bal.PrincipalBalance * rate / 100m * days / 365m);
+                                aibStdInt = Math.Round(bal.PrincipalBalance * rate / 100m * days / 365m, 0, MidpointRounding.AwayFromZero);
                         }
                         else
                         {
                             // Balance or MinBalance: use current outstanding principal
-                            aibStdInt = Math.Round(bal.PrincipalBalance * rate / 100m * days / 365m);
+                            aibStdInt = Math.Round(bal.PrincipalBalance * rate / 100m * days / 365m, 0, MidpointRounding.AwayFromZero);
                         }
                     }
 

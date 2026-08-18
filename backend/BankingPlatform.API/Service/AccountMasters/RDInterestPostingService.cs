@@ -145,7 +145,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     DateTime earnFrom = kistDate < fromDate.Date ? fromDate.Date : kistDate;
                     int days = (toDate.Date - earnFrom).Days + 1;
                     if (days <= 0) { kistNo++; continue; }
-                    decimal kistInterest = Math.Round((decimal)kist.AmountCr * (decimal)rate / 100m * days / 365m, 2);
+                    decimal kistInterest = Math.Round((decimal)kist.AmountCr * (decimal)rate / 100m * days / 365m, 0, MidpointRounding.AwayFromZero);
                     interest += kistInterest;
                     breakdown.Add(new RDInterestKistBreakdownDTO
                     {
