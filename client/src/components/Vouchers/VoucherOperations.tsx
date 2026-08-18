@@ -212,6 +212,32 @@ const categories: VoucherCategory[] = [
     ],
   },
   {
+    title: "Bank FD",
+    description: "Mature, renew or pre-maturely close Bank Fixed Deposits",
+    headerColor: "from-blue-600 to-purple-700",
+    accentColor: "text-blue-600",
+    bgColor: "bg-blue-50 hover:bg-blue-100",
+    borderColor: "border-blue-200 hover:border-blue-400",
+    badgeColor: "bg-blue-100 text-blue-700",
+    icon: <Landmark size={24} className="text-white" />,
+    vouchers: [
+      {
+        label: "Bank FD Mature / Renew",
+        description: "Close a matured Bank FD or roll it over into a new one",
+        path: "/bank-fd-mature",
+        icon: <RotateCcw size={26} className="text-blue-600" />,
+        color: "bg-blue-50 border-blue-200",
+      },
+      {
+        label: "Bank FD Pre-Mature",
+        description: "Close a Bank FD before its maturity date with penalty",
+        path: "/bank-fd-premature",
+        icon: <TimerOff size={26} className="text-rose-600" />,
+        color: "bg-rose-50 border-rose-200",
+      },
+    ],
+  },
+  {
     title: "Cash & Journal",
     description: "Cash transactions and inter-account transfers",
     headerColor: "from-teal-600 to-cyan-700",
