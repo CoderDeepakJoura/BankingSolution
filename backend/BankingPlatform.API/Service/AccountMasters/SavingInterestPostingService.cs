@@ -153,7 +153,6 @@ namespace BankingPlatform.API.Service.AccountMasters
                            ?? claimsPrincipal?.FindFirst("UserId")?.Value
                            ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            int nextVrNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.PostingDate);
             bool isAutoVerification = await _commonFunctions.IsAutoVerification(dto.BranchId);
             string voucherStatus = isAutoVerification ? "V" : "A";
             DateTime voucherDate = DateTime.SpecifyKind(dto.PostingDate, DateTimeKind.Unspecified);
@@ -162,6 +161,8 @@ namespace BankingPlatform.API.Service.AccountMasters
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                // First pass: calculate interest for every requested account
+                var postings = new List<(int AccountId, decimal Interest)>();
                 foreach (var accountId in dto.AccountIds)
                 {
                     var calc = await CalculateInterestForAccount(dto.BranchId, accountId, dto.PostingDate, rules, dto.FixedRate);
@@ -172,30 +173,54 @@ namespace BankingPlatform.API.Service.AccountMasters
                         : Math.Round(calc.TotalInterest, 0, MidpointRounding.AwayFromZero);
                     if (interestAmt <= 0) continue;
 
-                    // Create voucher
-                    var voucherEntity = new VoucherDTO
-                    {
-                        ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-                        VoucherDate = voucherDate,
-                        AddedBy = int.Parse(userIdClaim!),
-                        BrID = dto.BranchId,
-                        ModifiedBy = 0,
-                        VerifiedBy = isAutoVerification ? int.Parse(userIdClaim!) : 0,
-                        VoucherNarration = "Saving Interest Posting",
-                        OtherBrID = 0,
-                        VoucherNo = nextVrNo,
-                        VoucherStatus = voucherStatus,
-                        VoucherType = (int)Enums.VoucherType.Saving,
-                        VoucherSubType = (int)Enums.VoucherSubType.InterestPosting,
-                    };
+                    postings.Add((accountId, interestAmt));
+                }
 
-                    var voucherInfo = _memberService.MapToEntity(voucherEntity);
-                    await _context.voucher.AddAsync(voucherInfo);
-                    await _context.SaveChangesAsync();
+                if (!postings.Any())
+                {
+                    await transaction.RollbackAsync();
+                    return "No accounts eligible for interest posting.";
+                }
 
-                    int row = 1;
+                decimal totalInterest = postings.Sum(p => p.Interest);
 
-                    // Cr: saving account (interest received by member)
+                // ONE voucher for all accounts
+                int nextVrNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.PostingDate);
+                var voucherEntity = new VoucherDTO
+                {
+                    ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                    VoucherDate = voucherDate,
+                    AddedBy = int.Parse(userIdClaim!),
+                    BrID = dto.BranchId,
+                    ModifiedBy = 0,
+                    VerifiedBy = isAutoVerification ? int.Parse(userIdClaim!) : 0,
+                    VoucherNarration = "Saving Interest Posting",
+                    OtherBrID = 0,
+                    VoucherNo = nextVrNo,
+                    VoucherStatus = voucherStatus,
+                    VoucherType = (int)Enums.VoucherType.Saving,
+                    VoucherSubType = (int)Enums.VoucherSubType.InterestPosting,
+                };
+                var voucherInfo = _memberService.MapToEntity(voucherEntity);
+                await _context.voucher.AddAsync(voucherInfo);
+                await _context.SaveChangesAsync();
+
+                int row = 1;
+
+                // Dr: interest expense GL (combined total for all accounts)
+                long expHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(branchWise.intexpaccount, dto.BranchId);
+                var drEntry = _memberService.voucherCreditDebitDetails(
+                    expHeadCode, branchWise.intexpaccount, dto.BranchId,
+                    Enums.VoucherStatus.Dr.ToString(),
+                    "Saving Interest Posting", totalInterest, voucherStatus,
+                    valueDate, "Dr", voucherInfo.Id, row);
+                _context.vouchercreditdebitdetails.Add(drEntry);
+                await _context.SaveChangesAsync();
+                row++;
+
+                // Cr: one entry per member saving account
+                foreach (var (accountId, interestAmt) in postings)
+                {
                     long accHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(accountId, dto.BranchId);
                     var crEntry = _memberService.voucherCreditDebitDetails(
                         accHeadCode, accountId, dto.BranchId,
@@ -204,20 +229,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                         valueDate, "Cr", voucherInfo.Id, row);
                     _context.vouchercreditdebitdetails.Add(crEntry);
                     row++;
-
-                    // Dr: interest expense GL account
-                    long expHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(branchWise.intexpaccount, dto.BranchId);
-                    var drEntry = _memberService.voucherCreditDebitDetails(
-                        expHeadCode, branchWise.intexpaccount, dto.BranchId,
-                        Enums.VoucherStatus.Dr.ToString(),
-                        "Saving Interest Posting", interestAmt, voucherStatus,
-                        valueDate, "Dr", voucherInfo.Id, row);
-                    _context.vouchercreditdebitdetails.Add(drEntry);
-
-                    await _context.SaveChangesAsync();
-                    nextVrNo++;
                 }
 
+                await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return "Success";
             }

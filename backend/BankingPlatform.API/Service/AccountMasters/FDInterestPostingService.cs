@@ -197,7 +197,6 @@ namespace BankingPlatform.API.Service.AccountMasters
                            ?? claimsPrincipal?.FindFirst("UserId")?.Value
                            ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            int nextVrNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.PostingDate);
             bool isAutoVerification = await _commonFunctions.IsAutoVerification(dto.BranchId);
             string voucherStatus = isAutoVerification ? "V" : "A";
             DateTime voucherDate = DateTime.SpecifyKind(dto.PostingDate, DateTimeKind.Unspecified);
@@ -223,6 +222,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                         .ToListAsync();
                 }
 
+                // First pass: collect all resolved period postings across all accounts
+                var allPostings = new List<(int AccountId, FDAccountDetail Detail, DateTime From, DateTime To, decimal EffAmt)>();
+
                 foreach (var accountId in accountIdsToProcess)
                 {
                     var fdDetailsQuery = _context.fdaccountdetail
@@ -230,15 +232,12 @@ namespace BankingPlatform.API.Service.AccountMasters
                             && x.FDStatus == (int)Enums.FDStatus.Open
                             && x.FDMaturityDate.Date >= dto.PostingDate.Date);
 
-                    // Filter to only the selected detail IDs when per-detail selection is active
                     if (dto.SelectedDetailIds != null && dto.SelectedDetailIds.Count > 0)
                         fdDetailsQuery = fdDetailsQuery.Where(x => dto.SelectedDetailIds.Contains(x.Id));
 
                     var fdDetails = await fdDetailsQuery.ToListAsync();
-
                     if (!fdDetails.Any()) continue;
 
-                    // Collect all due period postings
                     var periodPostings = new List<(FDAccountDetail Detail, DateTime From, DateTime To, decimal Interest)>();
 
                     foreach (var detail in fdDetails)
@@ -279,24 +278,7 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                     if (!periodPostings.Any()) continue;
 
-                    // Overrides are keyed by fdDetailId; sum per-detail overridden amounts
-                    decimal totalInterest;
-                    if (dto.InterestOverrides != null && dto.InterestOverrides.Count > 0)
-                    {
-                        totalInterest = 0;
-                        foreach (var dg in periodPostings.GroupBy(p => p.Detail.Id))
-                            totalInterest += dto.InterestOverrides.TryGetValue(dg.Key, out var dOvr)
-                                ? Math.Round(dOvr, 0, MidpointRounding.AwayFromZero)
-                                : dg.Sum(p => p.Interest);
-                    }
-                    else
-                    {
-                        totalInterest = periodPostings.Sum(p => p.Interest);
-                    }
-                    if (totalInterest <= 0) continue;
-
-                    // Pre-compute effective per-period amounts so voucherfddetail.AmountCr / IntCr
-                    // stays in sync with the posted voucher Dr/Cr amount when an override is applied.
+                    // Resolve effective per-period amounts (applying overrides proportionally)
                     var effectivePeriodAmts = new Dictionary<(int detId, DateTime periodEnd), decimal>();
                     foreach (var dg in periodPostings.GroupBy(p => p.Detail.Id))
                     {
@@ -319,111 +301,81 @@ namespace BankingPlatform.API.Service.AccountMasters
                         }
                     }
 
-                    // Create voucher
-                    var voucherEntity = new VoucherDTO
+                    foreach (var (detail, from, to, calcInterest) in periodPostings)
                     {
-                        ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-                        VoucherDate = voucherDate,
-                        AddedBy = int.Parse(userIdClaim!),
-                        BrID = dto.BranchId,
-                        ModifiedBy = 0,
-                        VerifiedBy = isAutoVerification ? int.Parse(userIdClaim!) : 0,
-                        VoucherNarration = dto.IsMIS ? "MIS Interest Posting" : "FD Interest Posting",
-                        OtherBrID = 0,
-                        VoucherNo = nextVrNo,
-                        VoucherStatus = voucherStatus,
-                        VoucherType = (int)Enums.VoucherType.FD,
-                        VoucherSubType = voucherSubType,
-                    };
-
-                    var voucherInfo = _memberService.MapToEntity(voucherEntity);
-                    await _context.voucher.AddAsync(voucherInfo);
-                    await _context.SaveChangesAsync();
-
-                    int row = 1;
-
-                    // Dr: interest expense GL
-                    long expHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(branchWise.IntExpenseAccount, dto.BranchId);
-                    var drEntry = _memberService.voucherCreditDebitDetails(
-                        expHeadCode, branchWise.IntExpenseAccount, dto.BranchId,
-                        Enums.VoucherStatus.Dr.ToString(),
-                        dto.IsMIS ? "MIS Interest Posting" : "FD Interest Posting",
-                        totalInterest, voucherStatus, valueDate, "Dr", voucherInfo.Id, row);
-                    _context.vouchercreditdebitdetails.Add(drEntry);
-                    await _context.SaveChangesAsync();
-                    row++;
-
-                    if (dto.IsMIS)
-                    {
-                        // Cr: each MIS saving account (grouped, in case multiple FD details point to different MIS accounts)
-                        var misGroups = periodPostings
-                            .GroupBy(p => p.Detail.MISAccId ?? 0)
-                            .Where(g => g.Key > 0);
-
-                        foreach (var grp in misGroups)
-                        {
-                            decimal grpInterest;
-                            if (dto.InterestOverrides != null && dto.InterestOverrides.Count > 0)
-                            {
-                                grpInterest = 0;
-                                foreach (var dg in grp.GroupBy(p => p.Detail.Id))
-                                    grpInterest += dto.InterestOverrides.TryGetValue(dg.Key, out var dOvr)
-                                        ? Math.Round(dOvr, 0, MidpointRounding.AwayFromZero)
-                                        : dg.Sum(p => p.Interest);
-                            }
-                            else
-                            {
-                                grpInterest = grp.Sum(p => p.Interest);
-                            }
-                            long misHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(grp.Key, dto.BranchId);
-                            var crEntry = _memberService.voucherCreditDebitDetails(
-                                misHeadCode, grp.Key, dto.BranchId,
-                                Enums.VoucherStatus.Cr.ToString(),
-                                "MIS Interest Posting", grpInterest, voucherStatus,
-                                valueDate, "Cr", voucherInfo.Id, row);
-                            _context.vouchercreditdebitdetails.Add(crEntry);
-                            await _context.SaveChangesAsync();
-
-                            // Tag voucherfddetail entries for this MIS group
-                            foreach (var (detail, from, to, interest) in grp)
-                            {
-                                decimal effAmt = effectivePeriodAmts.GetValueOrDefault((detail.Id, to.Date), interest);
-                                _context.voucherfddetail.Add(new VoucherFDDetail
-                                {
-                                    BrId = dto.BranchId,
-                                    VoucherId = voucherInfo.Id,
-                                    VAccCrDrId = crEntry.Id,
-                                    FDAccId = accountId,
-                                    FDAccDetId = detail.Id,
-                                    AmountCr = effAmt,
-                                    AmountDr = 0,
-                                    Operation = operation,
-                                    ValueDate = DateTime.SpecifyKind(to, DateTimeKind.Unspecified),
-                                    VoucherDate = voucherDate,
-                                    IntCr = effAmt,
-                                    VoucherMainStatus = voucherStatus,
-                                });
-                            }
-
-                            row++;
-                        }
+                        decimal effAmt = effectivePeriodAmts.GetValueOrDefault((detail.Id, to.Date), calcInterest);
+                        allPostings.Add((accountId, detail, from, to, effAmt));
                     }
-                    else
+                }
+
+                if (!allPostings.Any())
+                {
+                    await transaction.RollbackAsync();
+                    return "No accounts eligible for interest posting.";
+                }
+
+                decimal grandTotal = allPostings.Sum(p => p.EffAmt);
+                if (grandTotal <= 0)
+                {
+                    await transaction.RollbackAsync();
+                    return "No interest to post.";
+                }
+
+                // ONE voucher for all accounts
+                int nextVrNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.PostingDate);
+                var voucherEntity = new VoucherDTO
+                {
+                    ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                    VoucherDate = voucherDate,
+                    AddedBy = int.Parse(userIdClaim!),
+                    BrID = dto.BranchId,
+                    ModifiedBy = 0,
+                    VerifiedBy = isAutoVerification ? int.Parse(userIdClaim!) : 0,
+                    VoucherNarration = dto.IsMIS ? "MIS Interest Posting" : "FD Interest Posting",
+                    OtherBrID = 0,
+                    VoucherNo = nextVrNo,
+                    VoucherStatus = voucherStatus,
+                    VoucherType = (int)Enums.VoucherType.FD,
+                    VoucherSubType = voucherSubType,
+                };
+                var voucherInfo = _memberService.MapToEntity(voucherEntity);
+                await _context.voucher.AddAsync(voucherInfo);
+                await _context.SaveChangesAsync();
+
+                int row = 1;
+
+                // ONE Dr: combined grand total interest expense
+                long expHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(branchWise.IntExpenseAccount, dto.BranchId);
+                var drEntry = _memberService.voucherCreditDebitDetails(
+                    expHeadCode, branchWise.IntExpenseAccount, dto.BranchId,
+                    Enums.VoucherStatus.Dr.ToString(),
+                    dto.IsMIS ? "MIS Interest Posting" : "FD Interest Posting",
+                    grandTotal, voucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                _context.vouchercreditdebitdetails.Add(drEntry);
+                await _context.SaveChangesAsync();
+                row++;
+
+                if (dto.IsMIS)
+                {
+                    // Cr: one per unique MIS savings account across all FD accounts
+                    var misGroups = allPostings
+                        .Where(p => (p.Detail.MISAccId ?? 0) > 0)
+                        .GroupBy(p => p.Detail.MISAccId ?? 0);
+
+                    foreach (var grp in misGroups)
                     {
-                        // Cr: FD account (customer's FD account — interest compounds into balance)
-                        long fdAccHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(accountId, dto.BranchId);
+                        decimal grpTotal = grp.Sum(p => p.EffAmt);
+                        long misHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(grp.Key, dto.BranchId);
                         var crEntry = _memberService.voucherCreditDebitDetails(
-                            fdAccHeadCode, accountId, dto.BranchId,
+                            misHeadCode, grp.Key, dto.BranchId,
                             Enums.VoucherStatus.Cr.ToString(),
-                            "FD Interest Posting", totalInterest, voucherStatus,
+                            "MIS Interest Posting", grpTotal, voucherStatus,
                             valueDate, "Cr", voucherInfo.Id, row);
                         _context.vouchercreditdebitdetails.Add(crEntry);
                         await _context.SaveChangesAsync();
 
-                        // Tag voucherfddetail entries — each period posting
-                        foreach (var (detail, from, to, interest) in periodPostings)
+                        foreach (var (accountId, detail, from, to, effAmt) in grp)
                         {
-                            decimal effAmt = effectivePeriodAmts.GetValueOrDefault((detail.Id, to.Date), interest);
                             _context.voucherfddetail.Add(new VoucherFDDetail
                             {
                                 BrId = dto.BranchId,
@@ -440,12 +392,50 @@ namespace BankingPlatform.API.Service.AccountMasters
                                 VoucherMainStatus = voucherStatus,
                             });
                         }
+                        row++;
                     }
+                }
+                else
+                {
+                    // Cr: one per FD account (customer's account — interest compounds into balance)
+                    var fdAccountGroups = allPostings.GroupBy(p => p.AccountId);
 
-                    await _context.SaveChangesAsync();
-                    nextVrNo++;
+                    foreach (var grp in fdAccountGroups)
+                    {
+                        int accountId = grp.Key;
+                        decimal accTotal = grp.Sum(p => p.EffAmt);
+                        long fdAccHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(accountId, dto.BranchId);
+                        var crEntry = _memberService.voucherCreditDebitDetails(
+                            fdAccHeadCode, accountId, dto.BranchId,
+                            Enums.VoucherStatus.Cr.ToString(),
+                            "FD Interest Posting", accTotal, voucherStatus,
+                            valueDate, "Cr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(crEntry);
+                        await _context.SaveChangesAsync();
+
+                        foreach (var (_, detail, from, to, effAmt) in grp)
+                        {
+                            _context.voucherfddetail.Add(new VoucherFDDetail
+                            {
+                                BrId = dto.BranchId,
+                                VoucherId = voucherInfo.Id,
+                                VAccCrDrId = crEntry.Id,
+                                FDAccId = accountId,
+                                FDAccDetId = detail.Id,
+                                AmountCr = effAmt,
+                                AmountDr = 0,
+                                Operation = operation,
+                                ValueDate = DateTime.SpecifyKind(to, DateTimeKind.Unspecified),
+                                VoucherDate = voucherDate,
+                                IntCr = effAmt,
+                                VoucherMainStatus = voucherStatus,
+                            });
+                        }
+                        row++;
+                    }
                 }
 
+                await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return "Success";
             }

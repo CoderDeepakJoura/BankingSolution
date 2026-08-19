@@ -192,7 +192,6 @@ namespace BankingPlatform.API.Service.AccountMasters
                            ?? claimsPrincipal?.FindFirst("UserId")?.Value
                            ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            int nextVrNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.PostingDate);
             bool isAutoVerification = await _commonFunctions.IsAutoVerification(dto.BranchId);
             string voucherStatus = isAutoVerification ? "V" : "A";
             DateTime voucherDate = DateTime.SpecifyKind(dto.PostingDate, DateTimeKind.Unspecified);
@@ -201,6 +200,8 @@ namespace BankingPlatform.API.Service.AccountMasters
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                // First pass: calculate interest for every requested account
+                var postings = new List<(int AccountId, int RdDetailId, decimal Interest)>();
                 foreach (var accountId in dto.AccountIds)
                 {
                     var rdDetail = await _context.rdaccountdetail
@@ -210,7 +211,6 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                     if (rdDetail == null || rdDetail.InterestRate == null) continue;
 
-                    // Recalculate interest (only genuine kist payments matching configured KistAmt)
                     var kistAmt = rdDetail.KistAmt ?? 0;
                     var kists = await _context.voucherrddetail.AsNoTracking()
                         .Where(x => x.RdAccId == accountId && x.BrId == dto.BranchId
@@ -225,7 +225,6 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                     decimal interest = 0;
                     double rate = rdDetail.InterestRate.Value;
-
                     foreach (var kist in kists)
                     {
                         DateTime kistDate = kist.ValueDate!.Value.Date;
@@ -240,40 +239,54 @@ namespace BankingPlatform.API.Service.AccountMasters
                         : Math.Round(interest, 0, MidpointRounding.AwayFromZero);
                     if (interest <= 0) continue;
 
-                    // Create voucher
-                    var voucherEntity = new VoucherDTO
-                    {
-                        ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-                        VoucherDate = voucherDate,
-                        AddedBy = int.Parse(userIdClaim!),
-                        BrID = dto.BranchId,
-                        ModifiedBy = 0,
-                        VerifiedBy = isAutoVerification ? int.Parse(userIdClaim!) : 0,
-                        VoucherNarration = $"RD Interest Posting ({dto.FromDate:dd-MMM-yyyy} to {dto.ToDate:dd-MMM-yyyy})",
-                        OtherBrID = 0,
-                        VoucherNo = nextVrNo,
-                        VoucherStatus = voucherStatus,
-                        VoucherType = (int)Enums.VoucherType.RD,
-                        VoucherSubType = (int)Enums.VoucherSubType.InterestPosting,
-                    };
+                    postings.Add((accountId, rdDetail.Id, interest));
+                }
 
-                    var voucherInfo = _memberService.MapToEntity(voucherEntity);
-                    await _context.voucher.AddAsync(voucherInfo);
-                    await _context.SaveChangesAsync();
+                if (!postings.Any())
+                {
+                    await transaction.RollbackAsync();
+                    return "No accounts eligible for interest posting.";
+                }
 
-                    // Dr: Interest Expense Account
-                    long expHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(branchWise.IntExpAccId.Value, dto.BranchId);
-                    var drEntry = _memberService.voucherCreditDebitDetails(
-                        expHeadCode, branchWise.IntExpAccId.Value, dto.BranchId,
-                        Enums.VoucherStatus.Dr.ToString(),
-                        $"RD Interest Expense ({dto.FromDate:dd-MMM-yyyy} to {dto.ToDate:dd-MMM-yyyy})",
-                        interest, voucherStatus,
-                        DateTime.SpecifyKind(dto.PostingDate, DateTimeKind.Utc),
-                        "Dr", voucherInfo.Id, 1);
-                    _context.vouchercreditdebitdetails.Add(drEntry);
-                    await _context.SaveChangesAsync();
+                decimal totalInterest = postings.Sum(p => p.Interest);
 
-                    // Cr: Member's RD account
+                // ONE voucher for all accounts
+                int nextVrNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.PostingDate);
+                var voucherEntity = new VoucherDTO
+                {
+                    ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                    VoucherDate = voucherDate,
+                    AddedBy = int.Parse(userIdClaim!),
+                    BrID = dto.BranchId,
+                    ModifiedBy = 0,
+                    VerifiedBy = isAutoVerification ? int.Parse(userIdClaim!) : 0,
+                    VoucherNarration = $"RD Interest Posting ({dto.FromDate:dd-MMM-yyyy} to {dto.ToDate:dd-MMM-yyyy})",
+                    OtherBrID = 0,
+                    VoucherNo = nextVrNo,
+                    VoucherStatus = voucherStatus,
+                    VoucherType = (int)Enums.VoucherType.RD,
+                    VoucherSubType = (int)Enums.VoucherSubType.InterestPosting,
+                };
+                var voucherInfo = _memberService.MapToEntity(voucherEntity);
+                await _context.voucher.AddAsync(voucherInfo);
+                await _context.SaveChangesAsync();
+
+                // Dr: Interest Expense Account (combined total)
+                long expHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(branchWise.IntExpAccId.Value, dto.BranchId);
+                var drEntry = _memberService.voucherCreditDebitDetails(
+                    expHeadCode, branchWise.IntExpAccId.Value, dto.BranchId,
+                    Enums.VoucherStatus.Dr.ToString(),
+                    $"RD Interest Expense ({dto.FromDate:dd-MMM-yyyy} to {dto.ToDate:dd-MMM-yyyy})",
+                    totalInterest, voucherStatus,
+                    DateTime.SpecifyKind(dto.PostingDate, DateTimeKind.Utc),
+                    "Dr", voucherInfo.Id, 1);
+                _context.vouchercreditdebitdetails.Add(drEntry);
+                await _context.SaveChangesAsync();
+
+                // Cr + VoucherRDDetail: one entry per member RD account
+                int row = 2;
+                foreach (var (accountId, rdDetailId, interest) in postings)
+                {
                     long rdHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(accountId, dto.BranchId);
                     var crEntry = _memberService.voucherCreditDebitDetails(
                         rdHeadCode, accountId, dto.BranchId,
@@ -281,20 +294,19 @@ namespace BankingPlatform.API.Service.AccountMasters
                         $"RD Interest ({dto.FromDate:dd-MMM-yyyy} to {dto.ToDate:dd-MMM-yyyy})",
                         interest, voucherStatus,
                         DateTime.SpecifyKind(dto.PostingDate, DateTimeKind.Utc),
-                        "Cr", voucherInfo.Id, 2);
+                        "Cr", voucherInfo.Id, row);
                     _context.vouchercreditdebitdetails.Add(crEntry);
                     await _context.SaveChangesAsync();
 
-                    // VoucherRDDetail entry (Operation = "IP", ValueDate = toDate for tracking)
                     var rdVoucherDetail = _voucherMapper.voucherRDDetails(
-                        dto.BranchId, accountId, rdDetail.Id,
+                        dto.BranchId, accountId, rdDetailId,
                         crEntry.Id, voucherInfo.Id,
                         (double)interest, 0, "IP", voucherStatus,
                         voucherDate, valueDate);
                     await _context.voucherrddetail.AddAsync(rdVoucherDetail);
                     await _context.SaveChangesAsync();
 
-                    nextVrNo++;
+                    row++;
                 }
 
                 await transaction.CommitAsync();

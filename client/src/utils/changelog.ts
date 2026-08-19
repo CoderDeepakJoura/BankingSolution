@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.32",
+    date: "2026-08-19",
+    changes: [
+      { type: "fix", text: "Saving, FD, and RD Interest Posting: fixed a critical bug where each account in a batch posting received its own separate voucher. All accounts in a single posting run now share one voucher — one combined debit to the interest expense account and one credit per member account." },
+    ],
+  },
+  {
     version: "1.0.31",
     date: "2026-08-19",
     changes: [
