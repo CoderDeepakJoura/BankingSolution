@@ -319,7 +319,7 @@ const PrePreMatureFDPage: React.FC = () => {
           receiptNo: data.fdAccountDetailDTOSingle.ltdNo || "",
           deductedTDS: data.fdAccountDetailDTOSingle.tdsAmount || 0,
           balance,
-          intPayableAmt: Math.max(0, preMaturityAmt - balance).toFixed(2),
+          intPayableAmt: Math.round(Math.max(0, preMaturityAmt - balance)).toString(),
           pendingAmount: pendingAmt,
         });
         Swal.fire({

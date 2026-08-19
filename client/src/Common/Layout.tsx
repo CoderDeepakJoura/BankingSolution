@@ -276,6 +276,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               label: "Bank FD",
               path: "",
               subItems: [
+                { label: "Bank FD Account", path: "/bank-fd-account" },
+                { label: "Bank FD Mature/Renew", path: "/bank-fd-mature" },
+                { label: "Bank FD Pre-Mature", path: "/bank-fd-premature" },
                 { label: "Bank FD TDS Setting", path: "/bank-fd-tds-setting" },
                 { label: "FD TDS Slab", path: "/fd-tds-slab" },
               ],
@@ -400,6 +403,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           subItems: [
             { label: "FD Maturity Report", path: "/fd-maturity-report" },
             { label: "FD Opening Report",  path: "/fd-opening-report" },
+          ],
+        },
+        {
+          label: "Bank FD Reports",
+          path: "",
+          subItems: [
+            { label: "Bank FD Ledger", path: "/bank-fd-ledger" },
           ],
         },
         {

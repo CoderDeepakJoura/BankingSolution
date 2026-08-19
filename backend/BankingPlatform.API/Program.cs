@@ -70,6 +70,7 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Reports.SavingLedgerServi
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.RDLedgerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanLedgerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.FDLedgerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.BankFDLedgerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.ShareMoneyLedgerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.BalanceSheetService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.ProfitLossService>();

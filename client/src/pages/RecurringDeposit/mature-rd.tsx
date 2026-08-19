@@ -627,7 +627,7 @@ const MatureRDPage: React.FC = () => {
                         </label>
                         <div className="bg-white px-4 py-3 rounded-lg border-l-4 border-green-500 shadow-sm">
                           <span className="text-lg font-bold text-gray-800 font-mono">
-                            ₹ {matureRDDetail.maturityAmt.toFixed(2)}
+                            ₹ {Math.round(matureRDDetail.maturityAmt).toLocaleString("en-IN")}
                           </span>
                         </div>
                       </div>

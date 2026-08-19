@@ -29,7 +29,10 @@ const BreakdownPopup = ({
   onClose: () => void;
 }) => {
   const rows: MonthlyInterestBreakdownDTO[] = row.monthlyBreakdown;
-  const total = rows.reduce((s, r) => s + r.interest, 0);
+  // row.calculatedInterest is the authoritative amount that gets posted (backend aggregate).
+  // Do NOT sum the per-row display values — they are individually rounded and their sum
+  // diverges from the actual posted amount due to rounding accumulation.
+  const postedTotal = Math.round(row.calculatedInterest);
 
   return (
     <div
@@ -70,7 +73,7 @@ const BreakdownPopup = ({
         <div className="px-6 pt-5 pb-4 grid grid-cols-3 gap-3">
           {[
             { label: "Current Balance", value: `₹${row.currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, color: "text-slate-800", bg: "bg-slate-50 border-slate-200" },
-            { label: "Total Interest", value: `₹${row.calculatedInterest.toLocaleString("en-IN", { minimumFractionDigits: 3 })}`, color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+            { label: "Total Interest", value: `₹${Math.round(row.calculatedInterest).toLocaleString("en-IN")}`, color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
             { label: "Months", value: String(rows.length), color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200" },
           ].map(({ label, value, color, bg }) => (
             <div key={label} className={`rounded-xl border px-4 py-3 ${bg}`}>
@@ -108,7 +111,7 @@ const BreakdownPopup = ({
                     <td className="px-4 py-2.5 text-gray-500">{r.days}</td>
                     <td className="px-4 py-2.5 text-gray-500">{r.rate}%</td>
                     <td className="px-4 py-2.5 font-bold text-emerald-600">
-                      ₹{r.interest.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      ₹{Math.round(r.interest).toLocaleString("en-IN")}
                     </td>
                   </tr>
                 ))}
@@ -117,7 +120,7 @@ const BreakdownPopup = ({
                 <tr className="bg-gradient-to-r from-indigo-50 to-blue-50 border-t-2 border-indigo-200">
                   <td colSpan={4} className="px-4 py-3 text-xs font-bold text-indigo-700 uppercase tracking-wider">Total</td>
                   <td className="px-4 py-3 font-extrabold text-emerald-700 text-base">
-                    ₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    ₹{postedTotal.toLocaleString("en-IN")}
                   </td>
                 </tr>
               </tfoot>
@@ -456,7 +459,7 @@ const SavingInterestPosting: React.FC = () => {
                     </span>
                     {selectedIds.size > 0 && (
                       <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-semibold">
-                        {selectedIds.size} selected — Total ₹{totalSelected.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        {selectedIds.size} selected — Total ₹{Math.round(totalSelected).toLocaleString("en-IN")}
                       </span>
                     )}
                   </div>
@@ -524,7 +527,7 @@ const SavingInterestPosting: React.FC = () => {
                                   value={
                                     interestDisplayValues[row.accountId] !== undefined
                                       ? interestDisplayValues[row.accountId]
-                                      : parseFloat(row.calculatedInterest.toFixed(2)).toString()
+                                      : Math.round(row.calculatedInterest).toString()
                                   }
                                   onChange={(e) => {
                                     const raw = e.target.value;
@@ -537,7 +540,7 @@ const SavingInterestPosting: React.FC = () => {
                                   className="w-28 px-2 py-1 border border-emerald-300 rounded-md text-emerald-700 text-sm font-semibold focus:outline-none focus:border-emerald-500 bg-emerald-50"
                                 />
                               ) : (
-                                <>₹{getInterest(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</>
+                                <>₹{Math.round(getInterest(row)).toLocaleString("en-IN")}</>
                               )}
                             </td>
                             <td className="px-4 py-3">
@@ -560,7 +563,7 @@ const SavingInterestPosting: React.FC = () => {
                           Total ({selectedIds.size} selected)
                         </td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-700">
-                          ₹{totalSelected.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          ₹{Math.round(totalSelected).toLocaleString("en-IN")}
                         </td>
                         <td />
                       </tr>

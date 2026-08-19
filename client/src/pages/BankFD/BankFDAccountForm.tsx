@@ -93,6 +93,9 @@ const BankFDAccountForm: React.FC = () => {
   const user = useSelector((state: RootState) => state.user);
   const navigate = useNavigate();
   const { accountId: encryptedAccountId } = useParams<{ accountId: string }>();
+  const workingDate = user.workingdate
+    ? commonservice.parseWorkingDate(user.workingdate)
+    : commonservice.getTodaysDate();
 
   const isEditMode = !!encryptedAccountId;
   const editAccId = isEditMode ? decryptId(encryptedAccountId!) : null;
@@ -121,6 +124,18 @@ const BankFDAccountForm: React.FC = () => {
   const [loading, setLoading] = useState(isEditMode);
 
   const isOpeningEntry = canEnterOpeningBalance(user, openingDate);
+
+  const resetForm = () => {
+    setAccountName("");
+    setOpeningDate(commonservice.getTodaysDate());
+    setAccPrefix("BFD");
+    setAccSuffix(null);
+    setAccountHeadId(0);
+    setDetails([]);
+    setRowCounter(1);
+    setEditingRowKey(null);
+    setEntry(emptyDetail(0));
+  };
 
   // Load account heads
   useEffect(() => {
@@ -354,7 +369,8 @@ const BankFDAccountForm: React.FC = () => {
           timer: 1500,
           showConfirmButton: false,
         });
-        navigate("/bank-fd-account");
+        if (!isEditMode) resetForm();
+        else navigate("/bank-fd-account");
       } else {
         throw new Error(res.message || "Save failed.");
       }
@@ -403,11 +419,11 @@ const BankFDAccountForm: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate("/bank-fd-account")}
+                  onClick={() => navigate(isEditMode ? "/bank-fd-account" : "/account-operations")}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 font-medium"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Back to List
+                  {isEditMode ? "Back to List" : "Back to Operations"}
                 </button>
               </div>
             </div>
@@ -456,8 +472,8 @@ const BankFDAccountForm: React.FC = () => {
                       <DatePicker
                         value={openingDate}
                         onChange={setOpeningDate}
-                        workingDate={user.workingdate}
-                        max={user.workingdate}
+                        workingDate={workingDate}
+                        max={workingDate}
                         className={inputCls}
                       />
                     </div>

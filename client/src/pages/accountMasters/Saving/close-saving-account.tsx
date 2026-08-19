@@ -588,7 +588,7 @@ const CloseSavingAccount: React.FC = () => {
                             ...prev,
                             balance: preview.data!.balance.toFixed(2),
                             interestPaid: preview.data!.calculatedInterest > 0
-                              ? preview.data!.calculatedInterest.toFixed(2)
+                              ? Math.round(preview.data!.calculatedInterest).toString()
                               : "",
                           }));
                         }

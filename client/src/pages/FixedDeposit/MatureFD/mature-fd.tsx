@@ -577,7 +577,7 @@ const MatureFDPage: React.FC = () => {
           receiptNo: data.fdAccountDetailDTOSingle.ltdNo || "",
           deductedTDS: data.fdAccountDetailDTOSingle.tdsAmount || 0,
           balance,
-          intPayableAmt: Math.max(0, maturityAmt - balance).toFixed(2),
+          intPayableAmt: Math.round(Math.max(0, maturityAmt - balance)).toString(),
           pendingAmount: Math.max(maturityAmt, balance),
           // Store member DOB for slab API (matches FDAccountMaster usage)
           memberDateOfBirth: data.accountMasterDTO?.dob?.split("T")[0] || "",

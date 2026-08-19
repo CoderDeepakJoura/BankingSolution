@@ -219,7 +219,7 @@ namespace BankingPlatform.API.Service.Reports
                     .FirstOrDefaultAsync();
             }
 
-            decimal openingBalance = await CalculateOpeningBalanceAsync(branchId, accountId, fromDate.Date);
+            decimal openingBalance = await CalculateOpeningBalanceAsync(branchId, accountId, detailId, fromDate.Date);
 
             DateTime toExclusive = toDate.Date.AddDays(1);
 
@@ -380,11 +380,15 @@ namespace BankingPlatform.API.Service.Reports
 
         private record FDLVoucherInfo(int VoucherNo, DateTime VoucherDate, int VoucherSubType);
 
-        private async Task<decimal> CalculateOpeningBalanceAsync(int branchId, int accountId, DateTime fromDate)
+        private async Task<decimal> CalculateOpeningBalanceAsync(int branchId, int accountId, int? detailId, DateTime fromDate)
         {
-            // Per-detail opening balance stored in fdaccountdetail (Cr = positive, Dr = negative)
-            var detailOpeningBals = await _context.fdaccountdetail.AsNoTracking()
-                .Where(x => x.BranchId == branchId && x.AccountId == accountId && x.OpeningBalance != null)
+            // Per-detail opening balance stored in fdaccountdetail
+            var obQuery = _context.fdaccountdetail.AsNoTracking()
+                .Where(x => x.BranchId == branchId && x.AccountId == accountId && x.OpeningBalance != null);
+            if (detailId.HasValue)
+                obQuery = obQuery.Where(x => x.Id == detailId.Value);
+
+            var detailOpeningBals = await obQuery
                 .Select(x => new { x.OpeningBalance, x.OpeningBalanceType })
                 .ToListAsync();
 
@@ -393,21 +397,31 @@ namespace BankingPlatform.API.Service.Reports
                     ? (x.OpeningBalance ?? 0)
                     : -(x.OpeningBalance ?? 0));
 
-            var crSum = await _context.vouchercreditdebitdetails
-                .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
-                .Where(x => x.e.AccountId == accountId
-                    && x.e.VoucherEntryType == "Cr"
-                    && x.v.BrID == branchId
-                    && x.v.VoucherDate < fromDate)
-                .SumAsync(x => (decimal?)x.e.VoucherAmount) ?? 0;
+            // When a specific detail is selected, only count voucher movements linked to that detail
+            List<int>? historicalVoucherIds = null;
+            if (detailId.HasValue)
+            {
+                historicalVoucherIds = await _context.voucherfddetail.AsNoTracking()
+                    .Where(x => x.FDAccDetId == detailId.Value && x.BrId == branchId)
+                    .Select(x => x.VoucherId)
+                    .Distinct()
+                    .ToListAsync();
+            }
 
-            var drSum = await _context.vouchercreditdebitdetails
-                .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
-                .Where(x => x.e.AccountId == accountId
-                    && x.e.VoucherEntryType == "Dr"
-                    && x.v.BrID == branchId
-                    && x.v.VoucherDate < fromDate)
-                .SumAsync(x => (decimal?)x.e.VoucherAmount) ?? 0;
+            var entryQuery = _context.vouchercreditdebitdetails.AsNoTracking()
+                .Where(x => x.AccountId == accountId);
+            if (historicalVoucherIds != null)
+                entryQuery = entryQuery.Where(x => historicalVoucherIds.Contains(x.VoucherID));
+
+            var beforeEntries = await (
+                from entry in entryQuery
+                join v in _context.voucher.AsNoTracking() on entry.VoucherID equals v.Id
+                where v.BrID == branchId && v.VoucherDate < fromDate && v.VoucherStatus != "D"
+                select new { entry.VoucherAmount, entry.VoucherEntryType }
+            ).ToListAsync();
+
+            decimal crSum = beforeEntries.Where(x => x.VoucherEntryType == "Cr").Sum(x => x.VoucherAmount);
+            decimal drSum = beforeEntries.Where(x => x.VoucherEntryType == "Dr").Sum(x => x.VoucherAmount);
 
             return initial + crSum - drSum;
         }

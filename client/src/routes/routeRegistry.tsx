@@ -153,6 +153,7 @@ import BankFDAccountTable from "../pages/BankFD/BankFDAccountTable";
 import BankFDAccountForm from "../pages/BankFD/BankFDAccountForm";
 import BankFDMaturePage from "../pages/BankFD/BankFDMature";
 import BankFDPreMaturePage from "../pages/BankFD/BankFDPreMature";
+import BankFDLedgerPage from "../pages/BankFD/BankFDLedger";
 import CRUDDashboard from "../components/Location/CRUDDashboard";
 import OtherBranchAccounts from "../pages/interbranch/OtherBranchAccounts";
 import IBPendingVouchers from "../pages/interbranch/IBPendingVouchers";
@@ -484,6 +485,9 @@ export const ROUTES: RouteEntry[] = [
   // ── RD Reports ────────────────────────────────────────────────────────────
   { path: "/rd-maturity-report",              element: <RDMaturityPage />,              label: "RD Maturity Report",       category: "RD Reports" },
   { path: "/rd-kist-receive-report",          element: <RDKistReceivePage />,           label: "RD Kist Receive",          category: "RD Reports" },
+
+  // ── Bank FD Reports ──────────────────────────────────────────────────────
+  { path: "/bank-fd-ledger",                  element: <BankFDLedgerPage />,            label: "Bank FD Ledger",           category: "Bank FD Reports" },
 
   // ── Member Reports ────────────────────────────────────────────────────────
   { path: "/member-report",                   element: <MemberReportPage />,            label: "Member Report",            category: "Member Reports" },

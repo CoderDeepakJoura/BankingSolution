@@ -15,6 +15,34 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.35",
+    date: "2026-08-20",
+    changes: [
+      { type: "new", text: "Bank FD Ledger: complete overhaul — native account and certificate dropdowns, date range placed first, accounts filtered by FD date range and re-fetched when dates change." },
+      { type: "fix", text: "Bank FD Account Form: FD Date and Opening Date pickers now correctly enforce the working date as the maximum (format bug prevented the max constraint from applying)." },
+      { type: "fix", text: "Bank FD Ledger: fixed account list not binding — was filtering by wrong AccTypeId (7 instead of 8) and unsafe nullable bool check." },
+    ],
+  },
+  {
+    version: "1.0.34",
+    date: "2026-08-19",
+    changes: [
+      { type: "fix", text: "FD Ledger: fixed opening balance calculation for accounts with multiple FD details — now correctly isolates each detail's historical movements instead of summing all details combined." },
+      { type: "fix", text: "FD Interest Posting: interest amounts in the main grid (display, editable default, and tfoot total) now round to whole numbers, consistent with the popup breakdown." },
+      { type: "fix", text: "FD Mature/Pre-Mature: Interest Payable field now pre-fills as a whole number (no paisa)." },
+      { type: "fix", text: "RD Mature/Pre-Mature: maturity amount and pre-maturity settlement displayed as whole numbers." },
+      { type: "fix", text: "Close Saving Account: accrued interest pre-fills as a whole number." },
+      { type: "fix", text: "Loan Recovery: kist interest and FD/RD pledge interest columns now display as whole numbers." },
+    ],
+  },
+  {
+    version: "1.0.33",
+    date: "2026-08-19",
+    changes: [
+      { type: "new", text: "Bank FD Ledger: new report screen showing a complete statement for a Bank Fixed Deposit account. Search accounts by name or number, filter by FD certificate and date range, and view opening balance, all transactions with operation type, running balance, and closing balance. Supports Print, PDF, and Excel export." },
+    ],
+  },
+  {
     version: "1.0.32",
     date: "2026-08-19",
     changes: [

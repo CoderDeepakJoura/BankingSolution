@@ -875,7 +875,7 @@ const LoanRecovery: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-gray-700">{k.date ? formatDate(k.date) : "—"}</td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-800">₹{fmt(k.kistAmount ?? 0)}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">₹{fmt(k.principalAmt ?? 0)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">₹{fmt(k.interestAmt ?? 0)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">₹{fmtWhole(k.interestAmt ?? 0)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -922,7 +922,7 @@ const LoanRecovery: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-gray-600">{i + 1}</td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-800">{p.fDAccNumber}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">₹{p.fDAmount?.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">₹{p.interest?.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">₹{fmtWhole(p.interest ?? 0)}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{p.date ? formatDate(p.date) : "—"}</td>
                   </tr>
                 ))}
@@ -954,7 +954,7 @@ const LoanRecovery: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-gray-600">{i + 1}</td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-800">{p.rDAccNumber}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">₹{p.rDAmount?.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">₹{p.interest?.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">₹{fmtWhole(p.interest ?? 0)}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{p.date ? formatDate(p.date) : "—"}</td>
                   </tr>
                 ))}

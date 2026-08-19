@@ -139,7 +139,7 @@ const PrematureRDPage: React.FC = () => {
       kistInterval: detail.kistInterval || 0,
       maturityAmt: detail.maturityAmt || 0,
       maturityDate: detail.maturityDate?.split("T")[0] || "",
-      preMaturityAmt: (data.preMaturityAmount || detail.maturityAmt || 0).toFixed(2),
+      preMaturityAmt: Math.round(data.preMaturityAmount || detail.maturityAmt || 0).toString(),
       interestRate: detail.interestRate || 0,
       balance: detail.rdAmount || 0,
       savingProduct: "",
@@ -283,7 +283,7 @@ const PrematureRDPage: React.FC = () => {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                   {show("RD No.", rd.rdNo, "text-slate-900")}{show("RD Date", rd.rdDate)}{show("RD Amount", `₹ ${rd.rdAmount.toFixed(2)}`, "text-emerald-700")}{show("RD Period", rd.rdPeriod ? `${rd.rdPeriod} Months` : "")}{show("Kist Amount", `₹ ${rd.kistAmount.toFixed(2)}`, "text-sky-700")}{show("Kist Int", rd.kistInterval)}
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Pre-Maturity Amt</p><input type="text" inputMode="decimal" value={rd.preMaturityAmt} onChange={(e) => setRd({ ...rd, preMaturityAmt: numberInput(e.target.value) })} className="mt-2 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-sm font-semibold text-amber-800 outline-none focus:border-amber-400" /></div>
-                  {show("Interest Rate", `${rd.interestRate}%`)}{show("Balance", `₹ ${rd.balance.toFixed(2)}`, "text-blue-700")}{show("Maturity Amt", `₹ ${rd.maturityAmt.toFixed(2)}`, "text-emerald-700")}{show("Maturity Date", rd.maturityDate)}{show("Saving Product", rd.savingProduct)}{show("Saving Acc No.", rd.savingAccNo)}{show("Saving Acc Name", rd.savingAccName)}{show("Saving Bal.", rd.savingBal ? `₹ ${rd.savingBal.toFixed(2)}` : "")}{show("Pending Amount", `₹ ${Math.abs(pendingAmount).toFixed(2)}`, pendingAmount > 0 ? "text-red-600" : pendingAmount < 0 ? "text-orange-600" : "text-emerald-600")}
+                  {show("Interest Rate", `${rd.interestRate}%`)}{show("Balance", `₹ ${rd.balance.toFixed(2)}`, "text-blue-700")}{show("Maturity Amt", `₹ ${Math.round(rd.maturityAmt).toLocaleString("en-IN")}`, "text-emerald-700")}{show("Maturity Date", rd.maturityDate)}{show("Saving Product", rd.savingProduct)}{show("Saving Acc No.", rd.savingAccNo)}{show("Saving Acc Name", rd.savingAccName)}{show("Saving Bal.", rd.savingBal ? `₹ ${rd.savingBal.toFixed(2)}` : "")}{show("Pending Amount", `₹ ${Math.abs(pendingAmount).toFixed(2)}`, pendingAmount > 0 ? "text-red-600" : pendingAmount < 0 ? "text-orange-600" : "text-emerald-600")}
                 </div>
                 {pendingAmount !== 0 && <div className={`mt-6 border-l-4 p-4 rounded-lg flex items-start gap-3 ${pendingAmount > 0 ? "bg-amber-50 border-amber-500" : "bg-orange-50 border-orange-500"}`}><AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${pendingAmount > 0 ? "text-amber-500" : "text-orange-500"}`} /><div><p className="text-sm font-semibold text-gray-800">{pendingAmount > 0 ? `Pending: ₹${pendingAmount.toFixed(2)}` : `Excess: ₹${Math.abs(pendingAmount).toFixed(2)}`}</p><p className="text-xs mt-1 text-gray-600">Adjust the settlement amounts below so the premature amount matches exactly.</p></div></div>}
               </div>

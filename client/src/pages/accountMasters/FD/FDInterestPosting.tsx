@@ -79,6 +79,8 @@ const fmtDate = (v: string) =>
   v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 const fmtAmt = (n: number) =>
   `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtInt = (n: number) =>
+  `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 // ── Period Breakdown Popup ────────────────────────────────────────────────────
 const BreakdownPopup = ({
@@ -127,7 +129,7 @@ const BreakdownPopup = ({
       <div className="px-6 pt-5 pb-4 grid grid-cols-3 gap-3">
         {[
           { label: "FD Amount",      value: fmtAmt(row.fdAmount),      color: "text-slate-800",  bg: "bg-slate-50 border-slate-200"  },
-          { label: "Total Interest", value: fmtAmt(row.totalInterest), color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+          { label: "Total Interest", value: fmtInt(row.totalInterest), color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
           { label: "Periods Due",    value: String(row.periods.length), color: "text-amber-700",  bg: "bg-amber-50 border-amber-200"  },
         ].map(({ label, value, color, bg }) => (
           <div key={label} className={`rounded-xl border px-4 py-3 ${bg}`}>
@@ -157,14 +159,14 @@ const BreakdownPopup = ({
                   <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{fmtDate(p.periodTo)}</td>
                   <td className="px-4 py-2.5 text-gray-500">{p.days}</td>
                   <td className="px-4 py-2.5 text-gray-500">{p.intRate}%</td>
-                  <td className="px-4 py-2.5 font-bold text-emerald-600">{fmtAmt(p.interest)}</td>
+                  <td className="px-4 py-2.5 font-bold text-emerald-600">{fmtInt(p.interest)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="bg-gradient-to-r from-amber-50 to-orange-50 border-t-2 border-amber-200">
                 <td colSpan={4} className="px-4 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider">Total</td>
-                <td className="px-4 py-3 font-extrabold text-emerald-700 text-base">{fmtAmt(row.totalInterest)}</td>
+                <td className="px-4 py-3 font-extrabold text-emerald-700 text-base">{fmtInt(row.totalInterest)}</td>
               </tr>
             </tfoot>
           </table>
@@ -480,7 +482,7 @@ const FDInterestPosting: React.FC<Props> = ({ isMIS = false }) => {
                         <span className="text-sm text-gray-500">
                           — {selectedIds.size} selected &nbsp;|&nbsp;
                           Total: <span className="font-bold text-emerald-600">
-                            {fmtAmt(totalSelected)}
+                            {fmtInt(totalSelected)}
                           </span>
                         </span>
                       )}
@@ -572,7 +574,7 @@ const FDInterestPosting: React.FC<Props> = ({ isMIS = false }) => {
                                   value={
                                     interestDisplayValues[row.fdDetailId] !== undefined
                                       ? interestDisplayValues[row.fdDetailId]
-                                      : parseFloat(row.totalInterest.toFixed(2)).toString()
+                                      : Math.round(row.totalInterest).toString()
                                   }
                                   onChange={(e) => {
                                     const raw = e.target.value;
@@ -585,7 +587,7 @@ const FDInterestPosting: React.FC<Props> = ({ isMIS = false }) => {
                                   className="w-28 px-2 py-1 border border-emerald-300 rounded-md text-emerald-700 text-sm font-semibold focus:outline-none focus:border-emerald-500 bg-emerald-50 text-right"
                                 />
                               ) : (
-                                <>{fmtAmt(getInterest(row))}</>
+                                <>{fmtInt(getInterest(row))}</>
                               )}
                             </td>
                             <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
@@ -606,7 +608,7 @@ const FDInterestPosting: React.FC<Props> = ({ isMIS = false }) => {
                             {selectedIds.size} of {gridData.length} detail(s) selected
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-bold text-emerald-700">
-                            {fmtAmt(totalSelected)}
+                            {fmtInt(totalSelected)}
                           </td>
                           <td />
                         </tr>
