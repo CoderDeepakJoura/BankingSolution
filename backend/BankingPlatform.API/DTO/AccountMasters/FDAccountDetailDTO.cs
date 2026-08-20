@@ -63,5 +63,7 @@
 
         public decimal? OpeningBalance { get; set; }
         public string? OpeningBalanceType { get; set; }
+        // Populated only in mature/premature responses — pre-maturity amount for this specific detail
+        public decimal? PreMaturityAmount { get; set; }
     }
 }

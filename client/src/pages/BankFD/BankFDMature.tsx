@@ -272,7 +272,7 @@ const BankFDMaturePage: React.FC = () => {
                               <td className="px-4 py-2.5 text-right font-mono">₹{fmt(d.fdAmount)}</td>
                               <td className="px-4 py-2.5 text-center">{d.intRate.toFixed(2)}%</td>
                               <td className="px-4 py-2.5 text-center">{compLabel(d.intCompInterval)}</td>
-                              <td className="px-4 py-2.5 text-right font-mono font-semibold text-green-700">₹{fmt(d.maturityAmount)}</td>
+                              <td className="px-4 py-2.5 text-right font-mono font-semibold text-green-700">₹{Math.round(d.maturityAmount).toLocaleString("en-IN")}</td>
                               <td className="px-4 py-2.5 text-center">
                                 <button
                                   onClick={() => handleDetailSelect(d)}
@@ -302,7 +302,7 @@ const BankFDMaturePage: React.FC = () => {
                       {[
                         { label: "Principal", value: `₹${fmt(selectedDetail.fdAmount)}`, color: "border-blue-500" },
                         { label: "Interest Earned", value: `₹${fmt(interest)}`, color: "border-emerald-500" },
-                        { label: "Maturity Amount", value: `₹${fmt(selectedDetail.maturityAmount)}`, color: "border-purple-500" },
+                        { label: "Maturity Amount", value: `₹${Math.round(selectedDetail.maturityAmount).toLocaleString("en-IN")}`, color: "border-purple-500" },
                         { label: "TDS Deducted", value: hasTDSSetting ? `₹${fmt(tdsAmount)}` : "No TDS Setting", color: "border-orange-500" },
                         { label: "Net Payout", value: `₹${fmt(netPayout)}`, color: "border-green-600" },
                       ].map(({ label, value, color }) => (
@@ -382,7 +382,7 @@ const BankFDMaturePage: React.FC = () => {
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-1.5">New Principal (after TDS)</label>
                           <div className="px-3 py-2.5 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-700 font-mono text-sm">
-                            ₹{fmt(Math.max(0, selectedDetail.maturityAmount - (hasTDSSetting ? tdsAmount : 0)))}
+                            ₹{Math.round(Math.max(0, selectedDetail.maturityAmount - (hasTDSSetting ? tdsAmount : 0))).toLocaleString("en-IN")}
                           </div>
                         </div>
                         {renewMatAmt > 0 && (

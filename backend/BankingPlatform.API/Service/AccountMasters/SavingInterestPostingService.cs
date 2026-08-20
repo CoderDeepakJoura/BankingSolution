@@ -21,6 +21,7 @@ namespace BankingPlatform.API.Service.AccountMasters
         public List<MonthlyInterestBreakdownDTO> MonthlyBreakdown { get; set; } = new();
     }
 
+
     public class MonthlyInterestBreakdownDTO
     {
         public string Month { get; set; } = "";       // "April 2025"
@@ -34,7 +35,12 @@ namespace BankingPlatform.API.Service.AccountMasters
     {
         public int BranchId { get; set; }
         public int ProductId { get; set; }
-        public DateTime PostingDate { get; set; }
+        /// <summary>The date written on the voucher (when the posting was made).</summary>
+        public DateTime VoucherDate { get; set; }
+        /// <summary>Interest calculation period end date (required).</summary>
+        public DateTime ToDate { get; set; }
+        /// <summary>Interest calculation period start override (optional). When null the service uses auto-detected periodStart.</summary>
+        public DateTime? FromDate { get; set; }
         public List<int> AccountIds { get; set; } = new();
         // Key = accountId, Value = SU-overridden interest amount (null = use calculated)
         public Dictionary<int, decimal>? InterestOverrides { get; set; }
@@ -66,49 +72,48 @@ namespace BankingPlatform.API.Service.AccountMasters
         // ── Get eligible accounts ─────────────────────────────────────────────────
 
         public async Task<List<SavingInterestAccountDTO>> GetEligibleAccountsAsync(
-            int branchId, int productId, DateTime postingDate, decimal? fixedRate = null)
+            int branchId, int productId, DateTime toDate, DateTime? fromDate = null, decimal? fixedRate = null)
         {
             var rules = await GetInterestRules(branchId, productId);
             if (rules == null) return new();
 
-            // All open saving accounts for this product
+            // All open saving accounts for this product opened on or before toDate
             var accounts = await _context.accountmaster
                 .AsNoTracking()
                 .Where(x => x.BranchId == branchId
                     && x.AccTypeId == (int)Enums.AccountTypes.Saving
                     && x.GeneralProductId == productId
                     && !x.IsAccClosed
-                    && x.AccOpeningDate <= postingDate.Date)
+                    && x.AccOpeningDate <= toDate.Date)
                 .ToListAsync();
 
-            // Determine the period start for the posting date
-            DateTime periodStart = GetPeriodStart(postingDate, rules.IntPostingInterval);
-
-            // Materialize IDs first to avoid EF translation issues
-            var accountIds = accounts.Select(a => a.ID).ToList();
-
-            // Exclude accounts that already had interest posted in this period
-            var alreadyPostedIds = await _context.vouchercreditdebitdetails
-                .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
-                .Where(x => x.v.BrID == branchId
-                    && x.v.VoucherType == (int)Enums.VoucherType.Saving
-                    && x.v.VoucherSubType == (int)Enums.VoucherSubType.InterestPosting
-                    && x.v.VoucherDate.Date >= periodStart.Date
-                    && x.v.VoucherDate.Date <= postingDate.Date
-                    && x.e.VoucherEntryType == "Cr"
-                    && accountIds.Contains(x.e.AccountId))
-                .Select(x => x.e.AccountId)
-                .Distinct()
-                .ToListAsync();
-
-            var eligible = accounts
-                .Where(a => !alreadyPostedIds.Contains(a.ID))
-                .ToList();
+            // Without fromDate: exclude accounts already fully covered in the current interval period
+            // (quick filter — avoids calculating per-account when clearly nothing is pending).
+            // With fromDate: don't bulk-exclude. CalculateInterestForAccount will advance past any
+            // existing postings inside [fromDate, toDate] and compute only the remaining interest.
+            if (!fromDate.HasValue)
+            {
+                var accountIds = accounts.Select(a => a.ID).ToList();
+                DateTime periodStartForExclusion = GetPeriodStart(toDate, rules.IntPostingInterval);
+                var alreadyPostedIds = await _context.vouchercreditdebitdetails
+                    .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
+                    .Where(x => x.v.BrID == branchId
+                        && x.v.VoucherType == (int)Enums.VoucherType.Saving
+                        && x.v.VoucherSubType == (int)Enums.VoucherSubType.InterestPosting
+                        && x.v.VoucherDate.Date >= periodStartForExclusion.Date
+                        && x.v.VoucherDate.Date <= toDate.Date
+                        && x.e.VoucherEntryType == "Cr"
+                        && accountIds.Contains(x.e.AccountId))
+                    .Select(x => x.e.AccountId)
+                    .Distinct()
+                    .ToListAsync();
+                accounts = accounts.Where(a => !alreadyPostedIds.Contains(a.ID)).ToList();
+            }
 
             var result = new List<SavingInterestAccountDTO>();
-            foreach (var acc in eligible)
+            foreach (var acc in accounts)
             {
-                var calc = await CalculateInterestForAccount(branchId, acc.ID, postingDate, rules, fixedRate);
+                var calc = await CalculateInterestForAccount(branchId, acc.ID, toDate, rules, fixedRate, fromDate);
                 result.Add(new SavingInterestAccountDTO
                 {
                     AccountId = acc.ID,
@@ -120,7 +125,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                 });
             }
 
-            return result.Where(r => r.CalculatedInterest >= (rules.MinPostingIntAmt > 0 ? rules.MinPostingIntAmt : 0.01m)).ToList();
+            return result
+                .Where(r => r.CalculatedInterest >= (rules.MinPostingIntAmt > 0 ? rules.MinPostingIntAmt : 0.01m))
+                .ToList();
         }
 
         // ── Closing preview ───────────────────────────────────────────────────────
@@ -155,8 +162,8 @@ namespace BankingPlatform.API.Service.AccountMasters
 
             bool isAutoVerification = await _commonFunctions.IsAutoVerification(dto.BranchId);
             string voucherStatus = isAutoVerification ? "V" : "A";
-            DateTime voucherDate = DateTime.SpecifyKind(dto.PostingDate, DateTimeKind.Unspecified);
-            DateTime valueDate = DateTime.SpecifyKind(dto.PostingDate, DateTimeKind.Utc);
+            DateTime voucherDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Unspecified);
+            DateTime valueDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Utc);
 
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -165,7 +172,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 var postings = new List<(int AccountId, decimal Interest)>();
                 foreach (var accountId in dto.AccountIds)
                 {
-                    var calc = await CalculateInterestForAccount(dto.BranchId, accountId, dto.PostingDate, rules, dto.FixedRate);
+                    var calc = await CalculateInterestForAccount(dto.BranchId, accountId, dto.ToDate, rules, dto.FixedRate, dto.FromDate);
                     if (calc.TotalInterest <= 0 && !(dto.InterestOverrides?.ContainsKey(accountId) == true)) continue;
 
                     decimal interestAmt = (dto.InterestOverrides != null && dto.InterestOverrides.TryGetValue(accountId, out var ov))
@@ -185,7 +192,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 decimal totalInterest = postings.Sum(p => p.Interest);
 
                 // ONE voucher for all accounts
-                int nextVrNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.PostingDate);
+                int nextVrNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.VoucherDate);
                 var voucherEntity = new VoucherDTO
                 {
                     ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
@@ -246,9 +253,10 @@ namespace BankingPlatform.API.Service.AccountMasters
 
         private async Task<(decimal TotalInterest, List<MonthlyInterestBreakdownDTO> Breakdown)>
             CalculateInterestForAccount(
-                int branchId, int accountId, DateTime postingDate,
+                int branchId, int accountId, DateTime toDate,
                 Infrastructure.Models.ProductMasters.Saving.SavingsProductInterestRules rules,
-                decimal? fixedRate = null)
+                decimal? fixedRate = null,
+                DateTime? fromDateOverride = null)
         {
             bool isMinBalance = rules.CalculationMethod == 1;
 
@@ -267,39 +275,67 @@ namespace BankingPlatform.API.Service.AccountMasters
                 .Select(x => x.MinBalanceAmt)
                 .FirstOrDefaultAsync();
 
-            // Determine period start: day after last interest posting, or account opening date
-            var lastPosting = await _context.vouchercreditdebitdetails
-                .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
-                .Where(x => x.v.BrID == branchId
-                    && x.v.VoucherType == (int)Enums.VoucherType.Saving
-                    && x.v.VoucherSubType == (int)Enums.VoucherSubType.InterestPosting
-                    && x.e.AccountId == accountId
-                    && x.e.VoucherEntryType == "Cr"
-                    && x.v.VoucherDate.Date <= postingDate.Date)
-                .OrderByDescending(x => x.v.VoucherDate)
-                .Select(x => (DateTime?)x.v.VoucherDate)
-                .FirstOrDefaultAsync();
-
             DateTime periodStart;
-            if (lastPosting.HasValue)
-                periodStart = lastPosting.Value.Date.AddDays(1);
-            else
+
+            if (fromDateOverride.HasValue)
             {
-                var accOpenDate = await _context.accountmaster
-                    .Where(x => x.ID == accountId)
-                    .Select(x => (DateTime?)x.AccOpeningDate)
+                // Find the latest interest posting in [fromDate, toDate] for this account.
+                // If one exists it means that period is already covered — advance past it so
+                // only the remaining unpaid portion is calculated. If none exists, use fromDate directly.
+                var latestPostingInRange = await _context.vouchercreditdebitdetails
+                    .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
+                    .Where(x => x.v.BrID == branchId
+                        && x.v.VoucherType == (int)Enums.VoucherType.Saving
+                        && x.v.VoucherSubType == (int)Enums.VoucherSubType.InterestPosting
+                        && x.e.AccountId == accountId
+                        && x.e.VoucherEntryType == "Cr"
+                        && x.v.VoucherDate.Date >= fromDateOverride.Value.Date
+                        && x.v.VoucherDate.Date <= toDate.Date)
+                    .OrderByDescending(x => x.v.VoucherDate)
+                    .Select(x => (DateTime?)x.v.VoucherDate)
                     .FirstOrDefaultAsync();
 
-                DateTime baseDate = accOpenDate?.Date ?? postingDate.Date;
+                periodStart = latestPostingInRange.HasValue
+                    ? latestPostingInRange.Value.Date.AddDays(1)
+                    : fromDateOverride.Value.Date;
+            }
+            else
+            {
+                // Auto-detect: day after last interest posting, or account opening date
+                var lastPosting = await _context.vouchercreditdebitdetails
+                    .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
+                    .Where(x => x.v.BrID == branchId
+                        && x.v.VoucherType == (int)Enums.VoucherType.Saving
+                        && x.v.VoucherSubType == (int)Enums.VoucherSubType.InterestPosting
+                        && x.e.AccountId == accountId
+                        && x.e.VoucherEntryType == "Cr"
+                        && x.v.VoucherDate.Date <= toDate.Date)
+                    .OrderByDescending(x => x.v.VoucherDate)
+                    .Select(x => (DateTime?)x.v.VoucherDate)
+                    .FirstOrDefaultAsync();
 
-                // Never calculate interest before the branch's first session start date
-                var (firstSessionFrom, _) = await _commonFunctions.FirstSessionFromDateAndToDate(branchId);
-                periodStart = (firstSessionFrom != DateTime.MinValue && firstSessionFrom.Date > baseDate)
-                    ? firstSessionFrom.Date
-                    : baseDate;
+                if (lastPosting.HasValue)
+                {
+                    periodStart = lastPosting.Value.Date.AddDays(1);
+                }
+                else
+                {
+                    var accOpenDate = await _context.accountmaster
+                        .Where(x => x.ID == accountId)
+                        .Select(x => (DateTime?)x.AccOpeningDate)
+                        .FirstOrDefaultAsync();
+
+                    DateTime baseDate = accOpenDate?.Date ?? toDate.Date;
+
+                    // Never calculate interest before the branch's first session start date
+                    var (firstSessionFrom, _) = await _commonFunctions.FirstSessionFromDateAndToDate(branchId);
+                    periodStart = (firstSessionFrom != DateTime.MinValue && firstSessionFrom.Date > baseDate)
+                        ? firstSessionFrom.Date
+                        : baseDate;
+                }
             }
 
-            if (periodStart > postingDate.Date)
+            if (periodStart > toDate.Date)
                 return (0, new());
 
             // Get opening balance
@@ -329,7 +365,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     && x.v.BrID == branchId
                     && (x.v.VoucherStatus == "V" || x.v.VoucherStatus == "A")
                     && x.v.VoucherDate.Date >= periodStart.Date
-                    && x.v.VoucherDate.Date <= postingDate.Date)
+                    && x.v.VoucherDate.Date <= toDate.Date)
                 .OrderBy(x => x.v.VoucherDate)
                 .ThenBy(x => x.e.Id)
                 .Select(x => new
@@ -353,7 +389,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             decimal totalInterest = 0;
 
             DateTime cursor = new DateTime(periodStart.Year, periodStart.Month, 1);
-            while (cursor <= postingDate.Date)
+            while (cursor <= toDate.Date)
             {
                 DateTime monthStart = cursor;
                 DateTime monthEnd = new DateTime(cursor.Year, cursor.Month,
@@ -361,7 +397,7 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                 // Clamp to period boundaries
                 DateTime effectiveStart = monthStart < periodStart ? periodStart : monthStart;
-                DateTime effectiveEnd = monthEnd > postingDate.Date ? postingDate.Date : monthEnd;
+                DateTime effectiveEnd = monthEnd > toDate.Date ? toDate.Date : monthEnd;
 
                 int daysInMonth = (effectiveEnd - effectiveStart).Days + 1;
 
@@ -396,7 +432,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     effectiveBalance = minBal < 0 ? 0 : minBal;
 
                     // Resolve the applicable rate for this month's balance (slab-wise or fixed)
-                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules, fixedRate);
+                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, toDate, rules, fixedRate);
 
                     // If a minimum balance requirement is configured and not met this month,
                     // record the month with zero interest and move on
@@ -444,12 +480,13 @@ namespace BankingPlatform.API.Service.AccountMasters
                     productSum += currentBal * remainDays;
 
                     effectiveBalance = productSum / daysInMonth; // avg balance for display
-                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, postingDate, rules, fixedRate);
+                    monthRate = await GetRateForBalance(branchId, rules.SavingsProductId, effectiveBalance, toDate, rules, fixedRate);
                     monthlyInterest = productSum * monthRate / (100m * daysInYear);
                 }
 
                 if (monthlyInterest < 0) monthlyInterest = 0;
-                totalInterest += monthlyInterest;
+                decimal roundedMonthly = Math.Round(monthlyInterest, 0, MidpointRounding.AwayFromZero);
+                totalInterest += roundedMonthly;
 
                 breakdown.Add(new MonthlyInterestBreakdownDTO
                 {
@@ -457,7 +494,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     EffectiveBalance = Math.Round(effectiveBalance, 2),
                     Days = daysInMonth,
                     Rate = monthRate,
-                    Interest = Math.Round(monthlyInterest, 0, MidpointRounding.AwayFromZero),
+                    Interest = roundedMonthly,
                 });
 
                 cursor = cursor.AddMonths(1);

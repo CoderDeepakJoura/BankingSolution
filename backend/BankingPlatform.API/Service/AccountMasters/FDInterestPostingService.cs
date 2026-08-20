@@ -136,7 +136,14 @@ namespace BankingPlatform.API.Service.AccountMasters
                     while (true)
                     {
                         DateTime periodEnd = GetPeriodEnd(cursor, interval);
-                        if (periodEnd > postingDate.Date) break;
+                        bool isPartial = false;
+
+                        if (periodEnd > postingDate.Date)
+                        {
+                            if (isMIS) break; // MIS never posts partial periods
+                            periodEnd = postingDate.Date;
+                            isPartial = true;
+                        }
                         if (periodEnd > detail.FDMaturityDate.Date) break;
 
                         int days = (periodEnd - cursor).Days + 1;
@@ -162,6 +169,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                             });
                         }
 
+                        if (isPartial) break;
                         cursor = periodEnd.AddDays(1);
                     }
                 }
@@ -261,7 +269,14 @@ namespace BankingPlatform.API.Service.AccountMasters
                         while (true)
                         {
                             DateTime periodEnd = GetPeriodEnd(cursor, interval);
-                            if (periodEnd > dto.PostingDate.Date) break;
+                            bool isPartial = false;
+
+                            if (periodEnd > dto.PostingDate.Date)
+                            {
+                                if (dto.IsMIS) break; // MIS never posts partial periods
+                                periodEnd = dto.PostingDate.Date;
+                                isPartial = true;
+                            }
                             if (periodEnd > detail.FDMaturityDate.Date) break;
 
                             int days = (periodEnd - cursor).Days + 1;
@@ -272,6 +287,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                             if (interest > 0)
                                 periodPostings.Add((detail, cursor, periodEnd, interest));
 
+                            if (isPartial) break;
                             cursor = periodEnd.AddDays(1);
                         }
                     }

@@ -431,9 +431,10 @@ namespace BankingPlatform.API.Service.AccountMasters
             string savingAccountInfo = await _commonfunctions.GetSavingAccInfoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, (int)Enums.AccountTypes.Saving);
 
             DateTime memberDOB = await _commonfunctions.MemberDOBFromMemberIdAndBranchId((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!);
-            var fdDetail = await _context.fdaccountdetail
+            var fdDetails = await _context.fdaccountdetail
                     .AsNoTracking()
                     .Where(f => f.AccountId == accountId && f.BranchId == branchId && f.FDStatus == fdStatus)
+                    .OrderBy(f => f.FDDate)
                     .Select(f => new FDAccountDetailDTO
                     {
                         Id = f.Id,
@@ -453,7 +454,18 @@ namespace BankingPlatform.API.Service.AccountMasters
                         SerialNo = f.SerialNo,
                         MISAccId = f.MISAccId
                     })
-                    .FirstOrDefaultAsync();
+                    .ToListAsync();
+
+            // Calculate pre-maturity amount for each open detail
+            foreach (var d in fdDetails)
+            {
+                d.PreMaturityAmount = await CalculatePreMaturityAmount(memberDOB,
+                    d.FDAmount,
+                    (currentDate - d.FDDate).Days,
+                    currentDate,
+                    (int)accountMaster.GeneralProductId!,
+                    branchId);
+            }
 
             return new CommonAccMasterDTO
             {
@@ -471,17 +483,12 @@ namespace BankingPlatform.API.Service.AccountMasters
                     IsMinor = n.IsMinor,
                     NameOfGuardian = n.NameOfGuardian
                 }).ToList(),
-                FDAccountDetailDTOSingle = fdDetail,
+                FDAccountDetailDTO = fdDetails,
+                FDAccountDetailDTOSingle = fdDetails.FirstOrDefault(),
                 OpeningBalance = accOpeningBalDetail != null ? accOpeningBalDetail.OpeningAmount.ToString() : "0",
                 OpeningBalanceType = accOpeningBalDetail != null ? accOpeningBalDetail.EntryType : "Cr",
                 SavingAccountName = savingAccountInfo,
-                PreMaturityAmount = await CalculatePreMaturityAmount(memberDOB,
-                                fdDetail!.FDAmount,
-                                (currentDate - fdDetail.FDDate).Days,
-                                currentDate,
-                                (int)accountMaster.GeneralProductId!,
-                                branchId
-                                    )
+                PreMaturityAmount = fdDetails.FirstOrDefault()?.PreMaturityAmount
             };
         }
 
@@ -1036,10 +1043,13 @@ namespace BankingPlatform.API.Service.AccountMasters
             if (daysInAYear <= 0)
                 daysInAYear = 360;
 
-            // Convert annual rate from percentage to decimal
-            decimal rate = intRate / 100;
+            // Pre-maturity penalty: deduct 1% from slab rate (min 0)
+            decimal preMaturityRate = Math.Max(0m, intRate - 1m);
 
-            // Simple Interest Formula: (P × R × Days) / 360
+            // Convert annual rate from percentage to decimal
+            decimal rate = preMaturityRate / 100;
+
+            // Simple Interest Formula: (P × R × Days) / DaysInAYear
             decimal interest = (principal * rate * totalDays) / daysInAYear;
 
             // Maturity Amount = Principal + Interest

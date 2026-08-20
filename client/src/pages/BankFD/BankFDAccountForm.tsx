@@ -47,7 +47,7 @@ const emptyDetail = (key: number): DetailRow => ({
   fdPeriodMonths: 0,
   fdPeriodDays: 0,
   intRate: 0,
-  intCompInterval: 1,
+  intCompInterval: 4,
   fdMaturityDate: "",
   maturityAmount: 0,
   fdStatus: 1,
@@ -81,11 +81,10 @@ const calcMaturityAmount = (
   const actualDays = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const t = actualDays / 365;
   if (compInterval === 0) {
-    // Simple interest
-    return Math.round(principal * (1 + (rate / 100) * t) * 100) / 100;
+    return Math.round(principal * (1 + (rate / 100) * t));
   }
   const n = compInterval;
-  return Math.round(principal * Math.pow(1 + rate / 100 / n, n * t) * 100) / 100;
+  return Math.round(principal * Math.pow(1 + rate / 100 / n, n * t));
 };
 
 // ─── Main component ───────────────────────────────────────────
@@ -105,6 +104,10 @@ const BankFDAccountForm: React.FC = () => {
   const [openingDate, setOpeningDate] = useState(commonservice.getTodaysDate());
   const [accPrefix, setAccPrefix] = useState("BFD");
   const [accSuffix, setAccSuffix] = useState<number | null>(null);
+  const [accSuffixInput, setAccSuffixInput] = useState("");   // editable text
+  const [suffixError, setSuffixError] = useState("");
+  const [lastAccNo, setLastAccNo] = useState("");
+  const [savedAccNo, setSavedAccNo] = useState("");   // edit mode: original account number
 
   // Detail rows in the grid
   const [details, setDetails] = useState<DetailRow[]>([]);
@@ -130,16 +133,31 @@ const BankFDAccountForm: React.FC = () => {
     setOpeningDate(commonservice.getTodaysDate());
     setAccPrefix("BFD");
     setAccSuffix(null);
+    setAccSuffixInput("");
+    setSuffixError("");
     setAccountHeadId(0);
     setDetails([]);
     setRowCounter(1);
     setEditingRowKey(null);
     setEntry(emptyDetail(0));
+    // Refresh last account number hint after save
+    if (user.branchid) {
+      bankFDAccountApi.getLastSuffix(user.branchid).then(res => {
+        if (res.success && res.data) setLastAccNo(res.data.lastAccNo);
+      }).catch(() => {});
+    }
   };
 
-  // Load account heads
+  // Load account heads + last suffix hint (create mode)
   useEffect(() => {
-    if (user.branchid) loadAccountHeads();
+    if (user.branchid) {
+      loadAccountHeads();
+      if (!isEditMode) {
+        bankFDAccountApi.getLastSuffix(user.branchid).then(res => {
+          if (res.success && res.data) setLastAccNo(res.data.lastAccNo);
+        }).catch(() => {});
+      }
+    }
   }, [user.branchid]);
 
   // Load account for edit mode
@@ -184,7 +202,11 @@ const BankFDAccountForm: React.FC = () => {
         account.openingDate ? commonservice.splitDate(account.openingDate) : commonservice.getTodaysDate()
       );
       setAccPrefix(account.accPrefix ?? "BFD");
-      setAccSuffix(account.accSuffix ?? null);
+      const loadedSuffix = account.accSuffix ?? null;
+      setAccSuffix(loadedSuffix);
+      setAccSuffixInput(loadedSuffix !== null ? String(loadedSuffix) : "");
+      setSuffixError("");
+      setSavedAccNo(`${account.accPrefix ?? "BFD"}-${loadedSuffix ?? ""}`);
       setAccountHeadId(account.headId ?? 0);
 
       let counter = 1;
@@ -199,7 +221,7 @@ const BankFDAccountForm: React.FC = () => {
         intRate: d.intRate ?? 0,
         intCompInterval: d.intCompInterval ?? 1,
         fdMaturityDate: d.fdMaturityDate ? commonservice.splitDate(d.fdMaturityDate) : "",
-        maturityAmount: d.maturityAmount ?? 0,
+        maturityAmount: Math.round(d.maturityAmount ?? 0),
         fdStatus: d.fdStatus ?? 1,
         serialNo: d.serialNo ?? undefined,
         openingBalance: d.openingBalance?.balance ?? 0,
@@ -307,11 +329,28 @@ const BankFDAccountForm: React.FC = () => {
     clearEntry();
   };
 
+  const handleSuffixBlur = async () => {
+    const val = accSuffixInput.trim();
+    if (!val) { setSuffixError(""); setAccSuffix(null); return; }
+    const n = parseInt(val, 10);
+    if (isNaN(n) || n <= 0) { setSuffixError("Must be a positive number."); setAccSuffix(null); return; }
+    setAccSuffix(n);
+    try {
+      const res = await bankFDAccountApi.checkSuffix(user.branchid, n, accountHeadId || undefined, editAccId ?? undefined);
+      if (res.success && res.data?.taken) {
+        setSuffixError(`${accPrefix || "BFD"}-${n} is already in use under this account head.`);
+      } else {
+        setSuffixError("");
+      }
+    } catch { setSuffixError(""); }
+  };
+
   const handleSave = async () => {
     const errors: string[] = [];
     if (!accountName.trim()) errors.push("Account Name is required.");
     if (!openingDate) errors.push("Account Opening Date is required.");
     if (details.length === 0) errors.push("At least one FD detail is required.");
+    if (suffixError) errors.push(`Account number: ${suffixError}`);
 
     if (errors.length > 0) {
       Swal.fire({
@@ -327,6 +366,7 @@ const BankFDAccountForm: React.FC = () => {
       branchId: user.branchid,
       accountName: accountName.trim(),
       accPrefix: accPrefix.trim() || "BFD",
+      accSuffix: accSuffix ?? undefined,
       openingDate,
       isOpeningEntry,
       headId: accountHeadId,
@@ -493,13 +533,48 @@ const BankFDAccountForm: React.FC = () => {
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Account Number
+                        {isEditMode && savedAccNo && (
+                          <span className="ml-2 text-xs font-normal text-slate-400">Saved: {savedAccNo}</span>
+                        )}
+                        {!isEditMode && lastAccNo && (
+                          <span className="ml-2 text-xs font-normal text-slate-400">Last: {lastAccNo}</span>
+                        )}
                       </label>
-                      <input
-                        type="text"
-                        value={accSuffix !== null ? `${accPrefix}-${accSuffix}` : `${accPrefix}-[auto]`}
-                        readOnly
-                        className={readonlyCls}
-                      />
+                      <div className="flex items-center gap-1">
+                        <span className="px-3 py-2 border border-gray-200 rounded-l-lg bg-gray-50 text-gray-600 text-sm font-mono select-none">
+                          {accPrefix || "BFD"}-
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={accSuffixInput}
+                          onChange={e => {
+                            const v = e.target.value.replace(/\D/g, "");
+                            setAccSuffixInput(v);
+                            setSuffixError("");
+                            setAccSuffix(v ? parseInt(v, 10) : null);
+                          }}
+                          onBlur={handleSuffixBlur}
+                          placeholder={isEditMode ? "" : "auto"}
+                          className={`flex-1 px-3 py-2 border rounded-r-lg text-sm outline-none transition-all font-mono ${
+                            suffixError
+                              ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                              : "border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                          }`}
+                          maxLength={10}
+                        />
+                      </div>
+                      {suffixError && (
+                        <p className="mt-1 text-xs text-red-600">{suffixError}</p>
+                      )}
+                      {!suffixError && accSuffix && (
+                        <p className="mt-1 text-xs text-slate-400">
+                          Account will be saved as <span className="font-semibold text-slate-600">{accPrefix || "BFD"}-{accSuffix}</span>
+                        </p>
+                      )}
+                      {!accSuffix && !isEditMode && (
+                        <p className="mt-1 text-xs text-slate-400">Leave blank to auto-assign the next number</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -634,8 +709,8 @@ const BankFDAccountForm: React.FC = () => {
                         Maturity Amount
                       </label>
                       <input
-                        type="number"
-                        value={entry.maturityAmount || ""}
+                        type="text"
+                        value={entry.maturityAmount ? Math.round(entry.maturityAmount).toLocaleString("en-IN") : ""}
                         readOnly
                         className={readonlyCls}
                         placeholder="Auto-calculated"
@@ -643,20 +718,8 @@ const BankFDAccountForm: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Row 3: FD Status, Serial No */}
+                  {/* Row 3: Serial No */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">FD Status</label>
-                      <Select
-                        classNamePrefix="react-select"
-                        options={fdStatusOptions}
-                        value={fdStatusOptions.find(o => o.value === entry.fdStatus) ?? null}
-                        onChange={opt => setEntryField("fdStatus", opt?.value ?? 1)}
-                        placeholder="-- Select --"
-
-
-                      />
-                    </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">Serial No</label>
                       <input
@@ -863,7 +926,7 @@ const BankFDAccountForm: React.FC = () => {
                               </td>
                               <td className="px-3 py-2.5 text-gray-700">{row.fdMaturityDate}</td>
                               <td className="px-3 py-2.5 text-right text-gray-800">
-                                {row.maturityAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                {Math.round(row.maturityAmount).toLocaleString("en-IN")}
                               </td>
                               <td className="px-3 py-2.5 text-gray-700">{statusLabel(row.fdStatus)}</td>
                               <td className="px-3 py-2.5 text-right text-gray-700">
@@ -929,7 +992,7 @@ const BankFDAccountForm: React.FC = () => {
                             </td>
                             <td colSpan={4} />
                             <td className="px-3 py-2.5 text-right text-teal-900">
-                              {details.reduce((s, r) => s + r.maturityAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              {Math.round(details.reduce((s, r) => s + r.maturityAmount, 0)).toLocaleString("en-IN")}
                             </td>
                             <td colSpan={isOpeningEntry ? 8 : 3} />
                           </tr>

@@ -1196,7 +1196,22 @@ namespace BankingPlatform.API.Controllers
             bool isDailyKist = periodInDays > 0 && periodInMonths == 0;
             int nInstallments = isDailyKist ? periodInDays : periodInMonths;
             decimal kistInstallment = nInstallments > 0 ? totalAmount / nInstallments : totalAmount;
-            decimal maturityAmount = _rdAccountService.CalculateRDMaturityAmount(kistInstallment, nInstallments, effectiveRate, intFormula, isDailyKist);
+
+            // When the user explicitly picks a compounding interval, derive the formula from it.
+            // Quarterly preserves the product formula (keeps annuity-due vs ordinary distinction).
+            // intCompoundingInterval == 0 means use slab default → stick to product formula.
+            int formulaToUse = intCompoundingInterval > 0
+                ? intCompoundingInterval switch
+                {
+                    3 => 2,          // Monthly    → CI Monthly, Ordinary Annuity
+                    5 => 4,          // Half-Yearly → CI Half-Yearly, Ordinary Annuity
+                    6 => 5,          // Yearly     → CI Yearly, Ordinary Annuity
+                    4 => intFormula, // Quarterly  → keep product formula (3 or 6)
+                    _ => intFormula
+                }
+                : intFormula;
+
+            decimal maturityAmount = _rdAccountService.CalculateRDMaturityAmount(kistInstallment, nInstallments, effectiveRate, formulaToUse, isDailyKist);
 
             return Ok(new
             {

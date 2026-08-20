@@ -159,7 +159,9 @@ const SavingInterestPosting: React.FC = () => {
     ? `${user.sessionInfo.split('-')[0]}-04-01`
     : undefined;
 
-  const [postingDate, setPostingDate] = useState(workingDateISO);
+  const [voucherDate, setVoucherDate] = useState(workingDateISO);
+  const [toDate, setToDate] = useState(workingDateISO);
+  const [fromDate, setFromDate] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<ProductOption | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<AccountOption | null>(null);
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -178,14 +180,14 @@ const SavingInterestPosting: React.FC = () => {
   const [fixedRateInput, setFixedRateInput] = useState("");
 
   useEffect(() => {
-    commonservice.fetch_saving_products(user.branchid, postingDate || undefined).then((res) => {
+    commonservice.fetch_saving_products(user.branchid, toDate || undefined).then((res) => {
       if (res.success && res.data)
         setProducts(res.data.map((p: any) => ({ value: p.id, label: p.productName })));
     });
     superUserSettingsApi.getInterestPostingSettings(user.branchid).then((res) => {
       if (res.success && res.data) setAllowInterestChange(res.data.allowSavingInterestChange);
     });
-  }, [user.branchid, postingDate]);
+  }, [user.branchid, toDate]);
 
   useEffect(() => {
     if (!selectedProduct) {
@@ -195,7 +197,7 @@ const SavingInterestPosting: React.FC = () => {
       setFixedRateInput("");
       return;
     }
-    commonservice.fetch_deposit_accounts(user.branchid, selectedProduct.value, 2, false, postingDate || undefined).then((res) => {
+    commonservice.fetch_deposit_accounts(user.branchid, selectedProduct.value, 2, false, toDate || undefined).then((res) => {
       if (res.success && res.data)
         setAccounts(res.data.map((a: any) => ({
           value: a.accId,
@@ -209,10 +211,12 @@ const SavingInterestPosting: React.FC = () => {
     setGridData([]);
     setSelectedIds(new Set());
     setFixedRateInput("");
-  }, [selectedProduct, postingDate]);
+  }, [selectedProduct, toDate]);
 
   const handleCalculate = async () => {
     if (!selectedProduct) { setError("Please select a saving product."); return; }
+    if (!toDate) { setError("Please select an Interest To Date."); return; }
+    if (fromDate && fromDate >= toDate) { setError("Interest From Date must be before Interest To Date."); return; }
     if (rateAppliedMethod === 2) {
       const r = parseFloat(fixedRateInput);
       if (!fixedRateInput || isNaN(r) || r <= 0) {
@@ -229,7 +233,8 @@ const SavingInterestPosting: React.FC = () => {
       const res = await savingInterestApi.getEligibleAccounts(
         user.branchid,
         selectedProduct.value,
-        postingDate,
+        toDate,
+        fromDate || undefined,
         selectedAccount?.value,
         fixedRate
       );
@@ -256,8 +261,9 @@ const SavingInterestPosting: React.FC = () => {
     const confirm = await Swal.fire({
       icon: "question",
       title: "Confirm Interest Posting",
-      html: `Post saving interest for <strong>${selectedIds.size}</strong> account(s) on <strong>${postingDate}</strong>?<br/>
-             <span class="text-sm text-gray-500">This action cannot be undone.</span>`,
+      html: `Post saving interest for <strong>${selectedIds.size}</strong> account(s)?<br/>
+             <span class="text-sm text-gray-500">Voucher Date: <strong>${voucherDate}</strong> &nbsp;|&nbsp; Period: <strong>${fromDate || "auto"}</strong> to <strong>${toDate}</strong></span><br/>
+             <span class="text-sm text-gray-400">This action cannot be undone.</span>`,
       showCancelButton: true,
       confirmButtonText: "Yes, Post",
       cancelButtonText: "Cancel",
@@ -273,7 +279,9 @@ const SavingInterestPosting: React.FC = () => {
       const res = await savingInterestApi.postInterest({
         branchId: user.branchid,
         productId: selectedProduct!.value,
-        postingDate,
+        voucherDate,
+        toDate,
+        fromDate: fromDate || undefined,
         accountIds: Array.from(selectedIds),
         interestOverrides: overrides,
         fixedRate: fixedRate && fixedRate > 0 ? fixedRate : undefined,
@@ -356,12 +364,40 @@ const SavingInterestPosting: React.FC = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Posting Date <span className="text-red-500">*</span>
+                      Voucher Date <span className="text-red-500">*</span>
                     </label>
                     <DatePicker
-                      value={postingDate}
-                      onChange={(v) => { setPostingDate(v); setGridData([]); setError(""); }}
+                      value={voucherDate}
+                      onChange={(v) => { setVoucherDate(v); setGridData([]); setError(""); }}
                       min={sessionFromDate}
+                      max={workingDateISO}
+                      workingDate={workingDateISO}
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Interest From Date <span className="text-gray-400 text-xs">(optional)</span>
+                    </label>
+                    <DatePicker
+                      value={fromDate}
+                      onChange={(v) => { setFromDate(v); setGridData([]); setError(""); }}
+                      min={sessionFromDate}
+                      max={toDate || workingDateISO}
+                      workingDate={workingDateISO}
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Interest To Date <span className="text-red-500">*</span>
+                    </label>
+                    <DatePicker
+                      value={toDate}
+                      onChange={(v) => { setToDate(v); setGridData([]); setError(""); }}
+                      min={fromDate || sessionFromDate}
                       max={workingDateISO}
                       workingDate={workingDateISO}
                       className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg outline-none"

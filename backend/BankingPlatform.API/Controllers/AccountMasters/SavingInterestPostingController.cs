@@ -33,7 +33,8 @@ namespace BankingPlatform.API.Controllers.AccountMasters
         public async Task<IActionResult> GetEligibleAccounts(
             [FromQuery] int branchId,
             [FromQuery] int productId,
-            [FromQuery] DateTime postingDate,
+            [FromQuery] DateTime toDate,
+            [FromQuery] DateTime? fromDate = null,
             [FromQuery] int? accountId = null,
             [FromQuery] decimal? fixedRate = null)
         {
@@ -42,7 +43,10 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                 if (branchId <= 0 || productId <= 0)
                     return BadRequest(new ResponseDto { Success = false, Message = "BranchId and ProductId are required." });
 
-                var accounts = await _service.GetEligibleAccountsAsync(branchId, productId, postingDate, fixedRate);
+                if (fromDate.HasValue && fromDate.Value.Date >= toDate.Date)
+                    return BadRequest(new ResponseDto { Success = false, Message = "From Date must be before To Date." });
+
+                var accounts = await _service.GetEligibleAccountsAsync(branchId, productId, toDate, fromDate, fixedRate);
 
                 // If a specific account was requested, filter to just that one
                 if (accountId.HasValue && accountId.Value > 0)

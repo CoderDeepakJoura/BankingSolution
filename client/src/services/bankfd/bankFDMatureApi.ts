@@ -131,7 +131,7 @@ export function calcBFDMaturityAmount(
   const end = new Date(maturityDate);
   const actualDays = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const t = actualDays / 365;
-  if (compInterval === 0) return Math.round(principal * (1 + (rate / 100) * t) * 100) / 100;
+  if (compInterval === 0) return Math.round(principal * (1 + (rate / 100) * t));
   const n = compInterval;
-  return Math.round(principal * Math.pow(1 + rate / 100 / n, n * t) * 100) / 100;
+  return Math.round(principal * Math.pow(1 + rate / 100 / n, n * t));
 }

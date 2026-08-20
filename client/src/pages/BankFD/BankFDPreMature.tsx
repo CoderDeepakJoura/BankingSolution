@@ -268,7 +268,7 @@ const BankFDPreMaturePage: React.FC = () => {
                               <td className="px-4 py-2.5 text-right font-mono">₹{fmt(d.fdAmount)}</td>
                               <td className="px-4 py-2.5 text-center">{d.intRate.toFixed(2)}%</td>
                               <td className="px-4 py-2.5 text-center">{compLabel(d.intCompInterval)}</td>
-                              <td className="px-4 py-2.5 text-right font-mono text-gray-600">₹{fmt(d.maturityAmount)}</td>
+                              <td className="px-4 py-2.5 text-right font-mono text-gray-600">₹{Math.round(d.maturityAmount).toLocaleString("en-IN")}</td>
                               <td className="px-4 py-2.5 text-center">
                                 <button
                                   onClick={() => handleDetailSelect(d)}
@@ -315,9 +315,9 @@ const BankFDPreMaturePage: React.FC = () => {
                       {[
                         { label: "Principal", value: `₹${fmt(selectedDetail.fdAmount)}`, color: "border-blue-500" },
                         { label: "Interest Earned", value: `₹${fmt(interest)}`, color: "border-emerald-500" },
-                        { label: "Pre-Mature Amount", value: `₹${fmt(preMatureAmount)}`, color: "border-orange-500" },
-                        { label: "TDS Deducted", value: hasTDSSetting ? `₹${fmt(tdsAmount)}` : "No TDS Setting", color: "border-rose-500" },
-                        { label: "Net Payout", value: `₹${fmt(netPayout)}`, color: "border-green-600" },
+                        { label: "Pre-Mature Amount", value: `₹${Math.round(preMatureAmount).toLocaleString("en-IN")}`, color: "border-orange-500" },
+                        { label: "TDS Deducted", value: hasTDSSetting ? `₹${Math.round(tdsAmount).toLocaleString("en-IN")}` : "No TDS Setting", color: "border-rose-500" },
+                        { label: "Net Payout", value: `₹${Math.round(netPayout).toLocaleString("en-IN")}`, color: "border-green-600" },
                       ].map(({ label, value, color }) => (
                         <div key={label} className={`bg-white rounded-lg border-l-4 ${color} px-4 py-3 shadow-sm`}>
                           <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>

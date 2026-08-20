@@ -148,6 +148,9 @@ const MatureFDPage: React.FC = () => {
   const [loanAccounts, setLoanAccounts] = useState<AccountOption[]>([]);
   const [loanBalance, setLoanBalance] = useState<LoanRecoveryBalanceDTO | null>(null);
 
+  const [openFDDetails, setOpenFDDetails] = useState<any[]>([]);
+  const [selectedDetailId, setSelectedDetailId] = useState<number | null>(null);
+
   // ─── Mature FD State ──────────────────────────────────────────────────────
 
   const blankMatureDetail = (): MatureFDDetail => ({
@@ -537,7 +540,7 @@ const MatureFDPage: React.FC = () => {
     try {
       const res = await commonservice.fetch_loan_accounts_by_product(user.branchid, productId, matureFDDetail.date);
       if (res.success && Array.isArray(res.data)) {
-        setLoanAccounts(res.data.map((a: any) => ({ value: a.accountId ?? a.AccountId, label: `${a.accountNumber ?? a.AccountNumber} - ${a.accountName ?? a.AccountName}` })));
+        setLoanAccounts(res.data.map((a: any) => ({ value: a.accId ?? a.AccId ?? a.accountId ?? a.AccountId, label: a.accountName ?? a.AccountName ?? "" })));
       }
     } catch { /* silently ignore */ }
   };
@@ -556,6 +559,8 @@ const MatureFDPage: React.FC = () => {
     setSelectedProduct(productId);
     setSelectedFDAccount(null);
     setFdAccounts([]);
+    setOpenFDDetails([]);
+    setSelectedDetailId(null);
     setMatureFDDetail(blankMatureDetail());
     setRenewFDDetail(blankRenewDetail());
     setValidationErrors({});
@@ -563,10 +568,35 @@ const MatureFDPage: React.FC = () => {
     if (productId && productId > 0) await fetchFDAccounts(productId);
   };
 
+  const handleDetailSelect = (detailId: number | null) => {
+    setSelectedDetailId(detailId);
+    if (!detailId) return;
+    const detail = openFDDetails.find((d: any) => d.id === detailId);
+    if (!detail) return;
+    const maturityAmt = detail.maturityAmount || 0;
+    setMatureFDDetail((prev) => ({
+      ...prev,
+      fdDetailId: detail.id,
+      maturityAmt,
+      fdDate: detail.fdDate?.split("T")[0] || "",
+      maturityDate: detail.fdMaturityDate?.split("T")[0] || "",
+      intRate: detail.intRate || 0,
+      receiptNo: detail.ltdNo || "",
+      intPayableAmt: Math.round(Math.max(0, maturityAmt - prev.balance)).toString(),
+    }));
+    setRenewFDDetail((prev) => ({
+      ...prev,
+      fdAmount: maturityAmt > 0 ? maturityAmt.toFixed(2) : "",
+      fdDate: detail.fdMaturityDate?.split("T")[0] || prev.fdDate,
+    }));
+  };
+
   // ─── FD Account Change (fetch FD details) ─────────────────────────────────
 
   const handleFDAccountChange = async (accountId: number | null) => {
     setSelectedFDAccount(accountId);
+    setOpenFDDetails([]);
+    setSelectedDetailId(null);
     if (!accountId || !selectedProduct) return;
 
     setIsFetchingFD(true);
@@ -578,49 +608,53 @@ const MatureFDPage: React.FC = () => {
 
       if (response.success && response.data) {
         const data = response.data;
-        const maturityAmt = data.fdAccountDetailDTOSingle.maturityAmount || 0;
+        const details: any[] = data.fdAccountDetailDTO || (data.fdAccountDetailDTOSingle ? [data.fdAccountDetailDTOSingle] : []);
+        setOpenFDDetails(details);
+
+        const firstDetail = details[0] || data.fdAccountDetailDTOSingle;
+        if (!firstDetail) throw new Error("No open FD details found for this account");
+
+        setSelectedDetailId(firstDetail.id || 0);
+
+        const maturityAmt = firstDetail.maturityAmount || 0;
         const balance = balanceRes.success && balanceRes.data != null
           ? balanceRes.data
-          : (data.fdAccountDetailDTOSingle.fdAmount || 0);
+          : (firstDetail.fdAmount || 0);
 
         setMatureFDDetail({
-          fdDetailId: data.fdAccountDetailDTOSingle.id || 0,
+          fdDetailId: firstDetail.id || 0,
           fdAccountId: accountId,
           fdAccountNo: data.accountMasterDTO?.accountNumber || "",
           date: sessionDate,
           product: selectedProduct,
           maturityAmt,
           postMaturityAmt: "0.00",
-          fdDate: data.fdAccountDetailDTOSingle.fdDate?.split("T")[0] || "",
-          maturityDate: data.fdAccountDetailDTOSingle.fdMaturityDate?.split("T")[0] || "",
+          fdDate: firstDetail.fdDate?.split("T")[0] || "",
+          maturityDate: firstDetail.fdMaturityDate?.split("T")[0] || "",
           savingAccName: data.savingAccountName || "",
-          intRate: data.fdAccountDetailDTOSingle.intRate || 0,
-          receiptNo: data.fdAccountDetailDTOSingle.ltdNo || "",
-          deductedTDS: data.fdAccountDetailDTOSingle.tdsAmount || 0,
+          intRate: firstDetail.intRate || 0,
+          receiptNo: firstDetail.ltdNo || "",
+          deductedTDS: firstDetail.tdsAmount || 0,
           balance,
           intPayableAmt: Math.round(Math.max(0, maturityAmt - balance)).toString(),
           pendingAmount: Math.max(maturityAmt, balance),
-          // Store member DOB for slab API (matches FDAccountMaster usage)
           memberDateOfBirth: data.accountMasterDTO?.dob?.split("T")[0] || "",
         });
 
-        // Auto-populate renew prefix/suffix from existing account
         const prefix = data.accountMasterDTO?.accPrefix || "";
         const suffix = (data.accountMasterDTO?.accSuffix || "").toString();
         setRenewFDDetail((prev) => ({
           ...prev,
           accountPrefix: prefix,
           accountSuffix: suffix,
-          // Pre-fill renew amount with maturity amount (user can increase, not decrease)
           fdAmount: maturityAmt > 0 ? maturityAmt.toFixed(2) : "",
-          // Pre-fill renew date with old maturity date as minimum
-          fdDate: data.fdAccountDetailDTOSingle.fdMaturityDate?.split("T")[0] || sessionDate,
+          fdDate: firstDetail.fdMaturityDate?.split("T")[0] || sessionDate,
         }));
 
         Swal.fire({
           icon: "success",
           title: "FD Details Loaded",
-          text: `Account: ${data.accountMasterDTO?.accountNumber}`,
+          text: `Account: ${data.accountMasterDTO?.accountNumber}${details.length > 1 ? ` — ${details.length} open certificates` : ""}`,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -656,6 +690,8 @@ const MatureFDPage: React.FC = () => {
     setSelectedProduct(null);
     setSelectedFDAccount(null);
     setFdAccounts([]);
+    setOpenFDDetails([]);
+    setSelectedDetailId(null);
     setIsRenewFD(false);
     setActiveTab("cash");
     setValidationErrors({});
@@ -883,7 +919,7 @@ const MatureFDPage: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <Search className="w-5 h-5 text-blue-500" /> Search FD Account
                 </h3>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
 
                   {/* Date */}
                   <div className="flex flex-col">
@@ -938,6 +974,37 @@ const MatureFDPage: React.FC = () => {
                     menuPortalTarget={document.body}
                     menuPosition="fixed"
                     />
+                  </div>
+
+                  {/* FD Certificate (LTD No) — shown when account has multiple open details */}
+                  <div className="flex flex-col">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" />
+                      FD Certificate / LTD No
+                      {openFDDetails.length > 1 && (
+                        <span className="text-red-500 text-xs">*</span>
+                      )}
+                    </label>
+                    <Select
+                      options={openFDDetails.map((d: any) => ({
+                        value: d.id,
+                        label: `LTD: ${d.ltdNo || d.id} | ₹${(d.fdAmount || 0).toFixed(2)} | Mat: ${d.fdMaturityDate ? new Date(d.fdMaturityDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}`,
+                      }))}
+                      value={openFDDetails.length > 0 && selectedDetailId
+                        ? { value: selectedDetailId, label: (() => { const d = openFDDetails.find((x: any) => x.id === selectedDetailId); return d ? `LTD: ${d.ltdNo || d.id} | ₹${(d.fdAmount || 0).toFixed(2)}` : ""; })() }
+                        : null}
+                      onChange={(option) => handleDetailSelect(option?.value ?? null)}
+                      placeholder={openFDDetails.length === 0 ? "Select FD account first" : "Select certificate"}
+                      isDisabled={openFDDetails.length === 0}
+                      styles={customSelectStyles}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                    />
+                    {openFDDetails.length > 1 && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        {openFDDetails.length} open certificates — select one to mature
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

@@ -102,6 +102,9 @@ const PrePreMatureFDPage: React.FC = () => {
   const [loanAccounts, setLoanAccounts] = useState<AccountOption[]>([]);
   const [loanBalance, setLoanBalance] = useState<LoanRecoveryBalanceDTO | null>(null);
 
+  const [openFDDetails, setOpenFDDetails] = useState<any[]>([]);
+  const [selectedDetailId, setSelectedDetailId] = useState<number | null>(null);
+
   const [preMatureFDDetail, setPreMatureFDDetail] = useState<PreMatureFDDetail>({
     fdDetailId: 0,
     fdAccountId: 0,
@@ -268,6 +271,8 @@ const PrePreMatureFDPage: React.FC = () => {
     setSelectedProduct(productId);
     setSelectedFDAccount(null);
     setFdAccounts([]);
+    setOpenFDDetails([]);
+    setSelectedDetailId(null);
     setPreMatureFDDetail({
       fdDetailId: 0, fdAccountId: 0, fdAccountNo: "",
       date: sessionDate, product: 0,
@@ -279,6 +284,24 @@ const PrePreMatureFDPage: React.FC = () => {
     if (productId && productId > 0) await fetchFDAccounts(productId);
   };
 
+  const handleDetailSelect = (detailId: number | null) => {
+    setSelectedDetailId(detailId);
+    if (!detailId) return;
+    const detail = openFDDetails.find((d: any) => d.id === detailId);
+    if (!detail) return;
+    const preMaturityAmt = Math.round(detail.preMaturityAmount || 0);
+    setPreMatureFDDetail((prev) => ({
+      ...prev,
+      fdDetailId: detail.id,
+      preMaturityAmt,
+      fdDate: detail.fdDate?.split("T")[0] || "",
+      maturityDate: detail.fdMaturityDate?.split("T")[0] || "",
+      intRate: detail.intRate || 0,
+      receiptNo: detail.ltdNo || "",
+      intPayableAmt: Math.round(Math.max(0, preMaturityAmt - prev.balance)).toString(),
+    }));
+  };
+
   const handleLoanProductChange = async (productId: number | null) => {
     setSelectedLoanProductId(productId);
     setLoanAccounts([]);
@@ -288,7 +311,7 @@ const PrePreMatureFDPage: React.FC = () => {
     try {
       const res = await commonservice.fetch_loan_accounts_by_product(user.branchid, productId, preMatureFDDetail.date);
       if (res.success && Array.isArray(res.data)) {
-        setLoanAccounts(res.data.map((a: any) => ({ value: a.accountId ?? a.AccountId, label: `${a.accountNumber ?? a.AccountNumber} - ${a.accountName ?? a.AccountName}` })));
+        setLoanAccounts(res.data.map((a: any) => ({ value: a.accId ?? a.AccId ?? a.accountId ?? a.AccountId, label: a.accountName ?? a.AccountName ?? "" })));
       }
     } catch { /* silently ignore */ }
   };
@@ -312,6 +335,8 @@ const PrePreMatureFDPage: React.FC = () => {
       receiptNo: "", deductedTDS: 0, balance: 0,
       intPayableAmt: "0.00", pendingAmount: 0,
     });
+    setOpenFDDetails([]);
+    setSelectedDetailId(null);
     setSelectedFDAccount(accountId);
     if (!accountId || !selectedProduct) return;
     setIsFetchingFD(true);
@@ -322,32 +347,39 @@ const PrePreMatureFDPage: React.FC = () => {
       ]);
       if (response.success && response.data) {
         const data = response.data;
-        const preMaturityAmt = Math.round(data.preMaturityAmount || 0);
+        const details: any[] = data.fdAccountDetailDTO || (data.fdAccountDetailDTOSingle ? [data.fdAccountDetailDTOSingle] : []);
+        setOpenFDDetails(details);
+
+        const firstDetail = details[0] || data.fdAccountDetailDTOSingle;
+        if (!firstDetail) throw new Error("No open FD details found for this account");
+
+        setSelectedDetailId(firstDetail.id || 0);
+
+        const preMaturityAmt = Math.round(firstDetail.preMaturityAmount || 0);
         const balance = balanceRes.success && balanceRes.data != null
           ? balanceRes.data
-          : (data.fdAccountDetailDTOSingle.fdAmount || 0);
-        const pendingAmt = preMaturityAmt;
+          : (firstDetail.fdAmount || 0);
         setPreMatureFDDetail({
-          fdDetailId: data.fdAccountDetailDTOSingle.id || 0,
+          fdDetailId: firstDetail.id || 0,
           fdAccountId: accountId,
           fdAccountNo: data.accountMasterDTO?.accountNumber || "",
           date: sessionDate,
           product: selectedProduct,
           preMaturityAmt,
           postMaturityAmt: (0.0).toString(),
-          fdDate: data.fdAccountDetailDTOSingle.fdDate?.split("T")[0] || "",
-          maturityDate: data.fdAccountDetailDTOSingle.fdMaturityDate?.split("T")[0] || "",
+          fdDate: firstDetail.fdDate?.split("T")[0] || "",
+          maturityDate: firstDetail.fdMaturityDate?.split("T")[0] || "",
           savingAccName: data.savingAccountName || "",
-          intRate: data.fdAccountDetailDTOSingle.intRate || 0,
-          receiptNo: data.fdAccountDetailDTOSingle.ltdNo || "",
-          deductedTDS: data.fdAccountDetailDTOSingle.tdsAmount || 0,
+          intRate: firstDetail.intRate || 0,
+          receiptNo: firstDetail.ltdNo || "",
+          deductedTDS: firstDetail.tdsAmount || 0,
           balance,
           intPayableAmt: Math.round(Math.max(0, preMaturityAmt - balance)).toString(),
-          pendingAmount: pendingAmt,
+          pendingAmount: preMaturityAmt,
         });
         Swal.fire({
           icon: "success", title: "FD Details Loaded",
-          text: `Account: ${data.accountMasterDTO?.accountNumber}`,
+          text: `Account: ${data.accountMasterDTO?.accountNumber}${details.length > 1 ? ` — ${details.length} open certificates` : ""}`,
           timer: 1500, showConfirmButton: false,
         });
       } else {
@@ -373,6 +405,8 @@ const PrePreMatureFDPage: React.FC = () => {
     setSelectedProduct(null);
     setSelectedFDAccount(null);
     setFdAccounts([]);
+    setOpenFDDetails([]);
+    setSelectedDetailId(null);
     setActiveTab("cash");
     setPreMatureFDDetail({
       fdDetailId: 0, fdAccountId: 0, fdAccountNo: "",
@@ -528,7 +562,7 @@ const PrePreMatureFDPage: React.FC = () => {
                   <Search className="w-5 h-5 text-blue-500" />
                   Search FD Account
                 </h3>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                   {/* Date */}
                   <div className="flex flex-col">
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
@@ -586,6 +620,38 @@ const PrePreMatureFDPage: React.FC = () => {
                       menuPortalTarget={document.body}
                       menuPosition="fixed"
                     />
+                  </div>
+
+                  {/* FD Certificate (LTD No) — shown when account has open details */}
+                  <div className="flex flex-col">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full"></div>
+                      FD Certificate / LTD No
+                      {openFDDetails.length > 1 && (
+                        <span className="text-red-500 text-xs">*</span>
+                      )}
+                    </label>
+                    <Select
+                      options={openFDDetails.map((d: any) => ({
+                        value: d.id,
+                        label: `LTD: ${d.ltdNo || d.id} | ₹${(d.fdAmount || 0).toFixed(2)} | Mat: ${d.fdMaturityDate ? new Date(d.fdMaturityDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}`,
+                      }))}
+                      value={openFDDetails.length > 0 && selectedDetailId
+                        ? { value: selectedDetailId, label: (() => { const d = openFDDetails.find((x: any) => x.id === selectedDetailId); return d ? `LTD: ${d.ltdNo || d.id} | ₹${(d.fdAmount || 0).toFixed(2)}` : ""; })() }
+                        : null}
+                      onChange={(option) => handleDetailSelect(option?.value ?? null)}
+                      placeholder={openFDDetails.length === 0 ? "Select FD account first" : "Select certificate"}
+                      isDisabled={openFDDetails.length === 0}
+                      className="text-sm"
+                      styles={customSelectStyles}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                    />
+                    {openFDDetails.length > 1 && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        {openFDDetails.length} open certificates — select one to pre-mature
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

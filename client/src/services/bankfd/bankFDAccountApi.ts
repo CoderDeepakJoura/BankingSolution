@@ -25,6 +25,7 @@ export interface CreateBankFDAccountDTO {
   branchId: number;
   accountName: string;
   accPrefix: string;
+  accSuffix?: number;
   openingDate: string;
   isOpeningEntry: boolean;
   details: BankFDDetailItemDTO[];
@@ -62,6 +63,15 @@ class BankFDAccountApiService extends ApiService {
   }
   async remove(branchId: number, accId: number): Promise<ApiResponse<{ message: string }>> {
     return this.makeRequest(`/BankFDAccount/${branchId}/${accId}`, { method: 'DELETE' });
+  }
+  async getLastSuffix(branchId: number): Promise<ApiResponse<{ lastSuffix: number; lastAccNo: string }>> {
+    return this.makeRequest(`/BankFDAccount/last-suffix?branchId=${branchId}`);
+  }
+  async checkSuffix(branchId: number, suffix: number, headId?: number, excludeAccId?: number): Promise<ApiResponse<{ taken: boolean }>> {
+    let url = `/BankFDAccount/check-suffix?branchId=${branchId}&suffix=${suffix}`;
+    if (headId && headId > 0) url += `&headId=${headId}`;
+    if (excludeAccId) url += `&excludeAccId=${excludeAccId}`;
+    return this.makeRequest(url);
   }
 }
 export default new BankFDAccountApiService();

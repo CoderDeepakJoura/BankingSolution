@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.37",
+    date: "2026-08-21",
+    changes: [
+      { type: "new", text: "FD Interest Posting: partial period support — posting before a full compounding interval (e.g. month 2 of a quarterly FD) now calculates interest on actual days elapsed. MIS is unchanged." },
+      { type: "new", text: "Saving Interest Posting: added Voucher Date, Interest From Date (optional), and Interest To Date fields. When From Date is set, the system skips periods already posted and calculates only the remaining unpaid interest." },
+      { type: "fix", text: "Saving Interest Posting: total interest now equals the sum of displayed per-month values (previously the total was the raw unrounded sum, causing a visible mismatch)." },
+      { type: "fix", text: "RD Account Master: changing the compounding interval now recalculates the maturity amount using the correct formula (Monthly→F2, Half-Yearly→F4, Yearly→F5, Quarterly keeps product formula)." },
+    ],
+  },
+  {
     version: "1.0.36",
     date: "2026-08-20",
     changes: [

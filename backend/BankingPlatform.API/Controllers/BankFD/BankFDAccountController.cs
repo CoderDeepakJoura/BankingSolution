@@ -40,6 +40,7 @@ namespace BankingPlatform.API.Controllers.BankFD
         public int BranchId { get; set; }
         public string AccountName { get; set; } = "";
         public string AccPrefix { get; set; } = "BFD";
+        public int? AccSuffix { get; set; }   // null = auto-assign
         public DateTime OpeningDate { get; set; }
         public bool IsOpeningEntry { get; set; }
         public int HeadId { get; set; }
@@ -62,6 +63,30 @@ namespace BankingPlatform.API.Controllers.BankFD
             _context = context;
             _logger = logger;
             _commonFunctions = commonFunctions;
+        }
+
+        // GET /api/BankFDAccount/last-suffix?branchId=X
+        [HttpGet("last-suffix")]
+        public async Task<IActionResult> GetLastSuffix([FromQuery] int branchId)
+        {
+            var last = await _context.accountmaster
+                .Where(x => x.BranchId == branchId && x.AccTypeId == 8)
+                .MaxAsync(x => (int?)x.AccSuffix) ?? 0;
+            return Ok(new { Success = true, data = new { lastSuffix = last, lastAccNo = last > 0 ? $"BFD-{last}" : "None" } });
+        }
+
+        // GET /api/BankFDAccount/check-suffix?branchId=X&suffix=Y&headId=H&excludeAccId=Z
+        [HttpGet("check-suffix")]
+        public async Task<IActionResult> CheckSuffix([FromQuery] int branchId, [FromQuery] int suffix, [FromQuery] int? headId = null, [FromQuery] int? excludeAccId = null)
+        {
+            var query = _context.accountmaster
+                .Where(x => x.BranchId == branchId && x.AccTypeId == 8 && x.AccSuffix == suffix);
+            if (headId.HasValue && headId.Value > 0)
+                query = query.Where(x => x.HeadId == headId.Value);
+            if (excludeAccId.HasValue)
+                query = query.Where(x => x.ID != excludeAccId.Value);
+            var exists = await query.AnyAsync();
+            return Ok(new { Success = true, data = new { taken = exists } });
         }
 
         // GET /api/BankFDAccount/{branchId}
@@ -216,13 +241,27 @@ namespace BankingPlatform.API.Controllers.BankFD
             await using var tx = await _context.Database.BeginTransactionAsync();
             try
             {
-                // Get next suffix for AccTypeId = 8
-                var maxSuffix = await _context.accountmaster
-                    .Where(x => x.BranchId == dto.BranchId && x.AccTypeId == 8)
-                    .MaxAsync(x => (int?)x.AccSuffix) ?? 0;
-                int nextSuffix = maxSuffix + 1;
-
                 var prefix = string.IsNullOrWhiteSpace(dto.AccPrefix) ? "BFD" : dto.AccPrefix.Trim();
+
+                int nextSuffix;
+                if (dto.AccSuffix.HasValue && dto.AccSuffix.Value > 0)
+                {
+                    // Manual suffix — check uniqueness per head
+                    bool taken = await _context.accountmaster
+                        .AnyAsync(x => x.BranchId == dto.BranchId && x.AccTypeId == 8
+                            && x.AccSuffix == dto.AccSuffix.Value
+                            && (dto.HeadId == 0 || x.HeadId == dto.HeadId));
+                    if (taken)
+                        return BadRequest(new ResponseDto { Success = false, Message = $"Account number {prefix}-{dto.AccSuffix.Value} is already in use under this account head. Please choose a different number." });
+                    nextSuffix = dto.AccSuffix.Value;
+                }
+                else
+                {
+                    var maxSuffix = await _context.accountmaster
+                        .Where(x => x.BranchId == dto.BranchId && x.AccTypeId == 8)
+                        .MaxAsync(x => (int?)x.AccSuffix) ?? 0;
+                    nextSuffix = maxSuffix + 1;
+                }
 
                 var newAccount = new AccountMaster
                 {
@@ -277,10 +316,24 @@ namespace BankingPlatform.API.Controllers.BankFD
                     return NotFound(new ResponseDto { Success = false, Message = "Account not found." });
 
                 account.AccountName = dto.AccountName.Trim();
-                account.AccPrefix = string.IsNullOrWhiteSpace(dto.AccPrefix) ? "BFD" : dto.AccPrefix.Trim();
+                var updPrefix = string.IsNullOrWhiteSpace(dto.AccPrefix) ? "BFD" : dto.AccPrefix.Trim();
+                account.AccPrefix = updPrefix;
                 account.AccOpeningDate = DateTime.SpecifyKind(dto.OpeningDate, DateTimeKind.Unspecified);
                 account.HeadId = dto.HeadId;
                 account.HeadCode = dto.HeadId;
+
+                if (dto.AccSuffix.HasValue && dto.AccSuffix.Value > 0 && dto.AccSuffix.Value != account.AccSuffix)
+                {
+                    bool taken = await _context.accountmaster
+                        .AnyAsync(x => x.BranchId == dto.BranchId && x.AccTypeId == 8
+                            && x.AccSuffix == dto.AccSuffix.Value
+                            && x.ID != accId
+                            && (dto.HeadId == 0 || x.HeadId == dto.HeadId));
+                    if (taken)
+                        return BadRequest(new ResponseDto { Success = false, Message = $"Account number {updPrefix}-{dto.AccSuffix.Value} is already in use under this account head. Please choose a different number." });
+                    account.AccSuffix = dto.AccSuffix.Value;
+                    account.AccountNumber = $"{updPrefix}-{dto.AccSuffix.Value}";
+                }
 
                 // Delete existing details (and their opening balance/TDS rows first)
                 await DeleteDetailsForAccount(dto.BranchId, accId);

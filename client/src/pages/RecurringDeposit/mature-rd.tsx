@@ -299,7 +299,7 @@ const MatureRDPage: React.FC = () => {
     try {
       const res = await commonservice.fetch_loan_accounts_by_product(user.branchid, productId, matureRDDetail.date);
       if (res.success && Array.isArray(res.data)) {
-        setLoanAccounts(res.data.map((a: any) => ({ value: a.accountId ?? a.AccountId, label: `${a.accountNumber ?? a.AccountNumber} - ${a.accountName ?? a.AccountName}` })));
+        setLoanAccounts(res.data.map((a: any) => ({ value: a.accId ?? a.AccId ?? a.accountId ?? a.AccountId, label: a.accountName ?? a.AccountName ?? "" })));
       }
     } catch { /* silently ignore */ }
   };
