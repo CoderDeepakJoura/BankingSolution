@@ -760,8 +760,22 @@ namespace BankingPlatform.API.Service.AccountMasters
                     }
                     if (dto.CreditAccountDetails!.LoanAccountId > 0 && dto.CreditAccountDetails!.LoanAmount > 0)
                     {
+                        decimal loanIntAmt = dto.CreditAccountDetails!.LoanIntAmount ?? 0m;
                         VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.LoanAccountId, branchId), (int)dto.CreditAccountDetails!.LoanAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "Loan Recovery", (decimal)dto.CreditAccountDetails!.LoanAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        if (loanIntAmt > 0) voucherCreditInfo.IntCr = loanIntAmt;
                         _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                        await _context.SaveChangesAsync();
+                        if (loanIntAmt > 0)
+                        {
+                            _context.voucherrecintdetail.Add(new BankingPlatform.Infrastructure.Models.voucher.VoucherRecIntDetail
+                            {
+                                BrId = branchId, VAccCrDrId = voucherCreditInfo.Id, VoucherId = voucherInfo.Id,
+                                VoucherNo = voucherInfo.VoucherNo, EntryDate = valueDate, ValueDate = valueDate,
+                                IntCatId = 1, Pamt = (double)((decimal)dto.CreditAccountDetails!.LoanAmount - loanIntAmt),
+                                AccId = (int)dto.CreditAccountDetails!.LoanAccountId,
+                                IntDr = 0, IntCr = (double)loanIntAmt, VoucherMainStatus = dto.Voucher.VoucherStatus,
+                            });
+                        }
                         row++;
                     }
 
@@ -909,8 +923,22 @@ namespace BankingPlatform.API.Service.AccountMasters
                     }
                     if (dto.CreditAccountDetails!.LoanAccountId > 0 && dto.CreditAccountDetails!.LoanAmount > 0)
                     {
+                        decimal loanIntAmt = dto.CreditAccountDetails!.LoanIntAmount ?? 0m;
                         VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.LoanAccountId, branchId), (int)dto.CreditAccountDetails!.LoanAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "Loan Recovery", (decimal)dto.CreditAccountDetails!.LoanAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                        if (loanIntAmt > 0) voucherCreditInfo.IntCr = loanIntAmt;
                         _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                        await _context.SaveChangesAsync();
+                        if (loanIntAmt > 0)
+                        {
+                            _context.voucherrecintdetail.Add(new BankingPlatform.Infrastructure.Models.voucher.VoucherRecIntDetail
+                            {
+                                BrId = branchId, VAccCrDrId = voucherCreditInfo.Id, VoucherId = voucherInfo.Id,
+                                VoucherNo = voucherInfo.VoucherNo, EntryDate = valueDate, ValueDate = valueDate,
+                                IntCatId = 1, Pamt = (double)((decimal)dto.CreditAccountDetails!.LoanAmount - loanIntAmt),
+                                AccId = (int)dto.CreditAccountDetails!.LoanAccountId,
+                                IntDr = 0, IntCr = (double)loanIntAmt, VoucherMainStatus = dto.Voucher.VoucherStatus,
+                            });
+                        }
                         row++;
                     }
                     await _context.SaveChangesAsync();

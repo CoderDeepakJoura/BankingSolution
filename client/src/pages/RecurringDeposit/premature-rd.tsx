@@ -23,8 +23,9 @@ import rdAccountService from "../../services/accountMasters/rdaccount/rdaccounta
 import { RootState } from "../../redux";
 import { SavingAccounts } from "../vouchers/saving/savingdeposit";
 import DatePicker from "../../components/DatePicker";
+import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../services/vouchers/loan/loanRecoveryApi";
 
-type Option = { value: string | number; label: string };
+type Option = { value: number; label: string };
 type RDProduct = { id: number; productName: string };
 type RDAccount = { accId: number; accountNumber: string; accountName: string };
 
@@ -55,8 +56,10 @@ const PrematureRDPage: React.FC = () => {
   const [rdAccounts, setRdAccounts] = useState<RDAccount[]>([]);
   const [generalAccounts, setGeneralAccounts] = useState<SavingAccounts[]>([]);
   const [savingAccounts, setSavingAccounts] = useState<SavingAccounts[]>([]);
-  const [loanOptions, setLoanOptions] = useState<Option[]>([]);
   const [loanProducts, setLoanProducts] = useState<Option[]>([]);
+  const [selectedLoanProductId, setSelectedLoanProductId] = useState<number | null>(null);
+  const [loanOptions, setLoanOptions] = useState<Option[]>([]);
+  const [loanBalance, setLoanBalance] = useState<LoanRecoveryBalanceDTO | null>(null);
 
   const [personal, setPersonal] = useState({
     name: "", relativeName: "", relation: "", gender: "", addressLine: "", station: "", phoneNo: "", aadhaar: "", pan: "",
@@ -67,8 +70,8 @@ const PrematureRDPage: React.FC = () => {
     savingAccName: "", savingBal: 0, DetailId: 0
   });
   const [credit, setCredit] = useState({
-    cashAccountId: 0, cashAmount: "", savingAccountId: 0, savingAmount: "", loanProduct: "", loanAccountId: 0, loanBalance: 0,
-    loanAmount: "", incomeAccountId: 0, incomeAmount: "", expenseAmount: "", closingCharges: "", narration: "",
+    cashAccountId: 0, cashAmount: "", savingAccountId: 0, savingAmount: "", loanAccountId: 0, loanBalance: 0,
+    loanAmount: "", loanIntAmount: "", incomeAccountId: 0, incomeAmount: "", expenseAmount: "", closingCharges: "", narration: "",
   });
 
   const pendingAmount = amount(rd.preMaturityAmt) - amount(credit.cashAmount) - amount(credit.savingAmount) - amount(credit.loanAmount);
@@ -83,16 +86,18 @@ const PrematureRDPage: React.FC = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [products, generals, savings] = await Promise.all([
+      const [products, generals, savings, loanProductsRes] = await Promise.all([
         commonservice.fetch_rd_products(user.branchid, sessionDate),
         commonservice.general_accmasters_info(user.branchid),
         commonservice.fetch_Saving_Accounts(user.branchid, sessionDate),
+        commonservice.fetch_loan_products(user.branchid, sessionDate),
       ]);
       setRdProducts(Array.isArray(products.data) ? products.data : []);
       if (generals.success) setGeneralAccounts(generals.data || []);
       if (savings.success) setSavingAccounts(savings.data || []);
-      setLoanOptions([{ value: "1", label: "Loan Account 001" }, { value: "2", label: "Loan Account 002" }]);
-      setLoanProducts([{ value: "LP-001", label: "Personal Loan" }, { value: "LP-002", label: "Home Loan" }]);
+      if (loanProductsRes.success && Array.isArray(loanProductsRes.data)) {
+        setLoanProducts(loanProductsRes.data.map((p: any) => ({ value: p.id ?? p.Id, label: p.productName ?? p.ProductName ?? p.name })));
+      }
     };
     if (user.branchid) load();
   }, [user.branchid, sessionDate]);
@@ -103,7 +108,34 @@ const PrematureRDPage: React.FC = () => {
     setRdAccounts([]);
     setPersonal({ name: "", relativeName: "", relation: "", gender: "", addressLine: "", station: "", phoneNo: "", aadhaar: "", pan: "" });
     setRd({ date: sessionDate, rdAccountId: 0, rdNo: "", rdDate: "", rdAmount: 0, rdPeriod: 0, kistAmount: 0, kistInterval: 0, maturityAmt: 0, maturityDate: "", preMaturityAmt: "0.00", interestRate: 0, balance: 0, savingProduct: "", savingAccNo: "", savingAccName: "", savingBal: 0, DetailId: 0 });
-    setCredit({ cashAccountId: 0, cashAmount: "", savingAccountId: 0, savingAmount: "", loanProduct: "", loanAccountId: 0, loanBalance: 0, loanAmount: "", incomeAccountId: 0, incomeAmount: "", expenseAmount: "", closingCharges: "", narration: "" });
+    setCredit({ cashAccountId: 0, cashAmount: "", savingAccountId: 0, savingAmount: "", loanAccountId: 0, loanBalance: 0, loanAmount: "", loanIntAmount: "", incomeAccountId: 0, incomeAmount: "", expenseAmount: "", closingCharges: "", narration: "" });
+    setSelectedLoanProductId(null);
+    setLoanOptions([]);
+    setLoanBalance(null);
+  };
+
+  const handleLoanProductChange = async (productId: number | null) => {
+    setSelectedLoanProductId(productId);
+    setLoanOptions([]);
+    setLoanBalance(null);
+    setCredit((c) => ({ ...c, loanAccountId: 0, loanAmount: "", loanIntAmount: "" }));
+    if (!productId) return;
+    try {
+      const res = await commonservice.fetch_loan_accounts_by_product(user.branchid, productId, rd.date);
+      if (res.success && Array.isArray(res.data)) {
+        setLoanOptions(res.data.map((a: any) => ({ value: a.accountId ?? a.AccountId, label: `${a.accountNumber ?? a.AccountNumber} - ${a.accountName ?? a.AccountName}` })));
+      }
+    } catch { /* silently ignore */ }
+  };
+
+  const handleLoanAccountChange = async (accountId: number | null) => {
+    setCredit((c) => ({ ...c, loanAccountId: accountId || 0, loanAmount: "", loanIntAmount: "" }));
+    setLoanBalance(null);
+    if (!accountId) return;
+    try {
+      const res = await loanRecoveryApi.getBalance(accountId, user.branchid);
+      if (res.success && res.data) setLoanBalance(res.data);
+    } catch { /* silently ignore */ }
   };
 
   const onProductChange = async (productId: number | null) => {
@@ -164,6 +196,7 @@ const PrematureRDPage: React.FC = () => {
         savingAccountId: credit.savingAccountId,
         loanAmount: amount(credit.loanAmount),
         loanAccountId: credit.loanAccountId,
+        loanIntAmount: amount(credit.loanIntAmount) || undefined,
         intPostingAmt: amount(credit.incomeAmount),
         closingCharges: amount(credit.closingCharges),
         tdsAmount: amount(credit.expenseAmount),
@@ -385,46 +418,80 @@ const PrematureRDPage: React.FC = () => {
                 )}
 
                 {activeTab === "loan" && (
-                  <div className="bg-gradient-to-br from-rose-50 to-red-50 rounded-xl p-6 border border-rose-200">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="flex flex-col">
-                        <label className="text-sm font-semibold text-gray-700 mb-2">Loan Account</label>
-                        <Select
-                          options={loanOptions}
-                          value={loanOptions.find((x) => x.value === credit.loanAccountId) || null}
-                          onChange={(o) => setCredit({ ...credit, loanAccountId: Number(o?.value) || 0 })}
-                          placeholder="Select Loan Account"
-                          isClearable
-                          styles={selectStyles}
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="text-sm font-semibold text-gray-700 mb-2">Amount</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={credit.loanAmount}
-                          onChange={(e) => setCredit({ ...credit, loanAmount: numberInput(e.target.value) })}
-                          className="px-4 py-3 border-2 border-rose-200 rounded-lg focus:border-rose-500 outline-none font-mono text-lg bg-white"
-                          placeholder="0.00"
-                        />
-                      </div>
+                  <div className="bg-gradient-to-br from-rose-50 to-red-50 rounded-xl p-6 border border-rose-200 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="flex flex-col">
                         <label className="text-sm font-semibold text-gray-700 mb-2">Loan Product</label>
                         <Select
                           options={loanProducts}
-                          value={loanProducts.find((x) => x.value === credit.loanProduct) || null}
-                          onChange={(o) => setCredit({ ...credit, loanProduct: o?.value?.toString() || "" })}
-                          placeholder="Select product"
+                          value={loanProducts.find((o) => o.value === selectedLoanProductId) || null}
+                          onChange={(o) => handleLoanProductChange(o?.value ?? null)}
+                          placeholder="Select loan product"
                           isClearable
                           styles={selectStyles}
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
+                          menuPortalTarget={document.body}
+                          menuPosition="fixed"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm font-semibold text-gray-700 mb-2">Loan Account</label>
+                        <Select
+                          options={loanOptions}
+                          value={loanOptions.find((o) => o.value === credit.loanAccountId) || null}
+                          onChange={(o) => handleLoanAccountChange(o?.value ?? null)}
+                          placeholder={selectedLoanProductId ? "Select loan account" : "Select product first"}
+                          isClearable
+                          isDisabled={!selectedLoanProductId}
+                          styles={selectStyles}
+                          menuPortalTarget={document.body}
+                          menuPosition="fixed"
                         />
                       </div>
                     </div>
+                    {loanBalance && (
+                      <>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          <div className="bg-white rounded-lg px-4 py-3 border border-rose-200">
+                            <div className="text-xs text-gray-500">Total Outstanding</div>
+                            <div className="font-semibold text-rose-700">₹{loanBalance.totalOutstanding.toLocaleString("en-IN")}</div>
+                          </div>
+                          <div className="bg-white rounded-lg px-4 py-3 border border-rose-200">
+                            <div className="text-xs text-gray-500">Principal Balance</div>
+                            <div className="font-semibold text-blue-700">₹{loanBalance.principalBalance.toLocaleString("en-IN")}</div>
+                          </div>
+                          {loanBalance.actOnIntPosting !== 1 && (
+                            <div className="bg-white rounded-lg px-4 py-3 border border-rose-200">
+                              <div className="text-xs text-gray-500">Interest Outstanding</div>
+                              <div className="font-semibold text-orange-700">₹{(loanBalance.stdInterestOutstanding + loanBalance.penalInterestOutstanding + loanBalance.stdRecoverableOutstanding + loanBalance.overdueRecoverableOutstanding).toLocaleString("en-IN")}</div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {loanBalance.actOnIntPosting !== 1 && (
+                            <div className="flex flex-col">
+                              <label className="text-sm font-semibold text-gray-700 mb-2">Interest Amount</label>
+                              <input
+                                type="text"
+                                value={credit.loanIntAmount}
+                                onChange={(e) => setCredit({ ...credit, loanIntAmount: numberInput(e.target.value) })}
+                                className="px-4 py-3 border-2 border-rose-200 rounded-lg focus:border-rose-500 outline-none font-mono text-lg bg-white"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          )}
+                          <div className="flex flex-col">
+                            <label className="text-sm font-semibold text-gray-700 mb-2">Amount (Recovery Total)</label>
+                            <input
+                              type="text"
+                              value={credit.loanAmount}
+                              onChange={(e) => setCredit({ ...credit, loanAmount: numberInput(e.target.value) })}
+                              className="px-4 py-3 border-2 border-rose-200 rounded-lg focus:border-rose-500 outline-none font-mono text-lg bg-white"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 

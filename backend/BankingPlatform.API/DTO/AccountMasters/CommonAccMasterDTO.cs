@@ -62,6 +62,7 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public decimal? GeneralAmount { get; set; }
         public decimal? SavingAmount { get; set; }
         public decimal? LoanAmount { get; set; }
+        public decimal? LoanIntAmount { get; set; }
         public decimal? CashAmount { get; set; }
 
     }

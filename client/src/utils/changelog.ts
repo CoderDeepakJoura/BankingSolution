@@ -15,6 +15,15 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.36",
+    date: "2026-08-20",
+    changes: [
+      { type: "fix", text: "FD Mature, FD Renew, FD Pre-Mature, RD Mature, RD Pre-Mature: replaced dummy loan data with real Loan Product → Loan Account selection. Balance card shows Outstanding and Principal; Stand loans show an Interest Amount field; Add-in-Balance loans show only the total Amount." },
+      { type: "improvement", text: "Loan recovery from FD/RD maturity now writes voucherrecintdetail entries for Stand loan interest, and sets IntCr on the voucher credit entry — consistent with regular loan recovery." },
+      { type: "fix", text: "Removed stray debug alert(JSON.stringify(...)) from RD Mature screen." },
+    ],
+  },
+  {
     version: "1.0.35",
     date: "2026-08-20",
     changes: [

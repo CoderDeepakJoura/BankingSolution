@@ -24,6 +24,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import { SavingAccounts } from "../../vouchers/saving/savingdeposit";
 import DatePicker from "../../../components/DatePicker";
+import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../../services/vouchers/loan/loanRecoveryApi";
 
 interface FDProduct {
   id: number;
@@ -62,7 +63,7 @@ interface AccountCreditDetail {
   savingAmount: string;
   loanAccountId: number;
   loanAmount: string;
-  loanProduct: string;
+  loanIntAmount: string;
   intPostingAmt: number;
   closingCharges: number;
   tdsAmount: number;
@@ -72,7 +73,7 @@ interface AccountCreditDetail {
 }
 
 interface AccountOption {
-  value: string;
+  value: number;
   label: string;
 }
 
@@ -96,8 +97,10 @@ const PrePreMatureFDPage: React.FC = () => {
 
   const [generalAccounts, setGeneralAccounts] = useState<SavingAccounts[]>([]);
   const [savingAccounts, setSavingAccounts] = useState<SavingAccounts[]>([]);
-  const [loanAccounts, setLoanAccounts] = useState<AccountOption[]>([]);
   const [loanProducts, setLoanProducts] = useState<AccountOption[]>([]);
+  const [selectedLoanProductId, setSelectedLoanProductId] = useState<number | null>(null);
+  const [loanAccounts, setLoanAccounts] = useState<AccountOption[]>([]);
+  const [loanBalance, setLoanBalance] = useState<LoanRecoveryBalanceDTO | null>(null);
 
   const [preMatureFDDetail, setPreMatureFDDetail] = useState<PreMatureFDDetail>({
     fdDetailId: 0,
@@ -125,7 +128,7 @@ const PrePreMatureFDPage: React.FC = () => {
     savingAmount: "0.00",
     loanAccountId: 0,
     loanAmount: "0.00",
-    loanProduct: "",
+    loanIntAmount: "0.00",
     intPostingAmt: 0,
     closingCharges: 0,
     tdsAmount: 0,
@@ -227,25 +230,16 @@ const PrePreMatureFDPage: React.FC = () => {
   useEffect(() => {
     const fetchAccountDropdowns = async () => {
       try {
-        const generalAccInfo = await commonservice.general_accmasters_info(user.branchid);
+        const [generalAccInfo, savingAccountsRes, loanProductsRes] = await Promise.all([
+          commonservice.general_accmasters_info(user.branchid),
+          commonservice.fetch_Saving_Accounts(user.branchid, preMatureFDDetail.date),
+          commonservice.fetch_loan_products(user.branchid, preMatureFDDetail.date),
+        ]);
         if (generalAccInfo.success) setGeneralAccounts(generalAccInfo.data);
-
-        const savingAccountsRes = await commonservice.fetch_Saving_Accounts(
-          user.branchid,
-          preMatureFDDetail.date,
-        );
         if (savingAccountsRes.success) setSavingAccounts(savingAccountsRes.data);
-
-        setLoanAccounts([
-          { value: "1", label: "Loan Account 001" },
-          { value: "2", label: "Loan Account 002" },
-          { value: "3", label: "Loan Account 003" },
-        ]);
-        setLoanProducts([
-          { value: "LP-001", label: "Personal Loan" },
-          { value: "LP-002", label: "Home Loan" },
-          { value: "LP-003", label: "Vehicle Loan" },
-        ]);
+        if (loanProductsRes.success && Array.isArray(loanProductsRes.data)) {
+          setLoanProducts(loanProductsRes.data.map((p: any) => ({ value: p.id ?? p.Id, label: p.productName ?? p.ProductName ?? p.name })));
+        }
       } catch (error) {
         console.error("Error loading account dropdowns:", error);
       }
@@ -285,6 +279,30 @@ const PrePreMatureFDPage: React.FC = () => {
     if (productId && productId > 0) await fetchFDAccounts(productId);
   };
 
+  const handleLoanProductChange = async (productId: number | null) => {
+    setSelectedLoanProductId(productId);
+    setLoanAccounts([]);
+    setLoanBalance(null);
+    setAccountCredit((c) => ({ ...c, loanAccountId: 0, loanAmount: "0.00", loanIntAmount: "0.00" }));
+    if (!productId) return;
+    try {
+      const res = await commonservice.fetch_loan_accounts_by_product(user.branchid, productId, preMatureFDDetail.date);
+      if (res.success && Array.isArray(res.data)) {
+        setLoanAccounts(res.data.map((a: any) => ({ value: a.accountId ?? a.AccountId, label: `${a.accountNumber ?? a.AccountNumber} - ${a.accountName ?? a.AccountName}` })));
+      }
+    } catch { /* silently ignore */ }
+  };
+
+  const handleLoanAccountChange = async (accountId: number | null) => {
+    setAccountCredit((c) => ({ ...c, loanAccountId: accountId || 0, loanAmount: "0.00", loanIntAmount: "0.00" }));
+    setLoanBalance(null);
+    if (!accountId) return;
+    try {
+      const res = await loanRecoveryApi.getBalance(accountId, user.branchid);
+      if (res.success && res.data) setLoanBalance(res.data);
+    } catch { /* silently ignore */ }
+  };
+
   const handleFDAccountChange = async (accountId: number | null) => {
     setPreMatureFDDetail({
       fdDetailId: 0, fdAccountId: 0, fdAccountNo: "",
@@ -298,11 +316,16 @@ const PrePreMatureFDPage: React.FC = () => {
     if (!accountId || !selectedProduct) return;
     setIsFetchingFD(true);
     try {
-      const response = await fdAccountService.getFDAccountById(accountId, user.branchid, preMatureFDDetail.date);
+      const [response, balanceRes] = await Promise.all([
+        fdAccountService.getFDAccountById(accountId, user.branchid, preMatureFDDetail.date),
+        commonservice.get_account_balance(user.branchid, accountId),
+      ]);
       if (response.success && response.data) {
         const data = response.data;
-        const preMaturityAmt = data.preMaturityAmount || 0;
-        const balance = data.fdAccountDetailDTOSingle.fdAmount || 0;
+        const preMaturityAmt = Math.round(data.preMaturityAmount || 0);
+        const balance = balanceRes.success && balanceRes.data != null
+          ? balanceRes.data
+          : (data.fdAccountDetailDTOSingle.fdAmount || 0);
         const pendingAmt = preMaturityAmt;
         setPreMatureFDDetail({
           fdDetailId: data.fdAccountDetailDTOSingle.id || 0,
@@ -362,10 +385,13 @@ const PrePreMatureFDPage: React.FC = () => {
     setAccountCredit({
       generalAccountId: 0, generalAmount: "0.00",
       savingAccountId: 0, savingAmount: "0.00",
-      loanAccountId: 0, loanAmount: "0.00", loanProduct: "",
+      loanAccountId: 0, loanAmount: "0.00", loanIntAmount: "0.00",
       intPostingAmt: 0, closingCharges: 0, tdsAmount: 0,
       loanAccBalance: 0, cashAccBalance: 0, narration: "",
     });
+    setSelectedLoanProductId(null);
+    setLoanAccounts([]);
+    setLoanBalance(null);
   };
 
   const handleSubmit = async () => {
@@ -423,7 +449,7 @@ const PrePreMatureFDPage: React.FC = () => {
         savingAmount: Number(accountCredit.savingAmount),
         loanAccountId: accountCredit.loanAccountId,
         loanAmount: Number(accountCredit.loanAmount),
-        loanProduct: accountCredit.loanProduct,
+        loanIntAmount: Number(accountCredit.loanIntAmount) || undefined,
         intPostingAmt: accountCredit.intPostingAmt,
         closingCharges: accountCredit.closingCharges,
         tdsAmount: accountCredit.tdsAmount
@@ -705,7 +731,7 @@ const PrePreMatureFDPage: React.FC = () => {
                       </label>
                       <div className={`bg-white px-4 py-3 rounded-lg border-l-4 shadow-sm ${pendingAmount > 0 ? "border-red-500" : pendingAmount < 0 ? "border-orange-500" : "border-green-500"}`}>
                         <span className={`text-lg font-bold font-mono ${pendingAmount > 0 ? "text-red-600" : pendingAmount < 0 ? "text-orange-600" : "text-green-600"}`}>
-                          {pendingAmount < 0 ? "-" : ""}₹ {Math.abs(pendingAmount).toFixed(2)}
+                          {pendingAmount < 0 ? "-" : ""}₹ {Math.round(Math.abs(pendingAmount)).toLocaleString("en-IN")}
                         </span>
                       </div>
                     </div>
@@ -718,12 +744,12 @@ const PrePreMatureFDPage: React.FC = () => {
                       <div>
                         {pendingAmount > 0 ? (
                           <>
-                            <p className="text-sm font-semibold text-amber-800">Pending Amount: ₹{pendingAmount.toFixed(2)}</p>
+                            <p className="text-sm font-semibold text-amber-800">Pending Amount: ₹{Math.round(pendingAmount).toLocaleString("en-IN")}</p>
                             <p className="text-xs text-amber-600 mt-1">Please credit the remaining amount to complete the transaction</p>
                           </>
                         ) : (
                           <>
-                            <p className="text-sm font-semibold text-orange-800">Credit Amount Exceeds: ₹{Math.abs(pendingAmount).toFixed(2)}</p>
+                            <p className="text-sm font-semibold text-orange-800">Credit Amount Exceeds: ₹{Math.round(Math.abs(pendingAmount)).toLocaleString("en-IN")}</p>
                             <p className="text-xs text-orange-600 mt-1">The credited amount exceeds the required amount</p>
                           </>
                         )}
@@ -848,54 +874,80 @@ const PrePreMatureFDPage: React.FC = () => {
 
                     {/* Loan Tab */}
                     {activeTab === "loan" && (
-                      <div className="bg-gradient-to-br from-rose-50 to-red-50 rounded-xl p-6 border border-rose-200">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-gradient-to-br from-rose-50 to-red-50 rounded-xl p-6 border border-rose-200 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="flex flex-col">
-                            <label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                              <div className="w-2 h-2 bg-gradient-to-r from-rose-500 to-red-500 rounded-full"></div>
-                              Account
-                            </label>
-                            <Select
-                              options={loanAccounts}
-                              value={loanAccounts.find((opt) => opt.value === accountCredit.loanAccountId) || null}
-                              onChange={(option) => setAccountCredit({ ...accountCredit, loanAccountId: option?.value || 0 })}
-                              placeholder="Select Loan Account"
-                              isClearable
-                              styles={customSelectStyles}
-                            />
-                          </div>
-                          <div className="flex flex-col">
-                            <label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                              <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"></div>
-                              Amount
-                            </label>
-                            <input
-                              type="text"
-                              value={accountCredit.loanAmount}
-                              onChange={(e) => {
-                                const validated = validateNumberInput(e.target.value, 10);
-                                setAccountCredit({ ...accountCredit, loanAmount: validated || "" });
-                              }}
-                              maxLength={10}
-                              className="px-4 py-3 border-2 border-rose-200 rounded-lg focus:border-rose-500 focus:ring-2 focus:ring-rose-100 outline-none transition-all duration-300 text-gray-700 bg-white font-mono text-lg"
-                              placeholder="0.00"
-                            />
-                          </div>
-                          <div className="flex flex-col">
-                            <label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                              <div className="w-2 h-2 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full"></div>
-                              Product
-                            </label>
+                            <label className="text-sm font-semibold text-gray-700 mb-2">Loan Product</label>
                             <Select
                               options={loanProducts}
-                              value={loanProducts.find((opt) => opt.value === accountCredit.loanProduct) || null}
-                              onChange={(option) => setAccountCredit({ ...accountCredit, loanProduct: option?.value || "" })}
+                              value={loanProducts.find((o) => o.value === selectedLoanProductId) || null}
+                              onChange={(option) => handleLoanProductChange(option?.value ?? null)}
                               placeholder="Select loan product"
                               isClearable
                               styles={customSelectStyles}
+                              menuPortalTarget={document.body}
+                              menuPosition="fixed"
+                            />
+                          </div>
+                          <div className="flex flex-col">
+                            <label className="text-sm font-semibold text-gray-700 mb-2">Loan Account</label>
+                            <Select
+                              options={loanAccounts}
+                              value={loanAccounts.find((o) => o.value === accountCredit.loanAccountId) || null}
+                              onChange={(option) => handleLoanAccountChange(option?.value ?? null)}
+                              placeholder={selectedLoanProductId ? "Select loan account" : "Select product first"}
+                              isClearable
+                              isDisabled={!selectedLoanProductId}
+                              styles={customSelectStyles}
+                              menuPortalTarget={document.body}
+                              menuPosition="fixed"
                             />
                           </div>
                         </div>
+                        {loanBalance && (
+                          <>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              <div className="bg-white rounded-lg px-4 py-3 border border-rose-200">
+                                <div className="text-xs text-gray-500">Total Outstanding</div>
+                                <div className="font-semibold text-rose-700">₹{loanBalance.totalOutstanding.toLocaleString("en-IN")}</div>
+                              </div>
+                              <div className="bg-white rounded-lg px-4 py-3 border border-rose-200">
+                                <div className="text-xs text-gray-500">Principal Balance</div>
+                                <div className="font-semibold text-blue-700">₹{loanBalance.principalBalance.toLocaleString("en-IN")}</div>
+                              </div>
+                              {loanBalance.actOnIntPosting !== 1 && (
+                                <div className="bg-white rounded-lg px-4 py-3 border border-rose-200">
+                                  <div className="text-xs text-gray-500">Interest Outstanding</div>
+                                  <div className="font-semibold text-orange-700">₹{(loanBalance.stdInterestOutstanding + loanBalance.penalInterestOutstanding + loanBalance.stdRecoverableOutstanding + loanBalance.overdueRecoverableOutstanding).toLocaleString("en-IN")}</div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {loanBalance.actOnIntPosting !== 1 && (
+                                <div className="flex flex-col">
+                                  <label className="text-sm font-semibold text-gray-700 mb-2">Interest Amount</label>
+                                  <input
+                                    type="text"
+                                    value={accountCredit.loanIntAmount}
+                                    onChange={(e) => setAccountCredit({ ...accountCredit, loanIntAmount: validateNumberInput(e.target.value, 10) || "" })}
+                                    className="px-4 py-3 border-2 border-rose-200 rounded-lg focus:border-rose-500 outline-none font-mono text-lg bg-white"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex flex-col">
+                                <label className="text-sm font-semibold text-gray-700 mb-2">Amount (Recovery Total)</label>
+                                <input
+                                  type="text"
+                                  value={accountCredit.loanAmount}
+                                  onChange={(e) => setAccountCredit({ ...accountCredit, loanAmount: validateNumberInput(e.target.value, 10) || "" })}
+                                  className="px-4 py-3 border-2 border-rose-200 rounded-lg focus:border-rose-500 outline-none font-mono text-lg bg-white"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
 
