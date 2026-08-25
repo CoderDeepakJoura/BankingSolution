@@ -15,12 +15,20 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.39",
+    date: "2026-08-26",
+    changes: [
+      { type: "improvement", text: "FD partial period interest posting; Saving interest from/to date with smart gap detection; RD compounding interval now drives maturity formula" },
+    ],
+  },
+  {
     version: "1.0.38",
     date: "2026-08-26",
     changes: [
       { type: "fix", text: "Bank FD Maturity / Premature / Renewal: Interest Earned is now editable — operators can override the calculated interest before confirming. TDS and net payout recalculate automatically." },
       { type: "fix", text: "Bank FD Maturity / Premature / Renewal: deleting the voucher now reverts the FD detail back to Open status so it reappears in the Maturity, Premature, and Renewal screens." },
       { type: "fix", text: "Head Wise Day Book: Bank FD accounts now show the correct account head name (e.g. 'FDR - HP Cooperative Bank') instead of 'Unknown'. Root cause was HeadCode being stored as the integer HeadId instead of the actual BIGINT headcode." },
+      { type: "new", text: "Salary / Payroll module introduced: Employee Designation master, Employee Master, Salary Component master, Employee Attendance tracking, and Monthly Salary Creation with component-wise breakdown." },
     ],
   },
   {
