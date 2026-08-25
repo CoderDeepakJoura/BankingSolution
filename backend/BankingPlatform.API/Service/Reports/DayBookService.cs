@@ -283,7 +283,8 @@ namespace BankingPlatform.API.Service.Reports
             4 => "Share Capital",
             5 => "Recurring Deposit",
             6 => "Fixed Deposit",
-            7 => "Bank FD",
+            7 => "Fixed Deposit",
+            8 => "Bank FD",
             _ => "Other"
         };
     }

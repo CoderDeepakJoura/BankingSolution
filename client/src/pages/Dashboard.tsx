@@ -3,7 +3,7 @@ import {
   Building2, MapPin, User2, Phone, Mail, Hash,
   Calendar, ArrowRight, GitMerge, Download,
   FileText, CreditCard, BookOpen, BarChart2,
-  ShieldCheck, Clock, Star, Plus, X, Search,
+  ShieldCheck, Clock, Star, Plus, X, Search, Wallet,
 } from 'lucide-react';
 import DashboardLayout from '../Common/Layout';
 import { useSelector } from 'react-redux';
@@ -275,6 +275,13 @@ const Dashboard: React.FC = () => {
       to: '/day-book',
       gradient: 'bg-gradient-to-br from-cyan-500 to-sky-600',
     },
+    {
+      icon: <Wallet className="w-5 h-5 text-white" />,
+      label: 'Salary Creation',
+      desc: 'Process monthly employee salary',
+      to: '/salary-creation',
+      gradient: 'bg-gradient-to-br from-orange-500 to-amber-500',
+    },
   ];
 
   if (isLoading) {
@@ -409,7 +416,7 @@ const Dashboard: React.FC = () => {
           {/* Quick access */}
           <div>
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Quick Access</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
               {quickActions.map(a => (
                 <QuickCard key={a.to} {...a} />
               ))}

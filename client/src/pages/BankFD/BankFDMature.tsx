@@ -45,6 +45,9 @@ const BankFDMaturePage: React.FC = () => {
   const [intIncomeAccId, setIntIncomeAccId] = useState<number | null>(null);
   const [narration, setNarration] = useState("");
 
+  // Interest override — null means use DB-derived value
+  const [overrideInterest, setOverrideInterest] = useState<number | null>(null);
+
   // Renew
   const [isRenew, setIsRenew] = useState(false);
   const [renewMonths, setRenewMonths] = useState("");
@@ -94,13 +97,14 @@ const BankFDMaturePage: React.FC = () => {
 
   const handleDetailSelect = (detail: BFDDetailItem) => {
     setSelectedDetail(detail);
+    setOverrideInterest(null);
     resetPayoutSection();
     recalcTDS(detail, accountData?.tdsSlabs ?? []);
   };
 
-  const recalcTDS = (detail: BFDDetailItem, slabs: TDSSlab[]) => {
+  const recalcTDS = (detail: BFDDetailItem, slabs: TDSSlab[], interestOverride?: number) => {
     if (!hasTDSSetting || slabs.length === 0) { setTdsRate(0); setTdsAmount(0); return; }
-    const interest = Math.max(0, detail.maturityAmount - detail.fdAmount);
+    const interest = interestOverride ?? Math.max(0, detail.maturityAmount - detail.fdAmount);
     const rate = findTDSRate(interest, slabs, withPan);
     const tds = Math.round((interest * rate) / 100 * 100) / 100;
     setTdsRate(rate);
@@ -123,6 +127,7 @@ const BankFDMaturePage: React.FC = () => {
     setSelectedAccId(null);
     setSelectedDetail(null);
     setAccountData(null);
+    setOverrideInterest(null);
     resetPayoutSection();
   };
 
@@ -132,7 +137,10 @@ const BankFDMaturePage: React.FC = () => {
     const months = parseInt(renewMonths) || 0;
     const days = parseInt(renewDays) || 0;
     if (!months && !days) { setRenewMatAmt(0); return; }
-    const newPrincipal = selectedDetail.maturityAmount - tdsAmount;
+    const baseInt = Math.max(0, selectedDetail.maturityAmount - selectedDetail.fdAmount);
+    const effInt = overrideInterest !== null ? overrideInterest : baseInt;
+    const effMatAmt = selectedDetail.fdAmount + effInt;
+    const newPrincipal = effMatAmt - tdsAmount;
     const newFDDate = workingDate;
     const start = new Date(newFDDate);
     const end = new Date(start);
@@ -141,7 +149,7 @@ const BankFDMaturePage: React.FC = () => {
     const matDate = end.toISOString().split("T")[0];
     const amt = calcBFDMaturityAmount(newPrincipal, selectedDetail.intRate, selectedDetail.intCompInterval, newFDDate, matDate);
     setRenewMatAmt(amt);
-  }, [renewMonths, renewDays, isRenew, selectedDetail, tdsAmount]);
+  }, [renewMonths, renewDays, isRenew, selectedDetail, tdsAmount, overrideInterest]);
 
   const handleSubmit = async () => {
     if (!selectedDetail || !selectedAccId) {
@@ -159,6 +167,9 @@ const BankFDMaturePage: React.FC = () => {
 
     setLoading(true);
     try {
+      const effMatAmt = overrideInterest !== null
+        ? selectedDetail.fdAmount + overrideInterest
+        : undefined;
       const res = await bankFDMatureApi.mature({
         branchId: user.branchid,
         accId: selectedAccId,
@@ -173,6 +184,7 @@ const BankFDMaturePage: React.FC = () => {
         renewMonths: parseInt(renewMonths) || 0,
         renewDays: parseInt(renewDays) || 0,
         renewMaturityAmount: renewMatAmt,
+        overrideMaturityAmount: effMatAmt,
       });
       await Swal.fire({ icon: "success", title: "Success!", text: (res as any).message || "Saved successfully.", timer: 1800, showConfirmButton: false });
       handleReset();
@@ -183,8 +195,10 @@ const BankFDMaturePage: React.FC = () => {
     }
   };
 
-  const interest = selectedDetail ? Math.max(0, selectedDetail.maturityAmount - selectedDetail.fdAmount) : 0;
-  const netPayout = selectedDetail ? selectedDetail.maturityAmount - (hasTDSSetting ? tdsAmount : 0) : 0;
+  const baseInterest = selectedDetail ? Math.max(0, selectedDetail.maturityAmount - selectedDetail.fdAmount) : 0;
+  const interest = overrideInterest !== null ? overrideInterest : baseInterest;
+  const effectiveMaturityAmount = selectedDetail ? selectedDetail.fdAmount + interest : 0;
+  const netPayout = selectedDetail ? effectiveMaturityAmount - (hasTDSSetting ? tdsAmount : 0) : 0;
 
   const accOptions = accounts.map(a => ({ value: a.accId, label: `${a.accNo} — ${a.accountName}` }));
 
@@ -301,8 +315,7 @@ const BankFDMaturePage: React.FC = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                       {[
                         { label: "Principal", value: `₹${fmt(selectedDetail.fdAmount)}`, color: "border-blue-500" },
-                        { label: "Interest Earned", value: `₹${fmt(interest)}`, color: "border-emerald-500" },
-                        { label: "Maturity Amount", value: `₹${Math.round(selectedDetail.maturityAmount).toLocaleString("en-IN")}`, color: "border-purple-500" },
+                        { label: "Maturity Amount", value: `₹${fmt(effectiveMaturityAmount)}`, color: "border-purple-500" },
                         { label: "TDS Deducted", value: hasTDSSetting ? `₹${fmt(tdsAmount)}` : "No TDS Setting", color: "border-orange-500" },
                         { label: "Net Payout", value: `₹${fmt(netPayout)}`, color: "border-green-600" },
                       ].map(({ label, value, color }) => (
@@ -311,6 +324,39 @@ const BankFDMaturePage: React.FC = () => {
                           <p className="text-base font-bold text-gray-800 font-mono">{value}</p>
                         </div>
                       ))}
+                      {/* Editable Interest Earned */}
+                      <div className="bg-white rounded-lg border-l-4 border-emerald-500 px-4 py-3 shadow-sm">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                          Interest Earned
+                          {overrideInterest !== null && (
+                            <span className="ml-1 bg-emerald-100 text-emerald-700 text-xs px-1.5 py-0.5 rounded font-medium">Edited</span>
+                          )}
+                        </p>
+                        <input
+                          type="number"
+                          value={interest}
+                          min={0}
+                          step={0.01}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setOverrideInterest(val);
+                            if (hasTDSSetting && accountData?.tdsSlabs.length) {
+                              const r = findTDSRate(val, accountData.tdsSlabs, withPan);
+                              setTdsRate(r);
+                              setTdsAmount(Math.round(val * r / 100 * 100) / 100);
+                            }
+                          }}
+                          className="w-full text-base font-bold text-gray-800 font-mono bg-transparent border-b-2 border-emerald-300 outline-none focus:border-emerald-600 py-0.5"
+                        />
+                        {overrideInterest !== null && (
+                          <button
+                            onClick={() => { setOverrideInterest(null); recalcTDS(selectedDetail!, accountData?.tdsSlabs ?? []); }}
+                            className="text-xs text-gray-400 hover:text-emerald-600 mt-1 underline"
+                          >
+                            ↩ Reset to {fmt(baseInterest)}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -382,7 +428,7 @@ const BankFDMaturePage: React.FC = () => {
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-1.5">New Principal (after TDS)</label>
                           <div className="px-3 py-2.5 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-700 font-mono text-sm">
-                            ₹{Math.round(Math.max(0, selectedDetail.maturityAmount - (hasTDSSetting ? tdsAmount : 0))).toLocaleString("en-IN")}
+                            ₹{Math.round(Math.max(0, effectiveMaturityAmount - (hasTDSSetting ? tdsAmount : 0))).toLocaleString("en-IN")}
                           </div>
                         </div>
                         {renewMatAmt > 0 && (

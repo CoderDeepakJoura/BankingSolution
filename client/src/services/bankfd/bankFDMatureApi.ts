@@ -56,6 +56,7 @@ export interface BankFDMatureRequestDTO {
   renewMonths: number;
   renewDays: number;
   renewMaturityAmount: number;
+  overrideMaturityAmount?: number;
 }
 
 export interface BankFDPreMatureRequestDTO {

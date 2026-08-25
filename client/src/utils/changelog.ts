@@ -15,6 +15,15 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.38",
+    date: "2026-08-26",
+    changes: [
+      { type: "fix", text: "Bank FD Maturity / Premature / Renewal: Interest Earned is now editable — operators can override the calculated interest before confirming. TDS and net payout recalculate automatically." },
+      { type: "fix", text: "Bank FD Maturity / Premature / Renewal: deleting the voucher now reverts the FD detail back to Open status so it reappears in the Maturity, Premature, and Renewal screens." },
+      { type: "fix", text: "Head Wise Day Book: Bank FD accounts now show the correct account head name (e.g. 'FDR - HP Cooperative Bank') instead of 'Unknown'. Root cause was HeadCode being stored as the integer HeadId instead of the actual BIGINT headcode." },
+    ],
+  },
+  {
     version: "1.0.37",
     date: "2026-08-21",
     changes: [

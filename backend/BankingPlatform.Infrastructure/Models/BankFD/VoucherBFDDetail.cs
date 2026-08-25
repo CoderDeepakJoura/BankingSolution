@@ -15,6 +15,9 @@ namespace BankingPlatform.Infrastructure.Models.BankFD
         [Column("brid")]
         public int BrId { get; set; }
 
+        [Column("voucherid")]
+        public int VoucherId { get; set; }
+
         [Required]
         [Column("vacccrdrid")]
         public int VAccCrDrId { get; set; }

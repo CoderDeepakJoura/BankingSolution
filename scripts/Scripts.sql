@@ -1809,6 +1809,7 @@ CREATE TABLE IF NOT EXISTS bankfdaccountopeningtds (
 CREATE TABLE IF NOT EXISTS voucherbfddetail (
     id                INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     brid              INT NOT NULL,
+    voucherid         INT NOT NULL DEFAULT 0,
     vacccrdrid        INT NOT NULL DEFAULT 0,
     fdaccid           INT NOT NULL DEFAULT 0,
     fdaccdetid        INT NOT NULL DEFAULT 0,
@@ -1896,6 +1897,128 @@ CREATE TABLE IF NOT EXISTS interbranchvoucher (
 );
 
 -- =============================================================================
+-- SECTION 15 : USER PREFERENCES & SALARY MODULE TABLES
+-- =============================================================================
+
+-- Per-user pinned screen shortcuts (persists across login/logout)
+CREATE TABLE IF NOT EXISTS userfavourites (
+    id          SERIAL PRIMARY KEY,
+    userid      INTEGER NOT NULL,
+    path        VARCHAR(200) NOT NULL,
+    label       VARCHAR(200) NOT NULL,
+    category    VARCHAR(100) NOT NULL DEFAULT '',
+    sortorder   INTEGER NOT NULL DEFAULT 0,
+    createdat   TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_userfavourites_user_path UNIQUE (userid, path)
+);
+
+CREATE TABLE IF NOT EXISTS employeedesignation (
+    id          SERIAL,
+    branchid    INTEGER NOT NULL,
+    alias       VARCHAR(20) NOT NULL,
+    description VARCHAR(150) NOT NULL,
+    empgradeid  INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT pk_employeedesignation PRIMARY KEY (id, branchid)
+);
+
+CREATE TABLE IF NOT EXISTS employeemaster (
+    id              SERIAL,
+    branchid        INTEGER NOT NULL,
+    code            VARCHAR(50) NOT NULL,
+    firstname       VARCHAR(80) NOT NULL,
+    lastname        VARCHAR(80) NULL,
+    designationid   INTEGER NOT NULL DEFAULT 0,
+    emptype         INTEGER NOT NULL DEFAULT 1,
+    genderid        INTEGER NOT NULL DEFAULT 1,
+    dob             TIMESTAMP NOT NULL DEFAULT '1900-01-01 00:00:00',
+    phone           VARCHAR(20) NULL,
+    emailid         VARCHAR(50) NULL,
+    address         VARCHAR(200) NULL,
+    joiningdate     TIMESTAMP NOT NULL,
+    status          INTEGER NOT NULL DEFAULT 1,
+    memberid        INTEGER NOT NULL DEFAULT 0,
+    memberbranchid  INTEGER NOT NULL DEFAULT 0,
+    currentbranchid INTEGER NOT NULL DEFAULT 0,
+    remarks         VARCHAR(200) NULL,
+    CONSTRAINT pk_employeemaster PRIMARY KEY (id, branchid)
+);
+
+CREATE TABLE IF NOT EXISTS salarycomponent (
+    id            SERIAL,
+    branchid      INTEGER NOT NULL,
+    alias         VARCHAR(50) NOT NULL,
+    description   VARCHAR(200) NOT NULL,
+    seqno         INTEGER NOT NULL DEFAULT 0,
+    type          INTEGER NOT NULL DEFAULT 1,
+    iseditable    SMALLINT NOT NULL DEFAULT 1,
+    formulaecode  CHAR(1) NOT NULL DEFAULT 'F',
+    defineamount  SMALLINT NOT NULL DEFAULT 0,
+    isallowance   SMALLINT NOT NULL DEFAULT 1,
+    isdeduction   SMALLINT NOT NULL DEFAULT 0,
+    accid         INTEGER NULL,
+    CONSTRAINT pk_salarycomponent PRIMARY KEY (id, branchid)
+);
+
+CREATE TABLE IF NOT EXISTS salarycompempwise (
+    id        SERIAL,
+    branchid  INTEGER NOT NULL,
+    date      TIMESTAMP NOT NULL,
+    empid     INTEGER NOT NULL,
+    compid    INTEGER NOT NULL,
+    amount    NUMERIC(18,2) NOT NULL DEFAULT 0,
+    isactive  SMALLINT NOT NULL DEFAULT 1,
+    CONSTRAINT pk_salarycompempwise PRIMARY KEY (id, branchid)
+);
+
+CREATE TABLE IF NOT EXISTS monthlysalary (
+    id           SERIAL,
+    branchid     INTEGER NOT NULL,
+    salarymonth  TIMESTAMP NOT NULL,
+    processdate  TIMESTAMP NOT NULL DEFAULT NOW(),
+    sessionid    INTEGER NOT NULL DEFAULT 0,
+    processedby  INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT pk_monthlysalary PRIMARY KEY (id, branchid)
+);
+
+CREATE TABLE IF NOT EXISTS monthlysalaryempdetail (
+    id               SERIAL,
+    branchid         INTEGER NOT NULL,
+    monthlysalaryid  INTEGER NOT NULL,
+    empid            INTEGER NOT NULL,
+    totalgross       NUMERIC(18,2) NOT NULL DEFAULT 0,
+    totaldeduction   NUMERIC(18,2) NOT NULL DEFAULT 0,
+    netpay           NUMERIC(18,2) NOT NULL DEFAULT 0,
+    CONSTRAINT pk_monthlysalaryempdetail PRIMARY KEY (id, branchid)
+);
+
+CREATE TABLE IF NOT EXISTS monthlysalarycompdetail (
+    id                  SERIAL,
+    branchid            INTEGER NOT NULL,
+    monthlysalaryempid  INTEGER NOT NULL,
+    compid              INTEGER NOT NULL,
+    amount              NUMERIC(18,2) NOT NULL DEFAULT 0,
+    isdeduction         SMALLINT NOT NULL DEFAULT 0,
+    CONSTRAINT pk_monthlysalarycompdetail PRIMARY KEY (id, branchid)
+);
+
+-- Monthly employee attendance: one row per employee per month
+CREATE TABLE IF NOT EXISTS employeeattendance (
+    id       SERIAL,
+    branchid INTEGER NOT NULL,
+    empid    INTEGER NOT NULL,
+    attmonth DATE    NOT NULL,
+    atttype  INTEGER NOT NULL DEFAULT 2, -- 1=Daily, 2=Monthly
+    el       NUMERIC(18,2) NOT NULL DEFAULT 0,
+    cl       NUMERIC(18,2) NOT NULL DEFAULT 0,
+    mlsl     NUMERIC(18,2) NOT NULL DEFAULT 0,
+    lwp      NUMERIC(18,2) NOT NULL DEFAULT 0,
+    remarks  VARCHAR(100),
+    CONSTRAINT pk_employeeattendance PRIMARY KEY (id, branchid)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "IX_employeeattendance_emp_month"
+    ON employeeattendance (branchid, empid, attmonth);
+
+-- =============================================================================
 -- SECTION 13 : INCREMENTAL COLUMN ADDITIONS
 -- =============================================================================
 -- Put every new column you add to an existing table here.
@@ -1941,18 +2064,6 @@ ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS lastseenversion VARCHAR(20) D
 
 -- interbranchvoucher: distinguishes 2-step HO-to-Branch from 3-step Branch-to-Branch flows
 ALTER TABLE interbranchvoucher ADD COLUMN IF NOT EXISTS flowtype VARCHAR(20) NOT NULL DEFAULT 'BranchToBranch';
-
--- userfavourites: per-user pinned screen shortcuts (persists across login/logout)
-CREATE TABLE IF NOT EXISTS userfavourites (
-    id          SERIAL PRIMARY KEY,
-    userid      INTEGER NOT NULL,
-    path        VARCHAR(200) NOT NULL,
-    label       VARCHAR(200) NOT NULL,
-    category    VARCHAR(100) NOT NULL DEFAULT '',
-    sortorder   INTEGER NOT NULL DEFAULT 0,
-    createdat   TIMESTAMP NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_userfavourites_user_path UNIQUE (userid, path)
-);
 
 -- =============================================================================
 -- REFERENTIAL INTEGRITY: add missing FK constraints (idempotent — safe to re-run)
@@ -2096,10 +2207,15 @@ DO $$ BEGIN
 END $$;
 
 
--- Incremental: rename interestpostingsettings → superusersettings and add new feature-flag columns
+-- Incremental: rename interestpostingsettings → superusersettings (idempotent)
+-- If superusersettings already exists (created above in Section 3), just drop the old table.
 DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'interestpostingsettings') THEN
-        ALTER TABLE interestpostingsettings RENAME TO superusersettings;
+        IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'superusersettings') THEN
+            ALTER TABLE interestpostingsettings RENAME TO superusersettings;
+        ELSE
+            DROP TABLE interestpostingsettings;
+        END IF;
     END IF;
 END $$;
 
@@ -2121,6 +2237,7 @@ ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS allowgstdeduction    BOOL
 ALTER TABLE bankfdaccountdetail ADD COLUMN IF NOT EXISTS tdsamount NUMERIC(18,2) NOT NULL DEFAULT 0;
 
 -- voucherbfddetail incremental columns
+ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS voucherid         INT NOT NULL DEFAULT 0;
 ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS vacccrdrid        INT NOT NULL DEFAULT 0;
 ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS fdaccid           INT NOT NULL DEFAULT 0;
 ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS fdaccdetid        INT NOT NULL DEFAULT 0;

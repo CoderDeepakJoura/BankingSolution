@@ -28,6 +28,8 @@ using BankingPlatform.Infrastructure.Models.voucher;
 using BankingPlatform.Infrastructure.Models.GST;
 using BankingPlatform.Infrastructure.Models.Services;
 using BankingPlatform.Infrastructure.Models.BankFD;
+using BankingPlatform.Infrastructure.Models.Salary;
+using BankingPlatform.Infrastructure.Configurations.Salary;
 namespace BankingPlatform.Infrastructure.Models;
 
 public partial class BankingDbContext : DbContext
@@ -160,6 +162,14 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<BankFDAccountDetail> bankfdaccountdetail { get; set; }
     public virtual DbSet<BankFDAccountOpeningBalance> bankfdaccountopeningbalance { get; set; }
     public virtual DbSet<BankFDAccountOpeningTDS> bankfdaccountopeningtds { get; set; }
+    public virtual DbSet<EmployeeDesignation> employeedesignation { get; set; }
+    public virtual DbSet<EmployeeMaster> employeemaster { get; set; }
+    public virtual DbSet<SalaryComponent> salarycomponent { get; set; }
+    public virtual DbSet<SalaryCompEmpWise> salarycompempwise { get; set; }
+    public virtual DbSet<MonthlySalary> monthlysalary { get; set; }
+    public virtual DbSet<MonthlySalaryEmpDetail> monthlysalaryempdetail { get; set; }
+    public virtual DbSet<MonthlySalaryCompDetail> monthlysalarycompdetail { get; set; }
+    public virtual DbSet<EmployeeAttendance> employeeattendance { get; set; }
     public virtual DbSet<VoucherBFDDetail> voucherbfddetail { get; set; }
     public virtual DbSet<OtherBranchAccount> otherbranchaccounts { get; set; }
     public virtual DbSet<InterBranchVoucher> interbranchvoucher { get; set; }

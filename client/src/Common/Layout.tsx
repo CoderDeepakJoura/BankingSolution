@@ -12,6 +12,7 @@ import {
   BarChart2,
   ShieldCheck,
   Receipt,
+  Wallet,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Header from "../components/HeaderLandingPage";
@@ -333,6 +334,58 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       label: "Voucher Operations",
       hasSubItems: false,
       path: "/voucher-operations",
+    },
+    {
+      icon: <Wallet size={18} />,
+      label: "Payroll",
+      hasSubItems: true,
+      subItems: [
+        {
+          label: "Master",
+          path: "",
+          subItems: [
+            { label: "Employee Designation",        path: "/employee-designation-data" },
+            { label: "Employee Master",             path: "/employee-master" },
+            { label: "Employee Grade",              path: "/employee-grade-data" },
+            { label: "Employee Attendance",         path: "/employee-attendance" },
+            { label: "Employee Wise Salary Component", path: "/salary-component-data" },
+            { label: "Employee Transfer",           path: "/employee-transfer" },
+          ],
+        },
+        {
+          label: "Transaction",
+          path: "",
+          subItems: [
+            { label: "Employee Salary Creation",    path: "/salary-creation" },
+            { label: "Salary Voucher",              path: "/salary-voucher" },
+            { label: "Delete Employee Salary Detail", path: "/delete-employee-salary" },
+          ],
+        },
+        {
+          label: "Reports",
+          path: "",
+          subItems: [
+            { label: "Bonus Report",                path: "/salary-bonus-report" },
+            { label: "Arrear Report",               path: "/salary-arrear-report" },
+            { label: "Salary Challan Report",       path: "/salary-challan-report" },
+            { label: "PF Statement Report",         path: "/salary-pf-report" },
+            { label: "ESIC Statement Report",       path: "/salary-esic-report" },
+            { label: "Salary Report",               path: "/salary-report" },
+            { label: "Employee Salary Statement",   path: "/salary-statement-report" },
+            { label: "Loan Recovery Detail Report", path: "/salary-loan-recovery-report" },
+          ],
+        },
+        {
+          label: "Settings",
+          path: "",
+          subItems: [
+            { label: "Payroll Settings",            path: "/payroll-settings" },
+            { label: "Other Branch Account",        path: "/payroll-other-branch-account" },
+            { label: "Salary Component Account",    path: "/salary-component-account" },
+            { label: "Employee Salary Other Setting", path: "/payroll-other-settings" },
+          ],
+        },
+      ],
     },
     {
       icon: <BarChart2 size={18} />,

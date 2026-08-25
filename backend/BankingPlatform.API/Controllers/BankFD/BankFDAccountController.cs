@@ -263,6 +263,11 @@ namespace BankingPlatform.API.Controllers.BankFD
                     nextSuffix = maxSuffix + 1;
                 }
 
+                long actualHeadCode = await _context.accounthead
+                    .Where(x => x.id == dto.HeadId && x.branchid == dto.BranchId)
+                    .Select(x => x.headcode)
+                    .FirstOrDefaultAsync();
+
                 var newAccount = new AccountMaster
                 {
                     BranchId = dto.BranchId,
@@ -276,7 +281,7 @@ namespace BankingPlatform.API.Controllers.BankFD
                     IsAccAddedManually = 0,
                     GeneralProductId = 0,
                     HeadId = dto.HeadId,
-                    HeadCode = dto.HeadId,
+                    HeadCode = actualHeadCode,
                     MemberId = null,
                     MemberBranchID = null
                 };
@@ -320,7 +325,10 @@ namespace BankingPlatform.API.Controllers.BankFD
                 account.AccPrefix = updPrefix;
                 account.AccOpeningDate = DateTime.SpecifyKind(dto.OpeningDate, DateTimeKind.Unspecified);
                 account.HeadId = dto.HeadId;
-                account.HeadCode = dto.HeadId;
+                account.HeadCode = await _context.accounthead
+                    .Where(x => x.id == dto.HeadId && x.branchid == dto.BranchId)
+                    .Select(x => x.headcode)
+                    .FirstOrDefaultAsync();
 
                 if (dto.AccSuffix.HasValue && dto.AccSuffix.Value > 0 && dto.AccSuffix.Value != account.AccSuffix)
                 {

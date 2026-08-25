@@ -28,6 +28,8 @@ namespace BankingPlatform.API.Controllers.BankFD
         public int RenewMonths { get; set; }
         public int RenewDays { get; set; }
         public decimal RenewMaturityAmount { get; set; }
+        // Optional: operator-overridden maturity amount (principal + edited interest)
+        public decimal? OverrideMaturityAmount { get; set; }
     }
 
     public class BankFDPreMatureRequestDTO
@@ -248,7 +250,8 @@ namespace BankingPlatform.API.Controllers.BankFD
                     dto.VoucherDate, dto.PayoutAccId, dto.IntIncomeAccId,
                     dto.TDSAmount, dto.TDSAccId, dto.Narration,
                     dto.IsRenew, dto.RenewMonths, dto.RenewDays, dto.RenewMaturityAmount,
-                    isPremature: false, penaltyRate: 0, effectiveRate: 0, preMatureAmount: 0);
+                    isPremature: false, penaltyRate: 0, effectiveRate: 0, preMatureAmount: 0,
+                    overrideMaturityAmount: dto.OverrideMaturityAmount);
 
                 if (msg != null) return BadRequest(new ResponseDto { Success = false, Message = msg });
 
@@ -301,7 +304,8 @@ namespace BankingPlatform.API.Controllers.BankFD
             decimal tdsAmount, int? tdsAccId,
             string narration,
             bool isRenew, int renewMonths, int renewDays, decimal renewMaturityAmount,
-            bool isPremature, double penaltyRate, double effectiveRate, decimal preMatureAmount)
+            bool isPremature, double penaltyRate, double effectiveRate, decimal preMatureAmount,
+            decimal? overrideMaturityAmount = null)
         {
             var detail = await _context.bankfdaccountdetail
                 .FirstOrDefaultAsync(d => d.ID == detailId && d.BrId == branchId && d.AccId == accId);
@@ -321,7 +325,9 @@ namespace BankingPlatform.API.Controllers.BankFD
             DateTime vDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Unspecified);
 
             decimal principal = detail.FDAmount;
-            decimal closureAmount = isPremature ? preMatureAmount : (isRenew ? renewMaturityAmount : detail.MaturityAmount);
+            decimal closureAmount = isPremature ? preMatureAmount
+                : (isRenew ? renewMaturityAmount
+                : (overrideMaturityAmount ?? detail.MaturityAmount));
             decimal interest = Math.Max(0, closureAmount - principal);
 
             string defaultNarration = isPremature
@@ -423,6 +429,7 @@ namespace BankingPlatform.API.Controllers.BankFD
             await _context.voucherbfddetail.AddAsync(new VoucherBFDDetail
             {
                 BrId = branchId,
+                VoucherId = voucher.Id,
                 VAccCrDrId = vcrBfd.Id,
                 FDAccId = accId,
                 FDAccDetId = detail.ID,
@@ -440,6 +447,7 @@ namespace BankingPlatform.API.Controllers.BankFD
                 await _context.voucherbfddetail.AddAsync(new VoucherBFDDetail
                 {
                     BrId = branchId,
+                    VoucherId = voucher.Id,
                     VAccCrDrId = vcrNewBfd.Id,
                     FDAccId = accId,
                     FDAccDetId = newDetail.ID,

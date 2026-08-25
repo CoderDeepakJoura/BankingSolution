@@ -36,6 +36,9 @@ const BankFDPreMaturePage: React.FC = () => {
   const [penaltyRate, setPenaltyRate] = useState(1.0);
   const [preMatureAmount, setPreMatureAmount] = useState(0);
 
+  // Interest override — null means use auto-calculated value
+  const [overrideInterest, setOverrideInterest] = useState<number | null>(null);
+
   // TDS
   const [hasTDSSetting, setHasTDSSetting] = useState(false);
   const [tdsAccId, setTdsAccId] = useState<number | null>(null);
@@ -105,6 +108,7 @@ const BankFDPreMaturePage: React.FC = () => {
 
   const handleDetailSelect = (detail: BFDDetailItem) => {
     setSelectedDetail(detail);
+    setOverrideInterest(null);
     resetPayoutSection();
     const pma = recalcPreMature(detail, penaltyRate);
     recalcTDS(detail, accountData?.tdsSlabs ?? [], pma);
@@ -112,6 +116,7 @@ const BankFDPreMaturePage: React.FC = () => {
 
   const handlePenaltyChange = (val: number) => {
     setPenaltyRate(val);
+    setOverrideInterest(null);
     if (!selectedDetail) return;
     const pma = recalcPreMature(selectedDetail, val);
     recalcTDS(selectedDetail, accountData?.tdsSlabs ?? [], pma);
@@ -131,6 +136,7 @@ const BankFDPreMaturePage: React.FC = () => {
     setSelectedDetail(null);
     setAccountData(null);
     setPenaltyRate(1.0);
+    setOverrideInterest(null);
     resetPayoutSection();
   };
 
@@ -161,7 +167,7 @@ const BankFDPreMaturePage: React.FC = () => {
         narration,
         penaltyRate,
         effectiveRate,
-        preMatureAmount,
+        preMatureAmount: effectivePreMatureAmount,
       });
       await Swal.fire({ icon: "success", title: "Success!", text: (res as any).message || "Saved successfully.", timer: 1800, showConfirmButton: false });
       handleReset();
@@ -173,8 +179,10 @@ const BankFDPreMaturePage: React.FC = () => {
   };
 
   const effectiveRate = selectedDetail ? Math.max(0, selectedDetail.intRate - penaltyRate) : 0;
-  const interest = selectedDetail ? Math.max(0, preMatureAmount - selectedDetail.fdAmount) : 0;
-  const netPayout = selectedDetail ? preMatureAmount - (hasTDSSetting ? tdsAmount : 0) : 0;
+  const autoInterest = selectedDetail ? Math.max(0, preMatureAmount - selectedDetail.fdAmount) : 0;
+  const interest = overrideInterest !== null ? overrideInterest : autoInterest;
+  const effectivePreMatureAmount = selectedDetail ? selectedDetail.fdAmount + interest : preMatureAmount;
+  const netPayout = selectedDetail ? effectivePreMatureAmount - (hasTDSSetting ? tdsAmount : 0) : 0;
 
   const accOptions = accounts.map(a => ({ value: a.accId, label: `${a.accNo} — ${a.accountName}` }));
 
@@ -314,16 +322,53 @@ const BankFDPreMaturePage: React.FC = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                       {[
                         { label: "Principal", value: `₹${fmt(selectedDetail.fdAmount)}`, color: "border-blue-500" },
-                        { label: "Interest Earned", value: `₹${fmt(interest)}`, color: "border-emerald-500" },
-                        { label: "Pre-Mature Amount", value: `₹${Math.round(preMatureAmount).toLocaleString("en-IN")}`, color: "border-orange-500" },
-                        { label: "TDS Deducted", value: hasTDSSetting ? `₹${Math.round(tdsAmount).toLocaleString("en-IN")}` : "No TDS Setting", color: "border-rose-500" },
-                        { label: "Net Payout", value: `₹${Math.round(netPayout).toLocaleString("en-IN")}`, color: "border-green-600" },
+                        { label: "Pre-Mature Amount", value: `₹${fmt(effectivePreMatureAmount)}`, color: "border-orange-500" },
+                        { label: "TDS Deducted", value: hasTDSSetting ? `₹${fmt(tdsAmount)}` : "No TDS Setting", color: "border-rose-500" },
+                        { label: "Net Payout", value: `₹${fmt(netPayout)}`, color: "border-green-600" },
                       ].map(({ label, value, color }) => (
                         <div key={label} className={`bg-white rounded-lg border-l-4 ${color} px-4 py-3 shadow-sm`}>
                           <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>
                           <p className="text-base font-bold text-gray-800 font-mono">{value}</p>
                         </div>
                       ))}
+                      {/* Editable Interest Earned */}
+                      <div className="bg-white rounded-lg border-l-4 border-emerald-500 px-4 py-3 shadow-sm">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                          Interest Earned
+                          {overrideInterest !== null && (
+                            <span className="ml-1 bg-emerald-100 text-emerald-700 text-xs px-1.5 py-0.5 rounded font-medium">Edited</span>
+                          )}
+                        </p>
+                        <input
+                          type="number"
+                          value={interest}
+                          min={0}
+                          step={0.01}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setOverrideInterest(val);
+                            setPreMatureAmount(selectedDetail!.fdAmount + val);
+                            if (hasTDSSetting && accountData?.tdsSlabs.length) {
+                              const r = findTDSRate(val, accountData.tdsSlabs, withPan);
+                              setTdsRate(r);
+                              setTdsAmount(Math.round(val * r / 100 * 100) / 100);
+                            }
+                          }}
+                          className="w-full text-base font-bold text-gray-800 font-mono bg-transparent border-b-2 border-emerald-300 outline-none focus:border-emerald-600 py-0.5"
+                        />
+                        {overrideInterest !== null && (
+                          <button
+                            onClick={() => {
+                              setOverrideInterest(null);
+                              const pma = recalcPreMature(selectedDetail!, penaltyRate);
+                              recalcTDS(selectedDetail!, accountData?.tdsSlabs ?? [], pma);
+                            }}
+                            className="text-xs text-gray-400 hover:text-emerald-600 mt-1 underline"
+                          >
+                            ↩ Reset to {fmt(autoInterest)}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 

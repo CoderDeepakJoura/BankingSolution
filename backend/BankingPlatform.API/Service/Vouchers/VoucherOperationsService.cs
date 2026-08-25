@@ -198,6 +198,11 @@ namespace BankingPlatform.API.Service.Vouchers
                     .Where(x => x.VoucherId == voucher.Id && x.BrId == branchId).ToListAsync();
                 if (fdVoucherDetails.Any()) _context.voucherfddetail.RemoveRange(fdVoucherDetails);
 
+                // Read Bank FD voucher detail entries before deletion (used to revert bankfdaccountdetail status)
+                var bfdVoucherDetails = await _context.voucherbfddetail
+                    .Where(x => x.VoucherId == voucher.Id && x.BrId == branchId).ToListAsync();
+                if (bfdVoucherDetails.Any()) _context.voucherbfddetail.RemoveRange(bfdVoucherDetails);
+
                 // Flush RESTRICT-constrained children first so the voucher delete succeeds
                 await _context.SaveChangesAsync();
 
@@ -248,6 +253,43 @@ namespace BankingPlatform.API.Service.Vouchers
                     {
                         acc.IsAccClosed = false;
                         acc.ClosingDate = null;
+                    }
+                }
+
+                // Bank FD mature / premature / renew — reopen the Bank FD detail
+                if (vType == (int)Enums.VoucherType.FD && isMatureOrPremature && bfdVoucherDetails.Any())
+                {
+                    if (vSubType == (int)Enums.VoucherSubType.Renew)
+                    {
+                        // Renew: remove the new detail (RC) and revert the original (BR) back to Open
+                        var rcEntry = bfdVoucherDetails.FirstOrDefault(x => x.Operation == "RC");
+                        var brEntry = bfdVoucherDetails.FirstOrDefault(x => x.Operation == "BR");
+
+                        if (rcEntry != null)
+                        {
+                            var newBfdDetail = await _context.bankfdaccountdetail
+                                .FirstOrDefaultAsync(x => x.ID == rcEntry.FDAccDetId);
+                            if (newBfdDetail != null)
+                                _context.bankfdaccountdetail.Remove(newBfdDetail);
+                        }
+
+                        if (brEntry != null)
+                        {
+                            var origBfdDetail = await _context.bankfdaccountdetail
+                                .FirstOrDefaultAsync(x => x.ID == brEntry.FDAccDetId);
+                            if (origBfdDetail != null)
+                                origBfdDetail.FDStatus = 1; // Open
+                        }
+                    }
+                    else
+                    {
+                        // Mature (BM) / PreMature (BP) — revert FDStatus back to Open
+                        var detailIds = bfdVoucherDetails.Select(x => x.FDAccDetId).Distinct().ToList();
+                        var bfdDetails = await _context.bankfdaccountdetail
+                            .Where(x => detailIds.Contains(x.ID) && x.FDStatus != 1)
+                            .ToListAsync();
+                        foreach (var bfd in bfdDetails)
+                            bfd.FDStatus = 1; // Open
                     }
                 }
 
