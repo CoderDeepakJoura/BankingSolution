@@ -215,7 +215,8 @@ namespace BankingPlatform.API.Service.Reports
             var voucherData = await _context.voucher.AsNoTracking()
                 .Where(x => x.BrID == branchId
                     && x.VoucherDate >= fromDate.Date
-                    && x.VoucherDate < toExclusive)
+                    && x.VoucherDate < toExclusive
+                    && x.VoucherStatus != "D")
                 .Select(x => new { x.Id, x.VoucherNo, x.VoucherDate })
                 .ToListAsync();
 
@@ -261,8 +262,23 @@ namespace BankingPlatform.API.Service.Reports
                 var info = voucherInfoMap.GetValueOrDefault(entry.VoucherID);
                 if (info == null) continue;
 
+                // Interest posting entries (EntryStatus="IP") are stored as Cr with VoucherAmount=0
+                // and IntDr=interest amount. Treat them as Dr (increases outstanding).
+                bool isIP = entry.EntryStatus == "IP";
+                decimal? dr, cr;
+                if (isIP)
+                {
+                    dr = entry.IntDr.HasValue && entry.IntDr.Value > 0 ? entry.IntDr.Value : (decimal?)null;
+                    cr = null;
+                }
+                else
+                {
+                    dr = entry.VoucherEntryType == "Dr" ? entry.VoucherAmount : (decimal?)null;
+                    cr = entry.VoucherEntryType == "Cr" ? entry.VoucherAmount : (decimal?)null;
+                }
+
                 // Loan: Dr = advancement/interest (contra is Cr side); Cr = recovery (contra is Dr side)
-                string contraType = entry.VoucherEntryType == "Dr" ? "Cr" : "Dr";
+                string contraType = isIP ? "Dr" : (entry.VoucherEntryType == "Dr" ? "Cr" : "Dr");
                 var contras = contraByVoucher.GetValueOrDefault(entry.VoucherID, new())
                     .Where(e => e.VoucherEntryType == contraType)
                     .Select(e => accountNameMap.GetValueOrDefault(e.AccountId, ""))
@@ -270,10 +286,8 @@ namespace BankingPlatform.API.Service.Reports
                     .Distinct()
                     .ToList();
 
-                string particulars = contras.Any() ? string.Join(" / ", contras) : "—";
-
-                decimal? dr = entry.VoucherEntryType == "Dr" ? entry.VoucherAmount : (decimal?)null;
-                decimal? cr = entry.VoucherEntryType == "Cr" ? entry.VoucherAmount : (decimal?)null;
+                string particulars = isIP ? "Loan Interest Posting"
+                    : (contras.Any() ? string.Join(" / ", contras) : "—");
 
                 // Loan: Dr increases outstanding, Cr (recovery) decreases outstanding
                 if (dr.HasValue) runningBalance += dr.Value;
@@ -337,21 +351,25 @@ namespace BankingPlatform.API.Service.Reports
             decimal initial = ob == null ? 0
                 : (ob.BalType?.ToUpper() == "DR" ? (ob.TotalBalance ?? 0) : -(ob.TotalBalance ?? 0));
 
-            var drSum = await _context.vouchercreditdebitdetails
+            var entries = await _context.vouchercreditdebitdetails
                 .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
                 .Where(x => x.e.AccountId == accountId
-                    && x.e.VoucherEntryType == "Dr"
                     && x.v.BrID == branchId
-                    && x.v.VoucherDate < fromDate)
-                .SumAsync(x => (decimal?)x.e.VoucherAmount) ?? 0;
+                    && x.v.VoucherDate < fromDate
+                    && x.v.VoucherStatus != "D")
+                .Select(x => new { x.e.VoucherEntryType, x.e.VoucherAmount, x.e.EntryStatus, x.e.IntDr })
+                .ToListAsync();
 
-            var crSum = await _context.vouchercreditdebitdetails
-                .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
-                .Where(x => x.e.AccountId == accountId
-                    && x.e.VoucherEntryType == "Cr"
-                    && x.v.BrID == branchId
-                    && x.v.VoucherDate < fromDate)
-                .SumAsync(x => (decimal?)x.e.VoucherAmount) ?? 0;
+            decimal drSum = 0, crSum = 0;
+            foreach (var e in entries)
+            {
+                if (e.EntryStatus == "IP")
+                    drSum += e.IntDr ?? 0;          // interest posting increases outstanding
+                else if (e.VoucherEntryType == "Dr")
+                    drSum += e.VoucherAmount;
+                else
+                    crSum += e.VoucherAmount;
+            }
 
             return initial + drSum - crSum;
         }

@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.45",
+    date: "2026-08-31",
+    changes: [
+      { type: "fix", text: "Loan Ledger — loan interest posting entries now correctly show in Dr column with proper amount (were missing/showing as zero)" },
+    ],
+  },
+  {
     version: "1.0.44",
     date: "2026-08-31",
     changes: [
