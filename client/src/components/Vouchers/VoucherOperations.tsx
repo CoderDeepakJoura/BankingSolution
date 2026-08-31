@@ -229,6 +229,13 @@ const categories: VoucherCategory[] = [
         color: "bg-blue-50 border-blue-200",
       },
       {
+        label: "Bank FD Interest Posting",
+        description: "Calculate and post periodic interest on Bank FD accounts",
+        path: "/bank-fd-interest-posting",
+        icon: <Landmark size={26} className="text-indigo-600" />,
+        color: "bg-indigo-50 border-indigo-200",
+      },
+      {
         label: "Bank FD Pre-Mature",
         description: "Close a Bank FD before its maturity date with penalty",
         path: "/bank-fd-premature",

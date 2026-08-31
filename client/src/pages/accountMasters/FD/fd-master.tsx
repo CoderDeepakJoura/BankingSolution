@@ -1,4 +1,4 @@
-﻿// pages/AccountMasters/FDAccount/FDAccountMaster.tsx
+// pages/AccountMasters/FDAccount/FDAccountMaster.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { encryptId, decryptId } from "../../../utils/encryption";
 import Swal from "sweetalert2";
@@ -363,6 +363,7 @@ const FDAccountMaster = () => {
     periodInMonths: number,
     periodInDays: number,
     isMIS: boolean = false,
+    misAmountOverride?: number,
   ) => {
     if (!fddate || (!periodInMonths && !periodInDays)) {
       setMisDetailForm((prev) => ({
@@ -378,34 +379,35 @@ const FDAccountMaster = () => {
     }
 
     try {
+      const misAmt = misAmountOverride !== undefined
+        ? misAmountOverride
+        : parseFloat(misDetailForm.misAmount) || 0;
       const response = await commonservice.fetch_fd_related_info(
         fddate,
         periodInMonths,
         periodInDays,
         memberDetailsData.dateOfBirth,
         formData.accountMasterDTO.fdProductId,
-        isMIS
-          ? parseFloat(misDetailForm.misAmount) || 0
-          : parseFloat(fdDetailForm.fdAmount) || 0,
+        isMIS ? misAmt : parseFloat(fdDetailForm.fdAmount) || 0,
         user.branchid,
       );
       if (response.success && response.data) {
         if (isMIS) {
           const rate = parseFloat(response.data.interestRate?.toString() || "0");
-          const principal = parseFloat(misDetailForm.misAmount) || 0;
+          const principal = misAmt;
           const periodsMap: Record<string, number> = {
             Monthly: 12, Quarterly: 4, "Half-Yearly": 2, Yearly: 1, "Two-Yearly": 0.5,
           };
           const periods = periodsMap[misDetailForm.interestPostInterval] ?? 12;
           const interestAmt = rate > 0 && principal > 0 && periods > 0
-            ? (principal * rate / 100 / periods).toFixed(2)
+            ? Math.round(principal * rate / 100 / periods).toString()
             : "";
           setMisDetailForm((prev) => ({
             ...prev,
             maturityDate: commonservice.splitDate(response.data.maturityDate),
             intRate: response.data.interestRate?.toString() || "",
             compoundingInterval: response.data.compoundingInterval || "Monthly",
-            maturityAmount: misDetailForm.misAmount.toString() || "",
+            maturityAmount: misAmt > 0 ? misAmt.toString() : "",
             slabId: response.data.slabId || 0,
             interestAmount: interestAmt,
           }));
@@ -1007,7 +1009,7 @@ const FDAccountMaster = () => {
           ? parseFloat(value) || 0
           : parseFloat(misDetailForm.misAmount) || 0;
       if (fdDate && (months || days) && fdAmount > 0) {
-        await fetchMaturityDate(fdDate, months, days, true);
+        await fetchMaturityDate(fdDate, months, days, true, fdAmount);
       } else {
         setFdDetailForm((prev) => ({
           ...prev,
@@ -2899,7 +2901,7 @@ const FDAccountMaster = () => {
                         const rate = parseFloat(prev.intRate) || 0;
                         const principal = parseFloat(prev.misAmount) || 0;
                         const interestAmt = rate > 0 && principal > 0 && periods > 0
-                          ? (principal * rate / 100 / periods).toFixed(2)
+                          ? Math.round(principal * rate / 100 / periods).toString()
                           : "";
                         return { ...prev, interestPostInterval: interval, interestAmount: interestAmt };
                       });

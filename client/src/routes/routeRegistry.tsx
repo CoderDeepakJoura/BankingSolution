@@ -154,6 +154,7 @@ import BankFDAccountForm from "../pages/BankFD/BankFDAccountForm";
 import BankFDMaturePage from "../pages/BankFD/BankFDMature";
 import BankFDPreMaturePage from "../pages/BankFD/BankFDPreMature";
 import BankFDLedgerPage from "../pages/BankFD/BankFDLedger";
+import BankFDInterestPosting from "../pages/BankFD/BankFDInterestPosting";
 import CRUDDashboard from "../components/Location/CRUDDashboard";
 import OtherBranchAccounts from "../pages/interbranch/OtherBranchAccounts";
 import IBPendingVouchers from "../pages/interbranch/IBPendingVouchers";
@@ -448,6 +449,7 @@ export const ROUTES: RouteEntry[] = [
   { path: "/bank-fd-account",                 element: <BankFDAccountTable />,          label: "Bank FD Account",          category: "Bank FD" },
   { path: "/bank-fd-account/create",          element: <BankFDAccountForm />,           label: "New Bank FD Account",      category: "Bank FD" },
   { path: "/bank-fd-account/edit/:accountId", element: <BankFDAccountForm /> },
+  { path: "/bank-fd-interest-posting",        element: <BankFDInterestPosting />,       label: "Bank FD Interest Posting", category: "Bank FD" },
   { path: "/bank-fd-mature",                  element: <BankFDMaturePage />,            label: "Bank FD Mature/Renew",     category: "Bank FD" },
   { path: "/bank-fd-premature",               element: <BankFDPreMaturePage />,         label: "Bank FD Pre-Mature",       category: "Bank FD" },
 

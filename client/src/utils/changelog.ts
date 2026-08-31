@@ -15,6 +15,15 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.44",
+    date: "2026-08-31",
+    changes: [
+      { type: "new", text: "Bank FD Interest Posting screen — calculate and post periodic interest with editable interest/TDS amounts" },
+      { type: "improvement", text: "Bank FD Interest Posting added to Voucher Operations page under Bank FD section" },
+      { type: "fix", text: "Settings Master — Bank FD Maturity Reminder Days field description fixed (was causing React warning)" },
+    ],
+  },
+  {
     version: "1.0.43",
     date: "2026-08-31",
     changes: [
