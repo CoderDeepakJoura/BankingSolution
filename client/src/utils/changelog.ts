@@ -15,6 +15,14 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.40",
+    date: "2026-08-26",
+    changes: [
+      { type: "new", text: "Bank FD Account creation: mandatory voucher section added for non-opening entries. Select the credit account (cash/GL), amount auto-fills from FD total, with a live Dr/Cr preview. Opening balance entries skip the voucher (same rule as all other account masters)." },
+      { type: "new", text: "New VoucherType 10 (Bank FD) and SubType 30 (Bank FD Deposit) introduced. Creation vouchers appear in Voucher Search and Day Book under Bank FD head — no modification allowed, only delete." },
+    ],
+  },
+  {
     version: "1.0.39",
     date: "2026-08-26",
     changes: [

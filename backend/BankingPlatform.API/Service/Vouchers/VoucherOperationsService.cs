@@ -416,7 +416,8 @@ namespace BankingPlatform.API.Service.Vouchers
             5 => "Loan",
             6 => "Cash",
             7 => "Journal",
-            9 => "Inter Branch",
+            9  => "Inter Branch",
+            10 => "Bank FD",
             _ => "Unknown"
         };
 
@@ -444,6 +445,8 @@ namespace BankingPlatform.API.Service.Vouchers
             26 => "IB Saving Wdl — Source Branch Step 1",
             27 => "IB Saving Wdl — HO Settlement",
             28 => "IB Saving Wdl — Dest Branch Debit",
+            29 => "Close Account",
+            30 => "Bank FD Deposit",
             _ => "Unknown"
         };
     }

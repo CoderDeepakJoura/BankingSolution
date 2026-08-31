@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../redux";
 import Swal from "sweetalert2";
 import Select from "react-select";
-import { Plus, Trash2, Pencil, ArrowLeft, Save, RotateCcw, Landmark } from "lucide-react";
+import { Plus, Trash2, Pencil, ArrowLeft, Save, RotateCcw, Landmark, Receipt } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import DatePicker from "../../components/DatePicker";
 import bankFDAccountApi, { BankFDDetailItemDTO } from "../../services/bankfd/bankFDAccountApi";
@@ -122,6 +122,11 @@ const BankFDAccountForm: React.FC = () => {
 
   // Dropdown data
   const [accountHeads, setAccountHeads] = useState<SelectOption[]>([]);
+  const [generalAccounts, setGeneralAccounts] = useState<SelectOption[]>([]);
+
+  // Voucher section (non-opening entry, create mode only)
+  const [voucherCreditAccId, setVoucherCreditAccId] = useState<number>(0);
+  const [voucherNarration, setVoucherNarration] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
@@ -140,6 +145,8 @@ const BankFDAccountForm: React.FC = () => {
     setRowCounter(1);
     setEditingRowKey(null);
     setEntry(emptyDetail(0));
+    setVoucherCreditAccId(0);
+    setVoucherNarration("");
     // Refresh last account number hint after save
     if (user.branchid) {
       bankFDAccountApi.getLastSuffix(user.branchid).then(res => {
@@ -148,10 +155,13 @@ const BankFDAccountForm: React.FC = () => {
     }
   };
 
-  // Load account heads + last suffix hint (create mode)
+  // Load account heads + GL accounts + last suffix hint (create mode)
   useEffect(() => {
     if (user.branchid) {
       loadAccountHeads();
+      commonservice.general_accmasters_info(user.branchid)
+        .then(r => setGeneralAccounts((r.data ?? []).map((a: any) => ({ value: a.accId, label: a.accountName }))))
+        .catch(() => {});
       if (!isEditMode) {
         bankFDAccountApi.getLastSuffix(user.branchid).then(res => {
           if (res.success && res.data) setLastAccNo(res.data.lastAccNo);
@@ -326,6 +336,8 @@ const BankFDAccountForm: React.FC = () => {
     setAccSuffix(null);
     setAccountHeadId(0);
     setDetails([]);
+    setVoucherCreditAccId(0);
+    setVoucherNarration("");
     clearEntry();
   };
 
@@ -351,6 +363,7 @@ const BankFDAccountForm: React.FC = () => {
     if (!openingDate) errors.push("Account Opening Date is required.");
     if (details.length === 0) errors.push("At least one FD detail is required.");
     if (suffixError) errors.push(`Account number: ${suffixError}`);
+    if (!isOpeningEntry && !isEditMode && !voucherCreditAccId) errors.push("Credit account is required for the voucher.");
 
     if (errors.length > 0) {
       Swal.fire({
@@ -370,6 +383,12 @@ const BankFDAccountForm: React.FC = () => {
       openingDate,
       isOpeningEntry,
       headId: accountHeadId,
+      // Voucher fields (only sent for create + non-opening entry)
+      ...(!isOpeningEntry && !isEditMode ? {
+        creditAccountId: voucherCreditAccId,
+        voucherNarration: voucherNarration.trim() || undefined,
+        voucherDate: workingDate,
+      } : {}),
       details: details.map(d => ({
         id: d.id,
         ltdNo: d.ltdNo,
@@ -863,6 +882,122 @@ const BankFDAccountForm: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {/* ── Voucher Section (create mode, non-opening entry only) ── */}
+                {!isOpeningEntry && !isEditMode && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <Receipt className="text-white w-4 h-4" />
+                      </div>
+                      <h2 className="text-base font-semibold text-blue-900">
+                        Voucher Detail <span className="text-red-500">*</span>
+                      </h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Debit side — auto-filled from BankFD account head */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Debit Account
+                        </label>
+                        <input
+                          type="text"
+                          readOnly
+                          value={accountHeads.find(h => h.value === accountHeadId)?.label ?? "Bank FD Account (auto)"}
+                          className={readonlyCls}
+                        />
+                        <p className="mt-1 text-xs text-blue-600">Auto: Bank FD account head</p>
+                      </div>
+
+                      {/* Credit side — user selects */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Credit Account <span className="text-red-500">*</span>
+                        </label>
+                        <Select
+                          classNamePrefix="react-select"
+                          options={generalAccounts}
+                          value={generalAccounts.find(a => a.value === voucherCreditAccId) ?? null}
+                          onChange={opt => setVoucherCreditAccId(opt?.value ?? 0)}
+                          placeholder="Cash / GL account..."
+                          isClearable
+                          styles={{ control: b => ({ ...b, cursor: "pointer" }) }}
+                          menuPortalTarget={document.body}
+                          menuPosition="fixed"
+                        />
+                      </div>
+
+                      {/* Amount — auto from FD totals */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Amount
+                        </label>
+                        <input
+                          type="text"
+                          readOnly
+                          value={details.length > 0
+                            ? details.reduce((s, r) => s + r.fdAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })
+                            : "0.00"}
+                          className={readonlyCls}
+                        />
+                        <p className="mt-1 text-xs text-blue-600">Auto: sum of all FD amounts</p>
+                      </div>
+
+                      {/* Narration */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Narration
+                        </label>
+                        <input
+                          type="text"
+                          value={voucherNarration}
+                          onChange={e => setVoucherNarration(e.target.value)}
+                          className={inputCls}
+                          placeholder="Auto-filled if left blank"
+                          maxLength={200}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Mini ledger row showing the entry */}
+                    {details.length > 0 && (
+                      <div className="mt-4 overflow-x-auto">
+                        <table className="w-full text-sm border border-blue-200 rounded-lg overflow-hidden">
+                          <thead className="bg-blue-100 border-b border-blue-200">
+                            <tr>
+                              <th className="text-left px-4 py-2 font-semibold text-blue-800">Account</th>
+                              <th className="text-right px-4 py-2 font-semibold text-blue-800">Debit</th>
+                              <th className="text-right px-4 py-2 font-semibold text-blue-800">Credit</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b border-blue-100 bg-white">
+                              <td className="px-4 py-2 text-gray-700">
+                                {accountHeads.find(h => h.value === accountHeadId)?.label ?? "Bank FD Account"} (Dr)
+                              </td>
+                              <td className="px-4 py-2 text-right font-medium text-gray-900">
+                                ₹{details.reduce((s, r) => s + r.fdAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-400">—</td>
+                            </tr>
+                            <tr className="bg-white">
+                              <td className="px-4 py-2 text-gray-700">
+                                {voucherCreditAccId
+                                  ? `${generalAccounts.find(a => a.value === voucherCreditAccId)?.label ?? "—"} (Cr)`
+                                  : <span className="text-red-400 italic">Select credit account</span>}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-400">—</td>
+                              <td className="px-4 py-2 text-right font-medium text-gray-900">
+                                ₹{details.reduce((s, r) => s + r.fdAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* ── Details Grid ── */}
                 {details.length > 0 && (

@@ -29,6 +29,11 @@ export interface CreateBankFDAccountDTO {
   openingDate: string;
   isOpeningEntry: boolean;
   details: BankFDDetailItemDTO[];
+  // Voucher — only for non-opening entries
+  creditAccountId?: number;
+  voucherNarration?: string;
+  voucherDate?: string;
+  headId?: number;
 }
 
 export interface BankFDAccountListItem {

@@ -45,6 +45,7 @@ export const MODIFY_BLOCKED_REASON: Record<string, string> = {
   "9-21": "IB vouchers cannot be modified. To make changes, delete the later step(s) first, then delete this voucher and re-enter it.",
   "9-22": "IB HO settlement vouchers cannot be modified. Delete this step to revert the IB record, then re-approve.",
   "9-23": "IB destination branch credit vouchers are auto-generated. Delete this step to revert the IB record, then re-approve.",
+  "10-30": "Bank FD deposit vouchers cannot be modified. Use the Bank FD Account Master to edit account details.",
 };
 
 // Maps {voucherType}-{voucherSubType} to the edit route

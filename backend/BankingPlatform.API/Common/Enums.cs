@@ -28,6 +28,7 @@
             Journal = 7,
             OdReserve = 8,
             InterBranch = 9,
+            BankFD = 10,
         }
 
         public enum VoucherSubType
@@ -70,6 +71,7 @@
             IBBrSavWdlStep3 = 28,       // Dest Branch: Dr Customer Saving Acc, Cr HO-Ref
 
             CloseAccount = 29,          // Account closure — single combined voucher (saving, RD, FD, etc.)
+            BankFDDeposit = 30,         // Bank FD account creation deposit voucher
         }
 
         public enum VoucherStatus

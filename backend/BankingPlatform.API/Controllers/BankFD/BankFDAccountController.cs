@@ -1,11 +1,14 @@
+using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.AccMasters;
 using BankingPlatform.Infrastructure.Models.BankFD;
+using BankingPlatform.Infrastructure.Models.voucher;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace BankingPlatform.API.Controllers.BankFD
 {
@@ -45,6 +48,10 @@ namespace BankingPlatform.API.Controllers.BankFD
         public bool IsOpeningEntry { get; set; }
         public int HeadId { get; set; }
         public List<BankFDDetailItemDTO> Details { get; set; } = new();
+        // Voucher — only for non-opening entries
+        public int CreditAccountId { get; set; }
+        public string VoucherNarration { get; set; } = "";
+        public DateTime VoucherDate { get; set; }
     }
 
     // ──────────────────────────── Controller ────────────────────────────
@@ -57,12 +64,14 @@ namespace BankingPlatform.API.Controllers.BankFD
         private readonly BankingDbContext _context;
         private readonly ILogger<BankFDAccountController> _logger;
         private readonly CommonFunctions _commonFunctions;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public BankFDAccountController(BankingDbContext context, ILogger<BankFDAccountController> logger, CommonFunctions commonFunctions)
+        public BankFDAccountController(BankingDbContext context, ILogger<BankFDAccountController> logger, CommonFunctions commonFunctions, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _logger = logger;
             _commonFunctions = commonFunctions;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         // GET /api/BankFDAccount/last-suffix?branchId=X
@@ -237,6 +246,8 @@ namespace BankingPlatform.API.Controllers.BankFD
                 return BadRequest(new ResponseDto { Success = false, Message = "Account Name is required." });
             if (dto.Details == null || dto.Details.Count == 0)
                 return BadRequest(new ResponseDto { Success = false, Message = "At least one FD detail is required." });
+            if (!dto.IsOpeningEntry && dto.CreditAccountId <= 0)
+                return BadRequest(new ResponseDto { Success = false, Message = "Credit account is required." });
 
             await using var tx = await _context.Database.BeginTransactionAsync();
             try
@@ -291,8 +302,86 @@ namespace BankingPlatform.API.Controllers.BankFD
 
                 await SaveDetails(dto.BranchId, newAccount.ID, dto.Details, dto.IsOpeningEntry);
 
+                int voucherNo = 0;
+                if (!dto.IsOpeningEntry)
+                {
+                    var claimsPrincipal = _httpContextAccessor.HttpContext?.User;
+                    var userIdStr = claimsPrincipal?.FindFirst("userId")?.Value
+                                 ?? claimsPrincipal?.FindFirst("UserId")?.Value
+                                 ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    int userId = int.TryParse(userIdStr, out var uid) ? uid : 0;
+
+                    bool autoVerify = await _commonFunctions.IsAutoVerification(dto.BranchId);
+                    string voucherStatus = autoVerify ? "V" : "A";
+                    DateTime vDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Unspecified);
+                    voucherNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.VoucherDate);
+                    decimal totalAmount = dto.Details.Sum(d => d.FDAmount);
+
+                    string narration = string.IsNullOrWhiteSpace(dto.VoucherNarration)
+                        ? $"Bank FD Deposit — {newAccount.AccountName} — {newAccount.AccountNumber}"
+                        : dto.VoucherNarration;
+
+                    var voucher = new Voucher
+                    {
+                        BrID = dto.BranchId,
+                        VoucherNo = voucherNo,
+                        VoucherType = (int)Enums.VoucherType.BankFD,
+                        VoucherSubType = (int)Enums.VoucherSubType.BankFDDeposit,
+                        VoucherDate = vDate,
+                        ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                        VoucherNarration = narration,
+                        VoucherStatus = voucherStatus,
+                        AddedBy = userId,
+                        ModifiedBy = 0,
+                        VerifiedBy = autoVerify ? userId : 0,
+                        OtherBrID = 0
+                    };
+                    await _context.voucher.AddAsync(voucher);
+                    await _context.SaveChangesAsync();
+
+                    int seq = 1;
+                    long bfdHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(newAccount.ID, dto.BranchId);
+
+                    // Dr: Bank FD Account (asset increases — money placed in bank FD)
+                    var drEntry = MakeEntry(bfdHeadCode, newAccount.ID, dto.BranchId, "Dr", narration, totalAmount, voucherStatus, vDate, voucher.Id, seq++);
+                    _context.vouchercreditdebitdetails.Add(drEntry);
+                    await _context.SaveChangesAsync();
+
+                    // Cr: User-selected credit GL account (cash/funds going to bank)
+                    long crHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(dto.CreditAccountId, dto.BranchId);
+                    var crEntry = MakeEntry(crHeadCode, dto.CreditAccountId, dto.BranchId, "Cr", narration, totalAmount, voucherStatus, vDate, voucher.Id, seq++);
+                    _context.vouchercreditdebitdetails.Add(crEntry);
+
+                    // VoucherBFDDetail: one row per FD detail (operation = "BD" Bank Deposit)
+                    var savedDetails = await _context.bankfdaccountdetail
+                        .Where(d => d.BrId == dto.BranchId && d.AccId == newAccount.ID)
+                        .ToListAsync();
+
+                    foreach (var fd in savedDetails)
+                    {
+                        await _context.voucherbfddetail.AddAsync(new VoucherBFDDetail
+                        {
+                            BrId = dto.BranchId,
+                            VoucherId = voucher.Id,
+                            VAccCrDrId = drEntry.Id,
+                            FDAccId = newAccount.ID,
+                            FDAccDetId = fd.ID,
+                            AmountCr = 0,
+                            AmountDr = fd.FDAmount,
+                            Operation = "BD",
+                            ValueDate = vDate,
+                            VoucherDate = vDate,
+                            VoucherMainStatus = voucherStatus
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
                 await tx.CommitAsync();
-                return Ok(new ResponseDto { Success = true, Message = "Bank FD account created successfully." });
+                string successMsg = voucherNo > 0
+                    ? $"Voucher saved successfully with voucher no. {voucherNo}"
+                    : "Bank FD account created successfully.";
+                return Ok(new ResponseDto { Success = true, Message = successMsg });
             }
             catch (Exception ex)
             {
@@ -445,6 +534,26 @@ namespace BankingPlatform.API.Controllers.BankFD
 
             await _context.SaveChangesAsync();
         }
+
+        private static VoucherCreditDebitDetails MakeEntry(
+            long headCode, int accId, int branchId,
+            string entryType, string narration, decimal amount,
+            string voucherStatus, DateTime valueDate, int voucherId, int seq) => new VoucherCreditDebitDetails
+        {
+            AccHeadCode = headCode,
+            AccountId = accId,
+            BrId = branchId,
+            EntryStatus = entryType,
+            Narration = narration,
+            VoucherAmount = amount,
+            VoucherStatus = voucherStatus,
+            ValueDate = valueDate,
+            VoucherEntryType = entryType,
+            VoucherID = voucherId,
+            VoucherSeqNo = seq,
+            ExpenseAmt = 0,
+            HCL1 = 0, HCL2 = 0, HCL3 = 0
+        };
 
         private async Task DeleteDetailsForAccount(int branchId, int accountId)
         {
