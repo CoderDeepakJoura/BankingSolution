@@ -446,7 +446,7 @@ export const ROUTES: RouteEntry[] = [
   { path: "/fd-tds-slab/create",              element: <FDTDSSlabForm /> },
   { path: "/fd-tds-slab/edit/:slabId",        element: <FDTDSSlabForm /> },
   { path: "/bank-fd-account",                 element: <BankFDAccountTable />,          label: "Bank FD Account",          category: "Bank FD" },
-  { path: "/bank-fd-account/create",          element: <BankFDAccountForm /> },
+  { path: "/bank-fd-account/create",          element: <BankFDAccountForm />,           label: "New Bank FD Account",      category: "Bank FD" },
   { path: "/bank-fd-account/edit/:accountId", element: <BankFDAccountForm /> },
   { path: "/bank-fd-mature",                  element: <BankFDMaturePage />,            label: "Bank FD Mature/Renew",     category: "Bank FD" },
   { path: "/bank-fd-premature",               element: <BankFDPreMaturePage />,         label: "Bank FD Pre-Mature",       category: "Bank FD" },

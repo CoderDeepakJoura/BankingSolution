@@ -344,7 +344,7 @@ namespace BankingPlatform.API.Controllers.BankFD
             {
                 BrID = branchId,
                 VoucherNo = voucherNo,
-                VoucherType = 3,        // Fixed Deposit
+                VoucherType = (int)Enums.VoucherType.BankFD,
                 VoucherSubType = subType,
                 VoucherDate = vDate,
                 ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),

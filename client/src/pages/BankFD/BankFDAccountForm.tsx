@@ -38,6 +38,12 @@ interface DetailRow extends BankFDDetailItemDTO {
   rowKey: number;
 }
 
+interface VoucherEntry {
+  creditAccountId: number;
+  amount: number;
+  narration: string;
+}
+
 const emptyDetail = (key: number): DetailRow => ({
   rowKey: key,
   id: 0,
@@ -54,9 +60,9 @@ const emptyDetail = (key: number): DetailRow => ({
   serialNo: undefined,
   openingBalance: 0,
   openingBalanceType: "Cr",
-  openingBalanceHeadCode: undefined,
+  openingBalanceHeadId: undefined,
   openingTDS: 0,
-  openingTDSHeadCode: undefined,
+  openingTDSHeadId: undefined,
 });
 
 // ─── Calculations ─────────────────────────────────────────────
@@ -125,8 +131,10 @@ const BankFDAccountForm: React.FC = () => {
   const [generalAccounts, setGeneralAccounts] = useState<SelectOption[]>([]);
 
   // Voucher section (non-opening entry, create mode only)
-  const [voucherCreditAccId, setVoucherCreditAccId] = useState<number>(0);
-  const [voucherNarration, setVoucherNarration] = useState("");
+  const [voucherEntries, setVoucherEntries] = useState<VoucherEntry[]>([]);
+  const [vEntryAccId, setVEntryAccId] = useState<number>(0);
+  const [vEntryAmount, setVEntryAmount] = useState<string>("");
+  const [vEntryNarration, setVEntryNarration] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
@@ -145,8 +153,10 @@ const BankFDAccountForm: React.FC = () => {
     setRowCounter(1);
     setEditingRowKey(null);
     setEntry(emptyDetail(0));
-    setVoucherCreditAccId(0);
-    setVoucherNarration("");
+    setVoucherEntries([]);
+    setVEntryAccId(0);
+    setVEntryAmount("");
+    setVEntryNarration("");
     // Refresh last account number hint after save
     if (user.branchid) {
       bankFDAccountApi.getLastSuffix(user.branchid).then(res => {
@@ -160,8 +170,11 @@ const BankFDAccountForm: React.FC = () => {
     if (user.branchid) {
       loadAccountHeads();
       commonservice.general_accmasters_info(user.branchid)
-        .then(r => setGeneralAccounts((r.data ?? []).map((a: any) => ({ value: a.accId, label: a.accountName }))))
-        .catch(() => {});
+        .then(r => {
+          const list = (r.data ?? []).map((a: any) => ({ value: a.accId ?? a.AccId, label: a.accountName ?? a.AccountName ?? a.name }));
+          setGeneralAccounts(list);
+        })
+        .catch(err => console.error("Failed to load general accounts", err));
       if (!isEditMode) {
         bankFDAccountApi.getLastSuffix(user.branchid).then(res => {
           if (res.success && res.data) setLastAccNo(res.data.lastAccNo);
@@ -236,9 +249,9 @@ const BankFDAccountForm: React.FC = () => {
         serialNo: d.serialNo ?? undefined,
         openingBalance: d.openingBalance?.balance ?? 0,
         openingBalanceType: d.openingBalance?.balanceType ?? "Cr",
-        openingBalanceHeadCode: d.openingBalance?.headCode ?? undefined,
+        openingBalanceHeadId: d.openingBalance?.headId ?? undefined,
         openingTDS: d.openingTDS?.balance ?? 0,
-        openingTDSHeadCode: d.openingTDS?.headCode ?? undefined,
+        openingTDSHeadId: d.openingTDS?.headId ?? undefined,
       }));
       setDetails(rows);
       setRowCounter(counter);
@@ -293,14 +306,23 @@ const BankFDAccountForm: React.FC = () => {
       return;
     }
 
+    // Auto-assign account head as both opening balance and TDS head
+    const finalEntry = isOpeningEntry
+      ? {
+          ...entry,
+          openingBalanceHeadId: accountHeadId || entry.openingBalanceHeadId,
+          openingTDSHeadId: accountHeadId || entry.openingTDSHeadId,
+        }
+      : entry;
+
     if (editingRowKey !== null) {
       setDetails(prev =>
-        prev.map(r => (r.rowKey === editingRowKey ? { ...entry, rowKey: editingRowKey } : r))
+        prev.map(r => (r.rowKey === editingRowKey ? { ...finalEntry, rowKey: editingRowKey } : r))
       );
     } else {
       const key = rowCounter;
       setRowCounter(k => k + 1);
-      setDetails(prev => [...prev, { ...entry, rowKey: key }]);
+      setDetails(prev => [...prev, { ...finalEntry, rowKey: key }]);
     }
     clearEntry();
   };
@@ -336,8 +358,10 @@ const BankFDAccountForm: React.FC = () => {
     setAccSuffix(null);
     setAccountHeadId(0);
     setDetails([]);
-    setVoucherCreditAccId(0);
-    setVoucherNarration("");
+    setVoucherEntries([]);
+    setVEntryAccId(0);
+    setVEntryAmount("");
+    setVEntryNarration("");
     clearEntry();
   };
 
@@ -363,7 +387,15 @@ const BankFDAccountForm: React.FC = () => {
     if (!openingDate) errors.push("Account Opening Date is required.");
     if (details.length === 0) errors.push("At least one FD detail is required.");
     if (suffixError) errors.push(`Account number: ${suffixError}`);
-    if (!isOpeningEntry && !isEditMode && !voucherCreditAccId) errors.push("Credit account is required for the voucher.");
+    if (!isOpeningEntry && !isEditMode) {
+      if (voucherEntries.length === 0) errors.push("At least one voucher credit entry is required.");
+      else {
+        const fdTotal = details.reduce((s, d) => s + d.fdAmount, 0);
+        const entryTotal = voucherEntries.reduce((s, e) => s + e.amount, 0);
+        if (Math.abs(fdTotal - entryTotal) > 0.01)
+          errors.push(`Voucher credit total (₹${entryTotal.toFixed(2)}) must equal total FD amount (₹${fdTotal.toFixed(2)}).`);
+      }
+    }
 
     if (errors.length > 0) {
       Swal.fire({
@@ -385,8 +417,7 @@ const BankFDAccountForm: React.FC = () => {
       headId: accountHeadId,
       // Voucher fields (only sent for create + non-opening entry)
       ...(!isOpeningEntry && !isEditMode ? {
-        creditAccountId: voucherCreditAccId,
-        voucherNarration: voucherNarration.trim() || undefined,
+        voucherEntries: voucherEntries,
         voucherDate: workingDate,
       } : {}),
       details: details.map(d => ({
@@ -404,9 +435,9 @@ const BankFDAccountForm: React.FC = () => {
         serialNo: d.serialNo,
         openingBalance: d.openingBalance,
         openingBalanceType: d.openingBalanceType,
-        openingBalanceHeadCode: d.openingBalanceHeadCode,
+        openingBalanceHeadId: d.openingBalanceHeadId,
         openingTDS: d.openingTDS,
-        openingTDSHeadCode: d.openingTDSHeadCode,
+        openingTDSHeadId: d.openingTDSHeadId,
       })),
     };
 
@@ -496,7 +527,7 @@ const BankFDAccountForm: React.FC = () => {
                 {/* ── Account Info Card ── */}
                 <div className="bg-white rounded-xl shadow border border-gray-200 p-6">
                   <h2 className="text-base font-semibold text-gray-700 mb-4">Account Information</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Account Head
@@ -538,19 +569,6 @@ const BankFDAccountForm: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Account Prefix
-                      </label>
-                      <input
-                        type="text"
-                        value={accPrefix}
-                        onChange={e => setAccPrefix(e.target.value)}
-                        className={inputCls}
-                        placeholder="BFD"
-                        maxLength={20}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Account Number
                         {isEditMode && savedAccNo && (
                           <span className="ml-2 text-xs font-normal text-slate-400">Saved: {savedAccNo}</span>
@@ -561,7 +579,7 @@ const BankFDAccountForm: React.FC = () => {
                       </label>
                       <div className="flex items-center gap-1">
                         <span className="px-3 py-2 border border-gray-200 rounded-l-lg bg-gray-50 text-gray-600 text-sm font-mono select-none">
-                          {accPrefix || "BFD"}-
+                          BFD-
                         </span>
                         <input
                           type="text"
@@ -574,13 +592,13 @@ const BankFDAccountForm: React.FC = () => {
                             setAccSuffix(v ? parseInt(v, 10) : null);
                           }}
                           onBlur={handleSuffixBlur}
+                          maxLength={10}
                           placeholder={isEditMode ? "" : "auto"}
                           className={`flex-1 px-3 py-2 border rounded-r-lg text-sm outline-none transition-all font-mono ${
                             suffixError
                               ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
                               : "border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                           }`}
-                          maxLength={10}
                         />
                       </div>
                       {suffixError && (
@@ -646,6 +664,7 @@ const BankFDAccountForm: React.FC = () => {
                         }}
                         className={numInputCls}
                         placeholder="0.00"
+                        maxLength={15}
                       />
                     </div>
                     <div>
@@ -663,6 +682,7 @@ const BankFDAccountForm: React.FC = () => {
                           }}
                           className={numInputCls}
                           placeholder="Months"
+                          maxLength={4}
                         />
                         <input
                           type="text"
@@ -674,6 +694,7 @@ const BankFDAccountForm: React.FC = () => {
                           }}
                           className={numInputCls}
                           placeholder="Days"
+                          maxLength={4}
                         />
                       </div>
                     </div>
@@ -695,6 +716,7 @@ const BankFDAccountForm: React.FC = () => {
                         }}
                         className={numInputCls}
                         placeholder="0.00"
+                        maxLength={8}
                       />
                     </div>
                     <div>
@@ -751,17 +773,22 @@ const BankFDAccountForm: React.FC = () => {
                         }}
                         className={numInputCls}
                         placeholder="Optional"
+                        maxLength={10}
                       />
                     </div>
                   </div>
 
                   {/* Opening Balance sub-section */}
                   {isOpeningEntry && (
-                    <div className="border border-amber-300 rounded-lg p-4 bg-amber-100/50 mt-2">
-                      <h3 className="text-sm font-semibold text-amber-900 mb-3">Opening Balance</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    <div className="border border-amber-300 rounded-xl p-4 bg-amber-50 mt-3">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                        <h3 className="text-sm font-bold text-amber-800 tracking-wide uppercase">Opening Balance</h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                        {/* Opening Balance */}
+                        <div className="bg-white rounded-lg border border-amber-200 p-3 shadow-sm">
+                          <label className="block text-xs font-semibold text-amber-700 mb-1.5 uppercase tracking-wide">
                             Opening Balance
                           </label>
                           <input
@@ -772,60 +799,40 @@ const BankFDAccountForm: React.FC = () => {
                               const v = e.target.value;
                               if (/^\d*\.?\d{0,2}$/.test(v)) setEntryField("openingBalance", v === "" ? 0 : parseFloat(v) || 0);
                             }}
-                            className={numInputCls}
+                            className="w-full px-3 py-2 text-right text-gray-800 font-mono text-sm border border-gray-200 rounded-md outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 transition-all bg-gray-50"
                             placeholder="0.00"
+                            maxLength={15}
                           />
                         </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">
+
+                        {/* Balance Type — pill toggle */}
+                        <div className="bg-white rounded-lg border border-amber-200 p-3 shadow-sm">
+                          <label className="block text-xs font-semibold text-amber-700 mb-2 uppercase tracking-wide">
                             Balance Type
                           </label>
-                          <div className="flex items-center gap-6 mt-2">
-                            <label className="flex items-center gap-2 text-sm cursor-pointer">
-                              <input
-                                type="radio"
-                                name={`obType_${entry.rowKey}`}
-                                value="Cr"
-                                checked={entry.openingBalanceType === "Cr"}
-                                onChange={() => setEntryField("openingBalanceType", "Cr")}
-                                className="text-teal-500 focus:ring-teal-400"
-                              />
-                              Cr
-                            </label>
-                            <label className="flex items-center gap-2 text-sm cursor-pointer">
-                              <input
-                                type="radio"
-                                name={`obType_${entry.rowKey}`}
-                                value="Dr"
-                                checked={entry.openingBalanceType === "Dr"}
-                                onChange={() => setEntryField("openingBalanceType", "Dr")}
-                                className="text-teal-500 focus:ring-teal-400"
-                              />
-                              Dr
-                            </label>
+                          <div className="flex rounded-md overflow-hidden border border-gray-200 w-fit">
+                            {(["Cr", "Dr"] as const).map(type => (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => setEntryField("openingBalanceType", type)}
+                                className={`px-5 py-2 text-sm font-semibold transition-all ${
+                                  entry.openingBalanceType === type
+                                    ? type === "Cr"
+                                      ? "bg-green-600 text-white"
+                                      : "bg-red-500 text-white"
+                                    : "bg-white text-gray-500 hover:bg-gray-50"
+                                }`}
+                              >
+                                {type}
+                              </button>
+                            ))}
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">
-                            Head Code
-                          </label>
-                          <Select
-                            classNamePrefix="react-select"
-                            options={accountHeads}
-                            value={
-                              accountHeads.find(h => h.value === entry.openingBalanceHeadCode) ?? null
-                            }
-                            onChange={opt =>
-                              setEntryField("openingBalanceHeadCode", opt?.value ?? undefined)
-                            }
-                            placeholder="-- Select Head --"
-                            isClearable
 
-
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        {/* TDS Balance */}
+                        <div className="bg-white rounded-lg border border-amber-200 p-3 shadow-sm">
+                          <label className="block text-xs font-semibold text-amber-700 mb-1.5 uppercase tracking-wide">
                             TDS Balance
                           </label>
                           <input
@@ -836,27 +843,9 @@ const BankFDAccountForm: React.FC = () => {
                               const v = e.target.value;
                               if (/^\d*\.?\d{0,2}$/.test(v)) setEntryField("openingTDS", v === "" ? 0 : parseFloat(v) || 0);
                             }}
-                            className={numInputCls}
+                            className="w-full px-3 py-2 text-right text-gray-800 font-mono text-sm border border-gray-200 rounded-md outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 transition-all bg-gray-50"
+                            maxLength={15}
                             placeholder="0.00"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1">
-                            TDS Head Code
-                          </label>
-                          <Select
-                            classNamePrefix="react-select"
-                            options={accountHeads}
-                            value={
-                              accountHeads.find(h => h.value === entry.openingTDSHeadCode) ?? null
-                            }
-                            onChange={opt =>
-                              setEntryField("openingTDSHeadCode", opt?.value ?? undefined)
-                            }
-                            placeholder="-- Select Head --"
-                            isClearable
-
-
                           />
                         </div>
                       </div>
@@ -895,107 +884,169 @@ const BankFDAccountForm: React.FC = () => {
                       </h2>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {/* Debit side — auto-filled from BankFD account head */}
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Debit Account
-                        </label>
-                        <input
-                          type="text"
-                          readOnly
-                          value={accountHeads.find(h => h.value === accountHeadId)?.label ?? "Bank FD Account (auto)"}
-                          className={readonlyCls}
-                        />
-                        <p className="mt-1 text-xs text-blue-600">Auto: Bank FD account head</p>
+                    {/* Debit info strip */}
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-blue-100 border border-blue-200 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Dr Account:</span>
+                        <span className="text-sm font-semibold text-blue-900">
+                          {accountHeads.find(h => h.value === accountHeadId)?.label ?? "Bank FD Account"}
+                        </span>
+                        <span className="text-xs text-blue-500 italic">(auto)</span>
                       </div>
-
-                      {/* Credit side — user selects */}
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Credit Account <span className="text-red-500">*</span>
-                        </label>
-                        <Select
-                          classNamePrefix="react-select"
-                          options={generalAccounts}
-                          value={generalAccounts.find(a => a.value === voucherCreditAccId) ?? null}
-                          onChange={opt => setVoucherCreditAccId(opt?.value ?? 0)}
-                          placeholder="Cash / GL account..."
-                          isClearable
-                          styles={{ control: b => ({ ...b, cursor: "pointer" }) }}
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
-                        />
-                      </div>
-
-                      {/* Amount — auto from FD totals */}
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Amount
-                        </label>
-                        <input
-                          type="text"
-                          readOnly
-                          value={details.length > 0
-                            ? details.reduce((s, r) => s + r.fdAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })
-                            : "0.00"}
-                          className={readonlyCls}
-                        />
-                        <p className="mt-1 text-xs text-blue-600">Auto: sum of all FD amounts</p>
-                      </div>
-
-                      {/* Narration */}
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Narration
-                        </label>
-                        <input
-                          type="text"
-                          value={voucherNarration}
-                          onChange={e => setVoucherNarration(e.target.value)}
-                          className={inputCls}
-                          placeholder="Auto-filled if left blank"
-                          maxLength={200}
-                        />
+                      <div className="text-xs text-blue-700 font-medium">
+                        Total FD: <span className="font-bold text-blue-900">
+                          ₹{details.reduce((s, r) => s + r.fdAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Mini ledger row showing the entry */}
-                    {details.length > 0 && (
-                      <div className="mt-4 overflow-x-auto">
-                        <table className="w-full text-sm border border-blue-200 rounded-lg overflow-hidden">
-                          <thead className="bg-blue-100 border-b border-blue-200">
-                            <tr>
-                              <th className="text-left px-4 py-2 font-semibold text-blue-800">Account</th>
-                              <th className="text-right px-4 py-2 font-semibold text-blue-800">Debit</th>
-                              <th className="text-right px-4 py-2 font-semibold text-blue-800">Credit</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="border-b border-blue-100 bg-white">
-                              <td className="px-4 py-2 text-gray-700">
-                                {accountHeads.find(h => h.value === accountHeadId)?.label ?? "Bank FD Account"} (Dr)
-                              </td>
-                              <td className="px-4 py-2 text-right font-medium text-gray-900">
-                                ₹{details.reduce((s, r) => s + r.fdAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-400">—</td>
-                            </tr>
-                            <tr className="bg-white">
-                              <td className="px-4 py-2 text-gray-700">
-                                {voucherCreditAccId
-                                  ? `${generalAccounts.find(a => a.value === voucherCreditAccId)?.label ?? "—"} (Cr)`
-                                  : <span className="text-red-400 italic">Select credit account</span>}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-400">—</td>
-                              <td className="px-4 py-2 text-right font-medium text-gray-900">
-                                ₹{details.reduce((s, r) => s + r.fdAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
+                    {/* Entry add row */}
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
+                      <div className="flex flex-wrap gap-3 items-end">
+                        <div className="flex-1 min-w-[220px]">
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">
+                            Credit Account <span className="text-red-500">*</span>
+                          </label>
+                          <Select
+                            classNamePrefix="react-select"
+                            options={generalAccounts}
+                            value={generalAccounts.find(a => a.value === vEntryAccId) ?? null}
+                            onChange={opt => setVEntryAccId(opt?.value ?? 0)}
+                            placeholder="Select GL / Cash account..."
+                            isClearable
+                            styles={{ control: b => ({ ...b, cursor: "pointer", minHeight: "38px" }), menuPortal: b => ({ ...b, zIndex: 9999 }) }}
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                          />
+                        </div>
+                        <div className="w-36">
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">
+                            Amount <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={vEntryAmount}
+                            onChange={e => {
+                              const val = e.target.value;
+                              if (val === "" || /^\d+(\.\d{0,2})?$/.test(val)) setVEntryAmount(val);
+                            }}
+                            className="w-full px-3 py-2 text-right font-mono text-sm border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 bg-white transition-all"
+                            placeholder="0.00"
+                            maxLength={15}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-[160px]">
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Narration</label>
+                          <input
+                            type="text"
+                            value={vEntryNarration}
+                            onChange={e => setVEntryNarration(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 bg-white transition-all"
+                            placeholder="Optional"
+                            maxLength={200}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const amt = parseFloat(vEntryAmount);
+                            if (!vEntryAccId) { Swal.fire({ icon: "warning", title: "Select credit account" }); return; }
+                            if (!vEntryAmount || isNaN(amt) || amt <= 0) { Swal.fire({ icon: "warning", title: "Enter a valid amount" }); return; }
+                            setVoucherEntries(prev => [...prev, { creditAccountId: vEntryAccId, amount: amt, narration: vEntryNarration.trim() }]);
+                            setVEntryAccId(0);
+                            setVEntryAmount("");
+                            setVEntryNarration("");
+                          }}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap"
+                        >
+                          <Plus className="w-4 h-4" /> Add
+                        </button>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Voucher entries table */}
+                    <div className="overflow-x-auto rounded-lg border border-blue-200">
+                      <table className="w-full text-sm">
+                        <thead className="bg-blue-100 border-b border-blue-200">
+                          <tr>
+                            <th className="text-center px-3 py-2 font-semibold text-blue-800 w-12">Sr.No</th>
+                            <th className="text-left px-3 py-2 font-semibold text-blue-800">Credit Account</th>
+                            <th className="text-right px-3 py-2 font-semibold text-blue-800 w-36">Amount</th>
+                            <th className="text-left px-3 py-2 font-semibold text-blue-800">Narration</th>
+                            <th className="text-center px-3 py-2 font-semibold text-blue-800 w-16">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {voucherEntries.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="text-center py-4 text-gray-400 italic">
+                                No entries added yet. Select a credit account and click Add.
+                              </td>
+                            </tr>
+                          ) : (
+                            voucherEntries.map((ve, idx) => (
+                              <tr key={idx} className="border-b border-blue-50 bg-white hover:bg-blue-50 transition-colors">
+                                <td className="text-center px-3 py-2 text-gray-600">{idx + 1}</td>
+                                <td className="px-3 py-2 text-gray-800">
+                                  {generalAccounts.find(a => a.value === ve.creditAccountId)?.label ?? `Account #${ve.creditAccountId}`}
+                                </td>
+                                <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                  ₹{ve.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="px-3 py-2 text-gray-600 text-xs">{ve.narration || "—"}</td>
+                                <td className="px-3 py-2 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setVoucherEntries(prev => prev.filter((_, i) => i !== idx))}
+                                    className="text-red-500 hover:text-red-700 transition-colors"
+                                    title="Remove"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                        {(voucherEntries.length > 0 || (parseFloat(vEntryAmount) > 0)) && (() => {
+                          // Committed FD rows, excluding the one currently being edited
+                          const committedFD = details
+                            .filter(r => r.rowKey !== editingRowKey)
+                            .reduce((s, r) => s + (Number(r.fdAmount) || 0), 0);
+                          // Add current entry form's fdAmount (covers both new and edit-in-progress)
+                          const pendingFD = Number(entry.fdAmount) || 0;
+                          const fdTotal = committedFD + pendingFD;
+
+                          // Committed voucher entries + whatever is currently typed in the add form
+                          const committedVoucher = voucherEntries.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+                          const pendingVoucher = parseFloat(vEntryAmount) || 0;
+                          const entryTotal = committedVoucher + pendingVoucher;
+
+                          const diff = Math.abs(fdTotal - entryTotal);
+                          return (
+                            <tfoot className="bg-blue-50 border-t border-blue-200">
+                              <tr>
+                                <td colSpan={2} className="px-3 py-2 text-sm font-semibold text-blue-800 text-right">Total</td>
+                                <td className={`px-3 py-2 text-right font-bold text-sm ${diff > 0.01 ? "text-red-600" : "text-green-700"}`}>
+                                  ₹{entryTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                  {diff > 0.01 && (
+                                    <div className="text-xs font-normal text-red-500">
+                                      FD Total: ₹{fdTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })} — must match
+                                    </div>
+                                  )}
+                                </td>
+                                <td colSpan={2} className="px-3 py-2 text-right text-xs">
+                                  {diff <= 0.01
+                                    ? <span className="text-green-600 font-semibold">✓ Balanced</span>
+                                    : <span className="text-red-500 font-semibold">⚠ Not balanced</span>}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          );
+                        })()}
+                      </table>
+                    </div>
                   </div>
                 )}
 
@@ -1011,29 +1062,25 @@ const BankFDAccountForm: React.FC = () => {
                       <table className="w-full text-sm">
                         <thead className="bg-teal-50 border-b border-teal-200">
                           <tr>
-                            <th className="text-left px-3 py-3 font-semibold text-teal-800 w-10">S.No</th>
-                            <th className="text-left px-3 py-3 font-semibold text-teal-800">LTD No</th>
-                            <th className="text-left px-3 py-3 font-semibold text-teal-800">FD Date</th>
-                            <th className="text-right px-3 py-3 font-semibold text-teal-800">Amount</th>
-                            <th className="text-center px-3 py-3 font-semibold text-teal-800">Period</th>
-                            <th className="text-right px-3 py-3 font-semibold text-teal-800">Rate %</th>
-                            <th className="text-left px-3 py-3 font-semibold text-teal-800">Comp.</th>
-                            <th className="text-left px-3 py-3 font-semibold text-teal-800">Maturity Date</th>
-                            <th className="text-right px-3 py-3 font-semibold text-teal-800">Maturity Amt</th>
-                            <th className="text-left px-3 py-3 font-semibold text-teal-800">Status</th>
-                            <th className="text-right px-3 py-3 font-semibold text-teal-800">Serial No</th>
+                            <th className="text-center px-2 py-2.5 font-semibold text-teal-800 w-8">#</th>
+                            <th className="text-left px-2 py-2.5 font-semibold text-teal-800 w-28">LTD No</th>
+                            <th className="text-left px-2 py-2.5 font-semibold text-teal-800 w-24">FD Date</th>
+                            <th className="text-right px-2 py-2.5 font-semibold text-teal-800 w-28">Amount</th>
+                            <th className="text-center px-2 py-2.5 font-semibold text-teal-800 w-20">Period</th>
+                            <th className="text-right px-2 py-2.5 font-semibold text-teal-800 w-16">Rate%</th>
+                            <th className="text-left px-2 py-2.5 font-semibold text-teal-800 w-24">Comp.</th>
+                            <th className="text-left px-2 py-2.5 font-semibold text-teal-800 w-24">Mat. Date</th>
+                            <th className="text-right px-2 py-2.5 font-semibold text-teal-800 w-28">Mat. Amt</th>
+                            <th className="text-left px-2 py-2.5 font-semibold text-teal-800 w-16">Status</th>
+                            <th className="text-right px-2 py-2.5 font-semibold text-teal-800 w-16">Sr.No</th>
                             {isOpeningEntry && (
                               <>
-                                <th className="text-right px-3 py-3 font-semibold text-teal-800">Op. Bal</th>
-                                <th className="text-center px-3 py-3 font-semibold text-teal-800">Bal Type</th>
-                                <th className="text-left px-3 py-3 font-semibold text-teal-800">Head</th>
-                                <th className="text-right px-3 py-3 font-semibold text-teal-800">TDS Bal</th>
-                                <th className="text-left px-3 py-3 font-semibold text-teal-800">TDS Head</th>
+                                <th className="text-right px-2 py-2.5 font-semibold text-teal-800 w-24">Op. Bal</th>
+                                <th className="text-center px-2 py-2.5 font-semibold text-teal-800 w-16">Type</th>
+                                <th className="text-right px-2 py-2.5 font-semibold text-teal-800 w-24">TDS Bal</th>
                               </>
                             )}
-                            <th className="text-center px-3 py-3 font-semibold text-teal-800 w-20">
-                              Actions
-                            </th>
+                            <th className="text-center px-2 py-2.5 font-semibold text-teal-800 w-16">Act.</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1044,59 +1091,49 @@ const BankFDAccountForm: React.FC = () => {
                                 editingRowKey === row.rowKey ? "bg-amber-50" : "hover:bg-gray-50"
                               }`}
                             >
-                              <td className="px-3 py-2.5 text-gray-500">{idx + 1}</td>
-                              <td className="px-3 py-2.5 text-gray-800 font-medium">{row.ltdNo}</td>
-                              <td className="px-3 py-2.5 text-gray-700">{row.fdDate}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-800">
+                              <td className="px-2 py-2 text-center text-gray-500 text-xs">{idx + 1}</td>
+                              <td className="px-2 py-2 text-gray-800 font-medium text-xs truncate max-w-[7rem]">{row.ltdNo}</td>
+                              <td className="px-2 py-2 text-gray-700 text-xs whitespace-nowrap">{row.fdDate}</td>
+                              <td className="px-2 py-2 text-right text-gray-800 text-xs">
                                 {row.fdAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                               </td>
-                              <td className="px-3 py-2.5 text-center text-gray-700">
+                              <td className="px-2 py-2 text-center text-gray-700 text-xs whitespace-nowrap">
                                 {row.fdPeriodMonths}M {row.fdPeriodDays}D
                               </td>
-                              <td className="px-3 py-2.5 text-right text-gray-700">
+                              <td className="px-2 py-2 text-right text-gray-700 text-xs">
                                 {row.intRate.toFixed(2)}%
                               </td>
-                              <td className="px-3 py-2.5 text-gray-700">
+                              <td className="px-2 py-2 text-gray-700 text-xs">
                                 {compIntervalLabel(row.intCompInterval)}
                               </td>
-                              <td className="px-3 py-2.5 text-gray-700">{row.fdMaturityDate}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-800">
+                              <td className="px-2 py-2 text-gray-700 text-xs whitespace-nowrap">{row.fdMaturityDate}</td>
+                              <td className="px-2 py-2 text-right text-gray-800 text-xs">
                                 {Math.round(row.maturityAmount).toLocaleString("en-IN")}
                               </td>
-                              <td className="px-3 py-2.5 text-gray-700">{statusLabel(row.fdStatus)}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-700">
+                              <td className="px-2 py-2 text-gray-700 text-xs">{statusLabel(row.fdStatus)}</td>
+                              <td className="px-2 py-2 text-right text-gray-700 text-xs">
                                 {row.serialNo ?? "-"}
                               </td>
                               {isOpeningEntry && (
                                 <>
-                                  <td className="px-3 py-2.5 text-right text-gray-700">
+                                  <td className="px-2 py-2 text-right text-gray-700 text-xs">
                                     {row.openingBalance > 0
-                                      ? row.openingBalance.toLocaleString("en-IN", {
-                                          minimumFractionDigits: 2,
-                                        })
+                                      ? row.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })
                                       : "-"}
                                   </td>
-                                  <td className="px-3 py-2.5 text-center text-gray-700">
-                                    {row.openingBalance > 0 ? row.openingBalanceType : "-"}
-                                  </td>
-                                  <td className="px-3 py-2.5 text-gray-700 max-w-[120px] truncate">
+                                  <td className="px-2 py-2 text-center text-xs font-medium">
                                     {row.openingBalance > 0
-                                      ? headLabel(row.openingBalanceHeadCode)
+                                      ? <span className={row.openingBalanceType === "Cr" ? "text-green-700" : "text-red-600"}>{row.openingBalanceType}</span>
                                       : "-"}
                                   </td>
-                                  <td className="px-3 py-2.5 text-right text-gray-700">
+                                  <td className="px-2 py-2 text-right text-gray-700 text-xs">
                                     {row.openingTDS > 0
-                                      ? row.openingTDS.toLocaleString("en-IN", {
-                                          minimumFractionDigits: 2,
-                                        })
+                                      ? row.openingTDS.toLocaleString("en-IN", { minimumFractionDigits: 2 })
                                       : "-"}
-                                  </td>
-                                  <td className="px-3 py-2.5 text-gray-700 max-w-[120px] truncate">
-                                    {row.openingTDS > 0 ? headLabel(row.openingTDSHeadCode) : "-"}
                                   </td>
                                 </>
                               )}
-                              <td className="px-3 py-2.5">
+                              <td className="px-2 py-2">
                                 <div className="flex items-center justify-center gap-1">
                                   <button
                                     onClick={() => handleEditRow(row)}
@@ -1129,7 +1166,7 @@ const BankFDAccountForm: React.FC = () => {
                             <td className="px-3 py-2.5 text-right text-teal-900">
                               {Math.round(details.reduce((s, r) => s + r.maturityAmount, 0)).toLocaleString("en-IN")}
                             </td>
-                            <td colSpan={isOpeningEntry ? 8 : 3} />
+                            <td colSpan={isOpeningEntry ? 6 : 3} />
                           </tr>
                         </tfoot>
                       </table>

@@ -15,6 +15,17 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.41",
+    date: "2026-08-31",
+    changes: [
+      { type: "fix", text: "Bank FD voucher section: live balance indicator now includes in-progress form values (pending FD amount and pending voucher amount), so the indicator stays accurate regardless of the order entries are filled in." },
+      { type: "fix", text: "Bank FD Mature/Renew/Pre-Mature vouchers now correctly use VoucherType 10 (Bank FD) instead of VoucherType 3 (regular FD) — they now appear correctly in Voucher Search and Bank FD Ledger." },
+      { type: "improvement", text: "Bank FD Account: multiple credit entries supported in the voucher section (table interface matching legacy system) — each credit row can target a different GL account with its own narration and amount." },
+      { type: "improvement", text: "Bank FD Account: opening balance head code now correctly stores the BIGINT headcode (not the integer head ID) — fixes incorrect values written to bankfdaccountopeningbalance and bankfdaccountopeningtds tables." },
+      { type: "improvement", text: "Dashboard search bar now includes 'New Bank FD Account' as a searchable screen, consistent with all other account masters." },
+    ],
+  },
+  {
     version: "1.0.40",
     date: "2026-08-26",
     changes: [

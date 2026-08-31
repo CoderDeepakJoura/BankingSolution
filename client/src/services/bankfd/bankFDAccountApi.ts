@@ -15,9 +15,15 @@ export interface BankFDDetailItemDTO {
   serialNo?: number;
   openingBalance: number;
   openingBalanceType: string;
-  openingBalanceHeadCode?: number;
+  openingBalanceHeadId?: number;
   openingTDS: number;
-  openingTDSHeadCode?: number;
+  openingTDSHeadId?: number;
+}
+
+export interface VoucherEntryItemDTO {
+  creditAccountId: number;
+  amount: number;
+  narration: string;
 }
 
 export interface CreateBankFDAccountDTO {
@@ -30,8 +36,7 @@ export interface CreateBankFDAccountDTO {
   isOpeningEntry: boolean;
   details: BankFDDetailItemDTO[];
   // Voucher — only for non-opening entries
-  creditAccountId?: number;
-  voucherNarration?: string;
+  voucherEntries?: VoucherEntryItemDTO[];
   voucherDate?: string;
   headId?: number;
 }

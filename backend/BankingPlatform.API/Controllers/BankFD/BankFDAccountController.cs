@@ -31,10 +31,17 @@ namespace BankingPlatform.API.Controllers.BankFD
         // Opening balance (only for opening entry)
         public decimal OpeningBalance { get; set; }
         public string OpeningBalanceType { get; set; } = "Cr";
-        public long? OpeningBalanceHeadCode { get; set; }
+        public int? OpeningBalanceHeadId { get; set; }   // integer FK to accounthead.id
         // Opening TDS (only for opening entry)
         public decimal OpeningTDS { get; set; }
-        public long? OpeningTDSHeadCode { get; set; }
+        public int? OpeningTDSHeadId { get; set; }       // integer FK to accounthead.id
+    }
+
+    public class VoucherEntryItemDTO
+    {
+        public int CreditAccountId { get; set; }
+        public decimal Amount { get; set; }
+        public string Narration { get; set; } = "";
     }
 
     public class CreateBankFDAccountDTO
@@ -49,8 +56,7 @@ namespace BankingPlatform.API.Controllers.BankFD
         public int HeadId { get; set; }
         public List<BankFDDetailItemDTO> Details { get; set; } = new();
         // Voucher — only for non-opening entries
-        public int CreditAccountId { get; set; }
-        public string VoucherNarration { get; set; } = "";
+        public List<VoucherEntryItemDTO> VoucherEntries { get; set; } = new();
         public DateTime VoucherDate { get; set; }
     }
 
@@ -177,6 +183,17 @@ namespace BankingPlatform.API.Controllers.BankFD
                     .Where(ot => ot.AccountId == accId && ot.BranchID == branchId && detailIds.Contains(ot.FDAccDetId))
                     .ToListAsync();
 
+                // Pre-fetch headIds for opening balance and TDS using stored BIGINT headcodes
+                var obHeadCodes = openingBalances.Where(x => x.HeadCode.HasValue).Select(x => x.HeadCode!.Value).Distinct().ToList();
+                var tdsHeadCodes = openingTDSList.Where(x => x.HeadCode.HasValue).Select(x => x.HeadCode!.Value).Distinct().ToList();
+                var allHeadCodes = obHeadCodes.Union(tdsHeadCodes).ToList();
+                var headCodeToIdMap = allHeadCodes.Count > 0
+                    ? await _context.accounthead
+                        .AsNoTracking()
+                        .Where(x => allHeadCodes.Contains(x.headcode) && x.branchid == branchId)
+                        .ToDictionaryAsync(x => x.headcode, x => x.id)
+                    : new Dictionary<long, int>();
+
                 var detailResult = details.Select(d =>
                 {
                     var ob = openingBalances.FirstOrDefault(x => x.FDAccDetId == d.ID);
@@ -202,13 +219,13 @@ namespace BankingPlatform.API.Controllers.BankFD
                             id = ob.ID,
                             balance = ob.Balance,
                             balanceType = ob.BalanceType,
-                            headCode = ob.HeadCode
+                            headId = ob.HeadCode.HasValue && headCodeToIdMap.TryGetValue(ob.HeadCode.Value, out var obHid) ? obHid : (int?)null
                         } : null,
                         openingTDS = ot != null ? new
                         {
                             id = ot.ID,
                             balance = ot.Balance,
-                            headCode = ot.HeadCode
+                            headId = ot.HeadCode.HasValue && headCodeToIdMap.TryGetValue(ot.HeadCode.Value, out var tdsHid) ? tdsHid : (int?)null
                         } : null
                     };
                 });
@@ -246,8 +263,17 @@ namespace BankingPlatform.API.Controllers.BankFD
                 return BadRequest(new ResponseDto { Success = false, Message = "Account Name is required." });
             if (dto.Details == null || dto.Details.Count == 0)
                 return BadRequest(new ResponseDto { Success = false, Message = "At least one FD detail is required." });
-            if (!dto.IsOpeningEntry && dto.CreditAccountId <= 0)
-                return BadRequest(new ResponseDto { Success = false, Message = "Credit account is required." });
+            if (!dto.IsOpeningEntry)
+            {
+                if (dto.VoucherEntries == null || dto.VoucherEntries.Count == 0)
+                    return BadRequest(new ResponseDto { Success = false, Message = "At least one voucher credit entry is required." });
+                if (dto.VoucherEntries.Any(e => e.CreditAccountId <= 0 || e.Amount <= 0))
+                    return BadRequest(new ResponseDto { Success = false, Message = "Each voucher entry must have a valid credit account and amount greater than zero." });
+                decimal fdTotal = dto.Details.Sum(d => d.FDAmount);
+                decimal entryTotal = dto.VoucherEntries.Sum(e => e.Amount);
+                if (Math.Abs(fdTotal - entryTotal) > 0.01m)
+                    return BadRequest(new ResponseDto { Success = false, Message = $"Voucher credit total (₹{entryTotal:N2}) must equal the total FD amount (₹{fdTotal:N2})." });
+            }
 
             await using var tx = await _context.Database.BeginTransactionAsync();
             try
@@ -317,9 +343,7 @@ namespace BankingPlatform.API.Controllers.BankFD
                     voucherNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.VoucherDate);
                     decimal totalAmount = dto.Details.Sum(d => d.FDAmount);
 
-                    string narration = string.IsNullOrWhiteSpace(dto.VoucherNarration)
-                        ? $"Bank FD Deposit — {newAccount.AccountName} — {newAccount.AccountNumber}"
-                        : dto.VoucherNarration;
+                    string defaultNarration = $"Bank FD Deposit — {newAccount.AccountName} — {newAccount.AccountNumber}";
 
                     var voucher = new Voucher
                     {
@@ -329,7 +353,7 @@ namespace BankingPlatform.API.Controllers.BankFD
                         VoucherSubType = (int)Enums.VoucherSubType.BankFDDeposit,
                         VoucherDate = vDate,
                         ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-                        VoucherNarration = narration,
+                        VoucherNarration = defaultNarration,
                         VoucherStatus = voucherStatus,
                         AddedBy = userId,
                         ModifiedBy = 0,
@@ -342,15 +366,19 @@ namespace BankingPlatform.API.Controllers.BankFD
                     int seq = 1;
                     long bfdHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(newAccount.ID, dto.BranchId);
 
-                    // Dr: Bank FD Account (asset increases — money placed in bank FD)
-                    var drEntry = MakeEntry(bfdHeadCode, newAccount.ID, dto.BranchId, "Dr", narration, totalAmount, voucherStatus, vDate, voucher.Id, seq++);
+                    // Dr: Bank FD Account — single debit for total amount
+                    var drEntry = MakeEntry(bfdHeadCode, newAccount.ID, dto.BranchId, "Dr", defaultNarration, totalAmount, voucherStatus, vDate, voucher.Id, seq++);
                     _context.vouchercreditdebitdetails.Add(drEntry);
                     await _context.SaveChangesAsync();
 
-                    // Cr: User-selected credit GL account (cash/funds going to bank)
-                    long crHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(dto.CreditAccountId, dto.BranchId);
-                    var crEntry = MakeEntry(crHeadCode, dto.CreditAccountId, dto.BranchId, "Cr", narration, totalAmount, voucherStatus, vDate, voucher.Id, seq++);
-                    _context.vouchercreditdebitdetails.Add(crEntry);
+                    // Cr: one row per voucher entry (credit GL accounts)
+                    foreach (var ve in dto.VoucherEntries)
+                    {
+                        string entryNarration = string.IsNullOrWhiteSpace(ve.Narration) ? defaultNarration : ve.Narration.Trim();
+                        long crHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(ve.CreditAccountId, dto.BranchId);
+                        var crEntry = MakeEntry(crHeadCode, ve.CreditAccountId, dto.BranchId, "Cr", entryNarration, ve.Amount, voucherStatus, vDate, voucher.Id, seq++);
+                        _context.vouchercreditdebitdetails.Add(crEntry);
+                    }
 
                     // VoucherBFDDetail: one row per FD detail (operation = "BD" Bank Deposit)
                     var savedDetails = await _context.bankfdaccountdetail
@@ -506,6 +534,12 @@ namespace BankingPlatform.API.Controllers.BankFD
 
                 if (isOpeningEntry && d.OpeningBalance > 0)
                 {
+                    long? obHeadCode = d.OpeningBalanceHeadId.HasValue && d.OpeningBalanceHeadId.Value > 0
+                        ? await _context.accounthead
+                            .Where(x => x.id == d.OpeningBalanceHeadId.Value && x.branchid == branchId)
+                            .Select(x => (long?)x.headcode)
+                            .FirstOrDefaultAsync()
+                        : null;
                     var ob = new BankFDAccountOpeningBalance
                     {
                         BranchID = branchId,
@@ -513,20 +547,26 @@ namespace BankingPlatform.API.Controllers.BankFD
                         FDAccDetId = detail.ID,
                         Balance = d.OpeningBalance,
                         BalanceType = string.IsNullOrWhiteSpace(d.OpeningBalanceType) ? "Cr" : d.OpeningBalanceType,
-                        HeadCode = d.OpeningBalanceHeadCode
+                        HeadCode = obHeadCode
                     };
                     await _context.bankfdaccountopeningbalance.AddAsync(ob);
                 }
 
                 if (isOpeningEntry && d.OpeningTDS > 0)
                 {
+                    long? tdsHeadCode = d.OpeningTDSHeadId.HasValue && d.OpeningTDSHeadId.Value > 0
+                        ? await _context.accounthead
+                            .Where(x => x.id == d.OpeningTDSHeadId.Value && x.branchid == branchId)
+                            .Select(x => (long?)x.headcode)
+                            .FirstOrDefaultAsync()
+                        : null;
                     var tds = new BankFDAccountOpeningTDS
                     {
                         BranchID = branchId,
                         AccountId = accountId,
                         FDAccDetId = detail.ID,
                         Balance = d.OpeningTDS,
-                        HeadCode = d.OpeningTDSHeadCode
+                        HeadCode = tdsHeadCode
                     };
                     await _context.bankfdaccountopeningtds.AddAsync(tds);
                 }
