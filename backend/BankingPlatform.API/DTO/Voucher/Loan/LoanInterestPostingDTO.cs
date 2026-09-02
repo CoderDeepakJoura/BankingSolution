@@ -33,6 +33,16 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
 
     // ── Batch calculation DTOs ────────────────────────────────────────────────────
 
+    public class InterestCalcSegmentDTO
+    {
+        public DateTime FromDate { get; set; }
+        public DateTime ToDate { get; set; }
+        public decimal Balance { get; set; }
+        public int Days { get; set; }
+        public double Rate { get; set; }
+        public decimal Interest { get; set; }
+    }
+
     public class LoanInterestBatchItemDTO
     {
         public int LoanAccId { get; set; }
@@ -53,6 +63,8 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public int? ActOnIntPosting { get; set; }
         // Reason why TotalPostable is 0 (empty = has postable interest)
         public string? NoInterestReason { get; set; }
+        // Day-weighted breakdown (Balance / WO-schedule-fallback method only)
+        public List<InterestCalcSegmentDTO>? CalcBreakdown { get; set; }
     }
 
     public class LoanInterestBatchPostItemDTO

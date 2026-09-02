@@ -212,6 +212,12 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             // ── Dynamic unposted interest (not yet formally posted) ───────────────
             decimal dynStdInt   = 0m;
             decimal dynPenalInt = 0m;
+            List<InterestCalcSegmentDTO>? calcSegments = null;
+
+            // OB net for day-weighted calculation (principal base before VCDD events)
+            decimal obNetForDayWeighted = openingPrincipal
+                + obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr)
+                + openStdInt;
 
             if (intCalcMethod == "Schedule" && kistSchedule.Any())
             {
@@ -222,15 +228,14 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 dynStdInt = Math.Max(0, scheduleIntDue - postedStdInt);
 
                 // WO (without-interest) schedule: InterestAmt is 0 on every installment but rate
-                // is still set — fall back to Balance method for standard interest calculation.
+                // is still set — fall back to day-weighted Balance method.
                 if (dynStdInt == 0 && kist != null && (kist.StandardInterestRate ?? 0) > 0 && principalBal > 0)
                 {
-                    int days = Math.Max(0, (calcToDate - calcFromDate).Days);
-                    decimal rawStd = Math.Round(
-                        principalBal * (decimal)kist.StandardInterestRate!.Value / 100m * days / 365m, 2);
-                    // Use postedStdInt only (Cat 1 IntDr) — not totalPosted which would also subtract
-                    // penal amounts from the standard interest calculation, understating dynStdInt.
-                    dynStdInt = Math.Max(0, rawStd + openStdInt - postedStdInt);
+                    var (wInt, wSegs) = await CalculateDayWeightedInterestAsync(
+                        loanAccId, branchId, obNetForDayWeighted,
+                        calcFromDate, calcToDate, kist.StandardInterestRate!.Value);
+                    dynStdInt = Math.Max(0, wInt);
+                    calcSegments = wSegs;
                 }
 
                 // Overdue (penal) interest: on overdue principal at overdue rate since due date
@@ -247,22 +252,29 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     dynPenalInt = Math.Max(0, rawPenal - postedPenalInt);
                 }
             }
-            else if (principalBal > 0 && kist != null && (kist.StandardInterestRate ?? 0) > 0)
+            else if (kist != null && (kist.StandardInterestRate ?? 0) > 0)
             {
-                // Balance or MinBalance method: interest on outstanding principal for the period
-                int days = Math.Max(0, (calcToDate - calcFromDate).Days);
-
-                decimal effectivePrincipal;
                 if (intCalcMethod == "MinBalance")
-                    effectivePrincipal = CalculateMinimumBalance(openingPrincipal, obDetails, calcFromDate, calcToDate);
+                {
+                    // MinBalance: interest on minimum balance over the period (single balance, no breakdown)
+                    if (principalBal > 0)
+                    {
+                        int days = Math.Max(0, (calcToDate - calcFromDate).Days);
+                        decimal effectivePrincipal = CalculateMinimumBalance(openingPrincipal, obDetails, calcFromDate, calcToDate);
+                        decimal rawStd = Math.Round(
+                            effectivePrincipal * (decimal)kist.StandardInterestRate!.Value / 100m * days / 365m, 2);
+                        dynStdInt = Math.Max(0, rawStd + openStdInt - postedStdInt);
+                    }
+                }
                 else
-                    effectivePrincipal = principalBal; // Balance method: current outstanding
-
-                decimal rawStd = Math.Round(
-                    effectivePrincipal * (decimal)kist.StandardInterestRate!.Value / 100m * days / 365m, 2);
-                // Use postedStdInt (Cat 1 IntDr only) — not totalPosted which mixes penal amounts
-                // into the standard interest offset, causing dynStdInt to be understated.
-                dynStdInt = Math.Max(0, rawStd + openStdInt - postedStdInt);
+                {
+                    // Balance method: day-weighted interest on effective outstanding (principal + posted interest)
+                    var (wInt, wSegs) = await CalculateDayWeightedInterestAsync(
+                        loanAccId, branchId, obNetForDayWeighted,
+                        calcFromDate, calcToDate, kist.StandardInterestRate!.Value);
+                    dynStdInt = Math.Max(0, wInt);
+                    calcSegments = wSegs;
+                }
 
                 // Overdue penal on overdue principal
                 if ((kist.OverdueInterestRate ?? 0) > 0 && overduePrincipal > 0)
@@ -337,7 +349,97 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 IntCalcMethod                = intCalcMethod,
                 ActOnIntPosting              = actOnIntPosting,
                 IntRecDetail                 = intRecDetail,
+                CalcBreakdown                = calcSegments,
             };
+        }
+
+        // ── Day-weighted interest calculation ─────────────────────────────────────
+        // Computes interest on the effective outstanding balance (principal + posted-but-unpaid
+        // interest) over the period [calcFromDate+1 .. calcToDate], segmented by balance changes.
+        private async Task<(decimal TotalInterest, List<InterestCalcSegmentDTO> Segments)>
+            CalculateDayWeightedInterestAsync(
+                int loanAccId, int branchId,
+                decimal obNet,          // OB principal + obDetails.net + openStdInt
+                DateTime calcFromDate,
+                DateTime calcToDate,
+                double rate)
+        {
+            if (calcFromDate.Date >= calcToDate.Date)
+                return (0m, new List<InterestCalcSegmentDTO>());
+
+            var events = await _db.vouchercreditdebitdetails.AsNoTracking()
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "IP"))
+                .OrderBy(x => x.ValueDate).ThenBy(x => x.VoucherID)
+                .Select(x => new { x.EntryStatus, x.VoucherAmount, x.IntDr, x.IntCr, x.ValueDate })
+                .ToListAsync();
+
+            // Build starting effective balance at calcFromDate (events on that date included)
+            decimal balance = obNet;
+            foreach (var e in events.Where(x => x.ValueDate.Date <= calcFromDate.Date))
+            {
+                if (e.EntryStatus == "LA")      balance += e.VoucherAmount;
+                else if (e.EntryStatus == "LR") balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
+                else if (e.EntryStatus == "IP") balance += e.IntDr ?? 0m;
+            }
+            balance = Math.Max(0, balance);
+
+            // Group period events (after calcFromDate, up to and including calcToDate)
+            var periodGroups = events
+                .Where(x => x.ValueDate.Date > calcFromDate.Date && x.ValueDate.Date <= calcToDate.Date)
+                .GroupBy(x => x.ValueDate.Date)
+                .OrderBy(g => g.Key)
+                .ToList();
+
+            var segments = new List<InterestCalcSegmentDTO>();
+            DateTime segStart = calcFromDate.Date.AddDays(1);
+
+            foreach (var group in periodGroups)
+            {
+                DateTime evDate = group.Key;
+                int days = (evDate - segStart).Days + 1; // inclusive: segStart to evDate
+                if (days > 0 && balance > 0)
+                {
+                    segments.Add(new InterestCalcSegmentDTO
+                    {
+                        FromDate = segStart,
+                        ToDate   = evDate,
+                        Balance  = balance,
+                        Days     = days,
+                        Rate     = rate,
+                        Interest = Math.Round(balance * (decimal)rate / 100m * days / 365m, 2),
+                    });
+                }
+                foreach (var e in group)
+                {
+                    if (e.EntryStatus == "LA")      balance += e.VoucherAmount;
+                    else if (e.EntryStatus == "LR") balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
+                    else if (e.EntryStatus == "IP") balance += e.IntDr ?? 0m;
+                }
+                balance = Math.Max(0, balance);
+                segStart = evDate.AddDays(1);
+            }
+
+            // Final segment after last event
+            if (segStart <= calcToDate.Date && balance > 0)
+            {
+                int days = (calcToDate.Date - segStart).Days + 1;
+                if (days > 0)
+                {
+                    segments.Add(new InterestCalcSegmentDTO
+                    {
+                        FromDate = segStart,
+                        ToDate   = calcToDate.Date,
+                        Balance  = balance,
+                        Days     = days,
+                        Rate     = rate,
+                        Interest = Math.Round(balance * (decimal)rate / 100m * days / 365m, 2),
+                    });
+                }
+            }
+
+            return (segments.Sum(s => s.Interest), segments);
         }
 
         public async Task<List<LoanLedgerRowDTO>> GetLoanLedgerAsync(int loanAccId, int branchId)
@@ -373,12 +475,15 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     x.EntryStatus,
                     x.VoucherEntryType,
                     x.VoucherAmount,
+                    x.IntDr,
+                    x.IntCr,
                     x.Narration,
                 })
                 .ToListAsync();
 
             foreach (var v in vouchers)
             {
+                bool isIP = v.EntryStatus == "IP";
                 string desc = v.EntryStatus switch
                 {
                     "LA" => "Loan Advancement",
@@ -386,14 +491,18 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     "IP" => "Interest Posting",
                     _    => v.EntryStatus ?? "",
                 };
+                // IP entries: VoucherAmount = 0, actual amount is in IntDr (Dr side)
+                // LR entries: VoucherAmount = principal portion, IntCr = interest portion (both Cr)
+                decimal dr = isIP ? (v.IntDr ?? 0m) : (v.VoucherEntryType == "Dr" ? v.VoucherAmount : 0m);
+                decimal cr = isIP ? 0m : (v.VoucherEntryType == "Cr" ? (v.VoucherAmount + (v.IntCr ?? 0m)) : 0m);
                 rows.Add(new LoanLedgerRowDTO
                 {
                     EntryDate   = v.ValueDate.Date,
                     VoucherNo   = v.VoucherNo,
                     EntryType   = v.EntryStatus ?? "",
                     Description = !string.IsNullOrWhiteSpace(v.Narration) ? v.Narration : desc,
-                    Dr          = v.VoucherEntryType == "Dr" ? v.VoucherAmount : 0,
-                    Cr          = v.VoucherEntryType == "Cr" ? v.VoucherAmount : 0,
+                    Dr          = dr,
+                    Cr          = cr,
                 });
             }
 

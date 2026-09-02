@@ -185,7 +185,6 @@ namespace BankingPlatform.API.Controllers.AccountMasters
             }
         }
 
-        [AllowAnonymous]
         [HttpGet("savingaccount-images/{fileName}/{type}")]
         public IActionResult GetSavingAccountImage(
             [FromRoute] string fileName,

@@ -203,14 +203,8 @@ namespace BankingPlatform.API.Controllers.BankFD
                     double days = (postingDate - lastPostingDate).TotalDays;
                     if (days <= 0) continue;
 
-                    int n = det.IntCompInterval switch
-                    {
-                        1 => 12,  // Monthly
-                        2 => 4,   // Quarterly
-                        3 => 2,   // Half-Yearly
-                        4 => 1,   // Yearly
-                        _ => 12
-                    };
+                    // IntCompInterval stores n directly (12=Monthly, 4=Quarterly, 2=Half-Yearly, 1=Yearly)
+                    int n = det.IntCompInterval > 0 ? det.IntCompInterval : 1;
                     double t = days / 365.0;
                     double A = (double)fdBalance * Math.Pow(1.0 + det.IntRate / (n * 100.0), n * t);
                     decimal intAmount = Math.Max(0m, (decimal)Math.Round(A - (double)fdBalance));

@@ -84,6 +84,8 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
 
         // For Stand loans: the full voucherrecintdetail history (IntDr = posted, IntCr = recovered)
         public List<IntRecDetailRowDTO> IntRecDetail { get; set; } = new();
+        // Day-weighted breakdown (Balance / WO-schedule-fallback method only)
+        public List<InterestCalcSegmentDTO>? CalcBreakdown { get; set; }
     }
 
     public class LoanAccountSearchDTO

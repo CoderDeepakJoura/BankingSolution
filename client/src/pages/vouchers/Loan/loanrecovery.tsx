@@ -401,6 +401,10 @@ const LoanRecovery: React.FC = () => {
     const errs: Record<string, string> = {};
     if (!rowForm.accountType) errs.rowType = "Select account type";
     if (!rowForm.accountId) errs.rowAccount = "Select account";
+    else if (editingRowId === null && debitRows.some((r) => r.accountId === rowForm.accountId))
+      errs.rowAccount = "This account is already added";
+    else if (editingRowId !== null && debitRows.some((r) => r.rowId !== editingRowId && r.accountId === rowForm.accountId))
+      errs.rowAccount = "This account is already added in another row";
     if (!rowForm.amount || Number(rowForm.amount) <= 0) errs.rowAmount = "Enter valid amount";
     else if (Number(rowForm.amount) > pending + 0.01)
       errs.rowAmount = `Exceeds available (${fmt(pending)})`;
@@ -620,9 +624,9 @@ const LoanRecovery: React.FC = () => {
             </div>
           );
         return (
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <div className="overflow-x-auto overflow-y-auto max-h-80 rounded-lg border border-gray-200">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Voucher No</th>
@@ -730,9 +734,9 @@ const LoanRecovery: React.FC = () => {
             </div>
 
             {/* Outstanding interest categories */}
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <div className="overflow-x-auto overflow-y-auto max-h-72 rounded-lg border border-gray-200">
               <table className="w-full">
-                <thead className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Interest Category</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Description</th>
@@ -794,9 +798,9 @@ const LoanRecovery: React.FC = () => {
                   <p className="text-sm text-gray-500">No interest entries yet — interest will appear here after posting or recovery</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <div className="overflow-x-auto overflow-y-auto max-h-64 rounded-lg border border-gray-200">
                   <table className="w-full text-sm">
-                    <thead>
+                    <thead className="sticky top-0 z-10">
                       <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
                         <th className="px-4 py-3 text-center font-semibold w-10">#</th>
                         <th className="px-4 py-3 text-left font-semibold">Date</th>
@@ -859,9 +863,9 @@ const LoanRecovery: React.FC = () => {
             <p className="text-sm text-gray-500">No instalment schedule available</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <div className="overflow-x-auto overflow-y-auto max-h-80 rounded-lg border border-gray-200">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <thead className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                 <tr>
                   {["Kist No.", "Date", "Kist Amount (₹)", "Principal (₹)", "Interest (₹)"].map((h) => (
                     <th key={h} className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">{h}</th>
@@ -907,9 +911,9 @@ const LoanRecovery: React.FC = () => {
             <p className="text-sm text-gray-500">No FD pledges found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <div className="overflow-x-auto overflow-y-auto max-h-80 rounded-lg border border-gray-200">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <thead className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                 <tr>
                   {["#", "FD Account No", "Amount", "Interest", "Date"].map((h) => (
                     <th key={h} className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">{h}</th>
@@ -939,9 +943,9 @@ const LoanRecovery: React.FC = () => {
             <p className="text-sm text-gray-500">No RD pledges found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <div className="overflow-x-auto overflow-y-auto max-h-80 rounded-lg border border-gray-200">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <thead className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                 <tr>
                   {["#", "RD Account No", "Amount", "Interest", "Date"].map((h) => (
                     <th key={h} className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">{h}</th>
@@ -1060,6 +1064,7 @@ const LoanRecovery: React.FC = () => {
                           placeholder="Select Loan Product"
                           isClearable
                           isDisabled={isEditMode}
+                          menuPortalTarget={document.body}
                           styles={selectStyles(!!errors.loanProductId)}
                         />
                         {errors.loanProductId && <p className="mt-1 text-xs text-red-600">{errors.loanProductId}</p>}
@@ -1078,6 +1083,7 @@ const LoanRecovery: React.FC = () => {
                           noOptionsMessage={() =>
                             !formData.loanProductId ? "Select a product first" : "No accounts found"
                           }
+                          menuPortalTarget={document.body}
                           styles={selectStyles(!!errors.loanAccountId)}
                         />
                         {errors.loanAccountId && <p className="mt-1 text-xs text-red-600">{errors.loanAccountId}</p>}
@@ -1214,6 +1220,7 @@ const LoanRecovery: React.FC = () => {
                             placeholder="Type"
                             isClearable
                             isDisabled={!formData.loanAccountId || totalAmt <= 0}
+                            menuPortalTarget={document.body}
                             styles={compactSelectStyles(!!errors.rowType)}
                           />
                           {errors.rowType && <p className="mt-1 text-xs text-red-600">{errors.rowType}</p>}
@@ -1245,6 +1252,7 @@ const LoanRecovery: React.FC = () => {
                             noOptionsMessage={() =>
                               !rowForm.accountType ? "Select type first" : "No accounts"
                             }
+                            menuPortalTarget={document.body}
                             styles={compactSelectStyles(!!errors.rowAccount)}
                           />
                           {errors.rowAccount && <p className="mt-1 text-xs text-red-600">{errors.rowAccount}</p>}
@@ -1331,9 +1339,9 @@ const LoanRecovery: React.FC = () => {
                     {errors.debitItems && <p className="mb-2 text-sm text-red-600">{errors.debitItems}</p>}
 
                     {/* Debit table */}
-                    <div className="overflow-x-auto rounded-lg border border-rose-200">
+                    <div className="overflow-x-auto overflow-y-auto max-h-64 rounded-lg border border-rose-200">
                       <table className="w-full">
-                        <thead className="bg-gradient-to-r from-rose-50 to-red-50 border-b border-rose-200">
+                        <thead className="sticky top-0 z-10 bg-gradient-to-r from-rose-50 to-red-50 border-b border-rose-200">
                           <tr>
                             {["#", "Account Type", "Account", "Amount (Dr)", "Narration", "Action"].map((h) => (
                               <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-rose-800 uppercase tracking-wider">

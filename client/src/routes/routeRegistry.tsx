@@ -147,6 +147,7 @@ import ServiceMaster from "../pages/services/service/service-master";
 import ServiceData from "../pages/services/service/service-data";
 import AccService from "../pages/services/accservice/accservice";
 import BFDTDSSetting from "../pages/BankFD/BFDTDSSetting";
+import BankFDSettings from "../pages/BankFD/BankFDSettings";
 import FDTDSSlabList from "../pages/BankFD/FDTDSSlabList";
 import FDTDSSlabForm from "../pages/BankFD/FDTDSSlabForm";
 import BankFDAccountTable from "../pages/BankFD/BankFDAccountTable";
@@ -442,6 +443,7 @@ export const ROUTES: RouteEntry[] = [
 
   // ── Bank FD ───────────────────────────────────────────────────────────────
   { path: "/bank-fd-tds-setting",             element: <BFDTDSSetting />,               label: "Bank FD TDS Setting",      category: "Bank FD" },
+  { path: "/bank-fd-settings",               element: <BankFDSettings />,              label: "Bank FD Interest Income Setting", category: "Bank FD" },
   { path: "/fd-tds-slab",                     element: <CRUDDashboard title="FD TDS Slab" addPath="/fd-tds-slab/create" modifyPath="/fd-tds-slab/list" />, label: "FD TDS Slab", category: "Bank FD" },
   { path: "/fd-tds-slab/list",                element: <FDTDSSlabList />,               label: "FD TDS Slab List",         category: "Bank FD" },
   { path: "/fd-tds-slab/create",              element: <FDTDSSlabForm /> },

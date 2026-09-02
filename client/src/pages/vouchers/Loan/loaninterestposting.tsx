@@ -13,6 +13,7 @@ import commonservice from "../../../services/common/commonservice";
 import superUserSettingsApi from "../../../services/superuser/superUserSettingsApi";
 import loanInterestPostingApi, {
   LoanInterestBatchItemDTO,
+  InterestCalcSegmentDTO,
 } from "../../../services/vouchers/loan/loanInterestPostingApi";
 
 // ── Select styles ─────────────────────────────────────────────────────────────
@@ -67,9 +68,11 @@ const LoanInterestDetailPopup = ({
 
   const fromDate = item.calcFromDate ? new Date(item.calcFromDate) : null;
   const toDate   = item.calcToDate   ? new Date(item.calcToDate)   : null;
-  const days = fromDate && toDate
-    ? Math.max(0, Math.round((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)))
-    : null;
+  const days = item.calcBreakdown && item.calcBreakdown.length > 0
+    ? item.calcBreakdown.reduce((sum, s) => sum + s.days, 0)
+    : fromDate && toDate
+      ? Math.max(0, Math.round((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)))
+      : null;
 
   const fmtDate = (d: Date | null) =>
     d ? d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -159,6 +162,41 @@ const LoanInterestDetailPopup = ({
                 <tr className="bg-blue-50 border-t-2 border-blue-200">
                   <td colSpan={6} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total</td>
                   <td className="px-4 py-3 font-extrabold text-blue-800">₹{Math.round(item.stdInterest).toLocaleString("en-IN")}</td>
+                </tr>
+              </tfoot>
+            </table>
+          ) : item.calcBreakdown && item.calcBreakdown.length > 0 ? (
+            // Day-weighted breakdown (Balance / WO-schedule-fallback method)
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gradient-to-r from-blue-600 to-indigo-500">
+                  {["From Date", "To Date", "Days", "Balance", "Rate", "Interest"].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {item.calcBreakdown.map((seg: InterestCalcSegmentDTO, i: number) => (
+                  <tr key={i} className={`border-b border-gray-100 hover:bg-amber-50/40 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"}`}>
+                    <td className="px-4 py-3 text-gray-600">{fmtDate(new Date(seg.fromDate))}</td>
+                    <td className="px-4 py-3 text-gray-600">{fmtDate(new Date(seg.toDate))}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-700">{seg.days}</td>
+                    <td className="px-4 py-3 text-gray-700">{fmtAmt(seg.balance)}</td>
+                    <td className="px-4 py-3 text-gray-700">{seg.rate}%</td>
+                    <td className="px-4 py-3 font-bold text-amber-700">{fmtAmt(seg.interest)}</td>
+                  </tr>
+                ))}
+                {item.stdRecoverable > 0 && (
+                  <tr className="bg-purple-50/30 border-b border-gray-100">
+                    <td colSpan={5} className="px-4 py-3 text-xs font-semibold text-purple-700">Recoverable (posted, not yet collected)</td>
+                    <td className="px-4 py-3 font-bold text-purple-700">{fmtAmt(item.stdRecoverable)}</td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="bg-blue-50 border-t-2 border-blue-200">
+                  <td colSpan={5} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total Postable</td>
+                  <td className="px-4 py-3 font-extrabold text-blue-800">{fmtAmt(item.totalPostable)}</td>
                 </tr>
               </tfoot>
             </table>

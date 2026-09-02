@@ -296,6 +296,28 @@ class commonService extends ApiService {
   getImageUrl(filename: string, type: string) {
     return `${API_CONFIG.BASE_URL}/member/member-images/${filename}/${type}`;
   }
+
+  async fetchAuthImageUrl(url: string): Promise<string> {
+    try {
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) return '';
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    } catch {
+      return '';
+    }
+  }
+
+  async fetchAuthFile(url: string, fileName: string, mimeType = 'image/jpeg'): Promise<File | null> {
+    try {
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      return new File([blob], fileName, { type: mimeType });
+    } catch {
+      return null;
+    }
+  }
   async productname_unique(
     branchId: number,
     productName: string,

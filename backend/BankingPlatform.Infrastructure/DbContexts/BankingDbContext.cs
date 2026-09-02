@@ -157,6 +157,7 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<NextBillNumber> nextbillnumber { get; set; }
     public virtual DbSet<LoanExpense> loanexpense { get; set; }
     public virtual DbSet<BFDHeadTDSAccSetting> bfdheadtdsaccsettings { get; set; }
+    public virtual DbSet<BankFDInterestIncomeSetting> bankfdinterestincomesetting { get; set; }
     public virtual DbSet<FDTDSSlab> fdtdsslab { get; set; }
     public virtual DbSet<FDTDSSlabDetail> fdtdsslabdetail { get; set; }
     public virtual DbSet<BankFDAccountDetail> bankfdaccountdetail { get; set; }

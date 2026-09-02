@@ -93,6 +93,7 @@ const BankFDMaturePage: React.FC = () => {
     const hasSetting = !!data.tdsSetting;
     setHasTDSSetting(hasSetting);
     setTdsAccId(hasSetting ? data.tdsSetting!.tdsAccId : null);
+    setIntIncomeAccId(data.intIncomeSetting?.intIncomeAccId ?? null);
   };
 
   const handleDetailSelect = (detail: BFDDetailItem) => {

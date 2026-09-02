@@ -29,6 +29,15 @@ export interface LoanInterestPostingVoucherDTO {
   narration?: string;
 }
 
+export interface InterestCalcSegmentDTO {
+  fromDate: string;
+  toDate: string;
+  balance: number;
+  days: number;
+  rate: number;
+  interest: number;
+}
+
 export interface LoanInterestBatchItemDTO {
   loanAccId: number;
   accountNumber: string;
@@ -46,6 +55,7 @@ export interface LoanInterestBatchItemDTO {
   intCalcMethod: string;
   actOnIntPosting?: number;
   noInterestReason?: string;
+  calcBreakdown?: InterestCalcSegmentDTO[];
 }
 
 export interface LoanInterestBatchPostItemDTO {

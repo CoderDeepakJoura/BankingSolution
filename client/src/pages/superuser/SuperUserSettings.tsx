@@ -90,7 +90,7 @@ const SuperUserSettings = () => {
             </div>
             <div className="relative flex items-center gap-4">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => navigate("/dashboard")}
                 className="w-9 h-9 flex items-center justify-center rounded-lg bg-white/15 hover:bg-white/25 text-white transition-all cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />

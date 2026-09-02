@@ -159,7 +159,7 @@ const AccService: React.FC = () => {
                 <button onClick={() => { setAccId(0); setServiceId(0); }} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
                   <RefreshCw className="w-4 h-4" /> Reset
                 </button>
-                <button onClick={() => navigate(-1)} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
+                <button onClick={() => navigate("/dashboard")} className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
                   <X className="w-4 h-4" /> Close
                 </button>
               </div>

@@ -1,12 +1,45 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "./redux";
 import commonservice from "./services/common/commonservice";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Login } from "./pages";
 import SessionExpired from "./pages/session-expired";
 import { ROUTES } from "./routes/routeRegistry";
 import { Monitor } from "lucide-react";
+
+const PUBLIC_PATHS = new Set(["/", "/session-expired"]);
+
+function RouterGuard({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+
+  // Ref so the single capture listener always sees the latest pathname
+  const locationRef = useRef(location);
+  locationRef.current = location;
+
+  useEffect(() => {
+    // Seed an extra entry so back always has something to pop into our trap
+    window.history.pushState(null, "");
+
+    const block = (e: PopStateEvent) => {
+      // Allow normal back on public pages (login / session-expired)
+      if (PUBLIC_PATHS.has(locationRef.current.pathname)) return;
+
+      // Capture phase → fires before React Router's listener.
+      // stopImmediatePropagation prevents React Router from processing the event.
+      e.stopImmediatePropagation();
+
+      // Push state again so the next back press is also trapped — user stays on current page.
+      window.history.pushState(null, "");
+    };
+
+    // capture: true  → our handler fires FIRST, before React Router
+    window.addEventListener("popstate", block, { capture: true });
+    return () => window.removeEventListener("popstate", block, { capture: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return <>{children}</>;
+}
 
 function DesktopOnly() {
   return (
@@ -47,17 +80,19 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/session-expired" element={<SessionExpired />} />
-        {ROUTES.map((r) => (
-          <Route
-            key={r.path}
-            path={r.path}
-            element={r.suOnly && !user.isSu ? <Navigate to="/dashboard" replace /> : r.element}
-          />
-        ))}
-      </Routes>
+      <RouterGuard>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/session-expired" element={<SessionExpired />} />
+          {ROUTES.map((r) => (
+            <Route
+              key={r.path}
+              path={r.path}
+              element={r.suOnly && !user.isSu ? <Navigate to="/dashboard" replace /> : r.element}
+            />
+          ))}
+        </Routes>
+      </RouterGuard>
     </BrowserRouter>
   );
 }

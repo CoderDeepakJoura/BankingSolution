@@ -1,3 +1,4 @@
+using BankingPlatform.API.Common;
 using BankingPlatform.Infrastructure.Models.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,6 +17,9 @@ namespace BankingPlatform.API.Controllers
         [HttpGet("{branchId}")]
         public async Task<IActionResult> Get([FromRoute] int branchId)
         {
+            if (!ClaimsHelper.BranchMatches(User, branchId))
+                return Forbid();
+
             var s = await _db.superusersettings
                 .FirstOrDefaultAsync(x => x.branchid == branchId);
 
@@ -38,6 +42,10 @@ namespace BankingPlatform.API.Controllers
         [HttpPost]
         public async Task<IActionResult> Save([FromBody] SuperUserSettingsDTO dto)
         {
+            // Only super-users may change these operational settings
+            if (!ClaimsHelper.GetIsSu(User))
+                return Forbid();
+
             var existing = await _db.superusersettings
                 .FirstOrDefaultAsync(x => x.branchid == dto.BranchId);
 

@@ -133,6 +133,7 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
 
   // ── Bank FD ───────────────────────────────────────────────────────────────
   { path: "/bank-fd-tds-setting",             label: "Bank FD TDS Setting",             category: "Bank FD" },
+  { path: "/bank-fd-settings",               label: "Bank FD Interest Income Setting", category: "Bank FD" },
   { path: "/fd-tds-slab",                     label: "FD TDS Slab",                     category: "Bank FD" },
   { path: "/fd-tds-slab/list",                label: "FD TDS Slab List",                category: "Bank FD" },
   { path: "/bank-fd-account",                 label: "Bank FD Account",                 category: "Bank FD" },

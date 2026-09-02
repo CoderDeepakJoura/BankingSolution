@@ -61,7 +61,7 @@ const urlToFile = async (
   mimeType: string = "image/jpeg"
 ): Promise<File> => {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { credentials: 'include' });
     const blob = await response.blob();
     return new File([blob], fileName, { type: mimeType });
   } catch (error) {

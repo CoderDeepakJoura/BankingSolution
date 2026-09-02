@@ -1730,6 +1730,15 @@ FOR EACH ROW EXECUTE FUNCTION fn_prevent_auditlog_modification();
 -- SECTION 14 : BANK FD MODULE
 -- =============================================================================
 
+-- BankFDInterestIncomeSetting — Interest Income Account per head code per branch
+CREATE TABLE IF NOT EXISTS bankfdinterestincomesetting (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    brid            INT NOT NULL,
+    headcode        BIGINT NOT NULL DEFAULT 0,
+    intincomeaccid  INT NOT NULL DEFAULT 0,
+    CONSTRAINT pk_bankfdinterestincomesetting PRIMARY KEY (id, brid)
+);
+
 -- BFDHeadTDSAccSettings — Bank FD TDS Account mapping (one row per head→TDS account per branch)
 CREATE TABLE IF NOT EXISTS bfdheadtdsaccsettings (
     id    INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
@@ -2049,6 +2058,9 @@ ALTER TABLE savingproductbranchwiserule ADD COLUMN IF NOT EXISTS daysinayear INT
 -- but listed here to follow the pattern for future column additions)
 ALTER TABLE bfdheadtdsaccsettings ADD COLUMN IF NOT EXISTS headcode BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE bfdheadtdsaccsettings ADD COLUMN IF NOT EXISTS tdsaccid INT NOT NULL DEFAULT 0;
+ALTER TABLE bankfdinterestincomesetting ADD COLUMN IF NOT EXISTS brid INT NOT NULL DEFAULT 0;
+ALTER TABLE bankfdinterestincomesetting ADD COLUMN IF NOT EXISTS headcode BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE bankfdinterestincomesetting ADD COLUMN IF NOT EXISTS intincomeaccid INT NOT NULL DEFAULT 0;
 ALTER TABLE fdtdsslab ADD COLUMN IF NOT EXISTS namesl VARCHAR(150) NULL;
 ALTER TABLE fdtdsslab ADD COLUMN IF NOT EXISTS withpancard SMALLINT NOT NULL DEFAULT 0;
 ALTER TABLE fdtdsslabdetail ADD COLUMN IF NOT EXISTS fromamount NUMERIC(18,2) NOT NULL DEFAULT 0;

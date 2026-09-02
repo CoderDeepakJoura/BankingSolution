@@ -68,7 +68,7 @@ const urlToFile = async (
   mimeType: string = "image/jpeg"
 ): Promise<File> => {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { credentials: 'include' });
     const blob = await response.blob();
     return new File([blob], fileName, { type: mimeType });
   } catch (error) {
@@ -139,10 +139,9 @@ const RDKistVoucher: React.FC = () => {
   ) {
     if (picExt) {
       const fileName = `account_${accountId}_picture${picExt}`;
-      const cacheBuster = `?t=${Date.now()}`;
-      const photoUrl =
-        commonservice.getAccountImageUrl(fileName, "Pictures") + cacheBuster;
-
+      const photoUrl = await commonservice.fetchAuthImageUrl(
+        commonservice.getAccountImageUrl(fileName, "Pictures") + `?t=${Date.now()}`
+      );
       setPictureFile({
         id: Date.now(),
         name: "picture",
@@ -152,9 +151,9 @@ const RDKistVoucher: React.FC = () => {
     }
     if (signExt) {
       const fileName = `account_${accountId}_signature${signExt}`;
-      const cacheBuster = `?t=${Date.now()}`;
-      const signUrl =
-        commonservice.getAccountImageUrl(fileName, "Signatures") + cacheBuster;
+      const signUrl = await commonservice.fetchAuthImageUrl(
+        commonservice.getAccountImageUrl(fileName, "Signatures") + `?t=${Date.now()}`
+      );
       setSignatureFile({
         id: Date.now() + 1,
         name: "signature",

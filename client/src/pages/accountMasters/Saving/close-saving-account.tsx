@@ -116,26 +116,25 @@ const CloseSavingAccount: React.FC = () => {
   ) {
     if (picExt) {
       const fileName = `account_${accountId}_picture${picExt}`;
-      const cacheBuster = `?t=${Date.now()}`;
-      const photoUrl =
-        commonservice.getAccountImageUrl(fileName, "Pictures") + cacheBuster;
-
+      const photoBlob = await commonservice.fetchAuthImageUrl(
+        commonservice.getAccountImageUrl(fileName, "Pictures") + `?t=${Date.now()}`
+      );
       setPictureFile({
         id: Date.now(),
         name: "picture",
-        preview: photoUrl,
+        preview: photoBlob,
         file: null,
       });
     }
     if (signExt) {
       const fileName = `account_${accountId}_signature${signExt}`;
-      const cacheBuster = `?t=${Date.now()}`;
-      const signUrl =
-        commonservice.getAccountImageUrl(fileName, "Signatures") + cacheBuster;
+      const signBlob = await commonservice.fetchAuthImageUrl(
+        commonservice.getAccountImageUrl(fileName, "Signatures") + `?t=${Date.now()}`
+      );
       setSignatureFile({
         id: Date.now() + 1,
         name: "signature",
-        preview: signUrl,
+        preview: signBlob,
         file: null,
       });
     }

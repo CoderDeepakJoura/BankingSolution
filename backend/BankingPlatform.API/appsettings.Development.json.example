@@ -6,21 +6,21 @@
     }
   },
   "JwtSettings": {
-    "SecretKey": "",
+    "SecretKey": "<base64-encoded-key-at-least-32-bytes>",
     "Issuer": "BankingAPI",
     "Audience": "BankingClients",
     "ExpiryDays": 1,
     "RefreshTokenExpiryDays": 7
   },
   "ConnectionStrings": {
-    "BankingDatabase": ""
+    "BankingDatabase": "Host=localhost;Database=SecureBankDB;Username=<user>;Password=<password>"
   },
   "DocPaths": {
     "MemberImagesDrive": "D:",
     "AccountImagesDrive": "D:"
   },
   "ScriptPath": {
-    "LoanAdvancement": ""
+    "LoanAdvancement": "E:\\Selenium"
   },
-  "AllowedHosts": "app.sicswave.com;hindusociety.sicswave.com;krishna.sicswave.com;localhost"
+  "AllowedHosts": "localhost"
 }

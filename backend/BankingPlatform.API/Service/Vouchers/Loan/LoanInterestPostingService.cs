@@ -157,38 +157,16 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 // ── VoucherCreditDebitDetails ─────────────────────────────────────
                 int row = 1;
 
-                // Dr: Interest Income account (income recognized)
-                //     Falls back to loan account if no income account configured
-                int  drAccId = intIncomeAccId > 0 ? intIncomeAccId : dto.LoanAccountId;
-                long drHead  = intIncomeHead  > 0 ? intIncomeHead  : loanHead;
-
-                await _db.vouchercreditdebitdetails.AddAsync(new VoucherCreditDebitDetails
-                {
-                    BrId             = dto.BrId,
-                    VoucherID        = voucherId,
-                    AccountId        = drAccId,
-                    AccHeadCode      = drHead,
-                    VoucherAmount    = total,
-                    VoucherEntryType = "Dr",
-                    EntryStatus      = Enums.VoucherStatus.Dr.ToString(),
-                    Narration        = narr,
-                    VoucherStatus    = vrStatus,
-                    ValueDate        = valDate,
-                    VoucherSeqNo     = row,
-                    IntDr = null, IntCr = null, ExpenseAmt = 0,
-                    HCL1 = 0, HCL2 = 0, HCL3 = 0,
-                });
-                row++;
-
-                // Cr: Loan account (interest formally recognized as receivable on this loan)
-                var crEntry = new VoucherCreditDebitDetails
+                // Dr: Loan account (interest charged to loan — payment side in Day Book)
+                //     EntryStatus="IP", IntDr=amount, VoucherAmount=0 (loan ledger uses IntDr)
+                var drEntry = new VoucherCreditDebitDetails
                 {
                     BrId             = dto.BrId,
                     VoucherID        = voucherId,
                     AccountId        = dto.LoanAccountId,
                     AccHeadCode      = loanHead,
                     VoucherAmount    = 0,
-                    VoucherEntryType = "Cr",
+                    VoucherEntryType = "Dr",
                     EntryStatus      = "IP",
                     Narration        = narr,
                     VoucherStatus    = vrStatus,
@@ -199,9 +177,33 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     ExpenseAmt       = 0,
                     HCL1 = 0, HCL2 = 0, HCL3 = 0,
                 };
-                await _db.vouchercreditdebitdetails.AddAsync(crEntry);
+                await _db.vouchercreditdebitdetails.AddAsync(drEntry);
                 await _db.SaveChangesAsync();
-                int crId = crEntry.Id;
+                int ipEntryId = drEntry.Id;
+                row++;
+
+                // Cr: Interest Income account (income recognized — receipt side in Day Book)
+                //     Falls back to loan account if no income account configured
+                int  crAccId = intIncomeAccId > 0 ? intIncomeAccId : dto.LoanAccountId;
+                long crHead  = intIncomeHead  > 0 ? intIncomeHead  : loanHead;
+
+                await _db.vouchercreditdebitdetails.AddAsync(new VoucherCreditDebitDetails
+                {
+                    BrId             = dto.BrId,
+                    VoucherID        = voucherId,
+                    AccountId        = crAccId,
+                    AccHeadCode      = crHead,
+                    VoucherAmount    = total,
+                    VoucherEntryType = "Cr",
+                    EntryStatus      = Enums.VoucherStatus.Cr.ToString(),
+                    Narration        = narr,
+                    VoucherStatus    = vrStatus,
+                    ValueDate        = valDate,
+                    VoucherSeqNo     = row,
+                    IntDr = null, IntCr = null, ExpenseAmt = 0,
+                    HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                });
+                row++;
 
                 // ── VoucherRecIntDetail — formal interest ledger entries (Stand loans only) ─
                 // AddInBalance doesn't use this table — interest is embedded in principal via
@@ -213,7 +215,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
                         {
                             BrId              = dto.BrId,
-                            VAccCrDrId        = crId,
+                            VAccCrDrId        = ipEntryId,
                             VoucherId         = voucherId,
                             VoucherNo         = nextVrNo,
                             EntryDate         = vrDate,
@@ -232,7 +234,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
                         {
                             BrId              = dto.BrId,
-                            VAccCrDrId        = crId,
+                            VAccCrDrId        = ipEntryId,
                             VoucherId         = voucherId,
                             VoucherNo         = nextVrNo,
                             EntryDate         = vrDate,
@@ -376,6 +378,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     IntCalcMethod       = bal.IntCalcMethod,
                     ActOnIntPosting     = bal.ActOnIntPosting,
                     NoInterestReason    = noReason,
+                    CalcBreakdown       = bal.CalcBreakdown,
                 });
             }
             return result;

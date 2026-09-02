@@ -40,6 +40,13 @@ export interface BFDAccountDetailsResponse {
   details: BFDDetailItem[];
   tdsSlabs: TDSSlab[];
   tdsSetting: { tdsAccId: number } | null;
+  intIncomeSetting: { intIncomeAccId: number } | null;
+}
+
+export interface BFDIntIncomeSettingItem {
+  id: number;
+  headCode: number;
+  intIncomeAccId: number;
 }
 
 export interface BankFDMatureRequestDTO {
@@ -101,6 +108,34 @@ class BankFDMatureApiService extends ApiService {
       body: JSON.stringify(dto),
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  async getInterestIncomeSettingByHeadId(branchId: number, headId: number): Promise<ApiResponse<{ intIncomeAccId: number | null }>> {
+    return this.makeRequest(`/BankFDMature/${branchId}/interest-income-setting-by-headid/${headId}`);
+  }
+
+  async getInterestIncomeSettings(branchId: number): Promise<ApiResponse<BFDIntIncomeSettingItem[]>> {
+    return this.makeRequest(`/BankFDMature/${branchId}/interest-income-settings`);
+  }
+
+  async createInterestIncomeSetting(branchId: number, headCode: number, intIncomeAccId: number): Promise<ApiResponse<{ message: string }>> {
+    return this.makeRequest(`/BankFDMature/${branchId}/interest-income-settings`, {
+      method: 'POST',
+      body: JSON.stringify({ headCode, intIncomeAccId }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  async updateInterestIncomeSetting(branchId: number, id: number, headCode: number, intIncomeAccId: number): Promise<ApiResponse<{ message: string }>> {
+    return this.makeRequest(`/BankFDMature/${branchId}/interest-income-settings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ headCode, intIncomeAccId }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  async deleteInterestIncomeSetting(branchId: number, id: number): Promise<ApiResponse<{ message: string }>> {
+    return this.makeRequest(`/BankFDMature/${branchId}/interest-income-settings/${id}`, { method: 'DELETE' });
   }
 }
 

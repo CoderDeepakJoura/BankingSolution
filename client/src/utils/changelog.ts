@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.46",
+    date: "2026-09-02",
+    changes: [
+      { type: "fix", text: "Security: super-user settings now require isSu claim — non-SU users can no longer call these endpoints directly via the API" },
+      { type: "fix", text: "Security: member and account images now require authentication — previously publicly accessible without login" },
+      { type: "fix", text: "Security: verbose request logging removed from production — all requests were being logged to console" },
+      { type: "fix", text: "Security: JWT secret and DB credentials removed from source code; appsettings.json secrets are now empty in the repo" },
+      { type: "fix", text: "Security: password strength indicator in user creation form no longer uses innerHTML — prevents potential XSS" },
+      { type: "improvement", text: "AllowedHosts restricted to known domains — was previously set to wildcard (*)" },
+      { type: "new", text: "Bank FD Interest Income Account auto-populates when selecting a head code in Mature, Pre-Mature, and Interest Posting screens" },
+      { type: "new", text: "Bank FD Interest Income Setting screen — configure per-head-code income account mapping" },
+    ],
+  },
+  {
     version: "1.0.45",
     date: "2026-08-31",
     changes: [

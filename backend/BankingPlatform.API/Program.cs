@@ -353,42 +353,7 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-app.Use(async (context, next) =>
-{
-    var origin = context.Request.Headers["Origin"].ToString();
-    var method = context.Request.Method;
-    var path = context.Request.Path;
-
-    Console.WriteLine($"🌐 Request: {method} {path} from Origin: {origin}");
-
-    // ✅ Handle preflight OPTIONS requests manually if needed
-    if (method == "OPTIONS")
-    {
-        Console.WriteLine("🔄 Preflight OPTIONS request detected");
-
-        var allowedOrigins = new[] {
-            "https://app.sicswave.com",
-            "https://hindusociety.sicswave.com",
-            "https://localhost:5173",
-            "http://127.0.0.1:5173"
-        };
-
-        if (allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
-        {
-            context.Response.Headers.Add("Access-Control-Allow-Origin", origin);
-            context.Response.Headers.Add("Access-Control-Allow-Credentials", "true");
-            context.Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-            context.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-            context.Response.StatusCode = 200;
-            Console.WriteLine($"✅ Preflight handled manually for: {origin}");
-            return;
-        }
-    }
-
-    await next();
-});
-
-// ✅ Apply CORS early in the pipeline
+// Apply CORS early in the pipeline
 app.UseCors("_myAllowSpecificOrigins");
 
 if (app.Environment.IsDevelopment())

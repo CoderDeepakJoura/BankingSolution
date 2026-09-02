@@ -161,7 +161,7 @@ const CashPaymentReceiptVoucher: React.FC = () => {
             text: "Please configure the default cash-in-hand account in Settings before using this voucher.",
             confirmButtonColor: "#EF4444",
           });
-          navigate(-1);
+          navigate("/dashboard");
           return;
         }
         setCashAccountId(accId);
@@ -176,7 +176,7 @@ const CashPaymentReceiptVoucher: React.FC = () => {
         setFormReady(true);
       } catch {
         Swal.fire("Error", "Failed to load voucher configuration.", "error");
-        navigate(-1);
+        navigate("/dashboard");
       } finally {
         setLoading(false);
       }

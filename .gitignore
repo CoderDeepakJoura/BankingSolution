@@ -15,6 +15,10 @@ client/dist/
 # Env files
 .env
 
+# Local secrets — never commit these; server keeps its own at /var/www/banking-api/
+backend/**/appsettings.Development.json
+backend/**/appsettings.Local.json
+
 # Docker
 **/Dockerfile
 **/docker-compose.yml

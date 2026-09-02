@@ -191,7 +191,6 @@ namespace BankingPlatform.API.Controllers.Member
             }
         }
 
-        [AllowAnonymous]
         [HttpGet("member-images/{fileName}/{type}")]
         public IActionResult GetMemberImage(
             [FromRoute] string fileName,

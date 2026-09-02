@@ -33,6 +33,12 @@ namespace BankingPlatform.API.Controllers.BankFD
         public decimal? OverrideMaturityAmount { get; set; }
     }
 
+    public class SaveInterestIncomeSettingDTO
+    {
+        public long HeadCode { get; set; }
+        public int IntIncomeAccId { get; set; }
+    }
+
     public class BankFDPreMatureRequestDTO
     {
         public int BranchId { get; set; }
@@ -187,6 +193,10 @@ namespace BankingPlatform.API.Controllers.BankFD
                     .AsNoTracking()
                     .FirstOrDefaultAsync(t => t.BrId == branchId && t.HeadCode == account.HeadCode);
 
+                var intIncomeSetting = await _context.bankfdinterestincomesetting
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.BrId == branchId && s.HeadCode == account.HeadCode);
+
                 var data = new
                 {
                     account = new
@@ -227,6 +237,10 @@ namespace BankingPlatform.API.Controllers.BankFD
                     tdsSetting = tdsSetting == null ? null : new
                     {
                         tdsAccId = tdsSetting.TDSAccId
+                    },
+                    intIncomeSetting = intIncomeSetting == null ? null : new
+                    {
+                        intIncomeAccId = intIncomeSetting.IntIncomeAccId
                     }
                 };
 
@@ -293,6 +307,100 @@ namespace BankingPlatform.API.Controllers.BankFD
                 await tx.RollbackAsync();
                 _logger.LogError(ex, "PreMatureFD error");
                 await _commonFunctions.LogErrors(ex, nameof(PreMatureFD), nameof(BankFDMatureController));
+                return StatusCode(500, new ResponseDto { Success = false, Message = ex.Message });
+            }
+        }
+
+        // ── GET /{branchId}/interest-income-setting-by-headid/{headId}
+        [HttpGet("{branchId}/interest-income-setting-by-headid/{headId}")]
+        public async Task<IActionResult> GetInterestIncomeSettingByHeadId(int branchId, int headId)
+        {
+            if (headId <= 0)
+                return Ok(new { Success = true, data = new { intIncomeAccId = (int?)null } });
+
+            var headCode = await _context.accounthead
+                .Where(x => x.id == headId && x.branchid == branchId)
+                .Select(x => x.headcode)
+                .FirstOrDefaultAsync();
+
+            var setting = headCode > 0
+                ? await _context.bankfdinterestincomesetting
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.BrId == branchId && s.HeadCode == headCode)
+                : null;
+
+            return Ok(new { Success = true, data = new { intIncomeAccId = setting?.IntIncomeAccId } });
+        }
+
+        // ── GET /{branchId}/interest-income-settings — all settings for this branch
+        [HttpGet("{branchId}/interest-income-settings")]
+        public async Task<IActionResult> GetInterestIncomeSettings(int branchId)
+        {
+            var settings = await _context.bankfdinterestincomesetting
+                .AsNoTracking()
+                .Where(s => s.BrId == branchId)
+                .Select(s => new { id = s.ID, headCode = s.HeadCode, intIncomeAccId = s.IntIncomeAccId })
+                .ToListAsync();
+            return Ok(new { Success = true, data = settings });
+        }
+
+        // ── POST /{branchId}/interest-income-settings — create setting
+        [HttpPost("{branchId}/interest-income-settings")]
+        public async Task<IActionResult> CreateInterestIncomeSetting(int branchId, [FromBody] SaveInterestIncomeSettingDTO dto)
+        {
+            try
+            {
+                if (await _context.bankfdinterestincomesetting.AnyAsync(s => s.BrId == branchId && s.HeadCode == dto.HeadCode))
+                    return BadRequest(new ResponseDto { Success = false, Message = "A setting for this account head already exists." });
+                _context.bankfdinterestincomesetting.Add(new BankFDInterestIncomeSetting
+                {
+                    BrId = branchId, HeadCode = dto.HeadCode, IntIncomeAccId = dto.IntIncomeAccId
+                });
+                await _context.SaveChangesAsync();
+                return Ok(new ResponseDto { Success = true, Message = "Setting saved." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CreateInterestIncomeSetting error");
+                return StatusCode(500, new ResponseDto { Success = false, Message = ex.Message });
+            }
+        }
+
+        // ── PUT /{branchId}/interest-income-settings/{id} — update setting
+        [HttpPut("{branchId}/interest-income-settings/{id}")]
+        public async Task<IActionResult> UpdateInterestIncomeSetting(int branchId, int id, [FromBody] SaveInterestIncomeSettingDTO dto)
+        {
+            try
+            {
+                var setting = await _context.bankfdinterestincomesetting.FirstOrDefaultAsync(s => s.ID == id && s.BrId == branchId);
+                if (setting == null) return NotFound(new ResponseDto { Success = false, Message = "Setting not found." });
+                setting.HeadCode = dto.HeadCode;
+                setting.IntIncomeAccId = dto.IntIncomeAccId;
+                await _context.SaveChangesAsync();
+                return Ok(new ResponseDto { Success = true, Message = "Setting updated." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "UpdateInterestIncomeSetting error");
+                return StatusCode(500, new ResponseDto { Success = false, Message = ex.Message });
+            }
+        }
+
+        // ── DELETE /{branchId}/interest-income-settings/{id}
+        [HttpDelete("{branchId}/interest-income-settings/{id}")]
+        public async Task<IActionResult> DeleteInterestIncomeSetting(int branchId, int id)
+        {
+            try
+            {
+                var setting = await _context.bankfdinterestincomesetting.FirstOrDefaultAsync(s => s.ID == id && s.BrId == branchId);
+                if (setting == null) return NotFound(new ResponseDto { Success = false, Message = "Setting not found." });
+                _context.bankfdinterestincomesetting.Remove(setting);
+                await _context.SaveChangesAsync();
+                return Ok(new ResponseDto { Success = true, Message = "Setting deleted." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteInterestIncomeSetting error");
                 return StatusCode(500, new ResponseDto { Success = false, Message = ex.Message });
             }
         }

@@ -1,3354 +1,3352 @@
-import React, { useState, useRef, useEffect } from "react";
-import { encryptId, decryptId } from "../../utils/encryption";
-import { useFormValidation } from "../../services/Validations/member/useFormValidation";
-import { ValidationSummary } from "../../components/Validations/ValidationSummary";
-import { FormField } from "../../components/Validations/FormField";
-import Swal from "sweetalert2";
-import { ValidationError } from "../../services/Validations/validation";
-import Select from "react-select";
-import commonservice, {
-  AccountMaster,
-} from "../../services/common/commonservice";
-import { useSelector } from "react-redux";
-import { RootState } from "../../redux";
-import memberAPIService, {
-  CombinedMemberDTO,
-  MemberDTO,
-  MemberDocDetailsDTO,
-  MemberLocationDetailsDTO,
-  VoucherDTO,
-  MemberNomineeDetailsDTO,
-} from "../../services/member/memberServiceapi";
-import {
-  User,
-  Users,
-  MapPin,
-  Phone,
-  CreditCard,
-  Calendar,
-  Building,
-  Home,
-  Plus,
-  Minus,
-  Save,
-  RotateCcw,
-  ArrowLeft,
-  UserCheck,
-  Globe,
-  Info,
-  FileText,
-  Upload,
-  X,
-  Image as ImageIcon,
-  Settings,
-  ChevronRight,
-  ChevronLeft,
-  Lock,
-  Check,
-} from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
-import DashboardLayout from "../../Common/Layout";
-import ZoneApiService from "../../services/location/zone/zoneapi";
-import DatePicker from "../../components/DatePicker";
-
-interface ZoneInfo {
-  zoneId: number;
-  zoneName: string;
-}
-interface OptionType {
-  value: number;
-  label: string;
-}
-
-// Updated File Upload Component for single file with title
-const FileUploadComponent = ({
-  onFileSelect,
-  acceptedTypes = "image/*",
-  maxSize = 5 * 1024 * 1024,
-  title = "Upload Picture",
-  uploadedFile,
-  onRemoveFile,
-  isRequired = false,
-}) => {
-  const [dragActive, setDragActive] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragActive(false);
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleFiles([files[0]]); // Only take first file
-    }
-  };
-
-  const handleFiles = (files: any) => {
-    const file = files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      Swal.fire({
-        icon: "error",
-        title: "Invalid File Type",
-        text: "Please upload only image files (PNG, JPG, JPEG)",
-      });
-      return;
-    }
-
-    if (file.size > maxSize) {
-      Swal.fire({
-        icon: "error",
-        title: "File Too Large",
-        text: `File size must be less than ${maxSize / (1024 * 1024)}MB`,
-      });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const newFile = {
-        id: Date.now(),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        preview: e.target.result,
-        file: file,
-      };
-
-      if (onFileSelect) onFileSelect(newFile);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setDragActive(true);
-  };
-
-  const handleDragLeave = () => {
-    setDragActive(false);
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Upload Area */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-          dragActive
-            ? "border-blue-400 bg-blue-50"
-            : "border-gray-300 hover:border-gray-400"
-        }`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <div className="flex flex-col items-center gap-2">
-          <Upload className="w-8 h-8 text-gray-400" />
-          <div>
-            <p className="text-sm font-medium text-gray-700">
-              {title} {isRequired && <span className="text-red-500">*</span>}
-            </p>
-            <p className="text-xs text-gray-500">
-              Click to browse or drag and drop image here
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              PNG, JPG, JPEG up to {maxSize / (1024 * 1024)}MB
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={acceptedTypes}
-        onChange={(e) => handleFiles(Array.from(e.target.files))}
-        className="hidden"
-      />
-
-      {/* Uploaded File Preview */}
-      {uploadedFile && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-gray-700">Uploaded File:</h4>
-          <div className="relative inline-block">
-            <div className="w-32 h-32 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-              <img
-                src={uploadedFile.preview}
-                alt={uploadedFile.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onRemoveFile) onRemoveFile();
-              }}
-              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-            >
-              <X className="w-3 h-3" />
-            </button>
-            <p className="text-xs text-gray-600 mt-1 truncate">
-              {uploadedFile.name}
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Age calculation utility
-const calculateAge = (dob: any) => {
-  if (!dob) return "";
-  const today = new Date();
-  const birthDate = new Date(dob);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < birthDate.getDate())
-  ) {
-    age--;
-  }
-  return age.toString();
-};
-
-// Interfaces
-export interface Relation {
-  relationId: number;
-  description: string;
-}
-export interface Village {
-  villageId: number;
-  villageName: string;
-}
-
-interface CasteInfo {
-  casteId: number;
-  casteDescription: string;
-}
-interface OccupationInfo {
-  occupationId: number;
-  description: string;
-}
-
-const MemberMaster = () => {
-  const navigate = useNavigate();
-  const { memberId: encryptedId } = useParams<{ memberId?: string }>();
-  const memberId = encryptedId ? decryptId(encryptedId) : null;
-  const accountNumberRef = useRef(null);
-  const refDebitAccount = useRef(null);
-  const nominalMemNoRef = useRef(null);
-  const permanentMemNoRef = useRef(null);
-  const [smAccId, setSMAccId] = useState<number>(0);
-  const isEditMode = !!memberId;
-  const aadhaarRef = useRef(null);
-  const PANref = useRef(null);
-  const [membershipType, setMembershipType] = useState<string>(""); // 'P' or 'N'
-  const [typeChangeLocked, setTypeChangeLocked] = useState(false);
-  const user = useSelector((state: RootState) => state.user);
-  const sessionDate = user.workingdate
-    ? commonservice.splitDate(user.workingdate)
-    : commonservice.getTodaysDate();
-  const { errors, validateForm, clearErrors, markFieldTouched } =
-    useFormValidation();
-  const [showValidationSummary, setShowValidationSummary] = useState(false);
-  const [activeTab, setActiveTab] = useState("basic");
-  // Wizard state — tracks which tabs are accessible and which have been completed
-  const [unlockedTabs, setUnlockedTabs] = useState<string[]>(["basic"]);
-  const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
-  const [lastPermanentNo, setLastPermanentNo] = useState<string | null>(null);
-  const [lastNominalNo, setLastNominalNo] = useState<string | null>(null);
-  const [relationId, setRelationId] = useState<number | "">("");
-  const [relations, setRelations] = useState<Relation[]>([]);
-  const [villageId1, setVillageId1] = useState<number | "">("");
-  const [villages1, setVillages] = useState<Village[]>([]);
-  const [villageId2, setVillageId2] = useState<number | "">("");
-  const [zone1, setZone1] = useState<number | "">("");
-  const [pinCode1, setPinCode1] = useState<number | "">("");
-  const [pinCode2, setPinCode2] = useState<number | "">("");
-  const [zone2, setZone2] = useState<number | "">("");
-  const [tehsil1, setTehsil1] = useState<number | "">("");
-  const [tehsil2, setTehsil2] = useState<number | "">("");
-  const [postOffice1, setPostOffice1] = useState<number | "">("");
-  const [postOffice2, setPostOffice2] = useState<number | "">("");
-  const [thana1, setThana1] = useState<number | "">("");
-  const [thana2, setThana2] = useState<number | "">("");
-  const [casteId, setCasteId] = useState<number | "">("");
-  const [casteInfo, setCaste] = useState<CasteInfo[]>([]);
-  const [category, setCategory] = useState<number | "">("");
-  const [occupationInfo, setOccupation] = useState<OccupationInfo[]>([]);
-  const [occupationId, setOccupationId] = useState<number | "">("");
-  const [generalAccInfo, setGeneralAccounts] = useState<AccountMaster[]>([]);
-  const [debitAccount, setDebitAccountId] = useState<number | "">("");
-  const [patwar1, setPatwar1] = useState<number | "">("");
-  const [patwar2, setPatwar2] = useState<number | "">("");
-  // Image upload states
-  const [memberPhoto, setMemberPhoto] = useState(null);
-  const [memberSignature, setMemberSignature] = useState(null);
-  const [shouldLoadData, setShouldLoadData] = useState(true);
-  const [zones, setZones] = useState<ZoneInfo[]>([]);
-
-  // Validation option toggles — all mandatory by default
-  const [requireAadhaarPan, setRequireAadhaarPan] = useState(true);
-  const [requireContact, setRequireContact] = useState(true);
-  const [requirePicSign, setRequirePicSign] = useState(true);
-
-  useEffect(() => {
-    const fetchZoneData = async () => {
-      const zonesRes = await ZoneApiService.getAllZones(user.branchid);
-      setZones(zonesRes.data || []);
-    };
-    // Only set default if NOT in edit mode and membership type is empty
-    if (!isEditMode && !membershipType) {
-      setMembershipType("P");
-    }
-    fetchZoneData();
-  }, [isEditMode, user.branchid]);
-  // ✅ NEW: Fetch member data if in edit mode
-  useEffect(() => {
-    const fetchMemberData = async () => {
-      if (isEditMode && memberId) {
-        try {
-          Swal.fire({
-            title: "Loading Member Data...",
-            text: "Please wait",
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading(),
-          });
-
-          const response = await memberAPIService.getMemberById(
-            parseInt(memberId),
-            user.branchid
-          );
-
-          if (response.success && response.data) {
-            const data = response.data;
-            // Populate member data
-            setMemberData({
-              accountNumber: data.accMaster?.accountNumber || "",
-              defAreaBrId: data.member?.defAreaBrId?.toString() || "",
-              memberType: data.member?.memberType?.toString() || "2",
-              nominalMembershipNo: data.member?.nominalMembershipNo || "",
-              permanentMembershipNo: data.member?.permanentMembershipNo || "",
-              memberName: data.member?.memberName || "",
-              memberNameSL: data.member?.memberNameSL || "",
-              relativeName: data.member?.relativeName || "",
-              relationId: data.member?.relationId?.toString() || "",
-              gender: data.member?.gender?.toString() || "",
-              dob: commonservice.splitDate(data.member?.dob) || "",
-              casteId: data.member?.casteId?.toString() || "",
-              age: calculateAge(data.member?.dob || ""),
-              joiningDate:
-                commonservice.splitDate(data.member?.joiningDate) || "",
-              occupationId: data.member?.occupationId?.toString() || "",
-              thana: "",
-              addressLine1: data.locationDetails?.addressLine1 || "",
-              addressLineSL1: data.locationDetails?.addressLineSL1 || "",
-              villageId1: data.locationDetails?.villageId1?.toString() || "",
-              po1: "",
-              tehsil1: "",
-              addressLine2: data.locationDetails?.addressLine2 || "",
-              addressLineSL2: data.locationDetails?.addressLineSL2 || "",
-              villageId2: data.locationDetails?.villageId2?.toString() || "",
-              po2: "",
-              tehsil2: "",
-              phoneType1: data.member?.phoneType1?.toString() || "",
-              phonePrefix1: data.member?.phonePrefix1 || "+91",
-              phoneNo1: data.member?.phoneNo1 || "",
-              phoneType2: data.member?.phoneType2?.toString() || "",
-              phonePrefix2: data.member?.phonePrefix2 || "+91",
-              phoneNo2: data.member?.phoneNo2 || "",
-              panCardNo: data.documentDetails?.panCardNo || "",
-              aadhaarCardNo: data.documentDetails?.aadhaarCardNo || "",
-              zoneId: "",
-              id: Number(memberId ?? 0),
-              email1: data.member?.email1 || "",
-              email2: data.member?.email2 || "",
-            });
-
-            // Set dropdown states
-            setRelationId(data.member?.relationId || "");
-            setCasteId(data.member?.casteId || "");
-            setOccupationId(data.member?.occupationId || "");
-            setVillageId1(data.locationDetails?.villageId1 || "");
-            setVillageId2(data.locationDetails?.villageId2 || "");
-            setDebitAccountId(data.voucher?.debitAccountId || "");
-            fetchLocationData(data.locationDetails?.villageId1, 0);
-            fetchLocationData(0, data.locationDetails?.villageId2);
-            setSMAccId(data.accMaster?.smAccId || 0);
-            // Set voucher data
-            setVoucherData({
-              smAmount: data.voucher?.smAmount?.toString() || "",
-              admissionFeesAccount: data.voucher?.admissionFeesAccount || "", // Will be set by settings
-              admissionFeeAmount:
-                data.voucher?.admissionFeeAmount ?? 0,
-              debitAccountId: data.voucher?.debitAccountId?.toString() || "",
-              debitAmount: data.voucher?.totalDebit?.toString() || "",
-              narration: data.voucher?.voucherNarration || "",
-              openingAmount: data.voucher.openingAmount?.toString() || "",
-            });
-
-            setDebitAccountId(data.voucher?.debitAccountId ?? 0);
-
-            // Set nominees
-            if (data.nominees && data.nominees.length > 0) {
-              setNominees(
-                data.nominees.map((nom) => ({
-                  id: nom.id || Date.now(),
-                  nomineeName: nom.nomineeName || "",
-                  relation: nom.relationId || 0,
-                  relationWithMember: nom.relationWithMember || 0,
-                  dob:
-                    (nom.dob != null ? commonservice.splitDate(nom.dob) : "") ||
-                    "",
-                  age: nom.dob ? calculateAge(commonservice.splitDate(nom.dob)) : (nom.age?.toString() || ""),
-                  isMinor: nom.isMinor === 1,
-                  nameOfGuardian: nom.nameOfGuardian || "",
-                  nameOfGuardianSL: nom.nameOfGuardianSL || "",
-                  nominationDate:
-                    (nom.nominationDate != null
-                      ? commonservice.splitDate(nom.nominationDate)
-                      : "") || "",
-                  aadhaarCardNo: nom.aadhaarCardNo || "",
-                  PANCardNo: nom.panCardNo || "",
-                  nomRelativeName: nom.nomRelativeName || "",
-                  percentageShare: Number(nom.percentageShare) || 0,
-                }))
-              );
-            }
-
-            // Add cache-busting timestamp to photo URL
-            if (data.documentDetails?.memberPicExt) {
-              const fileName = `member_${memberId}_picture${data.documentDetails.memberPicExt}`;
-              const cacheBuster = `?t=${Date.now()}`; // Cache-busting query parameter
-              const photoUrl =
-                commonservice.getImageUrl(fileName, "Pictures") + cacheBuster;
-              setMemberPhoto({
-                id: Date.now(),
-                name: `photo${data.documentDetails.memberPicExt}`,
-                preview: photoUrl,
-                file: null,
-              });
-            }
-
-            // Add cache-busting timestamp to signature URL
-            if (data.documentDetails?.memberSignExt) {
-              const fileName = `member_${memberId}_signature${data.documentDetails.memberSignExt}`;
-              const cacheBuster = `?t=${Date.now()}`; // Cache-busting query parameter
-              const signUrl =
-                commonservice.getImageUrl(fileName, "Signatures") + cacheBuster;
-              setMemberSignature({
-                id: Date.now(),
-                name: `sign${data.documentDetails.memberSignExt}`,
-                preview: signUrl,
-                file: null,
-              });
-            }
-
-            // Load category from caste
-            if (data.member?.casteId) {
-              fetchCategoryFromCaste(data.member.casteId);
-            }
-
-            if (data.member.nominalMembershipNo != "") setMembershipType("N");
-            else setMembershipType("P");
-            setTypeChangeLocked(data.hasTransactions ?? false);
-
-            // Auto-detect which fields are missing so toggles match the member's actual data
-            const hasPan     = !!data.documentDetails?.panCardNo?.trim();
-            const hasAadhaar = !!data.documentDetails?.aadhaarCardNo?.trim();
-            setRequireAadhaarPan(hasPan && hasAadhaar);
-
-            const hasPhone = !!data.member?.phoneNo1?.trim();
-            setRequireContact(hasPhone);
-
-            const hasPic  = !!data.documentDetails?.memberPicExt?.trim();
-            const hasSign = !!data.documentDetails?.memberSignExt?.trim();
-            setRequirePicSign(hasPic && hasSign);
-
-            // In edit mode unlock all tabs immediately — user can jump anywhere
-            setUnlockedTabs(["basic", "address", "contact", "documents", "voucher", "nominees"]);
-            setCompletedTabs(new Set(["basic", "address", "contact", "documents", "voucher", "nominees"]));
-
-            Swal.close();
-          } else {
-            Swal.fire("Error", "Member not found", "error");
-            navigate("/member");
-          }
-        } catch (error: any) {
-          console.error("Error fetching member:", error);
-          Swal.fire(
-            "Error",
-            error.message || "Failed to load member data",
-            "error"
-          );
-          navigate("/member");
-        }
-      }
-    };
-
-    fetchMemberData();
-  }, [memberId, isEditMode, user.branchid, navigate]);
-
-  useEffect(() => {
-    if (!isEditMode) {
-      memberAPIService.getLastMembershipNo(user.branchid).then((res: any) => {
-        const data = res.data ?? res;
-        if (data?.lastPermanentMembershipNo) setLastPermanentNo(data.lastPermanentMembershipNo);
-        if (data?.lastNominalMembershipNo) setLastNominalNo(data.lastNominalMembershipNo);
-      });
-    }
-  }, [isEditMode, user.branchid]);
-
-  const zoneData: OptionType[] = zones.map((zone) => ({
-    value: zone.zoneId,
-    label: zone.zoneName,
-  }));
-  useEffect(() => {
-    const fetchAutoCompleteData = async () => {
-      try {
-        const res = await commonservice.relation_info();
-        const data: Relation[] = res.data || [];
-        setRelations(data);
-
-        const villages = await commonservice.village_info(user.branchid);
-        const villageData: Village[] = villages.data || [];
-        setVillages(villageData);
-
-        const castes = await commonservice.caste_Info(user.branchid);
-        const casteData: CasteInfo[] = castes.data || [];
-        setCaste(casteData);
-
-        const occupations = await commonservice.occupation_Info(user.branchid);
-        const occupationData: OccupationInfo[] = occupations.data || [];
-        setOccupation(occupationData);
-
-        const general_accounts = await commonservice.general_accmasters_info(
-          user.branchid
-        );
-        setGeneralAccounts(general_accounts.data || []);
-
-        const settings = await commonservice.settings(user.branchid);
-        if(!isEditMode){
-        setVoucherData((prevData) => ({
-          ...prevData,
-          admissionFeesAccount:
-            settings.data.generalSettings.admissionFeeAccName || "",
-          admissionFeeAmount:
-            settings.data.generalSettings.admissionFeeAmount || 0,
-        }));
-      }
-      } catch (err: any) {
-        console.error(err);
-        Swal.fire("Error", err.message || "Could not load types", "error");
-      }
-    };
-    fetchAutoCompleteData();
-  }, [user.branchid]);
-  const [memberData, setMemberData] = useState({
-    accountNumber: "",
-    defAreaBrId: "",
-    memberType: "2",
-    nominalMembershipNo: "",
-    permanentMembershipNo: "",
-    memberName: "",
-    memberNameSL: "",
-    relativeName: "",
-    relationId: "",
-    gender: "",
-    dob: sessionDate,
-    casteId: "",
-    age: "", // Made readonly, calculated from DOB
-    joiningDate: sessionDate,
-    occupationId: "",
-    // Address fields
-    thana: "",
-    addressLine1: "",
-    addressLineSL1: "",
-    villageId1: "",
-    po1: "",
-    tehsil1: "",
-    addressLine2: "",
-    addressLineSL2: "",
-    villageId2: "",
-    po2: "",
-    tehsil2: "",
-    // Contact fields
-    phoneType1: "",
-    phonePrefix1: "+91",
-    phoneNo1: "",
-    phoneType2: "",
-    phonePrefix2: "+91",
-    phoneNo2: "",
-    // Document fields
-    panCardNo: "",
-    aadhaarCardNo: "",
-    // Zone field
-    zoneId: "",
-    id: 0,
-    email1: "",
-    email2: "",
-  });
-
-  const firstSessionFromDateStr = user.firstSessionFromDate
-    ? commonservice.splitDate(user.firstSessionFromDate)
-    : null;
-const isOpeningEntry = !!(
-    firstSessionFromDateStr &&
-    memberData.joiningDate &&
-    memberData.joiningDate < firstSessionFromDateStr
-  );
-
-  useEffect(() => {
-    if (isOpeningEntry && activeTab === "voucher") {
-      setActiveTab("basic");
-    }
-  }, [isOpeningEntry]);
-
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Only warn if in edit mode or form has data
-      if (isEditMode) {
-        e.preventDefault();
-      }
-    };
-
-    // Add the event listener
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    // Cleanup on unmount
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [isEditMode, memberData]);
-
-  const relationOptions = relations.map((type) => ({
-    value: type.relationId,
-    label: type.description,
-  }));
-
-  const casteOptions = casteInfo.map((type) => ({
-    value: type.casteId,
-    label: type.casteDescription,
-  }));
-
-  const villageOptions = villages1.map((type) => ({
-    value: type.villageId,
-    label: type.villageName,
-  }));
-
-  const occupationOptions = occupationInfo.map((type) => ({
-    value: type.occupationId,
-    label: type.description,
-  }));
-
-  const accOptions = generalAccInfo.map((type) => ({
-    value: type.accId,
-    label: type.accountName,
-  }));
-
-  // Updated Basic Information State
-
-  // Voucher Info State
-  const [voucherData, setVoucherData] = useState({
-    smAmount: "",
-    admissionFeesAccount: "", // Set as needed
-    admissionFeeAmount: 0, // Will be set via calculation or autofill
-    debitAccountId: "",
-    debitAmount: "", // Calculated field
-    narration: "",
-    openingAmount: "",
-  });
-  const handleSmAmountChange = (e) => {
-    let value = e.target.value.replace(/[^0-9.]/g, "");
-    value = value.replace(/^(\d*\.\d{0,2}).*$/, "$1");
-    setVoucherData((v) => ({
-      ...v,
-      smAmount: value,
-      debitAmount: (value > 0
-        ? parseFloat(value || 0) + parseFloat(v.admissionFeeAmount || 0)
-        : 0
-      ).toFixed(2),
-    }));
-  };
-
-  const handleOpeningAmountChange = (e) => {
-    let value = e.target.value.replace(/[^0-9.]/g, "");
-    value = value.replace(/^(\d*\.\d{0,2}).*$/, "$1");
-    setVoucherData((v) => ({
-      ...v,
-      openingAmount: value,
-    }));
-  };
-
-  const handleDebitAccountChange = (value: any) =>
-    setVoucherData((v) => ({
-      ...v,
-      debitAccount: value,
-    }));
-
-  const handleNarrationChange = (e: any) =>
-    setVoucherData((v) => ({
-      ...v,
-      narration: e.target.value,
-    }));
-
-  // Nominees State - Updated with age calculation
-  const [nominees, setNominees] = useState([
-    {
-      id: Date.now(),
-      nomineeName: "",
-      relation: 0,
-      relationWithMember: 0,
-      age: "", // Made readonly, calculated from DOB
-      isMinor: false,
-      dob: sessionDate,
-      nameOfGuardian: "",
-      nameOfGuardianSL: "",
-      nominationDate: commonservice.getTodaysDate(),
-      aadhaarCardNo: "",
-      PANCardNo: "",
-      nomRelativeName: "",
-      percentageShare: 0,
-    },
-  ]);
-
-  // Existing functions with updates
-  const addNominee = () => {
-    setNominees([
-      ...nominees,
-      {
-        id: Date.now(),
-        nomineeName: "",
-        relation: 0,
-        relationWithMember: 0,
-        age: "",
-        isMinor: false,
-        dob: "",
-        nameOfGuardian: "",
-        nameOfGuardianSL: "",
-        nominationDate: "",
-        aadhaarCardNo: "",
-        PANCardNo: "",
-        nomRelativeName: "",
-        percentageShare: 0,
-      },
-    ]);
-  };
-
-  const removeNominee = (id: any) => {
-    if (nominees.length > 1) {
-      setNominees(nominees.filter((nominee) => nominee.id !== id));
-    }
-  };
-
-  const updateNominee = (id: any, field: any, value: any) => {
-    setNominees(
-      nominees.map((nominee) => {
-        if (nominee.id === id) {
-          const updatedNominee = { ...nominee, [field]: value };
-
-          // Calculate age when DOB changes
-          if (field === "dob") {
-            updatedNominee.age = calculateAge(value);
-          }
-
-          return updatedNominee;
-        }
-        return nominee;
-      })
-    );
-  };
-
-  const handleInputChange = (
-    field: any,
-    value: any,
-    village1Label: any = "",
-    village2Label: any = ""
-  ) => {
-    setMemberData((prev) => {
-      const updatedData = { ...prev, [field]: value };
-
-      // Calculate age when DOB changes
-      if (field === "dob") {
-        updatedData.age = calculateAge(value);
-      }
-      if (field === "villageId1" && value == 0) {
-        updatedData.addressLine1 = "";
-      }
-      if (field === "villageId2" && value == 0) {
-        updatedData.addressLine2 = "";
-      }
-      if (
-        field === "nominalMembershipNo" ||
-        field === "permanentMembershipNo"
-      ) {
-        updatedData.accountNumber = value;
-      }
-      return updatedData;
-    });
-
-    if (field === "villageId1") {
-      fetchLocationData(value, 0, village1Label);
-    }
-    if (field === "villageId2") {
-      fetchLocationData(0, value, "", village2Label);
-    }
-    if (field === "casteId") {
-      fetchCategoryFromCaste(value);
-    }
-    clearLocationData(field);
-    if (field == "debitAccount") {
-      setDebitAccountId(value);
-    }
-  };
-
-  const handleVoucherInputChange = (field: any, value: any) => {
-    setVoucherData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  // Image upload handlers
-  const handleMemberPhotoSelect = (file) => {
-    setMemberPhoto(file);
-  };
-
-  const handleMemberSignatureSelect = (file) => {
-    setMemberSignature(file);
-  };
-
-  const removeMemberPhoto = () => {
-    setMemberPhoto(null);
-  };
-
-  const removeMemberSignature = () => {
-    setMemberSignature(null);
-  };
-
-  // Existing location and category functions remain the same...
-  const fetchCategoryFromCaste = async (casteId: number) => {
-    setCategory("");
-    try {
-      if (casteId === 0) return;
-      const res = await commonservice.category_Info_from_caste(
-        casteId,
-        user.branchid
-      );
-      if (!res.success) throw new Error("Failed to load Category Data.");
-      setCategory(res.data.categoryName || "");
-    } catch (error) {}
-  };
-
-  const clearLocationData = (caption: string) => {
-    if (caption == "villageId1") {
-      setThana1("");
-      setPostOffice1("");
-      setPatwar1("");
-      setTehsil1("");
-      setZone1("");
-      setPinCode1("");
-    } else if (caption == "villageId2") {
-      setThana2("");
-      setPostOffice2("");
-      setPatwar2("");
-      setTehsil2("");
-      setZone2("");
-      setPinCode2("");
-    }
-  };
-
-  const fetchLocationData = async (
-    villageId1: number = 0,
-    villageId2: number = 0,
-    village1Label: string = "",
-    village2Label: string = ""
-  ) => {
-    try {
-      const villageId = villageId1 || villageId2;
-      if (villageId === 0) {
-        return;
-      }
-      const res = await commonservice.location_Info(villageId, user.branchid);
-      if (!res.success) {
-        Swal.fire(
-          "Error",
-          "Unable to load location data. Please ensure the village master contains complete and valid location details."
-        );
-        return;
-      }
-      const data = res.data;
-      if (villageId1) {
-        setThana1(data.ThanaName || "");
-        setPostOffice1(data.PostOfficeName || "");
-        setTehsil1(data.TehsilName || "");
-        setZone1(commonservice.getLastSegment(data.ZoneName) || "");
-        setPinCode1(data.PinCode || "");
-        setPatwar1(data.Patwar);
-        setMemberData((prevData) => ({
-          ...prevData,
-          addressLine1: `Village: ${village1Label}, Thana Name: ${
-            data.ThanaName.split("-")[0]
-          }, Tehsil Name: ${data.TehsilName.split("-")[0]}, Post Office: ${
-            data.PostOfficeName.split("-")[0]
-          },  Zone Name: ${data.ZoneName.split("-")[0]}, Patwar: ${data.Patwar.split("-")[0]}, Pin Code: ${
-            data.PinCode
-          }`,
-        }));
-      } else {
-        setThana2(data.ThanaName || "");
-        setPostOffice2(data.PostOfficeName || "");
-        setTehsil2(data.TehsilName || "");
-        setZone2(commonservice.getLastSegment(data.ZoneName) || "");
-        setPinCode2(data.PinCode || "");
-        setPatwar1(data.Patwar);
-        setMemberData((prevData) => ({
-          ...prevData,
-          addressLine2: `Village: ${village2Label}, Thana Name: ${
-            data.ThanaName.split("-")[0]
-          }, Tehsil Name: ${data.TehsilName.split("-")[0]}, Post Office: ${
-            data.PostOfficeName.split("-")[0]
-          },  Zone Name: ${data.ZoneName.split("-")[0]}, Patwar: ${data.Patwar.split("-")[0]}, Pin Code: ${
-            data.PinCode
-          }`,
-        }));
-      }
-    } catch (error) {
-      if (villageId1 != 0) {
-        setVillageId1("");
-        setMemberData((prevData) => ({
-          ...prevData,
-          addressLine1: "",
-        }));
-      } else if (villageId2 != 0) {
-        setVillageId2("");
-        setMemberData((prevData) => ({
-          ...prevData,
-          addressLine2: "",
-        }));
-      }
-      Swal.fire(
-        "Error",
-        "Unable to load location data. Please ensure the village master contains complete and valid location details.",
-        "error"
-      );
-    }
-  };
-
-  // Enhanced handleSubmit remains the same...
-  const handleSubmit = async () => {
-    const validation = validateForm(
-      memberData,
-      nominees,
-      voucherData,
-      [memberPhoto, memberSignature],
-      { requireAadhaarPan, requireContact, requirePicSign }
-    );
-
-    if (!validation.isValid) {
-      setShowValidationSummary(true);
-      // Same validation error handling...
-      return;
-    }
-    if (!memberData.memberName?.trim()) {
-      Swal.fire("Error", "Member Name is required", "error");
-      return;
-    }
-    if (!memberData.relativeName?.trim()) {
-      Swal.fire("Error", "Relative Name is required", "error");
-      return;
-    }
-    if (requireContact && !memberData.phoneNo1?.trim()) {
-      Swal.fire("Error", "Phone Number is required", "error");
-      return;
-    }
-    if (requireContact && !memberData.phonePrefix1?.trim()) {
-      Swal.fire("Error", "Phone Prefix is required", "error");
-      return;
-    }
-    if (requireAadhaarPan && !memberData.panCardNo?.trim()) {
-      Swal.fire("Error", "PAN Card is required", "error");
-      return;
-    }
-    if (requireAadhaarPan && !memberData.aadhaarCardNo?.trim()) {
-      Swal.fire("Error", "Aadhaar Card is required", "error");
-      return;
-    }
-    if (!memberData.addressLine1?.trim()) {
-      Swal.fire("Error", "Address is required", "error");
-      return;
-    }
-    if (requirePicSign && !memberPhoto?.file && !isEditMode) {
-      Swal.fire("Error", "Member Photo is required", "error");
-      return;
-    }
-    if (requirePicSign && !memberSignature?.file && !isEditMode) {
-      Swal.fire("Error", "Member Signature is required", "error");
-      return;
-    }
-    if (memberData.aadhaarCardNo.trim() !== "") {
-      const aadhaarExistsInNominees = nominees.some(
-        (nominee) =>
-          nominee.aadhaarCardNo?.trim() !== "" &&
-          nominee.aadhaarCardNo?.trim() === memberData.aadhaarCardNo.trim()
-      );
-
-      if (aadhaarExistsInNominees) {
-        Swal.fire({
-          icon: "error",
-          text: "Member's Aadhaar number already exists in nominee list!",
-          title: "Duplication",
-        });
-        return false;
-      }
-    }
-    if (memberData.panCardNo.trim() !== "") {
-      const aadhaarExistsInNominees = nominees.some(
-        (nominee) =>
-          nominee.PANCardNo?.trim() !== "" &&
-          nominee.PANCardNo?.trim() === memberData.panCardNo.trim()
-      );
-
-      if (aadhaarExistsInNominees) {
-        Swal.fire({
-          icon: "error",
-          text: "Member's PAN already exists in nominee list!",
-          title: "Duplication",
-        });
-        return false;
-      }
-    }
-
-    if (!isOpeningEntry && debitAccount == 0) {
-      Swal.fire({
-        icon: "error",
-        title: "Error.",
-        text: "Debit Account is required in Voucher Tab.",
-        didClose: () => {
-          refDebitAccount.current?.focus();
-        },
-      });
-      return;
-    }
-    const memberDTO: MemberDTO = {
-      branchId: user.branchid,
-      defAreaBrId: Number(memberData.defAreaBrId) || 1, // ✅ Provide default
-      memberType: memberData.memberType ? Number(memberData.memberType) : 1, // ✅ Provide default
-      nominalMembershipNo: memberData.nominalMembershipNo,
-      permanentMembershipNo: memberData.permanentMembershipNo,
-      memberName: memberData.memberName.trim(), // ✅ Trim whitespace
-      memberNameSL: memberData.memberNameSL,
-      relativeName: memberData.relativeName.trim(), // ✅ Trim whitespace
-      relationId: Number(memberData.relationId),
-      gender: Number(memberData.gender),
-      dob: memberData.dob,
-      casteId: Number(memberData.casteId),
-      categoryId: commonservice.getLastSegment(category.toString()) ?? 1, // ✅ Provide default
-      occupationId: Number(memberData.occupationId) || 1, // ✅ Provide default
-      joiningDate: memberData.joiningDate,
-      phonePrefix1: memberData.phonePrefix1.trim(), // ✅ Trim whitespace
-      phoneType1: Number(memberData.phoneType1),
-      phoneNo1: memberData.phoneNo1.trim(), // ✅ Trim whitespace
-      phonePrefix2: memberData.phonePrefix2,
-      phoneType2: memberData.phoneType2
-        ? Number(memberData.phoneType2)
-        : undefined,
-      phoneNo2: memberData.phoneNo2,
-      id: Number(memberId),
-      email1: memberData.email1,
-      email2: memberData.email2,
-    };
-
-    const documentDetailsDTO: MemberDocDetailsDTO = {
-      branchId: user.branchid,
-      panCardNo: memberData.panCardNo.trim(), // ✅ Trim whitespace
-      aadhaarCardNo: memberData.aadhaarCardNo.replace(/\s/g, ""), // ✅ Remove spaces
-      memberPicExt: commonservice.getFileExtension(memberPhoto?.file || null),
-      memberSignExt: commonservice.getFileExtension(
-        memberSignature?.file || null
-      ),
-    };
-
-    // Create LocationDetails DTO
-    const locationDetailsDTO: MemberLocationDetailsDTO = {
-      branchId: user.branchid,
-      addressLine1: memberData.addressLine1.trim(), // ✅ Trim whitespace
-      addressLineSL1: memberData.addressLineSL1,
-      addressLine2: memberData.addressLine2,
-      addressLineSL2: memberData.addressLineSL2,
-      villageId1: Number(memberData.villageId1),
-      villageId2: memberData.villageId2
-        ? Number(memberData.villageId2)
-        : undefined,
-      po1: commonservice.getLastSegment(postOffice1.toString()) ?? 0,
-      po2: commonservice.getLastSegment(postOffice2.toString()) ?? 0,
-      tehsil1: commonservice.getLastSegment(tehsil1.toString()) ?? 0,
-      tehsil2: commonservice.getLastSegment(tehsil2.toString()) ?? 0,
-      thanaId1: commonservice.getLastSegment(thana1.toString()) ?? 0,
-      thanaId2: commonservice.getLastSegment(thana2.toString()) ?? 0,
-      zoneId1: Number(zone1) ?? 0,
-      zoneId2: Number(zone2) ?? 0,
-    };
-
-    // Create Nominees DTO array
-    const nomineesDTO: MemberNomineeDetailsDTO[] = nominees.map((nominee) => ({
-      branchId: user.branchid,
-      nomineeName: nominee.nomineeName,
-      nomRelativeName: nominee.nomRelativeName?.substring(0, 10), // Truncate to match DB constraint
-      relationId: Number(nominee.relation),
-      relationWithMember: Number(nominee.relationWithMember),
-      age: Number(nominee.age),
-      dob: nominee.dob,
-      isMinor: nominee.isMinor ? 1 : 0, // Convert boolean to smallint
-      nameOfGuardian: nominee.nameOfGuardian,
-      nameOfGuardianSL: nominee.nameOfGuardianSL,
-      nominationDate: nominee.nominationDate,
-      aadhaarCardNo: nominee.aadhaarCardNo,
-      panCardNo: nominee.PANCardNo,
-      percentageShare: Number(nominee.percentageShare), // Equal share for all nominees
-    }));
-    const totalNomineePercentage = nomineesDTO.reduce((sum, nominee) => {
-      return sum + (nominee.percentageShare || 0);
-    }, 0);
-
-    if (totalNomineePercentage > 100) {
-      await Swal.fire({
-        icon: "error",
-        title: "Limit exceed",
-        text: "The total share percentage of all nominees must not exceed 100%.",
-      });
-      return;
-    }
-    if (totalNomineePercentage < 100) {
-      await Swal.fire({
-        icon: "error",
-        title: "Limit exceed",
-        text: "The total share percentage of all nominees must be exactly 100%",
-      });
-      return;
-    }
-
-    // Create Voucher DTO
-    const voucherDTO: VoucherDTO = {
-      voucherNarration: voucherData.narration,
-      smAmount: Number(voucherData.smAmount) ?? 0,
-      admissionFeesAccountId:
-        Number(
-          commonservice.getLastSegment(voucherData.admissionFeesAccount)
-        ) ?? 0,
-      admissionFeeAmount: voucherData.admissionFeeAmount ?? 0,
-      debitAccountId: Number(debitAccount) ?? 0,
-      totalDebit: Number(voucherData.debitAmount) || 0,
-      openingAmount: Number(voucherData.openingAmount) || 0,
-      isOpeningEntry: isOpeningEntry,
-    };
-    const accMasterDTO = {
-      BranchId: user.branchid,
-      AccountNumber: memberData.accountNumber.trim(),
-      AccountName: `${memberData.memberName.trim()}`,
-      RelativeName: memberData.relativeName.trim(),
-      Gender: Number(memberData.gender),
-      PhoneNo1: memberData.phoneNo1.trim(),
-      Addressline: memberData.addressLine1.trim(),
-      dob: memberData.dob,
-    };
-    const combinedMemberDTO: CombinedMemberDTO = {
-      member: memberDTO,
-      nominees: nomineesDTO,
-      documentDetails: documentDetailsDTO,
-      locationDetails: locationDetailsDTO,
-      accMaster: accMasterDTO,
-      voucher: voucherDTO,
-    };
-
-    setLoading(true);
-    try {
-      const response = isEditMode
-        ? await memberAPIService.updateMember(
-            combinedMemberDTO,
-            memberPhoto?.file || undefined,
-            memberSignature?.file || undefined
-          )
-        : await memberAPIService.createMember(
-            combinedMemberDTO,
-            memberPhoto?.file || undefined,
-            memberSignature?.file || undefined
-          );
-
-      if (response.success) {
-        await Swal.fire({
-          icon: "success",
-          title: "Success!",
-          text: response.message || "Member created successfully!",
-          confirmButtonColor: "#3B82F6",
-        });
-
-        clearErrors();
-        setShowValidationSummary(false);
-        sessionStorage.removeItem("encryptedMemberId");
-        handleReset(); // Reset form after successful submission
-        if (isEditMode) {
-          navigate("/member-info");
-        }
-      } else {
-        await Swal.fire({
-          icon: "error",
-          title: "Error!",
-          text: "Failed to create member. Please try again.",
-          confirmButtonColor: "#EF4444",
-        });
-      }
-
-      clearErrors();
-      setShowValidationSummary(false);
-    } catch (error) {
-      await Swal.fire({
-        icon: "error",
-        title: "Error!",
-        text: "Failed to create member. Please try again.",
-        confirmButtonColor: "#EF4444",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFieldBlur = async (fieldName: string, value: any = "") => {
-    markFieldTouched(fieldName);
-    if (fieldName == "accountNumber" && value.trim() != "") {
-      const response = await commonservice.accno_unique(
-        user.branchid,
-        value,
-        smAccId,
-        4
-      );
-      if (response.success) {
-        setMemberData((prevData) => ({
-          ...prevData,
-          accountNumber: "",
-        }));
-        Swal.fire({
-          icon: "error",
-          title: "Duplication.",
-          text: response.message,
-          didClose: () => {
-            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
-            accountNumberRef.current?.focus();
-          },
-        });
-      }
-    }
-    if (fieldName == "nominalMembershipNo" && value.trim() != "") {
-      const response = await commonservice.nominalmembershipNo_unique(
-        user.branchid,
-        value,
-        Number(memberId ?? 0) ?? 0
-      );
-      if (response.success) {
-        setMemberData((prevData) => ({
-          ...prevData,
-          nominalMembershipNo: "",
-        }));
-        Swal.fire({
-          icon: "error",
-          title: "Duplication.",
-          text: response.message,
-          didClose: () => {
-            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
-            nominalMemNoRef.current?.focus();
-          },
-        });
-      }
-    }
-    if (fieldName == "permanentMembershipNo" && value.trim() != "") {
-      const response = await commonservice.permanentmembershipNo_unique(
-        user.branchid,
-        value,
-        Number(memberId ?? 0) ?? 0
-      );
-      if (response.success) {
-        setMemberData((prevData) => ({
-          ...prevData,
-          permanentMembershipNo: "",
-        }));
-        Swal.fire({
-          icon: "error",
-          title: "Duplication.",
-          text: response.message,
-          didClose: () => {
-            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
-            permanentMemNoRef.current?.focus();
-          },
-        });
-      }
-    }
-    if (fieldName == "aadhaarCardNo" && value.trim() != "") {
-      const response = await commonservice.aadhaar_unique(
-        user.branchid,
-        value,
-        Number(memberId ?? 0) ?? 0
-      );
-      if (response.success) {
-        setMemberData((prevData) => ({
-          ...prevData,
-          aadhaarCardNo: "",
-        }));
-        Swal.fire({
-          icon: "error",
-          title: "Duplication.",
-          text: response.message,
-          didClose: () => {
-            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
-            aadhaarRef.current?.focus();
-          },
-        });
-      }
-    }
-    if (fieldName == "panCardNo" && value.trim() != "") {
-      const response = await commonservice.PAN_unique(
-        user.branchid,
-        value,
-        Number(memberId ?? 0) ?? 0
-      );
-      if (response.success) {
-        setMemberData((prevData) => ({
-          ...prevData,
-          panCardNo: "",
-        }));
-        Swal.fire({
-          icon: "error",
-          title: "Duplication.",
-          text: response.message,
-          didClose: () => {
-            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
-            PANref.current?.focus();
-          },
-        });
-      }
-    }
-  };
-
-  // Group errors by field and tab
-  const errorsByField = errors.reduce((acc, error) => {
-    if (!acc[error.field]) acc[error.field] = [];
-    acc[error.field].push(error);
-    return acc;
-  }, {} as Record<string, ValidationError[]>);
-
-  const errorsByTab = errors.reduce((acc, error) => {
-    if (!acc[error.tab]) acc[error.tab] = [];
-    acc[error.tab].push(error);
-    return acc;
-  }, {} as Record<string, ValidationError[]>);
-
-  const handleResetNotAllowed = () => {
-    Swal.fire({
-      icon: "error",
-      title: "Not Allowed",
-      text: "Reset form is not allowed in modify mode.",
-    });
-  };
-
-  // Updated handleReset function
-  const handleReset = () => {
-    // Reset validation toggles to mandatory defaults
-    setRequireAadhaarPan(true);
-    setRequireContact(true);
-    setRequirePicSign(true);
-
-    // Reset member data
-    setMembershipType("P");
-    setMemberData({
-      accountNumber: "",
-      defAreaBrId: "",
-      memberType: "",
-      nominalMembershipNo: "",
-      permanentMembershipNo: "",
-      memberName: "",
-      memberNameSL: "",
-      relativeName: "",
-      relationId: "",
-      gender: "",
-      dob: sessionDate,
-      age: "", // Reset calculated age
-      casteId: "",
-      joiningDate: sessionDate,
-      occupationId: "",
-      thana: "",
-      addressLine1: "",
-      addressLineSL1: "",
-      villageId1: "",
-      po1: "",
-      tehsil1: "",
-      addressLine2: "",
-      addressLineSL2: "",
-      villageId2: "",
-      po2: "",
-      tehsil2: "",
-      phoneType1: "",
-      phonePrefix1: "+91",
-      phoneNo1: "",
-      phoneType2: "",
-      phonePrefix2: "+91",
-      phoneNo2: "",
-      panCardNo: "",
-      aadhaarCardNo: "",
-      zoneId: "",
-      id: Number(memberId ?? 0),
-      email1: "",
-      email2: "",
-    });
-
-    // Reset voucher data
-    setVoucherData({
-      smAmount: "",
-      admissionFeeAmount: voucherData.admissionFeeAmount,
-      admissionFeesAccount: voucherData.admissionFeesAccount,
-      debitAccountId: "",
-      debitAmount: "",
-      narration: "",
-      openingAmount: "",
-    });
-    setDebitAccountId("");
-    setOccupationId("");
-
-    // Reset images
-    setMemberPhoto(null);
-    setMemberSignature(null);
-
-    // Reset nominees with calculated age
-    setNominees([
-      {
-        id: Date.now(),
-        nomineeName: "",
-        relation: 0,
-        relationWithMember: 0,
-        age: "", // Reset calculated age
-        isMinor: false,
-        dob: sessionDate,
-        nameOfGuardian: "",
-        nameOfGuardianSL: "",
-        nominationDate: sessionDate,
-        aadhaarCardNo: "",
-        PANCardNo: "",
-        nomRelativeName: "",
-        percentageShare: 0,
-      },
-    ]);
-
-    // Reset other states
-    setRelationId("");
-    setVillageId1("");
-    setVillageId2("");
-    setZone1("");
-    setPinCode1("");
-    setPinCode2("");
-    setZone2("");
-    setTehsil1("");
-    setTehsil2("");
-    setPostOffice1("");
-    setPostOffice2("");
-    setThana1("");
-    setThana2("");
-    setCasteId("");
-    setCategory("");
-
-    setActiveTab("basic");
-    setUnlockedTabs(["basic"]);
-    setCompletedTabs(new Set());
-    clearErrors();
-    setShowValidationSummary(false);
-  };
-
-  const tabs = [
-    { id: "basic", label: "Basic Info", icon: User },
-    { id: "address", label: "Address", icon: MapPin },
-    { id: "contact", label: "Contact", icon: Phone },
-    { id: "documents", label: "Documents", icon: CreditCard },
-    ...(!isOpeningEntry ? [{ id: "voucher", label: "Voucher Info", icon: FileText }] : []),
-    { id: "nominees", label: "Nominees", icon: Users },
-  ];
-
-  // Wizard helpers
-  const effectiveUnlockedTabs = isEditMode ? tabs.map(t => t.id) : unlockedTabs;
-  const effectiveCompletedTabs: Set<string> = isEditMode
-    ? new Set(tabs.map(t => t.id))
-    : completedTabs;
-  const currentTabIndex = tabs.findIndex(t => t.id === activeTab);
-  const isLastTab = activeTab === tabs[tabs.length - 1]?.id;
-
-  const validateCurrentTab = (): boolean => {
-    const errs: string[] = [];
-    switch (activeTab) {
-      case "basic":
-        if (!memberData.memberName?.trim()) errs.push("Member Name is required");
-        else if (memberData.memberName.trim().length < 2) errs.push("Member Name must be at least 2 characters");
-        else if (!/^[a-zA-Z\s]+$/.test(memberData.memberName)) errs.push("Member Name can only contain letters and spaces");
-        if (!memberData.relativeName?.trim()) errs.push("Relative Name is required");
-        else if (memberData.relativeName.trim().length < 2) errs.push("Relative Name must be at least 2 characters");
-        if (!memberData.relationId) errs.push("Relation is required");
-        if (!memberData.gender) errs.push("Gender is required");
-        if (!memberData.dob) errs.push("Date of Birth is required");
-        else { const a = parseInt(memberData.age || "0"); if (a < 18 || a > 120) errs.push("Age must be between 18 and 120 years"); }
-        if (!memberData.joiningDate) errs.push("Joining Date is required");
-        if (!memberData.casteId) errs.push("Caste is required");
-        if (!memberData.accountNumber?.trim()) errs.push("Account Number is required");
-        if (membershipType === "P" && !memberData.permanentMembershipNo?.trim()) errs.push("Permanent Membership No is required");
-        if (membershipType === "N" && !memberData.nominalMembershipNo?.trim()) errs.push("Nominal Membership No is required");
-        break;
-      case "address":
-        if (!villageId1) errs.push("Primary Village is required");
-        if (!memberData.addressLine1?.trim()) errs.push("Address Line 1 is required");
-        else if (memberData.addressLine1.trim().length < 10) errs.push("Address must be at least 10 characters");
-        break;
-      case "contact":
-        if (requireContact) {
-          if (!memberData.phoneType1) errs.push("Phone Type is required");
-          if (!memberData.phoneNo1?.trim()) errs.push("Phone Number is required");
-          else if (!/^[6-9]\d{9}$/.test(memberData.phoneNo1)) errs.push("Please enter a valid 10-digit mobile number starting with 6-9");
-        }
-        break;
-      case "documents":
-        if (requireAadhaarPan) {
-          if (!memberData.panCardNo?.trim()) errs.push("PAN Card is required");
-          else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(memberData.panCardNo)) errs.push("PAN format should be ABCDE1234F");
-          if (!memberData.aadhaarCardNo?.trim()) errs.push("Aadhaar Card is required");
-          else if (!/^\d{12}$/.test(memberData.aadhaarCardNo.replace(/\s/g, ""))) errs.push("Please enter a valid 12-digit Aadhaar number");
-        }
-        if (requirePicSign && !isEditMode) {
-          if (!memberPhoto) errs.push("Member Photo is required");
-          if (!memberSignature) errs.push("Member Signature is required");
-        }
-        break;
-      case "voucher":
-        if (!isOpeningEntry) {
-          if (!voucherData.smAmount || parseFloat(voucherData.smAmount) <= 0) errs.push("SM Amount is required and must be greater than 0");
-          if (!debitAccount) errs.push("Debit Account is required");
-        }
-        break;
-      case "nominees": {
-        nominees.forEach((nom, idx) => {
-          if (!nom.nomineeName?.trim()) errs.push(`Nominee ${idx + 1}: Name is required`);
-          if (!nom.nomRelativeName?.trim()) errs.push(`Nominee ${idx + 1}: Relative Name is required`);
-          if (!nom.relation) errs.push(`Nominee ${idx + 1}: Relation is required`);
-          if (!nom.dob?.trim()) errs.push(`Nominee ${idx + 1}: Date of Birth is required`);
-          if (!nom.percentageShare) errs.push(`Nominee ${idx + 1}: Share Percentage is required`);
-        });
-        const total = nominees.reduce((s, n) => s + (Number(n.percentageShare) || 0), 0);
-        if (total !== 100) errs.push(`Total nominee share must be exactly 100% (currently ${total}%)`);
-        break;
-      }
-    }
-    if (errs.length > 0) {
-      Swal.fire({
-        icon: "warning",
-        title: "Please complete the required fields",
-        html: `<ul style="text-align:left;padding-left:1rem">${errs.map(e => `<li style="margin:4px 0">• ${e}</li>`).join("")}</ul>`,
-      });
-      return false;
-    }
-    return true;
-  };
-
-  const handleNext = () => {
-    if (!validateCurrentTab()) return;
-    setCompletedTabs(prev => new Set([...prev, activeTab]));
-    const next = tabs[currentTabIndex + 1];
-    if (next) {
-      setUnlockedTabs(prev => prev.includes(next.id) ? prev : [...prev, next.id]);
-      setActiveTab(next.id);
-    }
-  };
-
-  const handlePrev = () => {
-    const prev = tabs[currentTabIndex - 1];
-    if (prev) setActiveTab(prev.id);
-  };
-
-  // Updated renderBasicInfo with readonly age and max date validation
-  const renderBasicInfo = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {/* Account Number */}
-      {/* Membership Numbers */}
-      {/* Membership Type Toggle with Radio Buttons - Better Design */}
-      <FormField
-        name="membershipType"
-        label="Membership Type"
-        required
-        errors={errorsByField.membershipType || []}
-      >
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-4">
-            <label className={`flex items-center gap-2 ${isEditMode && typeChangeLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-              <input
-                type="radio"
-                name="membershipType"
-                value="P"
-                checked={membershipType === "P"}
-                disabled={isEditMode && typeChangeLocked}
-                onChange={(e) => {
-                  setMembershipType("P");
-                  setMemberData((prev) => ({
-                    ...prev,
-                    nominalMembershipNo: "",
-                  }));
-                }}
-                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-gray-700">Permanent</span>
-            </label>
-            <label className={`flex items-center gap-2 ${isEditMode && typeChangeLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-              <input
-                type="radio"
-                name="membershipType"
-                value="N"
-                checked={membershipType === "N"}
-                disabled={isEditMode && typeChangeLocked}
-                onChange={(e) => {
-                  setMembershipType("N");
-                  setMemberData((prev) => ({
-                    ...prev,
-                    permanentMembershipNo: "",
-                  }));
-                }}
-                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-gray-700">Nominal</span>
-            </label>
-          </div>
-          {isEditMode && typeChangeLocked && (
-            <p className="text-xs text-amber-600">Membership type cannot be changed — this member has existing transactions or opening balance.</p>
-          )}
-        </div>
-      </FormField>
-
-      {/* Permanent Membership No - Show only when type is 'P' */}
-      {membershipType === "P" && (
-        <FormField
-          name="permanentMembershipNo"
-          label="Permanent Membership No"
-          required
-          errors={errorsByField.permanentMembershipNo || []}
-        >
-          <input
-            type="text"
-            value={memberData.permanentMembershipNo}
-            ref={permanentMemNoRef}
-            onChange={(e) =>
-              handleInputChange("permanentMembershipNo", e.target.value)
-            }
-            onBlur={(e) =>
-              handleFieldBlur("permanentMembershipNo", e.target.value)
-            }
-            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-            placeholder="Enter Permanent Membership No"
-            maxLength={20}
-            autoFocus
-          />
-          {!isEditMode && lastPermanentNo && (
-            <span className="text-xs text-gray-500 mt-1 inline-block">
-              Last: <span className="font-semibold text-blue-600">{lastPermanentNo}</span>
-            </span>
-          )}
-        </FormField>
-      )}
-
-      {/* Nominal Membership No - Show only when type is 'N' */}
-      {membershipType === "N" && (
-        <FormField
-          name="nominalMembershipNo"
-          label="Nominal Membership No"
-          required
-          errors={errorsByField.nominalMembershipNo || []}
-        >
-          <input
-            type="text"
-            value={memberData.nominalMembershipNo}
-            onChange={(e) =>
-              handleInputChange("nominalMembershipNo", e.target.value)
-            }
-            ref={nominalMemNoRef}
-            onBlur={(e) =>
-              handleFieldBlur("nominalMembershipNo", e.target.value)
-            }
-            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-            placeholder="Enter Nominal Membership No"
-            maxLength={20}
-            autoFocus
-          />
-          {!isEditMode && lastNominalNo && (
-            <span className="text-xs text-gray-500 mt-1 inline-block">
-              Last: <span className="font-semibold text-blue-600">{lastNominalNo}</span>
-            </span>
-          )}
-        </FormField>
-      )}
-      <FormField
-        name="accountNumber"
-        label="Share Money Account Number"
-        required
-        errors={errorsByField.accountNumber || []}
-      >
-        <input
-          type="text"
-          value={memberData.accountNumber}
-          onChange={(e) => handleInputChange("accountNumber", e.target.value)}
-          onBlur={(e) => handleFieldBlur("accountNumber", e.target.value)}
-          ref={accountNumberRef}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="Enter Share Money Account Number"
-          maxLength={20}
-        />
-      </FormField>
-
-      {/* Name Fields */}
-      <FormField
-        name="memberName"
-        label="Member Name"
-        required
-        errors={errorsByField.memberName || []}
-        icon={<User className="w-4 h-4 text-green-500" />}
-      >
-        <input
-          type="text"
-          value={memberData.memberName}
-          onChange={(e) => handleInputChange("memberName", e.target.value)}
-          onBlur={() => handleFieldBlur("memberName")}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="Enter Member Name"
-          required
-          maxLength={100}
-        />
-      </FormField>
-      <FormField
-        name="memberNameSL"
-        label="Member Name (Hindi)"
-        errors={errorsByField.memberNameSL || []}
-        icon={<Globe className="w-4 h-4 text-purple-500" />}
-      >
-        <input
-          type="text"
-          value={memberData.memberNameSL}
-          onChange={(e) => handleInputChange("memberNameSL", e.target.value)}
-          onBlur={() => handleFieldBlur("memberNameSL")}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="हिंदी में नाम"
-          maxLength={100}
-          lang="hi"
-        />
-      </FormField>
-      {/* Relative Information */}
-      <FormField
-        name="relativeName"
-        label="Relative Name"
-        required
-        errors={errorsByField.relativeName || []}
-      >
-        <input
-          type="text"
-          value={memberData.relativeName}
-          onChange={(e) => handleInputChange("relativeName", e.target.value)}
-          onBlur={() => handleFieldBlur("relativeName")}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          placeholder="Enter Relative Name"
-          required
-          maxLength={100}
-        />
-      </FormField>
-      {/* Relation */}
-      <FormField
-        name="relationId"
-        label="Relation"
-        required
-        errors={errorsByField.relationId || []}
-      >
-        <Select
-          id="relation"
-          options={relationOptions}
-          value={
-            relationOptions.find((option) => option.value === relationId) ||
-            null
-          }
-          onChange={(selected) => {
-            setRelationId(selected ? selected.value : "");
-            handleInputChange("relationId", selected ? selected.value : "");
-          }}
-          placeholder="Select Relation"
-          isClearable
-          required
-          className="text-sm"
-
-
-        />
-      </FormField>
-
-      {/* Gender */}
-      <FormField
-        name="gender"
-        label="Gender"
-        required
-        errors={errorsByField.gender || []}
-      >
-        <select
-          value={memberData.gender}
-          onChange={(e) => handleInputChange("gender", e.target.value)}
-          onBlur={() => handleFieldBlur("gender")}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-          required
-        >
-          <option value="">Select Gender</option>
-          <option value="1">Male</option>
-          <option value="2">Female</option>
-          <option value="3">Trans Gender</option>
-        </select>
-      </FormField>
-
-      {/* DOB with max date validation */}
-      <FormField
-        name="dob"
-        label="Date of Birth"
-        required
-        errors={errorsByField.dob || []}
-        icon={<Calendar className="w-4 h-4 text-red-500" />}
-      >
-        <DatePicker
-          value={memberData.dob}
-          onChange={(val) => { handleInputChange("dob", val); handleFieldBlur("dob"); }}
-          max={sessionDate}
-          workingDate={sessionDate}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
-        />
-      </FormField>
-
-      {/* Age - readonly and calculated */}
-      <FormField
-        name="age"
-        label="Age"
-        required
-        errors={errorsByField.age || []}
-        icon={<User className="w-4 h-4 text-red-500" />}
-      >
-        <input
-          type="text"
-          value={memberData.age}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg bg-gray-100 outline-none cursor-not-allowed"
-          placeholder="Age will be calculated from DOB"
-          readOnly
-        />
-      </FormField>
-
-      {/* Joining Date with max date validation */}
-      <FormField
-        name="joiningDate"
-        label="Joining Date"
-        required
-        errors={errorsByField.joiningDate || []}
-        icon={<Calendar className="w-4 h-4 text-green-500" />}
-      >
-        <DatePicker
-          value={memberData.joiningDate}
-          onChange={(val) => handleInputChange("joiningDate", val)}
-          max={sessionDate}
-          workingDate={sessionDate}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
-        />
-      </FormField>
-
-      {/* Caste */}
-      <FormField
-        name="casteId"
-        label="Caste"
-        required
-        errors={errorsByField.casteId || []}
-      >
-        <Select
-          id="caste"
-          options={casteOptions}
-          value={
-            casteOptions.find((option) => option.value === casteId) || null
-          }
-          onChange={(selected) => {
-            setCasteId(selected ? selected.value : "");
-            handleInputChange("casteId", selected ? selected.value : 0);
-          }}
-          placeholder="Select Caste"
-          isClearable
-          required
-          className="text-sm"
-
-
-        />
-      </FormField>
-
-      <FormField
-        name="category"
-        label="Category"
-        required
-        errors={errorsByField.category || []}
-      >
-        <input
-          type="text"
-          value={category}
-          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg bg-gray-100 outline-none cursor-not-allowed"
-          placeholder="Category will be auto-filled"
-          readOnly
-        />
-      </FormField>
-
-      {/* Occupation */}
-      <FormField
-        name="occupationId"
-        label="Occupation"
-        errors={errorsByField.occupationId || []}
-      >
-        <Select
-          id="occupation"
-          options={occupationOptions} // Replace with occupation options when available
-          value={
-            occupationOptions.find((option) => option.value === occupationId) ||
-            null
-          }
-          onChange={(selected) => {
-            setOccupationId(selected ? selected.value : "");
-            handleInputChange("occupationId", selected ? selected.value : "");
-          }}
-          placeholder="Select Occupation"
-          isClearable
-          required
-          className="text-sm"
-
-
-        />
-      </FormField>
-
-      {isOpeningEntry && (
-        <FormField
-          name="openingAmount"
-          label="Opening Amount"
-          errors={errorsByField.openingAmount || []}
-        >
-          <input
-            type="text"
-            pattern="^\d*(\.\d{0,2})?$"
-            value={voucherData.openingAmount}
-            onChange={handleOpeningAmountChange}
-            className="w-full px-3 py-2 border rounded"
-            placeholder="Enter Opening amount"
-            inputMode="decimal"
-            maxLength={10}
-          />
-        </FormField>
-      )}
-    </div>
-  );
-
-  // Updated Documents tab with two mandatory image uploads
-  const renderDocumentsInfo = () => (
-    <div className="space-y-8">
-      {/* Document Information */}
-      <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-        <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
-          <CreditCard className="w-5 h-5" />
-          Document Information
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <FormField
-            name="panCardNo"
-            label="PAN Card Number"
-            required={requireAadhaarPan}
-            errors={errorsByField.panCardNo || []}
-            icon={<CreditCard className="w-4 h-4 text-blue-500" />}
-            description="Format: ABCDE1234F"
-          >
-            <input
-              type="text"
-              value={memberData.panCardNo}
-              ref={PANref}
-              autoFocus
-              onChange={(e) =>
-                handleInputChange("panCardNo", e.target.value.toUpperCase())
-              }
-              onBlur={(e) => handleFieldBlur("panCardNo", e.target.value)}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-              placeholder="Enter PAN Number"
-              maxLength={10}
-              required
-              pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
-            />
-          </FormField>
-
-          <FormField
-            name="aadhaarCardNo"
-            label="Aadhaar Card Number"
-            required={requireAadhaarPan}
-            errors={errorsByField.aadhaarCardNo || []}
-            icon={<CreditCard className="w-4 h-4 text-green-500" />}
-            description="Format: 1234 5678 9012"
-          >
-            <input
-              type="text"
-              value={memberData.aadhaarCardNo}
-              ref={aadhaarRef}
-              onChange={(e) =>
-                handleInputChange(
-                  "aadhaarCardNo",
-                  e.target.value
-                    .replace(/\D/g, "")
-                    .replace(/(\d{4})(?=\d)/g, "$1")
-                )
-              }
-              onBlur={(e) => handleFieldBlur("aadhaarCardNo", e.target.value)}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-              placeholder="Enter Aadhaar Number"
-              maxLength={12}
-              pattern="[0-9]{4}\s[0-9]{4}\s[0-9]{4}"
-            />
-          </FormField>
-        </div>
-      </div>
-
-      {/* Image Upload Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Member Photo */}
-        <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-          <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
-            <ImageIcon className="w-5 h-5" />
-            Member Photo
-          </h3>
-          <FileUploadComponent
-            onFileSelect={handleMemberPhotoSelect}
-            title="Upload Member Photo"
-            acceptedTypes="image/*"
-            maxSize={5 * 1024 * 1024}
-            uploadedFile={memberPhoto}
-            onRemoveFile={removeMemberPhoto}
-            isRequired={requirePicSign}
-          />
-        </div>
-
-        {/* Member Signature */}
-        <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
-          <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
-            <ImageIcon className="w-5 h-5" />
-            Member Signature
-          </h3>
-          <FileUploadComponent
-            onFileSelect={handleMemberSignatureSelect}
-            title="Upload Member Signature"
-            acceptedTypes="image/*"
-            maxSize={5 * 1024 * 1024}
-            uploadedFile={memberSignature}
-            onRemoveFile={removeMemberSignature}
-            isRequired={requirePicSign}
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  // Updated nominees section with readonly age and max date validation
-  const renderNomineesInfo = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-          <Users className="w-5 h-5 text-blue-500" />
-          Member Nominees
-        </h3>
-        <button
-          onClick={addNominee}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Nominee
-        </button>
-      </div>
-
-      {nominees.map((nominee, index) => (
-        <div
-          key={nominee.id}
-          className="bg-gray-50 p-6 rounded-lg border border-gray-200"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="font-semibold text-gray-800">Nominee {index + 1}</h4>
-            {nominees.length > 1 && (
-              <button
-                onClick={() => removeNominee(nominee.id)}
-                className="flex items-center gap-1 px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors text-sm"
-              >
-                <Minus className="w-3 h-3" />
-                Remove
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <FormField
-              name={`nominees[${index}].nomineeName`}
-              label="Nominee Name"
-              required
-              errors={errorsByField[`nominees[${index}].nomineeName`] || []}
-            >
-              <input
-                type="text"
-                value={nominee.nomineeName}
-                onChange={(e) =>
-                  updateNominee(nominee.id, "nomineeName", e.target.value)
-                }
-                autoFocus
-                onBlur={() => handleFieldBlur(`nominees[${index}].nomineeName`)}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="Enter Name"
-                required
-              />
-            </FormField>
-            <FormField
-              name={`nominees[${index}].nomRelativeName`}
-              label="Relative Name"
-              required
-              errors={errorsByField[`nominees[${index}].nomRelativeName`] || []}
-            >
-              <input
-                type="text"
-                value={nominee.nomRelativeName}
-                onChange={(e) =>
-                  updateNominee(nominee.id, "nomRelativeName", e.target.value)
-                }
-                onBlur={() =>
-                  handleFieldBlur(`nominees[${index}].nomRelativeName`)
-                }
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="Enter Relative Name"
-                required
-              />
-            </FormField>
-            <FormField
-              name={`nominees[${index}].relation`}
-              label="Relation"
-              required
-              errors={errorsByField[`nominees[${index}].relation`] || []}
-            >
-              <Select
-                id="relation"
-                required
-                options={relationOptions}
-                value={
-                  relationOptions.find(
-                    (option) => option.value === nominee.relation
-                  ) || null
-                }
-                onChange={(e) =>
-                  updateNominee(nominee.id, "relation", e?.value)
-                }
-                onBlur={() => handleFieldBlur(`nominees[${index}].relation`)}
-                placeholder="Select Relation"
-                isClearable
-                className="text-sm"
-
-
-              />
-            </FormField>
-
-            <FormField
-              name={`nominees[${index}].relationWithMember`}
-              label="Relation With Member"
-              required
-              errors={
-                errorsByField[`nominees[${index}].relationWithMember`] || []
-              }
-            >
-              <Select
-                id="relationWithMember"
-                options={relationOptions}
-                value={
-                  relationOptions.find(
-                    (option) => option.value === nominee.relationWithMember
-                  ) || null
-                }
-                onChange={(e) =>
-                  updateNominee(nominee.id, "relationWithMember", e?.value)
-                }
-                onBlur={() =>
-                  handleFieldBlur(`nominees[${index}].relationWithMember`)
-                }
-                placeholder="Select Relation"
-                isClearable
-                required
-                className="text-sm"
-
-
-              />
-            </FormField>
-
-            {/* DOB with max date validation */}
-            <FormField
-              name={`nominees[${index}].dob`}
-              label="Date of Birth"
-              required
-              errors={errorsByField[`nominees[${index}].dob`] || []}
-            >
-              <DatePicker
-                value={nominee.dob}
-                onChange={(val) => { updateNominee(nominee.id, "dob", val); handleFieldBlur(`nominees[${index}].dob`); }}
-                max={sessionDate}
-                workingDate={sessionDate}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg outline-none"
-              />
-            </FormField>
-
-            {/* Age - readonly and calculated */}
-            <FormField
-              name={`nominees[${index}].age`}
-              label="Age"
-              required
-              errors={errorsByField[`nominees[${index}].age`] || []}
-            >
-              <input
-                type="text"
-                value={nominee.age}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-gray-100 outline-none cursor-not-allowed"
-                placeholder="Age will be calculated from DOB"
-                readOnly
-              />
-            </FormField>
-
-            {/* Nomination Date with max date validation */}
-            <FormField
-              name={`nominees[${index}].nominationDate`}
-              label="Nomination Date"
-              required
-              errors={errorsByField[`nominees[${index}].nominationDate`] || []}
-            >
-              <DatePicker
-                value={nominee.nominationDate}
-                onChange={(val) => { updateNominee(nominee.id, "nominationDate", val); handleFieldBlur(`nominees[${index}].nominationDate`); }}
-                max={sessionDate}
-                workingDate={sessionDate}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg outline-none"
-              />
-            </FormField>
-
-            <FormField
-              name={`nominees[${index}].aadhaarCardNo`}
-              label="Aadhaar Card Number"
-              errors={errorsByField[`nominees[${index}].aadhaarCardNo`] || []}
-            >
-              <input
-                type="text"
-                value={nominee.aadhaarCardNo}
-                onChange={(e) =>
-                  updateNominee(
-                    nominee.id,
-                    "aadhaarCardNo",
-                    (e.target.value = e.target.value.replace(/\s+/g, ""))
-                  )
-                }
-                onBlur={() =>
-                  handleFieldBlur(`nominees[${index}].aadhaarCardNo`)
-                }
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="123456789012"
-                maxLength={12}
-              />
-            </FormField>
-
-            <FormField
-              name={`nominees[${index}].PANCardNo`}
-              label="PAN Card Number"
-              errors={errorsByField[`nominees[${index}].PANCardNo`] || []}
-            >
-              <input
-                type="text"
-                value={nominee.PANCardNo}
-                onChange={(e) =>
-                  updateNominee(
-                    nominee.id,
-                    "PANCardNo",
-                    e.target.value.toUpperCase().substring(0, 10)
-                  )
-                }
-                onBlur={() => handleFieldBlur(`nominees[${index}].PANCardNo`)}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="ABCDE1234F"
-                maxLength={10}
-              />
-            </FormField>
-            <FormField
-              name={`nominees[${index}].percentageShare`}
-              label="Share Percentage"
-              required
-              errors={errorsByField[`nominees[${index}].percentageShare`] || []}
-            >
-              <input
-                type="text"
-                // Use 'text' type but hint the browser for numeric input
-                inputMode="decimal"
-                value={nominee.percentageShare}
-                onChange={(e) => {
-                  const value = e.target.value;
-
-                  // Regex to allow digits and AT MOST one decimal point, followed by max two digits.
-                  // Allows numbers like 10, 10.5, 10.55, but prevents 10.555 or 10.5.5
-                  const numericRegex = /^\d*\.?\d{0,2}$/;
-
-                  if (value === "" || numericRegex.test(value)) {
-                    updateNominee(nominee.id, "percentageShare", value);
-                  }
-                }}
-                onBlur={() =>
-                  handleFieldBlur(`nominees[${index}].percentageShare`)
-                }
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="e.g., 50.00"
-                maxLength={6} // Max length sufficient for 100.00 (6 characters)
-              />
-            </FormField>
-
-            {/* Minor checkbox and guardian fields */}
-            <div className="flex items-center gap-2 md:col-span-2 lg:col-span-3">
-              <input
-                type="checkbox"
-                id={`isMinor-${nominee.id}`}
-                checked={nominee.isMinor}
-                onChange={(e) =>
-                  updateNominee(nominee.id, "isMinor", e.target.checked)
-                }
-                className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-              />
-              <label
-                htmlFor={`isMinor-${nominee.id}`}
-                className="text-sm font-semibold text-gray-700"
-              >
-                Is Minor (Below 18 years)
-              </label>
-            </div>
-
-            {nominee.isMinor && (
-              <>
-                <FormField
-                  name={`nominees[${index}].nameOfGuardian`}
-                  label="Guardian Name"
-                  required={nominee.isMinor}
-                  errors={
-                    errorsByField[`nominees[${index}].nameOfGuardian`] || []
-                  }
-                >
-                  <input
-                    type="text"
-                    value={nominee.nameOfGuardian}
-                    onChange={(e) =>
-                      updateNominee(
-                        nominee.id,
-                        "nameOfGuardian",
-                        e.target.value
-                      )
-                    }
-                    onBlur={() =>
-                      handleFieldBlur(`nominees[${index}].nameOfGuardian`)
-                    }
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                    placeholder="Enter Guardian Name"
-                    required={nominee.isMinor}
-                  />
-                </FormField>
-
-                <FormField
-                  name={`nominees[${index}].nameOfGuardianSL`}
-                  label="Guardian Name (Hindi)"
-                  errors={
-                    errorsByField[`nominees[${index}].nameOfGuardianSL`] || []
-                  }
-                >
-                  <input
-                    type="text"
-                    value={nominee.nameOfGuardianSL}
-                    onChange={(e) =>
-                      updateNominee(
-                        nominee.id,
-                        "nameOfGuardianSL",
-                        e.target.value
-                      )
-                    }
-                    onBlur={() =>
-                      handleFieldBlur(`nominees[${index}].nameOfGuardianSL`)
-                    }
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                    placeholder="हिंदी में संरक्षक का नाम"
-                    lang="hi"
-                  />
-                </FormField>
-              </>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  // Keep existing address, contact, and voucher render functions...
-  const renderAddressInfo = () => (
-    <div className="space-y-8">
-      {/* Primary Address */}
-      <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-        <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
-          <Home className="w-5 h-5" />
-          Primary Address
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FormField
-            name="villageId1"
-            label="Village"
-            required
-            errors={errorsByField.villageId1 || []}
-          >
-            <Select
-              id="village1"
-              options={villageOptions}
-              value={
-                villageOptions.find((option) => option.value === villageId1) ||
-                null
-              }
-              autoFocus
-              onChange={(selected) => {
-                setVillageId1(selected ? selected.value : "");
-                handleInputChange(
-                  "villageId1",
-                  selected ? selected.value : 0,
-                  selected?.label || ""
-                );
-              }}
-              placeholder="Select Village"
-              isClearable
-              required
-              className="text-sm"
-
-
-            />
-          </FormField>
-          <FormField
-            name="thana1"
-            label="Thana"
-            required
-            errors={errorsByField.thana1 || []}
-          >
-            <input
-              type="text"
-              value={thana1}
-              onChange={(e) => handleInputChange("thana", e.target.value)}
-              onBlur={() => handleFieldBlur("thana")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Thana (auto-filled)"
-              maxLength={100}
-              required
-              readOnly={true}
-            />
-          </FormField>
-
-          <FormField
-            name="po1"
-            label="Post Office"
-            required
-            errors={errorsByField.po1 || []}
-          >
-            <input
-              type="text"
-              value={postOffice1}
-              onChange={(e) => handleInputChange("po1", e.target.value)}
-              onBlur={() => handleFieldBlur("po1")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Post Office (auto-filled)"
-              readOnly={true}
-              required
-            />
-          </FormField>
-
-          <FormField
-            name="tehsil1"
-            label="Tehsil"
-            required
-            errors={errorsByField.tehsil1 || []}
-          >
-            <input
-              type="text"
-              value={tehsil1}
-              onChange={(e) => handleInputChange("tehsil1", e.target.value)}
-              onBlur={() => handleFieldBlur("tehsil1")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter Tehsil"
-              readOnly={true}
-              required
-            />
-          </FormField>
-          <FormField
-            name="patwar1"
-            label="Patwar"
-            required
-            errors={errorsByField.patwar1 || []}
-          >
-            <input
-              type="text"
-              value={patwar1}
-              onChange={(e) => handleInputChange("patwar1", e.target.value)}
-              onBlur={() => handleFieldBlur("patwar1")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Patwar (auto-filled)"
-              readOnly={true}
-              required
-            />
-          </FormField>
-          <FormField
-            name="zone1"
-            label="Zone"
-            required
-            errors={errorsByField.zone1 || []}
-          >
-            <Select
-              id="zone1"
-              options={zoneData}
-              value={zoneData.find((option) => option.value === zone1) || null}
-              onChange={(selected) => {
-                setZone1(selected ? selected.value : "");
-                handleInputChange(
-                  "zone1",
-                  selected ? selected.value : 0,
-                  selected?.label || ""
-                );
-              }}
-              placeholder="Select Zone"
-              isClearable
-              required
-              className="text-sm"
-
-
-            />
-          </FormField>
-
-          <FormField
-            name="pinCode1"
-            label="Pin Code"
-            required
-            errors={errorsByField.pinCode1 || []}
-          >
-            <input
-              type="text"
-              value={pinCode1}
-              onChange={(e) => handleInputChange("pinCode1", e.target.value)}
-              onBlur={() => handleFieldBlur("pinCode1")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="PIN Code (auto-filled)"
-              readOnly={true}
-              required
-            />
-          </FormField>
-          <div className="lg:col-span-3">
-            <FormField
-              name="addressLine1"
-              label="Address Line 1"
-              required
-              errors={errorsByField.addressLine1 || []}
-            >
-              <input
-                type="text"
-                value={memberData.addressLine1}
-                onChange={(e) =>
-                  handleInputChange("addressLine1", e.target.value)
-                }
-                onBlur={() => handleFieldBlur("addressLine1")}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="Enter Address Line 1"
-                required
-                maxLength={150}
-              />
-            </FormField>
-          </div>
-
-          <div className="lg:col-span-3">
-            <FormField
-              name="addressLineSL1"
-              label="Address Line 1 (Hindi)"
-              errors={errorsByField.addressLineSL1 || []}
-            >
-              <input
-                type="text"
-                value={memberData.addressLineSL1}
-                onChange={(e) =>
-                  handleInputChange("addressLineSL1", e.target.value)
-                }
-                onBlur={() => handleFieldBlur("addressLineSL1")}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="हिंदी में पता लाइन 1"
-                maxLength={150}
-                lang="hi"
-              />
-            </FormField>
-          </div>
-        </div>
-      </div>
-
-      {/* Secondary Address */}
-      <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-        <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
-          <Home className="w-5 h-5" />
-          Secondary Address (Optional)
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FormField
-            name="villageId2"
-            label="Village"
-            errors={errorsByField.villageId2 || []}
-          >
-            <Select
-              id="village2"
-              options={villageOptions}
-              value={
-                villageOptions.find((option) => option.value === villageId2) ||
-                null
-              }
-              onChange={(selected) => {
-                setVillageId2(selected ? selected.value : "");
-                handleInputChange(
-                  "villageId2",
-                  selected ? selected.value : 0,
-                  "",
-                  selected?.label || ""
-                );
-              }}
-              placeholder="Select Village"
-              isClearable
-              required
-              className="text-sm"
-
-
-            />
-          </FormField>
-          <FormField
-            name="thana2"
-            label="Thana"
-            errors={errorsByField.thana2 || []}
-          >
-            <input
-              type="text"
-              value={thana2}
-              onChange={(e) => handleInputChange("thana2", e.target.value)}
-              onBlur={() => handleFieldBlur("thana2")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Thana (auto-filled)"
-              maxLength={100}
-              readOnly={true}
-            />
-          </FormField>
-          <FormField
-            name="po2"
-            label="Post Office"
-            errors={errorsByField.po2 || []}
-          >
-            <input
-              type="text"
-              value={postOffice2}
-              onChange={(e) => handleInputChange("po2", e.target.value)}
-              onBlur={() => handleFieldBlur("po2")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Post Office (auto-filled)"
-              readOnly={true}
-            />
-          </FormField>
-
-          <FormField
-            name="tehsil2"
-            label="Tehsil"
-            errors={errorsByField.tehsil2 || []}
-          >
-            <input
-              type="text"
-              value={tehsil2}
-              onChange={(e) => handleInputChange("tehsil2", e.target.value)}
-              onBlur={() => handleFieldBlur("tehsil2")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Tehsil (auto-filled)"
-              readOnly={true}
-            />
-          </FormField>
-          <FormField
-            name="patwar2"
-            label="Patwar"
-            required
-            errors={errorsByField.patwar2 || []}
-          >
-            <input
-              type="text"
-              value={patwar2}
-              onChange={(e) => handleInputChange("patwar2", e.target.value)}
-              onBlur={() => handleFieldBlur("patwar2")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Patwar (auto-filled)"
-              readOnly={true}
-              required
-            />
-          </FormField>
-          <FormField
-            name="zone2"
-            label="Zone"
-            required
-            errors={errorsByField.zone2 || []}
-          >
-            <Select
-              id="zone1"
-              options={zoneData}
-              value={zoneData.find((option) => option.value === zone2) || null}
-              onChange={(selected) => {
-                setZone2(selected ? selected.value : "");
-                handleInputChange(
-                  "zone2",
-                  selected ? selected.value : 0,
-                  selected?.label || ""
-                );
-              }}
-              placeholder="Select Zone"
-              isClearable
-              required
-              className="text-sm"
-
-
-            />
-          </FormField>
-          <FormField
-            name="pinCode2"
-            label="Pin Code"
-            required
-            errors={errorsByField.pinCode2 || []}
-          >
-            <input
-              type="text"
-              value={pinCode2}
-              onChange={(e) => handleInputChange("pinCode2", e.target.value)}
-              onBlur={() => handleFieldBlur("pinCode2")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="PIN Code (auto-filled)"
-              readOnly={true}
-              required
-            />
-          </FormField>
-          <div className="lg:col-span-3">
-            <FormField
-              name="addressLine2"
-              label="Address Line 2"
-              errors={errorsByField.addressLine2 || []}
-            >
-              <input
-                type="text"
-                value={memberData.addressLine2}
-                onChange={(e) =>
-                  handleInputChange("addressLine2", e.target.value)
-                }
-                onBlur={() => handleFieldBlur("addressLine2")}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="Enter Address Line 2"
-                maxLength={150}
-              />
-            </FormField>
-          </div>
-
-          <div className="lg:col-span-3">
-            <FormField
-              name="addressLineSL2"
-              label="Address Line 2 (Hindi)"
-              errors={errorsByField.addressLineSL2 || []}
-            >
-              <input
-                type="text"
-                value={memberData.addressLineSL2}
-                onChange={(e) =>
-                  handleInputChange("addressLineSL2", e.target.value)
-                }
-                onBlur={() => handleFieldBlur("addressLineSL2")}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="हिंदी में पता लाइन 2"
-                maxLength={150}
-                lang="hi"
-              />
-            </FormField>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderContactInfo = () => (
-    <div className="space-y-6">
-      {/* Phone 1 */}
-      <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-        <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
-          <Phone className="w-5 h-5" />
-          Primary Contact
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            name="phoneType1"
-            label="Phone Type"
-            required={requireContact}
-            errors={errorsByField.phoneType1 || []}
-          >
-            <select
-              value={memberData.phoneType1}
-              onChange={(e) => handleInputChange("phoneType1", e.target.value)}
-              onBlur={() => handleFieldBlur("phoneType1")}
-              autoFocus
-              required
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-            >
-              <option value="">Select Type</option>
-              <option value="1">Mobile</option>
-              <option value="2">Landline</option>
-              <option value="3">Office</option>
-            </select>
-          </FormField>
-
-          <div className="hidden">
-            <FormField
-              name="phonePrefix1"
-              label="Prefix"
-              required
-              errors={errorsByField.phonePrefix1 || []}
-            >
-              <input
-                type="text"
-                value={memberData.phonePrefix1}
-                onChange={(e) =>
-                  handleInputChange("phonePrefix1", e.target.value)
-                }
-                onBlur={() => handleFieldBlur("phonePrefix1")}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="+91"
-                required
-                readOnly
-                maxLength={5}
-              />
-            </FormField>
-          </div>
-          <FormField
-            name="phoneNo1"
-            label="Phone Number"
-            required={requireContact}
-            errors={errorsByField.phoneNo1 || []}
-          >
-            <input
-              type="tel"
-              value={memberData.phoneNo1}
-              onChange={(e) => handleInputChange("phoneNo1", e.target.value)}
-              onBlur={() => handleFieldBlur("phoneNo1")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter Phone Number"
-              maxLength={15}
-              required
-            />
-          </FormField>
-          <FormField
-            name="email1"
-            label="Email"
-            errors={errorsByField.email1 || []}
-          >
-            <input
-              type="email" // Changed type to email
-              value={memberData.email1}
-              onChange={(e) => handleInputChange("email1", e.target.value)}
-              onBlur={() => handleFieldBlur("email1")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="example@domain.com" // Updated placeholder
-              // Removed readOnly
-              // Removed maxLength (emails can be long)
-              autoComplete="email" // Added for better browser autofill
-            />
-          </FormField>
-        </div>
-      </div>
-
-      {/* Phone 2 */}
-      <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-        <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
-          <Phone className="w-5 h-5" />
-          Secondary Contact (Optional)
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            name="phoneType2"
-            label="Phone Type"
-            errors={errorsByField.phoneType2 || []}
-          >
-            <select
-              value={memberData.phoneType2}
-              onChange={(e) => handleInputChange("phoneType2", e.target.value)}
-              onBlur={() => handleFieldBlur("phoneType2")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-            >
-              <option value="">Select Type</option>
-              <option value="1">Mobile</option>
-              <option value="2">Landline</option>
-              <option value="3">Office</option>
-            </select>
-          </FormField>
-
-          <div className="hidden">
-            <FormField
-              name="phonePrefix2"
-              label="Prefix"
-              errors={errorsByField.phonePrefix2 || []}
-            >
-              <input
-                type="text"
-                value={memberData.phonePrefix2}
-                onChange={(e) =>
-                  handleInputChange("phonePrefix2", e.target.value)
-                }
-                onBlur={() => handleFieldBlur("phonePrefix2")}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-                placeholder="+91"
-                readOnly
-                maxLength={5}
-              />
-            </FormField>
-          </div>
-
-          <FormField
-            name="phoneNo2"
-            label="Phone Number"
-            errors={errorsByField.phoneNo2 || []}
-          >
-            <input
-              type="tel"
-              value={memberData.phoneNo2}
-              onChange={(e) => handleInputChange("phoneNo2", e.target.value)}
-              onBlur={() => handleFieldBlur("phoneNo2")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="Enter Phone Number"
-              maxLength={20}
-            />
-          </FormField>
-          <FormField
-            name="email2"
-            label="Email"
-            errors={errorsByField.email2 || []}
-          >
-            <input
-              type="email" // Changed type to email
-              value={memberData.email2}
-              onChange={(e) => handleInputChange("email2", e.target.value)}
-              onBlur={() => handleFieldBlur("email2")}
-              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="example@domain.com" // Updated placeholder
-              // Removed readOnly
-              // Removed maxLength (emails can be long)
-              autoComplete="email" // Added for better browser autofill
-            />
-          </FormField>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Voucher Info tab with max date validation
-  const renderVoucherInfo = () => (
-    <div className="space-y-6">
-      <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
-        <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
-          <FileText className="w-5 h-5" />
-          Voucher Information
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <FormField
-            name="smAmount"
-            label="SM Amount"
-            errors={errorsByField.smAmount || []}
-            required
-          >
-            <input
-              type="text"
-              pattern="^\d*(\.\d{0,2})?$"
-              value={voucherData.smAmount}
-              onChange={handleSmAmountChange}
-              className="w-full px-3 py-2 border rounded"
-              placeholder="Enter amount"
-              inputMode="decimal"
-              autoFocus
-              readOnly={isEditMode}
-              maxLength={15}
-            />
-          </FormField>
-          {/* Admission Fees Account - readonly */}
-          <FormField
-            errors={errorsByField.admissionFeesAccount || []}
-            name="admissionFeesAccount"
-            label="Admission Fees Account"
-          >
-            <input
-              type="text"
-              value={voucherData.admissionFeesAccount}
-              readOnly
-              className="w-full px-3 py-2 border rounded bg-gray-100"
-              placeholder="Admission Fees Account"
-            />
-          </FormField>
-          {/* Admission Fee Amount - readonly */}
-          <FormField
-            errors={errorsByField.admissionFeeAmount || []}
-            name="admissionFeeAmount"
-            label="Admission Fee Amount"
-          >
-            <input
-              type="text"
-              value={voucherData.admissionFeeAmount}
-              readOnly
-              className="w-full px-3 py-2 border rounded bg-gray-100"
-              placeholder="Admission Fee Amount"
-            />
-          </FormField>
-          {/* Debit Account Dropdown */}
-          <FormField
-            errors={errorsByField.debitAccount || []}
-            name="debitAccount"
-            label="Debit Account"
-            required
-          >
-            <Select
-              id="debitAccount"
-              options={accOptions}
-              value={
-                accOptions.find((option) => option.value === debitAccount) ||
-                null
-              }
-              ref={refDebitAccount}
-              onChange={(selected) => {
-                setDebitAccountId(selected ? selected.value : "");
-                handleInputChange(
-                  "debitAccount",
-                  selected ? selected.value : ""
-                );
-              }}
-              placeholder="Select Debit Account"
-              isClearable
-              required
-              isDisabled={isEditMode}
-              className="text-sm"
-
-
-            />
-          </FormField>
-          {/* Debit Amount - sum, readonly */}
-          <FormField
-            errors={errorsByField.debitAmount || []}
-            name="debitAmount"
-            label="Debit Amount"
-          >
-            <input
-              type="text"
-              value={voucherData.debitAmount}
-              readOnly
-              className="w-full px-3 py-2 border rounded bg-gray-100"
-              placeholder="Debit Amount"
-            />
-          </FormField>
-          {/* Narration */}
-          <FormField
-            errors={errorsByField.narration || []}
-            name="narration"
-            label="Voucher Narration"
-          >
-            <textarea
-              value={voucherData.narration}
-              onChange={handleNarrationChange}
-              className="w-full px-3 py-2 border rounded"
-              maxLength={255}
-              readOnly={isEditMode}
-              placeholder="Narration"
-              rows={2}
-            />
-          </FormField>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case "basic":
-        return renderBasicInfo();
-      case "address":
-        return renderAddressInfo();
-      case "contact":
-        return renderContactInfo();
-      case "documents":
-        return renderDocumentsInfo();
-      case "voucher":
-        return renderVoucherInfo();
-      case "nominees":
-        return renderNomineesInfo();
-      default:
-        return renderBasicInfo();
-    }
-  };
-
-  return (
-    <DashboardLayout
-      mainContent={
-        <div className="-mt-3 bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
-          <div className="w-full space-y-6">
-            {/* Header */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                    <UserCheck className="text-white text-xl" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                      Member Master
-                    </h1>
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigate(isEditMode ? "/member-info" : "/member-operations")}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 font-medium"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  {isEditMode ? "Back to Member Info" : "Back to Operations"}
-                </button>
-              </div>
-
-              {/* Validation options */}
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center gap-2 mb-3">
-                  <Settings className="w-4 h-4 text-gray-500" />
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Make Optional
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {/* Aadhaar & PAN toggle */}
-                  <label className="flex items-center gap-2.5 cursor-pointer group select-none">
-                    <div
-                      onClick={() => setRequireAadhaarPan((v) => !v)}
-                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-                        requireAadhaarPan ? "bg-blue-600" : "bg-amber-400"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
-                          requireAadhaarPan ? "translate-x-0" : "translate-x-5"
-                        }`}
-                      />
-                    </div>
-                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                      Aadhaar &amp; PAN
-                      <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${requireAadhaarPan ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
-                        {requireAadhaarPan ? "Required" : "Optional"}
-                      </span>
-                    </span>
-                  </label>
-
-                  {/* Contact details toggle */}
-                  <label className="flex items-center gap-2.5 cursor-pointer group select-none">
-                    <div
-                      onClick={() => setRequireContact((v) => !v)}
-                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-                        requireContact ? "bg-blue-600" : "bg-amber-400"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
-                          requireContact ? "translate-x-0" : "translate-x-5"
-                        }`}
-                      />
-                    </div>
-                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                      Contact Details
-                      <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${requireContact ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
-                        {requireContact ? "Required" : "Optional"}
-                      </span>
-                    </span>
-                  </label>
-
-                  {/* Picture & Signature toggle */}
-                  <label className="flex items-center gap-2.5 cursor-pointer group select-none">
-                    <div
-                      onClick={() => setRequirePicSign((v) => !v)}
-                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-                        requirePicSign ? "bg-blue-600" : "bg-amber-400"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
-                          requirePicSign ? "translate-x-0" : "translate-x-5"
-                        }`}
-                      />
-                    </div>
-                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                      Picture &amp; Signature
-                      <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${requirePicSign ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
-                        {requirePicSign ? "Required" : "Optional"}
-                      </span>
-                    </span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Add Validation Summary */}
-            <ValidationSummary
-              errors={errors}
-              errorsByTab={errorsByTab}
-              isVisible={showValidationSummary}
-              onErrorClick={(fieldName, tab) => {
-                setActiveTab(tab);
-              }}
-              onClose={() => setShowValidationSummary(false)}
-            />
-
-            {/* Wizard Step Progress + Tab Content */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-
-              {/* Step Progress Header */}
-              <div className="border-b border-gray-200 bg-gray-50 px-4 py-5 overflow-x-auto">
-                <div className="flex items-center min-w-max mx-auto w-fit">
-                  {tabs.map((tab, idx) => {
-                    const isUnlocked = effectiveUnlockedTabs.includes(tab.id);
-                    const isComplete = effectiveCompletedTabs.has(tab.id) && activeTab !== tab.id;
-                    const isActive = activeTab === tab.id;
-                    const isLast = idx === tabs.length - 1;
-                    const tabErrors = errorsByTab[tab.id]?.length || 0;
-
-                    return (
-                      <div key={tab.id} className="flex items-center">
-                        <button
-                          onClick={() => isUnlocked ? setActiveTab(tab.id) : undefined}
-                          disabled={!isUnlocked}
-                          className={`flex flex-col items-center gap-1.5 px-3 py-1 rounded-lg transition-all duration-200 ${
-                            isUnlocked ? "cursor-pointer hover:bg-gray-100" : "cursor-not-allowed"
-                          }`}
-                          title={!isUnlocked ? "Complete previous steps first" : tab.label}
-                        >
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-200 relative ${
-                            isActive
-                              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200"
-                              : isComplete && tabErrors === 0
-                              ? "bg-green-500 border-green-500 text-white"
-                              : isComplete && tabErrors > 0
-                              ? "bg-red-500 border-red-500 text-white"
-                              : isUnlocked
-                              ? "bg-white border-gray-400 text-gray-600"
-                              : "bg-gray-100 border-gray-300 text-gray-400"
-                          }`}>
-                            {isComplete && tabErrors === 0 ? (
-                              <Check className="w-4 h-4" />
-                            ) : isComplete && tabErrors > 0 ? (
-                              <span className="text-xs font-bold">{tabErrors}</span>
-                            ) : !isUnlocked ? (
-                              <Lock className="w-3.5 h-3.5" />
-                            ) : (
-                              idx + 1
-                            )}
-                          </div>
-                          <span className={`text-xs font-medium whitespace-nowrap ${
-                            isActive
-                              ? "text-blue-600"
-                              : isComplete && tabErrors === 0
-                              ? "text-green-600"
-                              : isComplete && tabErrors > 0
-                              ? "text-red-500"
-                              : isUnlocked
-                              ? "text-gray-600"
-                              : "text-gray-400"
-                          }`}>
-                            {tab.label}
-                          </span>
-                        </button>
-
-                        {!isLast && (
-                          <div className={`h-0.5 w-8 mx-1 rounded-full flex-shrink-0 transition-all duration-300 ${
-                            effectiveCompletedTabs.has(tab.id) && (errorsByTab[tab.id]?.length || 0) === 0
-                              ? "bg-green-400"
-                              : effectiveCompletedTabs.has(tab.id)
-                              ? "bg-red-300"
-                              : isUnlocked
-                              ? "bg-gray-300"
-                              : "bg-gray-200"
-                          }`} />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Step counter label */}
-                <p className="text-center text-xs text-gray-400 mt-3">
-                  Step {currentTabIndex + 1} of {tabs.length}
-                </p>
-              </div>
-
-              {/* Tab Content */}
-              <div className="p-6 sm:p-8">{renderTabContent()}</div>
-
-              {/* Wizard Action Buttons */}
-              <div className="border-t border-gray-200 p-6 bg-gray-50">
-                <div className="flex items-center justify-between gap-4">
-                  {/* Left: Reset */}
-                  <button
-                    onClick={isEditMode ? handleResetNotAllowed : handleReset}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition-all duration-200"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reset
-                  </button>
-
-                  {/* Right: Prev / Next / Save */}
-                  <div className="flex items-center gap-3">
-                    {currentTabIndex > 0 && (
-                      <button
-                        onClick={handlePrev}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-semibold transition-all duration-200"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                        Previous
-                      </button>
-                    )}
-
-                    {!isLastTab && (
-                      <button
-                        onClick={handleNext}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-sm"
-                      >
-                        Next
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    )}
-
-                    {isLastTab && (
-                      <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                      >
-                        {loading ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="w-4 h-4" />
-                            Save Member
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      }
-    />
-  );
-};
-
-export default MemberMaster;
+import React, { useState, useRef, useEffect } from "react";
+import { encryptId, decryptId } from "../../utils/encryption";
+import { useFormValidation } from "../../services/Validations/member/useFormValidation";
+import { ValidationSummary } from "../../components/Validations/ValidationSummary";
+import { FormField } from "../../components/Validations/FormField";
+import Swal from "sweetalert2";
+import { ValidationError } from "../../services/Validations/validation";
+import Select from "react-select";
+import commonservice, {
+  AccountMaster,
+} from "../../services/common/commonservice";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux";
+import memberAPIService, {
+  CombinedMemberDTO,
+  MemberDTO,
+  MemberDocDetailsDTO,
+  MemberLocationDetailsDTO,
+  VoucherDTO,
+  MemberNomineeDetailsDTO,
+} from "../../services/member/memberServiceapi";
+import {
+  User,
+  Users,
+  MapPin,
+  Phone,
+  CreditCard,
+  Calendar,
+  Building,
+  Home,
+  Plus,
+  Minus,
+  Save,
+  RotateCcw,
+  ArrowLeft,
+  UserCheck,
+  Globe,
+  Info,
+  FileText,
+  Upload,
+  X,
+  Image as ImageIcon,
+  Settings,
+  ChevronRight,
+  ChevronLeft,
+  Lock,
+  Check,
+} from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import DashboardLayout from "../../Common/Layout";
+import ZoneApiService from "../../services/location/zone/zoneapi";
+import DatePicker from "../../components/DatePicker";
+
+interface ZoneInfo {
+  zoneId: number;
+  zoneName: string;
+}
+interface OptionType {
+  value: number;
+  label: string;
+}
+
+// Updated File Upload Component for single file with title
+const FileUploadComponent = ({
+  onFileSelect,
+  acceptedTypes = "image/*",
+  maxSize = 5 * 1024 * 1024,
+  title = "Upload Picture",
+  uploadedFile,
+  onRemoveFile,
+  isRequired = false,
+}) => {
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragActive(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleFiles([files[0]]); // Only take first file
+    }
+  };
+
+  const handleFiles = (files: any) => {
+    const file = files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid File Type",
+        text: "Please upload only image files (PNG, JPG, JPEG)",
+      });
+      return;
+    }
+
+    if (file.size > maxSize) {
+      Swal.fire({
+        icon: "error",
+        title: "File Too Large",
+        text: `File size must be less than ${maxSize / (1024 * 1024)}MB`,
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const newFile = {
+        id: Date.now(),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        preview: e.target.result,
+        file: file,
+      };
+
+      if (onFileSelect) onFileSelect(newFile);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragActive(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Upload Area */}
+      <div
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+          dragActive
+            ? "border-blue-400 bg-blue-50"
+            : "border-gray-300 hover:border-gray-400"
+        }`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <div className="flex flex-col items-center gap-2">
+          <Upload className="w-8 h-8 text-gray-400" />
+          <div>
+            <p className="text-sm font-medium text-gray-700">
+              {title} {isRequired && <span className="text-red-500">*</span>}
+            </p>
+            <p className="text-xs text-gray-500">
+              Click to browse or drag and drop image here
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              PNG, JPG, JPEG up to {maxSize / (1024 * 1024)}MB
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={acceptedTypes}
+        onChange={(e) => handleFiles(Array.from(e.target.files))}
+        className="hidden"
+      />
+
+      {/* Uploaded File Preview */}
+      {uploadedFile && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-700">Uploaded File:</h4>
+          <div className="relative inline-block">
+            <div className="w-32 h-32 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+              <img
+                src={uploadedFile.preview}
+                alt={uploadedFile.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onRemoveFile) onRemoveFile();
+              }}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+            <p className="text-xs text-gray-600 mt-1 truncate">
+              {uploadedFile.name}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Age calculation utility
+const calculateAge = (dob: any) => {
+  if (!dob) return "";
+  const today = new Date();
+  const birthDate = new Date(dob);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age--;
+  }
+  return age.toString();
+};
+
+// Interfaces
+export interface Relation {
+  relationId: number;
+  description: string;
+}
+export interface Village {
+  villageId: number;
+  villageName: string;
+}
+
+interface CasteInfo {
+  casteId: number;
+  casteDescription: string;
+}
+interface OccupationInfo {
+  occupationId: number;
+  description: string;
+}
+
+const MemberMaster = () => {
+  const navigate = useNavigate();
+  const { memberId: encryptedId } = useParams<{ memberId?: string }>();
+  const memberId = encryptedId ? decryptId(encryptedId) : null;
+  const accountNumberRef = useRef(null);
+  const refDebitAccount = useRef(null);
+  const nominalMemNoRef = useRef(null);
+  const permanentMemNoRef = useRef(null);
+  const [smAccId, setSMAccId] = useState<number>(0);
+  const isEditMode = !!memberId;
+  const aadhaarRef = useRef(null);
+  const PANref = useRef(null);
+  const [membershipType, setMembershipType] = useState<string>(""); // 'P' or 'N'
+  const [typeChangeLocked, setTypeChangeLocked] = useState(false);
+  const user = useSelector((state: RootState) => state.user);
+  const sessionDate = user.workingdate
+    ? commonservice.splitDate(user.workingdate)
+    : commonservice.getTodaysDate();
+  const { errors, validateForm, clearErrors, markFieldTouched } =
+    useFormValidation();
+  const [showValidationSummary, setShowValidationSummary] = useState(false);
+  const [activeTab, setActiveTab] = useState("basic");
+  // Wizard state — tracks which tabs are accessible and which have been completed
+  const [unlockedTabs, setUnlockedTabs] = useState<string[]>(["basic"]);
+  const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+  const [lastPermanentNo, setLastPermanentNo] = useState<string | null>(null);
+  const [lastNominalNo, setLastNominalNo] = useState<string | null>(null);
+  const [relationId, setRelationId] = useState<number | "">("");
+  const [relations, setRelations] = useState<Relation[]>([]);
+  const [villageId1, setVillageId1] = useState<number | "">("");
+  const [villages1, setVillages] = useState<Village[]>([]);
+  const [villageId2, setVillageId2] = useState<number | "">("");
+  const [zone1, setZone1] = useState<number | "">("");
+  const [pinCode1, setPinCode1] = useState<number | "">("");
+  const [pinCode2, setPinCode2] = useState<number | "">("");
+  const [zone2, setZone2] = useState<number | "">("");
+  const [tehsil1, setTehsil1] = useState<number | "">("");
+  const [tehsil2, setTehsil2] = useState<number | "">("");
+  const [postOffice1, setPostOffice1] = useState<number | "">("");
+  const [postOffice2, setPostOffice2] = useState<number | "">("");
+  const [thana1, setThana1] = useState<number | "">("");
+  const [thana2, setThana2] = useState<number | "">("");
+  const [casteId, setCasteId] = useState<number | "">("");
+  const [casteInfo, setCaste] = useState<CasteInfo[]>([]);
+  const [category, setCategory] = useState<number | "">("");
+  const [occupationInfo, setOccupation] = useState<OccupationInfo[]>([]);
+  const [occupationId, setOccupationId] = useState<number | "">("");
+  const [generalAccInfo, setGeneralAccounts] = useState<AccountMaster[]>([]);
+  const [debitAccount, setDebitAccountId] = useState<number | "">("");
+  const [patwar1, setPatwar1] = useState<number | "">("");
+  const [patwar2, setPatwar2] = useState<number | "">("");
+  // Image upload states
+  const [memberPhoto, setMemberPhoto] = useState(null);
+  const [memberSignature, setMemberSignature] = useState(null);
+  const [shouldLoadData, setShouldLoadData] = useState(true);
+  const [zones, setZones] = useState<ZoneInfo[]>([]);
+
+  // Validation option toggles — all mandatory by default
+  const [requireAadhaarPan, setRequireAadhaarPan] = useState(true);
+  const [requireContact, setRequireContact] = useState(true);
+  const [requirePicSign, setRequirePicSign] = useState(true);
+
+  useEffect(() => {
+    const fetchZoneData = async () => {
+      const zonesRes = await ZoneApiService.getAllZones(user.branchid);
+      setZones(zonesRes.data || []);
+    };
+    // Only set default if NOT in edit mode and membership type is empty
+    if (!isEditMode && !membershipType) {
+      setMembershipType("P");
+    }
+    fetchZoneData();
+  }, [isEditMode, user.branchid]);
+  // ✅ NEW: Fetch member data if in edit mode
+  useEffect(() => {
+    const fetchMemberData = async () => {
+      if (isEditMode && memberId) {
+        try {
+          Swal.fire({
+            title: "Loading Member Data...",
+            text: "Please wait",
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading(),
+          });
+
+          const response = await memberAPIService.getMemberById(
+            parseInt(memberId),
+            user.branchid
+          );
+
+          if (response.success && response.data) {
+            const data = response.data;
+            // Populate member data
+            setMemberData({
+              accountNumber: data.accMaster?.accountNumber || "",
+              defAreaBrId: data.member?.defAreaBrId?.toString() || "",
+              memberType: data.member?.memberType?.toString() || "2",
+              nominalMembershipNo: data.member?.nominalMembershipNo || "",
+              permanentMembershipNo: data.member?.permanentMembershipNo || "",
+              memberName: data.member?.memberName || "",
+              memberNameSL: data.member?.memberNameSL || "",
+              relativeName: data.member?.relativeName || "",
+              relationId: data.member?.relationId?.toString() || "",
+              gender: data.member?.gender?.toString() || "",
+              dob: commonservice.splitDate(data.member?.dob) || "",
+              casteId: data.member?.casteId?.toString() || "",
+              age: calculateAge(data.member?.dob || ""),
+              joiningDate:
+                commonservice.splitDate(data.member?.joiningDate) || "",
+              occupationId: data.member?.occupationId?.toString() || "",
+              thana: "",
+              addressLine1: data.locationDetails?.addressLine1 || "",
+              addressLineSL1: data.locationDetails?.addressLineSL1 || "",
+              villageId1: data.locationDetails?.villageId1?.toString() || "",
+              po1: "",
+              tehsil1: "",
+              addressLine2: data.locationDetails?.addressLine2 || "",
+              addressLineSL2: data.locationDetails?.addressLineSL2 || "",
+              villageId2: data.locationDetails?.villageId2?.toString() || "",
+              po2: "",
+              tehsil2: "",
+              phoneType1: data.member?.phoneType1?.toString() || "",
+              phonePrefix1: data.member?.phonePrefix1 || "+91",
+              phoneNo1: data.member?.phoneNo1 || "",
+              phoneType2: data.member?.phoneType2?.toString() || "",
+              phonePrefix2: data.member?.phonePrefix2 || "+91",
+              phoneNo2: data.member?.phoneNo2 || "",
+              panCardNo: data.documentDetails?.panCardNo || "",
+              aadhaarCardNo: data.documentDetails?.aadhaarCardNo || "",
+              zoneId: "",
+              id: Number(memberId ?? 0),
+              email1: data.member?.email1 || "",
+              email2: data.member?.email2 || "",
+            });
+
+            // Set dropdown states
+            setRelationId(data.member?.relationId || "");
+            setCasteId(data.member?.casteId || "");
+            setOccupationId(data.member?.occupationId || "");
+            setVillageId1(data.locationDetails?.villageId1 || "");
+            setVillageId2(data.locationDetails?.villageId2 || "");
+            setDebitAccountId(data.voucher?.debitAccountId || "");
+            fetchLocationData(data.locationDetails?.villageId1, 0);
+            fetchLocationData(0, data.locationDetails?.villageId2);
+            setSMAccId(data.accMaster?.smAccId || 0);
+            // Set voucher data
+            setVoucherData({
+              smAmount: data.voucher?.smAmount?.toString() || "",
+              admissionFeesAccount: data.voucher?.admissionFeesAccount || "", // Will be set by settings
+              admissionFeeAmount:
+                data.voucher?.admissionFeeAmount ?? 0,
+              debitAccountId: data.voucher?.debitAccountId?.toString() || "",
+              debitAmount: data.voucher?.totalDebit?.toString() || "",
+              narration: data.voucher?.voucherNarration || "",
+              openingAmount: data.voucher.openingAmount?.toString() || "",
+            });
+
+            setDebitAccountId(data.voucher?.debitAccountId ?? 0);
+
+            // Set nominees
+            if (data.nominees && data.nominees.length > 0) {
+              setNominees(
+                data.nominees.map((nom) => ({
+                  id: nom.id || Date.now(),
+                  nomineeName: nom.nomineeName || "",
+                  relation: nom.relationId || 0,
+                  relationWithMember: nom.relationWithMember || 0,
+                  dob:
+                    (nom.dob != null ? commonservice.splitDate(nom.dob) : "") ||
+                    "",
+                  age: nom.dob ? calculateAge(commonservice.splitDate(nom.dob)) : (nom.age?.toString() || ""),
+                  isMinor: nom.isMinor === 1,
+                  nameOfGuardian: nom.nameOfGuardian || "",
+                  nameOfGuardianSL: nom.nameOfGuardianSL || "",
+                  nominationDate:
+                    (nom.nominationDate != null
+                      ? commonservice.splitDate(nom.nominationDate)
+                      : "") || "",
+                  aadhaarCardNo: nom.aadhaarCardNo || "",
+                  PANCardNo: nom.panCardNo || "",
+                  nomRelativeName: nom.nomRelativeName || "",
+                  percentageShare: Number(nom.percentageShare) || 0,
+                }))
+              );
+            }
+
+            if (data.documentDetails?.memberPicExt) {
+              const fileName = `member_${memberId}_picture${data.documentDetails.memberPicExt}`;
+              const photoUrl = await commonservice.fetchAuthImageUrl(
+                commonservice.getImageUrl(fileName, "Pictures") + `?t=${Date.now()}`
+              );
+              setMemberPhoto({
+                id: Date.now(),
+                name: `photo${data.documentDetails.memberPicExt}`,
+                preview: photoUrl,
+                file: null,
+              });
+            }
+
+            if (data.documentDetails?.memberSignExt) {
+              const fileName = `member_${memberId}_signature${data.documentDetails.memberSignExt}`;
+              const signUrl = await commonservice.fetchAuthImageUrl(
+                commonservice.getImageUrl(fileName, "Signatures") + `?t=${Date.now()}`
+              );
+              setMemberSignature({
+                id: Date.now(),
+                name: `sign${data.documentDetails.memberSignExt}`,
+                preview: signUrl,
+                file: null,
+              });
+            }
+
+            // Load category from caste
+            if (data.member?.casteId) {
+              fetchCategoryFromCaste(data.member.casteId);
+            }
+
+            if (data.member.nominalMembershipNo != "") setMembershipType("N");
+            else setMembershipType("P");
+            setTypeChangeLocked(data.hasTransactions ?? false);
+
+            // Auto-detect which fields are missing so toggles match the member's actual data
+            const hasPan     = !!data.documentDetails?.panCardNo?.trim();
+            const hasAadhaar = !!data.documentDetails?.aadhaarCardNo?.trim();
+            setRequireAadhaarPan(hasPan && hasAadhaar);
+
+            const hasPhone = !!data.member?.phoneNo1?.trim();
+            setRequireContact(hasPhone);
+
+            const hasPic  = !!data.documentDetails?.memberPicExt?.trim();
+            const hasSign = !!data.documentDetails?.memberSignExt?.trim();
+            setRequirePicSign(hasPic && hasSign);
+
+            // In edit mode unlock all tabs immediately — user can jump anywhere
+            setUnlockedTabs(["basic", "address", "contact", "documents", "voucher", "nominees"]);
+            setCompletedTabs(new Set(["basic", "address", "contact", "documents", "voucher", "nominees"]));
+
+            Swal.close();
+          } else {
+            Swal.fire("Error", "Member not found", "error");
+            navigate("/member");
+          }
+        } catch (error: any) {
+          console.error("Error fetching member:", error);
+          Swal.fire(
+            "Error",
+            error.message || "Failed to load member data",
+            "error"
+          );
+          navigate("/member");
+        }
+      }
+    };
+
+    fetchMemberData();
+  }, [memberId, isEditMode, user.branchid, navigate]);
+
+  useEffect(() => {
+    if (!isEditMode) {
+      memberAPIService.getLastMembershipNo(user.branchid).then((res: any) => {
+        const data = res.data ?? res;
+        if (data?.lastPermanentMembershipNo) setLastPermanentNo(data.lastPermanentMembershipNo);
+        if (data?.lastNominalMembershipNo) setLastNominalNo(data.lastNominalMembershipNo);
+      });
+    }
+  }, [isEditMode, user.branchid]);
+
+  const zoneData: OptionType[] = zones.map((zone) => ({
+    value: zone.zoneId,
+    label: zone.zoneName,
+  }));
+  useEffect(() => {
+    const fetchAutoCompleteData = async () => {
+      try {
+        const res = await commonservice.relation_info();
+        const data: Relation[] = res.data || [];
+        setRelations(data);
+
+        const villages = await commonservice.village_info(user.branchid);
+        const villageData: Village[] = villages.data || [];
+        setVillages(villageData);
+
+        const castes = await commonservice.caste_Info(user.branchid);
+        const casteData: CasteInfo[] = castes.data || [];
+        setCaste(casteData);
+
+        const occupations = await commonservice.occupation_Info(user.branchid);
+        const occupationData: OccupationInfo[] = occupations.data || [];
+        setOccupation(occupationData);
+
+        const general_accounts = await commonservice.general_accmasters_info(
+          user.branchid
+        );
+        setGeneralAccounts(general_accounts.data || []);
+
+        const settings = await commonservice.settings(user.branchid);
+        if(!isEditMode){
+        setVoucherData((prevData) => ({
+          ...prevData,
+          admissionFeesAccount:
+            settings.data.generalSettings.admissionFeeAccName || "",
+          admissionFeeAmount:
+            settings.data.generalSettings.admissionFeeAmount || 0,
+        }));
+      }
+      } catch (err: any) {
+        console.error(err);
+        Swal.fire("Error", err.message || "Could not load types", "error");
+      }
+    };
+    fetchAutoCompleteData();
+  }, [user.branchid]);
+  const [memberData, setMemberData] = useState({
+    accountNumber: "",
+    defAreaBrId: "",
+    memberType: "2",
+    nominalMembershipNo: "",
+    permanentMembershipNo: "",
+    memberName: "",
+    memberNameSL: "",
+    relativeName: "",
+    relationId: "",
+    gender: "",
+    dob: sessionDate,
+    casteId: "",
+    age: "", // Made readonly, calculated from DOB
+    joiningDate: sessionDate,
+    occupationId: "",
+    // Address fields
+    thana: "",
+    addressLine1: "",
+    addressLineSL1: "",
+    villageId1: "",
+    po1: "",
+    tehsil1: "",
+    addressLine2: "",
+    addressLineSL2: "",
+    villageId2: "",
+    po2: "",
+    tehsil2: "",
+    // Contact fields
+    phoneType1: "",
+    phonePrefix1: "+91",
+    phoneNo1: "",
+    phoneType2: "",
+    phonePrefix2: "+91",
+    phoneNo2: "",
+    // Document fields
+    panCardNo: "",
+    aadhaarCardNo: "",
+    // Zone field
+    zoneId: "",
+    id: 0,
+    email1: "",
+    email2: "",
+  });
+
+  const firstSessionFromDateStr = user.firstSessionFromDate
+    ? commonservice.splitDate(user.firstSessionFromDate)
+    : null;
+const isOpeningEntry = !!(
+    firstSessionFromDateStr &&
+    memberData.joiningDate &&
+    memberData.joiningDate < firstSessionFromDateStr
+  );
+
+  useEffect(() => {
+    if (isOpeningEntry && activeTab === "voucher") {
+      setActiveTab("basic");
+    }
+  }, [isOpeningEntry]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Only warn if in edit mode or form has data
+      if (isEditMode) {
+        e.preventDefault();
+      }
+    };
+
+    // Add the event listener
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isEditMode, memberData]);
+
+  const relationOptions = relations.map((type) => ({
+    value: type.relationId,
+    label: type.description,
+  }));
+
+  const casteOptions = casteInfo.map((type) => ({
+    value: type.casteId,
+    label: type.casteDescription,
+  }));
+
+  const villageOptions = villages1.map((type) => ({
+    value: type.villageId,
+    label: type.villageName,
+  }));
+
+  const occupationOptions = occupationInfo.map((type) => ({
+    value: type.occupationId,
+    label: type.description,
+  }));
+
+  const accOptions = generalAccInfo.map((type) => ({
+    value: type.accId,
+    label: type.accountName,
+  }));
+
+  // Updated Basic Information State
+
+  // Voucher Info State
+  const [voucherData, setVoucherData] = useState({
+    smAmount: "",
+    admissionFeesAccount: "", // Set as needed
+    admissionFeeAmount: 0, // Will be set via calculation or autofill
+    debitAccountId: "",
+    debitAmount: "", // Calculated field
+    narration: "",
+    openingAmount: "",
+  });
+  const handleSmAmountChange = (e) => {
+    let value = e.target.value.replace(/[^0-9.]/g, "");
+    value = value.replace(/^(\d*\.\d{0,2}).*$/, "$1");
+    setVoucherData((v) => ({
+      ...v,
+      smAmount: value,
+      debitAmount: (value > 0
+        ? parseFloat(value || 0) + parseFloat(v.admissionFeeAmount || 0)
+        : 0
+      ).toFixed(2),
+    }));
+  };
+
+  const handleOpeningAmountChange = (e) => {
+    let value = e.target.value.replace(/[^0-9.]/g, "");
+    value = value.replace(/^(\d*\.\d{0,2}).*$/, "$1");
+    setVoucherData((v) => ({
+      ...v,
+      openingAmount: value,
+    }));
+  };
+
+  const handleDebitAccountChange = (value: any) =>
+    setVoucherData((v) => ({
+      ...v,
+      debitAccount: value,
+    }));
+
+  const handleNarrationChange = (e: any) =>
+    setVoucherData((v) => ({
+      ...v,
+      narration: e.target.value,
+    }));
+
+  // Nominees State - Updated with age calculation
+  const [nominees, setNominees] = useState([
+    {
+      id: Date.now(),
+      nomineeName: "",
+      relation: 0,
+      relationWithMember: 0,
+      age: "", // Made readonly, calculated from DOB
+      isMinor: false,
+      dob: sessionDate,
+      nameOfGuardian: "",
+      nameOfGuardianSL: "",
+      nominationDate: commonservice.getTodaysDate(),
+      aadhaarCardNo: "",
+      PANCardNo: "",
+      nomRelativeName: "",
+      percentageShare: 0,
+    },
+  ]);
+
+  // Existing functions with updates
+  const addNominee = () => {
+    setNominees([
+      ...nominees,
+      {
+        id: Date.now(),
+        nomineeName: "",
+        relation: 0,
+        relationWithMember: 0,
+        age: "",
+        isMinor: false,
+        dob: "",
+        nameOfGuardian: "",
+        nameOfGuardianSL: "",
+        nominationDate: "",
+        aadhaarCardNo: "",
+        PANCardNo: "",
+        nomRelativeName: "",
+        percentageShare: 0,
+      },
+    ]);
+  };
+
+  const removeNominee = (id: any) => {
+    if (nominees.length > 1) {
+      setNominees(nominees.filter((nominee) => nominee.id !== id));
+    }
+  };
+
+  const updateNominee = (id: any, field: any, value: any) => {
+    setNominees(
+      nominees.map((nominee) => {
+        if (nominee.id === id) {
+          const updatedNominee = { ...nominee, [field]: value };
+
+          // Calculate age when DOB changes
+          if (field === "dob") {
+            updatedNominee.age = calculateAge(value);
+          }
+
+          return updatedNominee;
+        }
+        return nominee;
+      })
+    );
+  };
+
+  const handleInputChange = (
+    field: any,
+    value: any,
+    village1Label: any = "",
+    village2Label: any = ""
+  ) => {
+    setMemberData((prev) => {
+      const updatedData = { ...prev, [field]: value };
+
+      // Calculate age when DOB changes
+      if (field === "dob") {
+        updatedData.age = calculateAge(value);
+      }
+      if (field === "villageId1" && value == 0) {
+        updatedData.addressLine1 = "";
+      }
+      if (field === "villageId2" && value == 0) {
+        updatedData.addressLine2 = "";
+      }
+      if (
+        field === "nominalMembershipNo" ||
+        field === "permanentMembershipNo"
+      ) {
+        updatedData.accountNumber = value;
+      }
+      return updatedData;
+    });
+
+    if (field === "villageId1") {
+      fetchLocationData(value, 0, village1Label);
+    }
+    if (field === "villageId2") {
+      fetchLocationData(0, value, "", village2Label);
+    }
+    if (field === "casteId") {
+      fetchCategoryFromCaste(value);
+    }
+    clearLocationData(field);
+    if (field == "debitAccount") {
+      setDebitAccountId(value);
+    }
+  };
+
+  const handleVoucherInputChange = (field: any, value: any) => {
+    setVoucherData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Image upload handlers
+  const handleMemberPhotoSelect = (file) => {
+    setMemberPhoto(file);
+  };
+
+  const handleMemberSignatureSelect = (file) => {
+    setMemberSignature(file);
+  };
+
+  const removeMemberPhoto = () => {
+    setMemberPhoto(null);
+  };
+
+  const removeMemberSignature = () => {
+    setMemberSignature(null);
+  };
+
+  // Existing location and category functions remain the same...
+  const fetchCategoryFromCaste = async (casteId: number) => {
+    setCategory("");
+    try {
+      if (casteId === 0) return;
+      const res = await commonservice.category_Info_from_caste(
+        casteId,
+        user.branchid
+      );
+      if (!res.success) throw new Error("Failed to load Category Data.");
+      setCategory(res.data.categoryName || "");
+    } catch (error) {}
+  };
+
+  const clearLocationData = (caption: string) => {
+    if (caption == "villageId1") {
+      setThana1("");
+      setPostOffice1("");
+      setPatwar1("");
+      setTehsil1("");
+      setZone1("");
+      setPinCode1("");
+    } else if (caption == "villageId2") {
+      setThana2("");
+      setPostOffice2("");
+      setPatwar2("");
+      setTehsil2("");
+      setZone2("");
+      setPinCode2("");
+    }
+  };
+
+  const fetchLocationData = async (
+    villageId1: number = 0,
+    villageId2: number = 0,
+    village1Label: string = "",
+    village2Label: string = ""
+  ) => {
+    try {
+      const villageId = villageId1 || villageId2;
+      if (villageId === 0) {
+        return;
+      }
+      const res = await commonservice.location_Info(villageId, user.branchid);
+      if (!res.success) {
+        Swal.fire(
+          "Error",
+          "Unable to load location data. Please ensure the village master contains complete and valid location details."
+        );
+        return;
+      }
+      const data = res.data;
+      if (villageId1) {
+        setThana1(data.ThanaName || "");
+        setPostOffice1(data.PostOfficeName || "");
+        setTehsil1(data.TehsilName || "");
+        setZone1(commonservice.getLastSegment(data.ZoneName) || "");
+        setPinCode1(data.PinCode || "");
+        setPatwar1(data.Patwar);
+        setMemberData((prevData) => ({
+          ...prevData,
+          addressLine1: `Village: ${village1Label}, Thana Name: ${
+            data.ThanaName.split("-")[0]
+          }, Tehsil Name: ${data.TehsilName.split("-")[0]}, Post Office: ${
+            data.PostOfficeName.split("-")[0]
+          },  Zone Name: ${data.ZoneName.split("-")[0]}, Patwar: ${data.Patwar.split("-")[0]}, Pin Code: ${
+            data.PinCode
+          }`,
+        }));
+      } else {
+        setThana2(data.ThanaName || "");
+        setPostOffice2(data.PostOfficeName || "");
+        setTehsil2(data.TehsilName || "");
+        setZone2(commonservice.getLastSegment(data.ZoneName) || "");
+        setPinCode2(data.PinCode || "");
+        setPatwar1(data.Patwar);
+        setMemberData((prevData) => ({
+          ...prevData,
+          addressLine2: `Village: ${village2Label}, Thana Name: ${
+            data.ThanaName.split("-")[0]
+          }, Tehsil Name: ${data.TehsilName.split("-")[0]}, Post Office: ${
+            data.PostOfficeName.split("-")[0]
+          },  Zone Name: ${data.ZoneName.split("-")[0]}, Patwar: ${data.Patwar.split("-")[0]}, Pin Code: ${
+            data.PinCode
+          }`,
+        }));
+      }
+    } catch (error) {
+      if (villageId1 != 0) {
+        setVillageId1("");
+        setMemberData((prevData) => ({
+          ...prevData,
+          addressLine1: "",
+        }));
+      } else if (villageId2 != 0) {
+        setVillageId2("");
+        setMemberData((prevData) => ({
+          ...prevData,
+          addressLine2: "",
+        }));
+      }
+      Swal.fire(
+        "Error",
+        "Unable to load location data. Please ensure the village master contains complete and valid location details.",
+        "error"
+      );
+    }
+  };
+
+  // Enhanced handleSubmit remains the same...
+  const handleSubmit = async () => {
+    const validation = validateForm(
+      memberData,
+      nominees,
+      voucherData,
+      [memberPhoto, memberSignature],
+      { requireAadhaarPan, requireContact, requirePicSign }
+    );
+
+    if (!validation.isValid) {
+      setShowValidationSummary(true);
+      // Same validation error handling...
+      return;
+    }
+    if (!memberData.memberName?.trim()) {
+      Swal.fire("Error", "Member Name is required", "error");
+      return;
+    }
+    if (!memberData.relativeName?.trim()) {
+      Swal.fire("Error", "Relative Name is required", "error");
+      return;
+    }
+    if (requireContact && !memberData.phoneNo1?.trim()) {
+      Swal.fire("Error", "Phone Number is required", "error");
+      return;
+    }
+    if (requireContact && !memberData.phonePrefix1?.trim()) {
+      Swal.fire("Error", "Phone Prefix is required", "error");
+      return;
+    }
+    if (requireAadhaarPan && !memberData.panCardNo?.trim()) {
+      Swal.fire("Error", "PAN Card is required", "error");
+      return;
+    }
+    if (requireAadhaarPan && !memberData.aadhaarCardNo?.trim()) {
+      Swal.fire("Error", "Aadhaar Card is required", "error");
+      return;
+    }
+    if (!memberData.addressLine1?.trim()) {
+      Swal.fire("Error", "Address is required", "error");
+      return;
+    }
+    if (requirePicSign && !memberPhoto?.file && !isEditMode) {
+      Swal.fire("Error", "Member Photo is required", "error");
+      return;
+    }
+    if (requirePicSign && !memberSignature?.file && !isEditMode) {
+      Swal.fire("Error", "Member Signature is required", "error");
+      return;
+    }
+    if (memberData.aadhaarCardNo.trim() !== "") {
+      const aadhaarExistsInNominees = nominees.some(
+        (nominee) =>
+          nominee.aadhaarCardNo?.trim() !== "" &&
+          nominee.aadhaarCardNo?.trim() === memberData.aadhaarCardNo.trim()
+      );
+
+      if (aadhaarExistsInNominees) {
+        Swal.fire({
+          icon: "error",
+          text: "Member's Aadhaar number already exists in nominee list!",
+          title: "Duplication",
+        });
+        return false;
+      }
+    }
+    if (memberData.panCardNo.trim() !== "") {
+      const aadhaarExistsInNominees = nominees.some(
+        (nominee) =>
+          nominee.PANCardNo?.trim() !== "" &&
+          nominee.PANCardNo?.trim() === memberData.panCardNo.trim()
+      );
+
+      if (aadhaarExistsInNominees) {
+        Swal.fire({
+          icon: "error",
+          text: "Member's PAN already exists in nominee list!",
+          title: "Duplication",
+        });
+        return false;
+      }
+    }
+
+    if (!isOpeningEntry && debitAccount == 0) {
+      Swal.fire({
+        icon: "error",
+        title: "Error.",
+        text: "Debit Account is required in Voucher Tab.",
+        didClose: () => {
+          refDebitAccount.current?.focus();
+        },
+      });
+      return;
+    }
+    const memberDTO: MemberDTO = {
+      branchId: user.branchid,
+      defAreaBrId: Number(memberData.defAreaBrId) || 1, // ✅ Provide default
+      memberType: memberData.memberType ? Number(memberData.memberType) : 1, // ✅ Provide default
+      nominalMembershipNo: memberData.nominalMembershipNo,
+      permanentMembershipNo: memberData.permanentMembershipNo,
+      memberName: memberData.memberName.trim(), // ✅ Trim whitespace
+      memberNameSL: memberData.memberNameSL,
+      relativeName: memberData.relativeName.trim(), // ✅ Trim whitespace
+      relationId: Number(memberData.relationId),
+      gender: Number(memberData.gender),
+      dob: memberData.dob,
+      casteId: Number(memberData.casteId),
+      categoryId: commonservice.getLastSegment(category.toString()) ?? 1, // ✅ Provide default
+      occupationId: Number(memberData.occupationId) || 1, // ✅ Provide default
+      joiningDate: memberData.joiningDate,
+      phonePrefix1: memberData.phonePrefix1.trim(), // ✅ Trim whitespace
+      phoneType1: Number(memberData.phoneType1),
+      phoneNo1: memberData.phoneNo1.trim(), // ✅ Trim whitespace
+      phonePrefix2: memberData.phonePrefix2,
+      phoneType2: memberData.phoneType2
+        ? Number(memberData.phoneType2)
+        : undefined,
+      phoneNo2: memberData.phoneNo2,
+      id: Number(memberId),
+      email1: memberData.email1,
+      email2: memberData.email2,
+    };
+
+    const documentDetailsDTO: MemberDocDetailsDTO = {
+      branchId: user.branchid,
+      panCardNo: memberData.panCardNo.trim(), // ✅ Trim whitespace
+      aadhaarCardNo: memberData.aadhaarCardNo.replace(/\s/g, ""), // ✅ Remove spaces
+      memberPicExt: commonservice.getFileExtension(memberPhoto?.file || null),
+      memberSignExt: commonservice.getFileExtension(
+        memberSignature?.file || null
+      ),
+    };
+
+    // Create LocationDetails DTO
+    const locationDetailsDTO: MemberLocationDetailsDTO = {
+      branchId: user.branchid,
+      addressLine1: memberData.addressLine1.trim(), // ✅ Trim whitespace
+      addressLineSL1: memberData.addressLineSL1,
+      addressLine2: memberData.addressLine2,
+      addressLineSL2: memberData.addressLineSL2,
+      villageId1: Number(memberData.villageId1),
+      villageId2: memberData.villageId2
+        ? Number(memberData.villageId2)
+        : undefined,
+      po1: commonservice.getLastSegment(postOffice1.toString()) ?? 0,
+      po2: commonservice.getLastSegment(postOffice2.toString()) ?? 0,
+      tehsil1: commonservice.getLastSegment(tehsil1.toString()) ?? 0,
+      tehsil2: commonservice.getLastSegment(tehsil2.toString()) ?? 0,
+      thanaId1: commonservice.getLastSegment(thana1.toString()) ?? 0,
+      thanaId2: commonservice.getLastSegment(thana2.toString()) ?? 0,
+      zoneId1: Number(zone1) ?? 0,
+      zoneId2: Number(zone2) ?? 0,
+    };
+
+    // Create Nominees DTO array
+    const nomineesDTO: MemberNomineeDetailsDTO[] = nominees.map((nominee) => ({
+      branchId: user.branchid,
+      nomineeName: nominee.nomineeName,
+      nomRelativeName: nominee.nomRelativeName?.substring(0, 10), // Truncate to match DB constraint
+      relationId: Number(nominee.relation),
+      relationWithMember: Number(nominee.relationWithMember),
+      age: Number(nominee.age),
+      dob: nominee.dob,
+      isMinor: nominee.isMinor ? 1 : 0, // Convert boolean to smallint
+      nameOfGuardian: nominee.nameOfGuardian,
+      nameOfGuardianSL: nominee.nameOfGuardianSL,
+      nominationDate: nominee.nominationDate,
+      aadhaarCardNo: nominee.aadhaarCardNo,
+      panCardNo: nominee.PANCardNo,
+      percentageShare: Number(nominee.percentageShare), // Equal share for all nominees
+    }));
+    const totalNomineePercentage = nomineesDTO.reduce((sum, nominee) => {
+      return sum + (nominee.percentageShare || 0);
+    }, 0);
+
+    if (totalNomineePercentage > 100) {
+      await Swal.fire({
+        icon: "error",
+        title: "Limit exceed",
+        text: "The total share percentage of all nominees must not exceed 100%.",
+      });
+      return;
+    }
+    if (totalNomineePercentage < 100) {
+      await Swal.fire({
+        icon: "error",
+        title: "Limit exceed",
+        text: "The total share percentage of all nominees must be exactly 100%",
+      });
+      return;
+    }
+
+    // Create Voucher DTO
+    const voucherDTO: VoucherDTO = {
+      voucherNarration: voucherData.narration,
+      smAmount: Number(voucherData.smAmount) ?? 0,
+      admissionFeesAccountId:
+        Number(
+          commonservice.getLastSegment(voucherData.admissionFeesAccount)
+        ) ?? 0,
+      admissionFeeAmount: voucherData.admissionFeeAmount ?? 0,
+      debitAccountId: Number(debitAccount) ?? 0,
+      totalDebit: Number(voucherData.debitAmount) || 0,
+      openingAmount: Number(voucherData.openingAmount) || 0,
+      isOpeningEntry: isOpeningEntry,
+    };
+    const accMasterDTO = {
+      BranchId: user.branchid,
+      AccountNumber: memberData.accountNumber.trim(),
+      AccountName: `${memberData.memberName.trim()}`,
+      RelativeName: memberData.relativeName.trim(),
+      Gender: Number(memberData.gender),
+      PhoneNo1: memberData.phoneNo1.trim(),
+      Addressline: memberData.addressLine1.trim(),
+      dob: memberData.dob,
+    };
+    const combinedMemberDTO: CombinedMemberDTO = {
+      member: memberDTO,
+      nominees: nomineesDTO,
+      documentDetails: documentDetailsDTO,
+      locationDetails: locationDetailsDTO,
+      accMaster: accMasterDTO,
+      voucher: voucherDTO,
+    };
+
+    setLoading(true);
+    try {
+      const response = isEditMode
+        ? await memberAPIService.updateMember(
+            combinedMemberDTO,
+            memberPhoto?.file || undefined,
+            memberSignature?.file || undefined
+          )
+        : await memberAPIService.createMember(
+            combinedMemberDTO,
+            memberPhoto?.file || undefined,
+            memberSignature?.file || undefined
+          );
+
+      if (response.success) {
+        await Swal.fire({
+          icon: "success",
+          title: "Success!",
+          text: response.message || "Member created successfully!",
+          confirmButtonColor: "#3B82F6",
+        });
+
+        clearErrors();
+        setShowValidationSummary(false);
+        sessionStorage.removeItem("encryptedMemberId");
+        handleReset(); // Reset form after successful submission
+        if (isEditMode) {
+          navigate("/member-info");
+        }
+      } else {
+        await Swal.fire({
+          icon: "error",
+          title: "Error!",
+          text: "Failed to create member. Please try again.",
+          confirmButtonColor: "#EF4444",
+        });
+      }
+
+      clearErrors();
+      setShowValidationSummary(false);
+    } catch (error) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error!",
+        text: "Failed to create member. Please try again.",
+        confirmButtonColor: "#EF4444",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFieldBlur = async (fieldName: string, value: any = "") => {
+    markFieldTouched(fieldName);
+    if (fieldName == "accountNumber" && value.trim() != "") {
+      const response = await commonservice.accno_unique(
+        user.branchid,
+        value,
+        smAccId,
+        4
+      );
+      if (response.success) {
+        setMemberData((prevData) => ({
+          ...prevData,
+          accountNumber: "",
+        }));
+        Swal.fire({
+          icon: "error",
+          title: "Duplication.",
+          text: response.message,
+          didClose: () => {
+            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
+            accountNumberRef.current?.focus();
+          },
+        });
+      }
+    }
+    if (fieldName == "nominalMembershipNo" && value.trim() != "") {
+      const response = await commonservice.nominalmembershipNo_unique(
+        user.branchid,
+        value,
+        Number(memberId ?? 0) ?? 0
+      );
+      if (response.success) {
+        setMemberData((prevData) => ({
+          ...prevData,
+          nominalMembershipNo: "",
+        }));
+        Swal.fire({
+          icon: "error",
+          title: "Duplication.",
+          text: response.message,
+          didClose: () => {
+            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
+            nominalMemNoRef.current?.focus();
+          },
+        });
+      }
+    }
+    if (fieldName == "permanentMembershipNo" && value.trim() != "") {
+      const response = await commonservice.permanentmembershipNo_unique(
+        user.branchid,
+        value,
+        Number(memberId ?? 0) ?? 0
+      );
+      if (response.success) {
+        setMemberData((prevData) => ({
+          ...prevData,
+          permanentMembershipNo: "",
+        }));
+        Swal.fire({
+          icon: "error",
+          title: "Duplication.",
+          text: response.message,
+          didClose: () => {
+            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
+            permanentMemNoRef.current?.focus();
+          },
+        });
+      }
+    }
+    if (fieldName == "aadhaarCardNo" && value.trim() != "") {
+      const response = await commonservice.aadhaar_unique(
+        user.branchid,
+        value,
+        Number(memberId ?? 0) ?? 0
+      );
+      if (response.success) {
+        setMemberData((prevData) => ({
+          ...prevData,
+          aadhaarCardNo: "",
+        }));
+        Swal.fire({
+          icon: "error",
+          title: "Duplication.",
+          text: response.message,
+          didClose: () => {
+            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
+            aadhaarRef.current?.focus();
+          },
+        });
+      }
+    }
+    if (fieldName == "panCardNo" && value.trim() != "") {
+      const response = await commonservice.PAN_unique(
+        user.branchid,
+        value,
+        Number(memberId ?? 0) ?? 0
+      );
+      if (response.success) {
+        setMemberData((prevData) => ({
+          ...prevData,
+          panCardNo: "",
+        }));
+        Swal.fire({
+          icon: "error",
+          title: "Duplication.",
+          text: response.message,
+          didClose: () => {
+            // 2. Call focus ONLY after the alert is completely closed and the DOM is clear
+            PANref.current?.focus();
+          },
+        });
+      }
+    }
+  };
+
+  // Group errors by field and tab
+  const errorsByField = errors.reduce((acc, error) => {
+    if (!acc[error.field]) acc[error.field] = [];
+    acc[error.field].push(error);
+    return acc;
+  }, {} as Record<string, ValidationError[]>);
+
+  const errorsByTab = errors.reduce((acc, error) => {
+    if (!acc[error.tab]) acc[error.tab] = [];
+    acc[error.tab].push(error);
+    return acc;
+  }, {} as Record<string, ValidationError[]>);
+
+  const handleResetNotAllowed = () => {
+    Swal.fire({
+      icon: "error",
+      title: "Not Allowed",
+      text: "Reset form is not allowed in modify mode.",
+    });
+  };
+
+  // Updated handleReset function
+  const handleReset = () => {
+    // Reset validation toggles to mandatory defaults
+    setRequireAadhaarPan(true);
+    setRequireContact(true);
+    setRequirePicSign(true);
+
+    // Reset member data
+    setMembershipType("P");
+    setMemberData({
+      accountNumber: "",
+      defAreaBrId: "",
+      memberType: "",
+      nominalMembershipNo: "",
+      permanentMembershipNo: "",
+      memberName: "",
+      memberNameSL: "",
+      relativeName: "",
+      relationId: "",
+      gender: "",
+      dob: sessionDate,
+      age: "", // Reset calculated age
+      casteId: "",
+      joiningDate: sessionDate,
+      occupationId: "",
+      thana: "",
+      addressLine1: "",
+      addressLineSL1: "",
+      villageId1: "",
+      po1: "",
+      tehsil1: "",
+      addressLine2: "",
+      addressLineSL2: "",
+      villageId2: "",
+      po2: "",
+      tehsil2: "",
+      phoneType1: "",
+      phonePrefix1: "+91",
+      phoneNo1: "",
+      phoneType2: "",
+      phonePrefix2: "+91",
+      phoneNo2: "",
+      panCardNo: "",
+      aadhaarCardNo: "",
+      zoneId: "",
+      id: Number(memberId ?? 0),
+      email1: "",
+      email2: "",
+    });
+
+    // Reset voucher data
+    setVoucherData({
+      smAmount: "",
+      admissionFeeAmount: voucherData.admissionFeeAmount,
+      admissionFeesAccount: voucherData.admissionFeesAccount,
+      debitAccountId: "",
+      debitAmount: "",
+      narration: "",
+      openingAmount: "",
+    });
+    setDebitAccountId("");
+    setOccupationId("");
+
+    // Reset images
+    setMemberPhoto(null);
+    setMemberSignature(null);
+
+    // Reset nominees with calculated age
+    setNominees([
+      {
+        id: Date.now(),
+        nomineeName: "",
+        relation: 0,
+        relationWithMember: 0,
+        age: "", // Reset calculated age
+        isMinor: false,
+        dob: sessionDate,
+        nameOfGuardian: "",
+        nameOfGuardianSL: "",
+        nominationDate: sessionDate,
+        aadhaarCardNo: "",
+        PANCardNo: "",
+        nomRelativeName: "",
+        percentageShare: 0,
+      },
+    ]);
+
+    // Reset other states
+    setRelationId("");
+    setVillageId1("");
+    setVillageId2("");
+    setZone1("");
+    setPinCode1("");
+    setPinCode2("");
+    setZone2("");
+    setTehsil1("");
+    setTehsil2("");
+    setPostOffice1("");
+    setPostOffice2("");
+    setThana1("");
+    setThana2("");
+    setCasteId("");
+    setCategory("");
+
+    setActiveTab("basic");
+    setUnlockedTabs(["basic"]);
+    setCompletedTabs(new Set());
+    clearErrors();
+    setShowValidationSummary(false);
+  };
+
+  const tabs = [
+    { id: "basic", label: "Basic Info", icon: User },
+    { id: "address", label: "Address", icon: MapPin },
+    { id: "contact", label: "Contact", icon: Phone },
+    { id: "documents", label: "Documents", icon: CreditCard },
+    ...(!isOpeningEntry ? [{ id: "voucher", label: "Voucher Info", icon: FileText }] : []),
+    { id: "nominees", label: "Nominees", icon: Users },
+  ];
+
+  // Wizard helpers
+  const effectiveUnlockedTabs = isEditMode ? tabs.map(t => t.id) : unlockedTabs;
+  const effectiveCompletedTabs: Set<string> = isEditMode
+    ? new Set(tabs.map(t => t.id))
+    : completedTabs;
+  const currentTabIndex = tabs.findIndex(t => t.id === activeTab);
+  const isLastTab = activeTab === tabs[tabs.length - 1]?.id;
+
+  const validateCurrentTab = (): boolean => {
+    const errs: string[] = [];
+    switch (activeTab) {
+      case "basic":
+        if (!memberData.memberName?.trim()) errs.push("Member Name is required");
+        else if (memberData.memberName.trim().length < 2) errs.push("Member Name must be at least 2 characters");
+        else if (!/^[a-zA-Z\s]+$/.test(memberData.memberName)) errs.push("Member Name can only contain letters and spaces");
+        if (!memberData.relativeName?.trim()) errs.push("Relative Name is required");
+        else if (memberData.relativeName.trim().length < 2) errs.push("Relative Name must be at least 2 characters");
+        if (!memberData.relationId) errs.push("Relation is required");
+        if (!memberData.gender) errs.push("Gender is required");
+        if (!memberData.dob) errs.push("Date of Birth is required");
+        else { const a = parseInt(memberData.age || "0"); if (a < 18 || a > 120) errs.push("Age must be between 18 and 120 years"); }
+        if (!memberData.joiningDate) errs.push("Joining Date is required");
+        if (!memberData.casteId) errs.push("Caste is required");
+        if (!memberData.accountNumber?.trim()) errs.push("Account Number is required");
+        if (membershipType === "P" && !memberData.permanentMembershipNo?.trim()) errs.push("Permanent Membership No is required");
+        if (membershipType === "N" && !memberData.nominalMembershipNo?.trim()) errs.push("Nominal Membership No is required");
+        break;
+      case "address":
+        if (!villageId1) errs.push("Primary Village is required");
+        if (!memberData.addressLine1?.trim()) errs.push("Address Line 1 is required");
+        else if (memberData.addressLine1.trim().length < 10) errs.push("Address must be at least 10 characters");
+        break;
+      case "contact":
+        if (requireContact) {
+          if (!memberData.phoneType1) errs.push("Phone Type is required");
+          if (!memberData.phoneNo1?.trim()) errs.push("Phone Number is required");
+          else if (!/^[6-9]\d{9}$/.test(memberData.phoneNo1)) errs.push("Please enter a valid 10-digit mobile number starting with 6-9");
+        }
+        break;
+      case "documents":
+        if (requireAadhaarPan) {
+          if (!memberData.panCardNo?.trim()) errs.push("PAN Card is required");
+          else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(memberData.panCardNo)) errs.push("PAN format should be ABCDE1234F");
+          if (!memberData.aadhaarCardNo?.trim()) errs.push("Aadhaar Card is required");
+          else if (!/^\d{12}$/.test(memberData.aadhaarCardNo.replace(/\s/g, ""))) errs.push("Please enter a valid 12-digit Aadhaar number");
+        }
+        if (requirePicSign && !isEditMode) {
+          if (!memberPhoto) errs.push("Member Photo is required");
+          if (!memberSignature) errs.push("Member Signature is required");
+        }
+        break;
+      case "voucher":
+        if (!isOpeningEntry) {
+          if (!voucherData.smAmount || parseFloat(voucherData.smAmount) <= 0) errs.push("SM Amount is required and must be greater than 0");
+          if (!debitAccount) errs.push("Debit Account is required");
+        }
+        break;
+      case "nominees": {
+        nominees.forEach((nom, idx) => {
+          if (!nom.nomineeName?.trim()) errs.push(`Nominee ${idx + 1}: Name is required`);
+          if (!nom.nomRelativeName?.trim()) errs.push(`Nominee ${idx + 1}: Relative Name is required`);
+          if (!nom.relation) errs.push(`Nominee ${idx + 1}: Relation is required`);
+          if (!nom.dob?.trim()) errs.push(`Nominee ${idx + 1}: Date of Birth is required`);
+          if (!nom.percentageShare) errs.push(`Nominee ${idx + 1}: Share Percentage is required`);
+        });
+        const total = nominees.reduce((s, n) => s + (Number(n.percentageShare) || 0), 0);
+        if (total !== 100) errs.push(`Total nominee share must be exactly 100% (currently ${total}%)`);
+        break;
+      }
+    }
+    if (errs.length > 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please complete the required fields",
+        html: `<ul style="text-align:left;padding-left:1rem">${errs.map(e => `<li style="margin:4px 0">• ${e}</li>`).join("")}</ul>`,
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (!validateCurrentTab()) return;
+    setCompletedTabs(prev => new Set([...prev, activeTab]));
+    const next = tabs[currentTabIndex + 1];
+    if (next) {
+      setUnlockedTabs(prev => prev.includes(next.id) ? prev : [...prev, next.id]);
+      setActiveTab(next.id);
+    }
+  };
+
+  const handlePrev = () => {
+    const prev = tabs[currentTabIndex - 1];
+    if (prev) setActiveTab(prev.id);
+  };
+
+  // Updated renderBasicInfo with readonly age and max date validation
+  const renderBasicInfo = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Account Number */}
+      {/* Membership Numbers */}
+      {/* Membership Type Toggle with Radio Buttons - Better Design */}
+      <FormField
+        name="membershipType"
+        label="Membership Type"
+        required
+        errors={errorsByField.membershipType || []}
+      >
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-4">
+            <label className={`flex items-center gap-2 ${isEditMode && typeChangeLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+              <input
+                type="radio"
+                name="membershipType"
+                value="P"
+                checked={membershipType === "P"}
+                disabled={isEditMode && typeChangeLocked}
+                onChange={(e) => {
+                  setMembershipType("P");
+                  setMemberData((prev) => ({
+                    ...prev,
+                    nominalMembershipNo: "",
+                  }));
+                }}
+                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Permanent</span>
+            </label>
+            <label className={`flex items-center gap-2 ${isEditMode && typeChangeLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+              <input
+                type="radio"
+                name="membershipType"
+                value="N"
+                checked={membershipType === "N"}
+                disabled={isEditMode && typeChangeLocked}
+                onChange={(e) => {
+                  setMembershipType("N");
+                  setMemberData((prev) => ({
+                    ...prev,
+                    permanentMembershipNo: "",
+                  }));
+                }}
+                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Nominal</span>
+            </label>
+          </div>
+          {isEditMode && typeChangeLocked && (
+            <p className="text-xs text-amber-600">Membership type cannot be changed — this member has existing transactions or opening balance.</p>
+          )}
+        </div>
+      </FormField>
+
+      {/* Permanent Membership No - Show only when type is 'P' */}
+      {membershipType === "P" && (
+        <FormField
+          name="permanentMembershipNo"
+          label="Permanent Membership No"
+          required
+          errors={errorsByField.permanentMembershipNo || []}
+        >
+          <input
+            type="text"
+            value={memberData.permanentMembershipNo}
+            ref={permanentMemNoRef}
+            onChange={(e) =>
+              handleInputChange("permanentMembershipNo", e.target.value)
+            }
+            onBlur={(e) =>
+              handleFieldBlur("permanentMembershipNo", e.target.value)
+            }
+            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+            placeholder="Enter Permanent Membership No"
+            maxLength={20}
+            autoFocus
+          />
+          {!isEditMode && lastPermanentNo && (
+            <span className="text-xs text-gray-500 mt-1 inline-block">
+              Last: <span className="font-semibold text-blue-600">{lastPermanentNo}</span>
+            </span>
+          )}
+        </FormField>
+      )}
+
+      {/* Nominal Membership No - Show only when type is 'N' */}
+      {membershipType === "N" && (
+        <FormField
+          name="nominalMembershipNo"
+          label="Nominal Membership No"
+          required
+          errors={errorsByField.nominalMembershipNo || []}
+        >
+          <input
+            type="text"
+            value={memberData.nominalMembershipNo}
+            onChange={(e) =>
+              handleInputChange("nominalMembershipNo", e.target.value)
+            }
+            ref={nominalMemNoRef}
+            onBlur={(e) =>
+              handleFieldBlur("nominalMembershipNo", e.target.value)
+            }
+            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+            placeholder="Enter Nominal Membership No"
+            maxLength={20}
+            autoFocus
+          />
+          {!isEditMode && lastNominalNo && (
+            <span className="text-xs text-gray-500 mt-1 inline-block">
+              Last: <span className="font-semibold text-blue-600">{lastNominalNo}</span>
+            </span>
+          )}
+        </FormField>
+      )}
+      <FormField
+        name="accountNumber"
+        label="Share Money Account Number"
+        required
+        errors={errorsByField.accountNumber || []}
+      >
+        <input
+          type="text"
+          value={memberData.accountNumber}
+          onChange={(e) => handleInputChange("accountNumber", e.target.value)}
+          onBlur={(e) => handleFieldBlur("accountNumber", e.target.value)}
+          ref={accountNumberRef}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+          placeholder="Enter Share Money Account Number"
+          maxLength={20}
+        />
+      </FormField>
+
+      {/* Name Fields */}
+      <FormField
+        name="memberName"
+        label="Member Name"
+        required
+        errors={errorsByField.memberName || []}
+        icon={<User className="w-4 h-4 text-green-500" />}
+      >
+        <input
+          type="text"
+          value={memberData.memberName}
+          onChange={(e) => handleInputChange("memberName", e.target.value)}
+          onBlur={() => handleFieldBlur("memberName")}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+          placeholder="Enter Member Name"
+          required
+          maxLength={100}
+        />
+      </FormField>
+      <FormField
+        name="memberNameSL"
+        label="Member Name (Hindi)"
+        errors={errorsByField.memberNameSL || []}
+        icon={<Globe className="w-4 h-4 text-purple-500" />}
+      >
+        <input
+          type="text"
+          value={memberData.memberNameSL}
+          onChange={(e) => handleInputChange("memberNameSL", e.target.value)}
+          onBlur={() => handleFieldBlur("memberNameSL")}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+          placeholder="हिंदी में नाम"
+          maxLength={100}
+          lang="hi"
+        />
+      </FormField>
+      {/* Relative Information */}
+      <FormField
+        name="relativeName"
+        label="Relative Name"
+        required
+        errors={errorsByField.relativeName || []}
+      >
+        <input
+          type="text"
+          value={memberData.relativeName}
+          onChange={(e) => handleInputChange("relativeName", e.target.value)}
+          onBlur={() => handleFieldBlur("relativeName")}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+          placeholder="Enter Relative Name"
+          required
+          maxLength={100}
+        />
+      </FormField>
+      {/* Relation */}
+      <FormField
+        name="relationId"
+        label="Relation"
+        required
+        errors={errorsByField.relationId || []}
+      >
+        <Select
+          id="relation"
+          options={relationOptions}
+          value={
+            relationOptions.find((option) => option.value === relationId) ||
+            null
+          }
+          onChange={(selected) => {
+            setRelationId(selected ? selected.value : "");
+            handleInputChange("relationId", selected ? selected.value : "");
+          }}
+          placeholder="Select Relation"
+          isClearable
+          required
+          className="text-sm"
+
+
+        />
+      </FormField>
+
+      {/* Gender */}
+      <FormField
+        name="gender"
+        label="Gender"
+        required
+        errors={errorsByField.gender || []}
+      >
+        <select
+          value={memberData.gender}
+          onChange={(e) => handleInputChange("gender", e.target.value)}
+          onBlur={() => handleFieldBlur("gender")}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+          required
+        >
+          <option value="">Select Gender</option>
+          <option value="1">Male</option>
+          <option value="2">Female</option>
+          <option value="3">Trans Gender</option>
+        </select>
+      </FormField>
+
+      {/* DOB with max date validation */}
+      <FormField
+        name="dob"
+        label="Date of Birth"
+        required
+        errors={errorsByField.dob || []}
+        icon={<Calendar className="w-4 h-4 text-red-500" />}
+      >
+        <DatePicker
+          value={memberData.dob}
+          onChange={(val) => { handleInputChange("dob", val); handleFieldBlur("dob"); }}
+          max={sessionDate}
+          workingDate={sessionDate}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
+        />
+      </FormField>
+
+      {/* Age - readonly and calculated */}
+      <FormField
+        name="age"
+        label="Age"
+        required
+        errors={errorsByField.age || []}
+        icon={<User className="w-4 h-4 text-red-500" />}
+      >
+        <input
+          type="text"
+          value={memberData.age}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg bg-gray-100 outline-none cursor-not-allowed"
+          placeholder="Age will be calculated from DOB"
+          readOnly
+        />
+      </FormField>
+
+      {/* Joining Date with max date validation */}
+      <FormField
+        name="joiningDate"
+        label="Joining Date"
+        required
+        errors={errorsByField.joiningDate || []}
+        icon={<Calendar className="w-4 h-4 text-green-500" />}
+      >
+        <DatePicker
+          value={memberData.joiningDate}
+          onChange={(val) => handleInputChange("joiningDate", val)}
+          max={sessionDate}
+          workingDate={sessionDate}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg outline-none"
+        />
+      </FormField>
+
+      {/* Caste */}
+      <FormField
+        name="casteId"
+        label="Caste"
+        required
+        errors={errorsByField.casteId || []}
+      >
+        <Select
+          id="caste"
+          options={casteOptions}
+          value={
+            casteOptions.find((option) => option.value === casteId) || null
+          }
+          onChange={(selected) => {
+            setCasteId(selected ? selected.value : "");
+            handleInputChange("casteId", selected ? selected.value : 0);
+          }}
+          placeholder="Select Caste"
+          isClearable
+          required
+          className="text-sm"
+
+
+        />
+      </FormField>
+
+      <FormField
+        name="category"
+        label="Category"
+        required
+        errors={errorsByField.category || []}
+      >
+        <input
+          type="text"
+          value={category}
+          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg bg-gray-100 outline-none cursor-not-allowed"
+          placeholder="Category will be auto-filled"
+          readOnly
+        />
+      </FormField>
+
+      {/* Occupation */}
+      <FormField
+        name="occupationId"
+        label="Occupation"
+        errors={errorsByField.occupationId || []}
+      >
+        <Select
+          id="occupation"
+          options={occupationOptions} // Replace with occupation options when available
+          value={
+            occupationOptions.find((option) => option.value === occupationId) ||
+            null
+          }
+          onChange={(selected) => {
+            setOccupationId(selected ? selected.value : "");
+            handleInputChange("occupationId", selected ? selected.value : "");
+          }}
+          placeholder="Select Occupation"
+          isClearable
+          required
+          className="text-sm"
+
+
+        />
+      </FormField>
+
+      {isOpeningEntry && (
+        <FormField
+          name="openingAmount"
+          label="Opening Amount"
+          errors={errorsByField.openingAmount || []}
+        >
+          <input
+            type="text"
+            pattern="^\d*(\.\d{0,2})?$"
+            value={voucherData.openingAmount}
+            onChange={handleOpeningAmountChange}
+            className="w-full px-3 py-2 border rounded"
+            placeholder="Enter Opening amount"
+            inputMode="decimal"
+            maxLength={10}
+          />
+        </FormField>
+      )}
+    </div>
+  );
+
+  // Updated Documents tab with two mandatory image uploads
+  const renderDocumentsInfo = () => (
+    <div className="space-y-8">
+      {/* Document Information */}
+      <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+        <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+          <CreditCard className="w-5 h-5" />
+          Document Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <FormField
+            name="panCardNo"
+            label="PAN Card Number"
+            required={requireAadhaarPan}
+            errors={errorsByField.panCardNo || []}
+            icon={<CreditCard className="w-4 h-4 text-blue-500" />}
+            description="Format: ABCDE1234F"
+          >
+            <input
+              type="text"
+              value={memberData.panCardNo}
+              ref={PANref}
+              autoFocus
+              onChange={(e) =>
+                handleInputChange("panCardNo", e.target.value.toUpperCase())
+              }
+              onBlur={(e) => handleFieldBlur("panCardNo", e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder="Enter PAN Number"
+              maxLength={10}
+              required
+              pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
+            />
+          </FormField>
+
+          <FormField
+            name="aadhaarCardNo"
+            label="Aadhaar Card Number"
+            required={requireAadhaarPan}
+            errors={errorsByField.aadhaarCardNo || []}
+            icon={<CreditCard className="w-4 h-4 text-green-500" />}
+            description="Format: 1234 5678 9012"
+          >
+            <input
+              type="text"
+              value={memberData.aadhaarCardNo}
+              ref={aadhaarRef}
+              onChange={(e) =>
+                handleInputChange(
+                  "aadhaarCardNo",
+                  e.target.value
+                    .replace(/\D/g, "")
+                    .replace(/(\d{4})(?=\d)/g, "$1")
+                )
+              }
+              onBlur={(e) => handleFieldBlur("aadhaarCardNo", e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              placeholder="Enter Aadhaar Number"
+              maxLength={12}
+              pattern="[0-9]{4}\s[0-9]{4}\s[0-9]{4}"
+            />
+          </FormField>
+        </div>
+      </div>
+
+      {/* Image Upload Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Member Photo */}
+        <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+          <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
+            <ImageIcon className="w-5 h-5" />
+            Member Photo
+          </h3>
+          <FileUploadComponent
+            onFileSelect={handleMemberPhotoSelect}
+            title="Upload Member Photo"
+            acceptedTypes="image/*"
+            maxSize={5 * 1024 * 1024}
+            uploadedFile={memberPhoto}
+            onRemoveFile={removeMemberPhoto}
+            isRequired={requirePicSign}
+          />
+        </div>
+
+        {/* Member Signature */}
+        <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
+          <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
+            <ImageIcon className="w-5 h-5" />
+            Member Signature
+          </h3>
+          <FileUploadComponent
+            onFileSelect={handleMemberSignatureSelect}
+            title="Upload Member Signature"
+            acceptedTypes="image/*"
+            maxSize={5 * 1024 * 1024}
+            uploadedFile={memberSignature}
+            onRemoveFile={removeMemberSignature}
+            isRequired={requirePicSign}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  // Updated nominees section with readonly age and max date validation
+  const renderNomineesInfo = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          <Users className="w-5 h-5 text-blue-500" />
+          Member Nominees
+        </h3>
+        <button
+          onClick={addNominee}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Add Nominee
+        </button>
+      </div>
+
+      {nominees.map((nominee, index) => (
+        <div
+          key={nominee.id}
+          className="bg-gray-50 p-6 rounded-lg border border-gray-200"
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="font-semibold text-gray-800">Nominee {index + 1}</h4>
+            {nominees.length > 1 && (
+              <button
+                onClick={() => removeNominee(nominee.id)}
+                className="flex items-center gap-1 px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors text-sm"
+              >
+                <Minus className="w-3 h-3" />
+                Remove
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <FormField
+              name={`nominees[${index}].nomineeName`}
+              label="Nominee Name"
+              required
+              errors={errorsByField[`nominees[${index}].nomineeName`] || []}
+            >
+              <input
+                type="text"
+                value={nominee.nomineeName}
+                onChange={(e) =>
+                  updateNominee(nominee.id, "nomineeName", e.target.value)
+                }
+                autoFocus
+                onBlur={() => handleFieldBlur(`nominees[${index}].nomineeName`)}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="Enter Name"
+                required
+              />
+            </FormField>
+            <FormField
+              name={`nominees[${index}].nomRelativeName`}
+              label="Relative Name"
+              required
+              errors={errorsByField[`nominees[${index}].nomRelativeName`] || []}
+            >
+              <input
+                type="text"
+                value={nominee.nomRelativeName}
+                onChange={(e) =>
+                  updateNominee(nominee.id, "nomRelativeName", e.target.value)
+                }
+                onBlur={() =>
+                  handleFieldBlur(`nominees[${index}].nomRelativeName`)
+                }
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="Enter Relative Name"
+                required
+              />
+            </FormField>
+            <FormField
+              name={`nominees[${index}].relation`}
+              label="Relation"
+              required
+              errors={errorsByField[`nominees[${index}].relation`] || []}
+            >
+              <Select
+                id="relation"
+                required
+                options={relationOptions}
+                value={
+                  relationOptions.find(
+                    (option) => option.value === nominee.relation
+                  ) || null
+                }
+                onChange={(e) =>
+                  updateNominee(nominee.id, "relation", e?.value)
+                }
+                onBlur={() => handleFieldBlur(`nominees[${index}].relation`)}
+                placeholder="Select Relation"
+                isClearable
+                className="text-sm"
+
+
+              />
+            </FormField>
+
+            <FormField
+              name={`nominees[${index}].relationWithMember`}
+              label="Relation With Member"
+              required
+              errors={
+                errorsByField[`nominees[${index}].relationWithMember`] || []
+              }
+            >
+              <Select
+                id="relationWithMember"
+                options={relationOptions}
+                value={
+                  relationOptions.find(
+                    (option) => option.value === nominee.relationWithMember
+                  ) || null
+                }
+                onChange={(e) =>
+                  updateNominee(nominee.id, "relationWithMember", e?.value)
+                }
+                onBlur={() =>
+                  handleFieldBlur(`nominees[${index}].relationWithMember`)
+                }
+                placeholder="Select Relation"
+                isClearable
+                required
+                className="text-sm"
+
+
+              />
+            </FormField>
+
+            {/* DOB with max date validation */}
+            <FormField
+              name={`nominees[${index}].dob`}
+              label="Date of Birth"
+              required
+              errors={errorsByField[`nominees[${index}].dob`] || []}
+            >
+              <DatePicker
+                value={nominee.dob}
+                onChange={(val) => { updateNominee(nominee.id, "dob", val); handleFieldBlur(`nominees[${index}].dob`); }}
+                max={sessionDate}
+                workingDate={sessionDate}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg outline-none"
+              />
+            </FormField>
+
+            {/* Age - readonly and calculated */}
+            <FormField
+              name={`nominees[${index}].age`}
+              label="Age"
+              required
+              errors={errorsByField[`nominees[${index}].age`] || []}
+            >
+              <input
+                type="text"
+                value={nominee.age}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-gray-100 outline-none cursor-not-allowed"
+                placeholder="Age will be calculated from DOB"
+                readOnly
+              />
+            </FormField>
+
+            {/* Nomination Date with max date validation */}
+            <FormField
+              name={`nominees[${index}].nominationDate`}
+              label="Nomination Date"
+              required
+              errors={errorsByField[`nominees[${index}].nominationDate`] || []}
+            >
+              <DatePicker
+                value={nominee.nominationDate}
+                onChange={(val) => { updateNominee(nominee.id, "nominationDate", val); handleFieldBlur(`nominees[${index}].nominationDate`); }}
+                max={sessionDate}
+                workingDate={sessionDate}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg outline-none"
+              />
+            </FormField>
+
+            <FormField
+              name={`nominees[${index}].aadhaarCardNo`}
+              label="Aadhaar Card Number"
+              errors={errorsByField[`nominees[${index}].aadhaarCardNo`] || []}
+            >
+              <input
+                type="text"
+                value={nominee.aadhaarCardNo}
+                onChange={(e) =>
+                  updateNominee(
+                    nominee.id,
+                    "aadhaarCardNo",
+                    (e.target.value = e.target.value.replace(/\s+/g, ""))
+                  )
+                }
+                onBlur={() =>
+                  handleFieldBlur(`nominees[${index}].aadhaarCardNo`)
+                }
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="123456789012"
+                maxLength={12}
+              />
+            </FormField>
+
+            <FormField
+              name={`nominees[${index}].PANCardNo`}
+              label="PAN Card Number"
+              errors={errorsByField[`nominees[${index}].PANCardNo`] || []}
+            >
+              <input
+                type="text"
+                value={nominee.PANCardNo}
+                onChange={(e) =>
+                  updateNominee(
+                    nominee.id,
+                    "PANCardNo",
+                    e.target.value.toUpperCase().substring(0, 10)
+                  )
+                }
+                onBlur={() => handleFieldBlur(`nominees[${index}].PANCardNo`)}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="ABCDE1234F"
+                maxLength={10}
+              />
+            </FormField>
+            <FormField
+              name={`nominees[${index}].percentageShare`}
+              label="Share Percentage"
+              required
+              errors={errorsByField[`nominees[${index}].percentageShare`] || []}
+            >
+              <input
+                type="text"
+                // Use 'text' type but hint the browser for numeric input
+                inputMode="decimal"
+                value={nominee.percentageShare}
+                onChange={(e) => {
+                  const value = e.target.value;
+
+                  // Regex to allow digits and AT MOST one decimal point, followed by max two digits.
+                  // Allows numbers like 10, 10.5, 10.55, but prevents 10.555 or 10.5.5
+                  const numericRegex = /^\d*\.?\d{0,2}$/;
+
+                  if (value === "" || numericRegex.test(value)) {
+                    updateNominee(nominee.id, "percentageShare", value);
+                  }
+                }}
+                onBlur={() =>
+                  handleFieldBlur(`nominees[${index}].percentageShare`)
+                }
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="e.g., 50.00"
+                maxLength={6} // Max length sufficient for 100.00 (6 characters)
+              />
+            </FormField>
+
+            {/* Minor checkbox and guardian fields */}
+            <div className="flex items-center gap-2 md:col-span-2 lg:col-span-3">
+              <input
+                type="checkbox"
+                id={`isMinor-${nominee.id}`}
+                checked={nominee.isMinor}
+                onChange={(e) =>
+                  updateNominee(nominee.id, "isMinor", e.target.checked)
+                }
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+              />
+              <label
+                htmlFor={`isMinor-${nominee.id}`}
+                className="text-sm font-semibold text-gray-700"
+              >
+                Is Minor (Below 18 years)
+              </label>
+            </div>
+
+            {nominee.isMinor && (
+              <>
+                <FormField
+                  name={`nominees[${index}].nameOfGuardian`}
+                  label="Guardian Name"
+                  required={nominee.isMinor}
+                  errors={
+                    errorsByField[`nominees[${index}].nameOfGuardian`] || []
+                  }
+                >
+                  <input
+                    type="text"
+                    value={nominee.nameOfGuardian}
+                    onChange={(e) =>
+                      updateNominee(
+                        nominee.id,
+                        "nameOfGuardian",
+                        e.target.value
+                      )
+                    }
+                    onBlur={() =>
+                      handleFieldBlur(`nominees[${index}].nameOfGuardian`)
+                    }
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                    placeholder="Enter Guardian Name"
+                    required={nominee.isMinor}
+                  />
+                </FormField>
+
+                <FormField
+                  name={`nominees[${index}].nameOfGuardianSL`}
+                  label="Guardian Name (Hindi)"
+                  errors={
+                    errorsByField[`nominees[${index}].nameOfGuardianSL`] || []
+                  }
+                >
+                  <input
+                    type="text"
+                    value={nominee.nameOfGuardianSL}
+                    onChange={(e) =>
+                      updateNominee(
+                        nominee.id,
+                        "nameOfGuardianSL",
+                        e.target.value
+                      )
+                    }
+                    onBlur={() =>
+                      handleFieldBlur(`nominees[${index}].nameOfGuardianSL`)
+                    }
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                    placeholder="हिंदी में संरक्षक का नाम"
+                    lang="hi"
+                  />
+                </FormField>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Keep existing address, contact, and voucher render functions...
+  const renderAddressInfo = () => (
+    <div className="space-y-8">
+      {/* Primary Address */}
+      <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+        <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+          <Home className="w-5 h-5" />
+          Primary Address
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <FormField
+            name="villageId1"
+            label="Village"
+            required
+            errors={errorsByField.villageId1 || []}
+          >
+            <Select
+              id="village1"
+              options={villageOptions}
+              value={
+                villageOptions.find((option) => option.value === villageId1) ||
+                null
+              }
+              autoFocus
+              onChange={(selected) => {
+                setVillageId1(selected ? selected.value : "");
+                handleInputChange(
+                  "villageId1",
+                  selected ? selected.value : 0,
+                  selected?.label || ""
+                );
+              }}
+              placeholder="Select Village"
+              isClearable
+              required
+              className="text-sm"
+
+
+            />
+          </FormField>
+          <FormField
+            name="thana1"
+            label="Thana"
+            required
+            errors={errorsByField.thana1 || []}
+          >
+            <input
+              type="text"
+              value={thana1}
+              onChange={(e) => handleInputChange("thana", e.target.value)}
+              onBlur={() => handleFieldBlur("thana")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Thana (auto-filled)"
+              maxLength={100}
+              required
+              readOnly={true}
+            />
+          </FormField>
+
+          <FormField
+            name="po1"
+            label="Post Office"
+            required
+            errors={errorsByField.po1 || []}
+          >
+            <input
+              type="text"
+              value={postOffice1}
+              onChange={(e) => handleInputChange("po1", e.target.value)}
+              onBlur={() => handleFieldBlur("po1")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Post Office (auto-filled)"
+              readOnly={true}
+              required
+            />
+          </FormField>
+
+          <FormField
+            name="tehsil1"
+            label="Tehsil"
+            required
+            errors={errorsByField.tehsil1 || []}
+          >
+            <input
+              type="text"
+              value={tehsil1}
+              onChange={(e) => handleInputChange("tehsil1", e.target.value)}
+              onBlur={() => handleFieldBlur("tehsil1")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Enter Tehsil"
+              readOnly={true}
+              required
+            />
+          </FormField>
+          <FormField
+            name="patwar1"
+            label="Patwar"
+            required
+            errors={errorsByField.patwar1 || []}
+          >
+            <input
+              type="text"
+              value={patwar1}
+              onChange={(e) => handleInputChange("patwar1", e.target.value)}
+              onBlur={() => handleFieldBlur("patwar1")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Patwar (auto-filled)"
+              readOnly={true}
+              required
+            />
+          </FormField>
+          <FormField
+            name="zone1"
+            label="Zone"
+            required
+            errors={errorsByField.zone1 || []}
+          >
+            <Select
+              id="zone1"
+              options={zoneData}
+              value={zoneData.find((option) => option.value === zone1) || null}
+              onChange={(selected) => {
+                setZone1(selected ? selected.value : "");
+                handleInputChange(
+                  "zone1",
+                  selected ? selected.value : 0,
+                  selected?.label || ""
+                );
+              }}
+              placeholder="Select Zone"
+              isClearable
+              required
+              className="text-sm"
+
+
+            />
+          </FormField>
+
+          <FormField
+            name="pinCode1"
+            label="Pin Code"
+            required
+            errors={errorsByField.pinCode1 || []}
+          >
+            <input
+              type="text"
+              value={pinCode1}
+              onChange={(e) => handleInputChange("pinCode1", e.target.value)}
+              onBlur={() => handleFieldBlur("pinCode1")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="PIN Code (auto-filled)"
+              readOnly={true}
+              required
+            />
+          </FormField>
+          <div className="lg:col-span-3">
+            <FormField
+              name="addressLine1"
+              label="Address Line 1"
+              required
+              errors={errorsByField.addressLine1 || []}
+            >
+              <input
+                type="text"
+                value={memberData.addressLine1}
+                onChange={(e) =>
+                  handleInputChange("addressLine1", e.target.value)
+                }
+                onBlur={() => handleFieldBlur("addressLine1")}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="Enter Address Line 1"
+                required
+                maxLength={150}
+              />
+            </FormField>
+          </div>
+
+          <div className="lg:col-span-3">
+            <FormField
+              name="addressLineSL1"
+              label="Address Line 1 (Hindi)"
+              errors={errorsByField.addressLineSL1 || []}
+            >
+              <input
+                type="text"
+                value={memberData.addressLineSL1}
+                onChange={(e) =>
+                  handleInputChange("addressLineSL1", e.target.value)
+                }
+                onBlur={() => handleFieldBlur("addressLineSL1")}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="हिंदी में पता लाइन 1"
+                maxLength={150}
+                lang="hi"
+              />
+            </FormField>
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary Address */}
+      <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+        <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
+          <Home className="w-5 h-5" />
+          Secondary Address (Optional)
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <FormField
+            name="villageId2"
+            label="Village"
+            errors={errorsByField.villageId2 || []}
+          >
+            <Select
+              id="village2"
+              options={villageOptions}
+              value={
+                villageOptions.find((option) => option.value === villageId2) ||
+                null
+              }
+              onChange={(selected) => {
+                setVillageId2(selected ? selected.value : "");
+                handleInputChange(
+                  "villageId2",
+                  selected ? selected.value : 0,
+                  "",
+                  selected?.label || ""
+                );
+              }}
+              placeholder="Select Village"
+              isClearable
+              required
+              className="text-sm"
+
+
+            />
+          </FormField>
+          <FormField
+            name="thana2"
+            label="Thana"
+            errors={errorsByField.thana2 || []}
+          >
+            <input
+              type="text"
+              value={thana2}
+              onChange={(e) => handleInputChange("thana2", e.target.value)}
+              onBlur={() => handleFieldBlur("thana2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Thana (auto-filled)"
+              maxLength={100}
+              readOnly={true}
+            />
+          </FormField>
+          <FormField
+            name="po2"
+            label="Post Office"
+            errors={errorsByField.po2 || []}
+          >
+            <input
+              type="text"
+              value={postOffice2}
+              onChange={(e) => handleInputChange("po2", e.target.value)}
+              onBlur={() => handleFieldBlur("po2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Post Office (auto-filled)"
+              readOnly={true}
+            />
+          </FormField>
+
+          <FormField
+            name="tehsil2"
+            label="Tehsil"
+            errors={errorsByField.tehsil2 || []}
+          >
+            <input
+              type="text"
+              value={tehsil2}
+              onChange={(e) => handleInputChange("tehsil2", e.target.value)}
+              onBlur={() => handleFieldBlur("tehsil2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Tehsil (auto-filled)"
+              readOnly={true}
+            />
+          </FormField>
+          <FormField
+            name="patwar2"
+            label="Patwar"
+            required
+            errors={errorsByField.patwar2 || []}
+          >
+            <input
+              type="text"
+              value={patwar2}
+              onChange={(e) => handleInputChange("patwar2", e.target.value)}
+              onBlur={() => handleFieldBlur("patwar2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Patwar (auto-filled)"
+              readOnly={true}
+              required
+            />
+          </FormField>
+          <FormField
+            name="zone2"
+            label="Zone"
+            required
+            errors={errorsByField.zone2 || []}
+          >
+            <Select
+              id="zone1"
+              options={zoneData}
+              value={zoneData.find((option) => option.value === zone2) || null}
+              onChange={(selected) => {
+                setZone2(selected ? selected.value : "");
+                handleInputChange(
+                  "zone2",
+                  selected ? selected.value : 0,
+                  selected?.label || ""
+                );
+              }}
+              placeholder="Select Zone"
+              isClearable
+              required
+              className="text-sm"
+
+
+            />
+          </FormField>
+          <FormField
+            name="pinCode2"
+            label="Pin Code"
+            required
+            errors={errorsByField.pinCode2 || []}
+          >
+            <input
+              type="text"
+              value={pinCode2}
+              onChange={(e) => handleInputChange("pinCode2", e.target.value)}
+              onBlur={() => handleFieldBlur("pinCode2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="PIN Code (auto-filled)"
+              readOnly={true}
+              required
+            />
+          </FormField>
+          <div className="lg:col-span-3">
+            <FormField
+              name="addressLine2"
+              label="Address Line 2"
+              errors={errorsByField.addressLine2 || []}
+            >
+              <input
+                type="text"
+                value={memberData.addressLine2}
+                onChange={(e) =>
+                  handleInputChange("addressLine2", e.target.value)
+                }
+                onBlur={() => handleFieldBlur("addressLine2")}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="Enter Address Line 2"
+                maxLength={150}
+              />
+            </FormField>
+          </div>
+
+          <div className="lg:col-span-3">
+            <FormField
+              name="addressLineSL2"
+              label="Address Line 2 (Hindi)"
+              errors={errorsByField.addressLineSL2 || []}
+            >
+              <input
+                type="text"
+                value={memberData.addressLineSL2}
+                onChange={(e) =>
+                  handleInputChange("addressLineSL2", e.target.value)
+                }
+                onBlur={() => handleFieldBlur("addressLineSL2")}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="हिंदी में पता लाइन 2"
+                maxLength={150}
+                lang="hi"
+              />
+            </FormField>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderContactInfo = () => (
+    <div className="space-y-6">
+      {/* Phone 1 */}
+      <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+        <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+          <Phone className="w-5 h-5" />
+          Primary Contact
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField
+            name="phoneType1"
+            label="Phone Type"
+            required={requireContact}
+            errors={errorsByField.phoneType1 || []}
+          >
+            <select
+              value={memberData.phoneType1}
+              onChange={(e) => handleInputChange("phoneType1", e.target.value)}
+              onBlur={() => handleFieldBlur("phoneType1")}
+              autoFocus
+              required
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+            >
+              <option value="">Select Type</option>
+              <option value="1">Mobile</option>
+              <option value="2">Landline</option>
+              <option value="3">Office</option>
+            </select>
+          </FormField>
+
+          <div className="hidden">
+            <FormField
+              name="phonePrefix1"
+              label="Prefix"
+              required
+              errors={errorsByField.phonePrefix1 || []}
+            >
+              <input
+                type="text"
+                value={memberData.phonePrefix1}
+                onChange={(e) =>
+                  handleInputChange("phonePrefix1", e.target.value)
+                }
+                onBlur={() => handleFieldBlur("phonePrefix1")}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="+91"
+                required
+                readOnly
+                maxLength={5}
+              />
+            </FormField>
+          </div>
+          <FormField
+            name="phoneNo1"
+            label="Phone Number"
+            required={requireContact}
+            errors={errorsByField.phoneNo1 || []}
+          >
+            <input
+              type="tel"
+              value={memberData.phoneNo1}
+              onChange={(e) => handleInputChange("phoneNo1", e.target.value)}
+              onBlur={() => handleFieldBlur("phoneNo1")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Enter Phone Number"
+              maxLength={15}
+              required
+            />
+          </FormField>
+          <FormField
+            name="email1"
+            label="Email"
+            errors={errorsByField.email1 || []}
+          >
+            <input
+              type="email" // Changed type to email
+              value={memberData.email1}
+              onChange={(e) => handleInputChange("email1", e.target.value)}
+              onBlur={() => handleFieldBlur("email1")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="example@domain.com" // Updated placeholder
+              // Removed readOnly
+              // Removed maxLength (emails can be long)
+              autoComplete="email" // Added for better browser autofill
+            />
+          </FormField>
+        </div>
+      </div>
+
+      {/* Phone 2 */}
+      <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+        <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
+          <Phone className="w-5 h-5" />
+          Secondary Contact (Optional)
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField
+            name="phoneType2"
+            label="Phone Type"
+            errors={errorsByField.phoneType2 || []}
+          >
+            <select
+              value={memberData.phoneType2}
+              onChange={(e) => handleInputChange("phoneType2", e.target.value)}
+              onBlur={() => handleFieldBlur("phoneType2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+            >
+              <option value="">Select Type</option>
+              <option value="1">Mobile</option>
+              <option value="2">Landline</option>
+              <option value="3">Office</option>
+            </select>
+          </FormField>
+
+          <div className="hidden">
+            <FormField
+              name="phonePrefix2"
+              label="Prefix"
+              errors={errorsByField.phonePrefix2 || []}
+            >
+              <input
+                type="text"
+                value={memberData.phonePrefix2}
+                onChange={(e) =>
+                  handleInputChange("phonePrefix2", e.target.value)
+                }
+                onBlur={() => handleFieldBlur("phonePrefix2")}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                placeholder="+91"
+                readOnly
+                maxLength={5}
+              />
+            </FormField>
+          </div>
+
+          <FormField
+            name="phoneNo2"
+            label="Phone Number"
+            errors={errorsByField.phoneNo2 || []}
+          >
+            <input
+              type="tel"
+              value={memberData.phoneNo2}
+              onChange={(e) => handleInputChange("phoneNo2", e.target.value)}
+              onBlur={() => handleFieldBlur("phoneNo2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="Enter Phone Number"
+              maxLength={20}
+            />
+          </FormField>
+          <FormField
+            name="email2"
+            label="Email"
+            errors={errorsByField.email2 || []}
+          >
+            <input
+              type="email" // Changed type to email
+              value={memberData.email2}
+              onChange={(e) => handleInputChange("email2", e.target.value)}
+              onBlur={() => handleFieldBlur("email2")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+              placeholder="example@domain.com" // Updated placeholder
+              // Removed readOnly
+              // Removed maxLength (emails can be long)
+              autoComplete="email" // Added for better browser autofill
+            />
+          </FormField>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Voucher Info tab with max date validation
+  const renderVoucherInfo = () => (
+    <div className="space-y-6">
+      <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
+        <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          Voucher Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <FormField
+            name="smAmount"
+            label="SM Amount"
+            errors={errorsByField.smAmount || []}
+            required
+          >
+            <input
+              type="text"
+              pattern="^\d*(\.\d{0,2})?$"
+              value={voucherData.smAmount}
+              onChange={handleSmAmountChange}
+              className="w-full px-3 py-2 border rounded"
+              placeholder="Enter amount"
+              inputMode="decimal"
+              autoFocus
+              readOnly={isEditMode}
+              maxLength={15}
+            />
+          </FormField>
+          {/* Admission Fees Account - readonly */}
+          <FormField
+            errors={errorsByField.admissionFeesAccount || []}
+            name="admissionFeesAccount"
+            label="Admission Fees Account"
+          >
+            <input
+              type="text"
+              value={voucherData.admissionFeesAccount}
+              readOnly
+              className="w-full px-3 py-2 border rounded bg-gray-100"
+              placeholder="Admission Fees Account"
+            />
+          </FormField>
+          {/* Admission Fee Amount - readonly */}
+          <FormField
+            errors={errorsByField.admissionFeeAmount || []}
+            name="admissionFeeAmount"
+            label="Admission Fee Amount"
+          >
+            <input
+              type="text"
+              value={voucherData.admissionFeeAmount}
+              readOnly
+              className="w-full px-3 py-2 border rounded bg-gray-100"
+              placeholder="Admission Fee Amount"
+            />
+          </FormField>
+          {/* Debit Account Dropdown */}
+          <FormField
+            errors={errorsByField.debitAccount || []}
+            name="debitAccount"
+            label="Debit Account"
+            required
+          >
+            <Select
+              id="debitAccount"
+              options={accOptions}
+              value={
+                accOptions.find((option) => option.value === debitAccount) ||
+                null
+              }
+              ref={refDebitAccount}
+              onChange={(selected) => {
+                setDebitAccountId(selected ? selected.value : "");
+                handleInputChange(
+                  "debitAccount",
+                  selected ? selected.value : ""
+                );
+              }}
+              placeholder="Select Debit Account"
+              isClearable
+              required
+              isDisabled={isEditMode}
+              className="text-sm"
+
+
+            />
+          </FormField>
+          {/* Debit Amount - sum, readonly */}
+          <FormField
+            errors={errorsByField.debitAmount || []}
+            name="debitAmount"
+            label="Debit Amount"
+          >
+            <input
+              type="text"
+              value={voucherData.debitAmount}
+              readOnly
+              className="w-full px-3 py-2 border rounded bg-gray-100"
+              placeholder="Debit Amount"
+            />
+          </FormField>
+          {/* Narration */}
+          <FormField
+            errors={errorsByField.narration || []}
+            name="narration"
+            label="Voucher Narration"
+          >
+            <textarea
+              value={voucherData.narration}
+              onChange={handleNarrationChange}
+              className="w-full px-3 py-2 border rounded"
+              maxLength={255}
+              readOnly={isEditMode}
+              placeholder="Narration"
+              rows={2}
+            />
+          </FormField>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "basic":
+        return renderBasicInfo();
+      case "address":
+        return renderAddressInfo();
+      case "contact":
+        return renderContactInfo();
+      case "documents":
+        return renderDocumentsInfo();
+      case "voucher":
+        return renderVoucherInfo();
+      case "nominees":
+        return renderNomineesInfo();
+      default:
+        return renderBasicInfo();
+    }
+  };
+
+  return (
+    <DashboardLayout
+      mainContent={
+        <div className="-mt-3 bg-gradient-to-br from-gray-100 to-blue-50 p-4 sm:p-6 lg:p-8">
+          <div className="w-full space-y-6">
+            {/* Header */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                    <UserCheck className="text-white text-xl" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                      Member Master
+                    </h1>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate(isEditMode ? "/member-info" : "/member-operations")}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 font-medium"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  {isEditMode ? "Back to Member Info" : "Back to Operations"}
+                </button>
+              </div>
+
+              {/* Validation options */}
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <Settings className="w-4 h-4 text-gray-500" />
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Make Optional
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {/* Aadhaar & PAN toggle */}
+                  <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                    <div
+                      onClick={() => setRequireAadhaarPan((v) => !v)}
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                        requireAadhaarPan ? "bg-blue-600" : "bg-amber-400"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                          requireAadhaarPan ? "translate-x-0" : "translate-x-5"
+                        }`}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                      Aadhaar &amp; PAN
+                      <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${requireAadhaarPan ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                        {requireAadhaarPan ? "Required" : "Optional"}
+                      </span>
+                    </span>
+                  </label>
+
+                  {/* Contact details toggle */}
+                  <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                    <div
+                      onClick={() => setRequireContact((v) => !v)}
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                        requireContact ? "bg-blue-600" : "bg-amber-400"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                          requireContact ? "translate-x-0" : "translate-x-5"
+                        }`}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                      Contact Details
+                      <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${requireContact ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                        {requireContact ? "Required" : "Optional"}
+                      </span>
+                    </span>
+                  </label>
+
+                  {/* Picture & Signature toggle */}
+                  <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                    <div
+                      onClick={() => setRequirePicSign((v) => !v)}
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                        requirePicSign ? "bg-blue-600" : "bg-amber-400"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                          requirePicSign ? "translate-x-0" : "translate-x-5"
+                        }`}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                      Picture &amp; Signature
+                      <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${requirePicSign ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                        {requirePicSign ? "Required" : "Optional"}
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Add Validation Summary */}
+            <ValidationSummary
+              errors={errors}
+              errorsByTab={errorsByTab}
+              isVisible={showValidationSummary}
+              onErrorClick={(fieldName, tab) => {
+                setActiveTab(tab);
+              }}
+              onClose={() => setShowValidationSummary(false)}
+            />
+
+            {/* Wizard Step Progress + Tab Content */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+
+              {/* Step Progress Header */}
+              <div className="border-b border-gray-200 bg-gray-50 px-4 py-5 overflow-x-auto">
+                <div className="flex items-center min-w-max mx-auto w-fit">
+                  {tabs.map((tab, idx) => {
+                    const isUnlocked = effectiveUnlockedTabs.includes(tab.id);
+                    const isComplete = effectiveCompletedTabs.has(tab.id) && activeTab !== tab.id;
+                    const isActive = activeTab === tab.id;
+                    const isLast = idx === tabs.length - 1;
+                    const tabErrors = errorsByTab[tab.id]?.length || 0;
+
+                    return (
+                      <div key={tab.id} className="flex items-center">
+                        <button
+                          onClick={() => isUnlocked ? setActiveTab(tab.id) : undefined}
+                          disabled={!isUnlocked}
+                          className={`flex flex-col items-center gap-1.5 px-3 py-1 rounded-lg transition-all duration-200 ${
+                            isUnlocked ? "cursor-pointer hover:bg-gray-100" : "cursor-not-allowed"
+                          }`}
+                          title={!isUnlocked ? "Complete previous steps first" : tab.label}
+                        >
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-200 relative ${
+                            isActive
+                              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200"
+                              : isComplete && tabErrors === 0
+                              ? "bg-green-500 border-green-500 text-white"
+                              : isComplete && tabErrors > 0
+                              ? "bg-red-500 border-red-500 text-white"
+                              : isUnlocked
+                              ? "bg-white border-gray-400 text-gray-600"
+                              : "bg-gray-100 border-gray-300 text-gray-400"
+                          }`}>
+                            {isComplete && tabErrors === 0 ? (
+                              <Check className="w-4 h-4" />
+                            ) : isComplete && tabErrors > 0 ? (
+                              <span className="text-xs font-bold">{tabErrors}</span>
+                            ) : !isUnlocked ? (
+                              <Lock className="w-3.5 h-3.5" />
+                            ) : (
+                              idx + 1
+                            )}
+                          </div>
+                          <span className={`text-xs font-medium whitespace-nowrap ${
+                            isActive
+                              ? "text-blue-600"
+                              : isComplete && tabErrors === 0
+                              ? "text-green-600"
+                              : isComplete && tabErrors > 0
+                              ? "text-red-500"
+                              : isUnlocked
+                              ? "text-gray-600"
+                              : "text-gray-400"
+                          }`}>
+                            {tab.label}
+                          </span>
+                        </button>
+
+                        {!isLast && (
+                          <div className={`h-0.5 w-8 mx-1 rounded-full flex-shrink-0 transition-all duration-300 ${
+                            effectiveCompletedTabs.has(tab.id) && (errorsByTab[tab.id]?.length || 0) === 0
+                              ? "bg-green-400"
+                              : effectiveCompletedTabs.has(tab.id)
+                              ? "bg-red-300"
+                              : isUnlocked
+                              ? "bg-gray-300"
+                              : "bg-gray-200"
+                          }`} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Step counter label */}
+                <p className="text-center text-xs text-gray-400 mt-3">
+                  Step {currentTabIndex + 1} of {tabs.length}
+                </p>
+              </div>
+
+              {/* Tab Content */}
+              <div className="p-6 sm:p-8">{renderTabContent()}</div>
+
+              {/* Wizard Action Buttons */}
+              <div className="border-t border-gray-200 p-6 bg-gray-50">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left: Reset */}
+                  <button
+                    onClick={isEditMode ? handleResetNotAllowed : handleReset}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition-all duration-200"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reset
+                  </button>
+
+                  {/* Right: Prev / Next / Save */}
+                  <div className="flex items-center gap-3">
+                    {currentTabIndex > 0 && (
+                      <button
+                        onClick={handlePrev}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-semibold transition-all duration-200"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        Previous
+                      </button>
+                    )}
+
+                    {!isLastTab && (
+                      <button
+                        onClick={handleNext}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-sm"
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {isLastTab && (
+                      <button
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save Member
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    />
+  );
+};
+
+export default MemberMaster;

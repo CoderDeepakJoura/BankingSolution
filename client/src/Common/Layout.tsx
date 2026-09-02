@@ -280,6 +280,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 { label: "Bank FD Mature/Renew", path: "/bank-fd-mature" },
                 { label: "Bank FD Pre-Mature", path: "/bank-fd-premature" },
                 { label: "Bank FD TDS Setting", path: "/bank-fd-tds-setting" },
+                { label: "Bank FD Interest Income Setting", path: "/bank-fd-settings" },
                 { label: "FD TDS Slab", path: "/fd-tds-slab" },
               ],
             },

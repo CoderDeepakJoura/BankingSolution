@@ -108,7 +108,21 @@ function attachPasswordListeners() {
   pwInput.addEventListener("input", () => {
     const val = pwInput.value;
     const rulesEl = document.getElementById("sw-rules");
-    if (rulesEl) rulesEl.innerHTML = buildRulesHtml(val);
+    if (rulesEl) {
+      rulesEl.innerHTML = "";
+      rules.forEach(r => {
+        const ok = r.test(val);
+        const li = document.createElement("li");
+        li.id = `rule-${r.id}`;
+        li.className = `flex items-center gap-1.5 text-xs transition-colors ${ok ? "text-green-600" : "text-slate-400"}`;
+        const icon = document.createElement("span");
+        icon.className = "font-bold";
+        icon.textContent = ok ? "✓" : "○";
+        li.appendChild(icon);
+        li.appendChild(document.createTextNode(r.label));
+        rulesEl.appendChild(li);
+      });
+    }
 
     if (confirmInput && confirmErr && confirmInput.value) {
       const match = confirmInput.value === val;

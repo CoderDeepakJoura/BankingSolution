@@ -9,12 +9,13 @@ import DashboardLayout from "../../Common/Layout";
 import commonservice from "../../services/common/commonservice";
 import DatePicker from "../../components/DatePicker";
 import { bankFDInterestPostingApi, BFDIPPreviewRow } from "../../services/bankfd/bankFDInterestPostingApi";
+import bankFDMatureApi from "../../services/bankfd/bankFDMatureApi";
 
 interface SelectOption { value: number; label: string; }
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const compLabel = (v: number) =>
-  ({ 1: "Monthly", 2: "Quarterly", 3: "Half-Yearly", 4: "Yearly" }[v] ?? String(v));
+  ({ 12: "Monthly", 4: "Quarterly", 2: "Half-Yearly", 1: "Yearly", 0: "No Compounding" }[v] ?? String(v));
 
 const selectStyles = {
   control: (b: any) => ({ ...b, cursor: "pointer", minHeight: 36, fontSize: 13 }),
@@ -66,19 +67,24 @@ const BankFDInterestPosting: React.FC = () => {
       .then(r => setGeneralAccounts((r.data ?? []).map((a: any) => ({ value: a.accId, label: a.accountName }))));
   }, [user.branchid]);
 
-  // Load BFD accounts when head changes
+  // Load BFD accounts + auto-fill interest income account when head changes
   useEffect(() => {
     setBfdAccId(0);
     setBfdAccounts([]);
-    if (!headId || !user.branchid) return;
+    setCreditAccId(null);
+    if (!user.branchid) return;
     bankFDInterestPostingApi.getAccounts(user.branchid, headId)
       .then(r => setBfdAccounts((r as any)?.data?.map((a: any) => ({ value: a.accId, label: `${a.accNo} — ${a.accountName}` })) ?? []));
+    if (headId > 0) {
+      bankFDMatureApi.getInterestIncomeSettingByHeadId(user.branchid, headId)
+        .then(r => {
+          const id = (r as any)?.data?.intIncomeAccId ?? null;
+          if (id) setCreditAccId(id);
+        }).catch(() => {});
+    }
   }, [headId, user.branchid]);
 
   const handleShow = async () => {
-    if (!headId && !bfdAccId) {
-      Swal.fire("Warning", "Please select an Account Head or a BFD Account.", "warning"); return;
-    }
     if (!creditAccId) {
       Swal.fire("Warning", "Please select a Credit (Interest Income) Account.", "warning"); return;
     }
