@@ -274,7 +274,8 @@ namespace BankingPlatform.API.Service.Reports
                 else
                 {
                     dr = entry.VoucherEntryType == "Dr" ? entry.VoucherAmount : (decimal?)null;
-                    cr = entry.VoucherEntryType == "Cr" ? entry.VoucherAmount : (decimal?)null;
+                    // LR entries: VoucherAmount = principal, IntCr = interest portion — both are credit
+                    cr = entry.VoucherEntryType == "Cr" ? (entry.VoucherAmount + (entry.IntCr ?? 0)) : (decimal?)null;
                 }
 
                 // Loan: Dr = advancement/interest (contra is Cr side); Cr = recovery (contra is Dr side)
@@ -357,7 +358,7 @@ namespace BankingPlatform.API.Service.Reports
                     && x.v.BrID == branchId
                     && x.v.VoucherDate < fromDate
                     && x.v.VoucherStatus != "D")
-                .Select(x => new { x.e.VoucherEntryType, x.e.VoucherAmount, x.e.EntryStatus, x.e.IntDr })
+                .Select(x => new { x.e.VoucherEntryType, x.e.VoucherAmount, x.e.EntryStatus, x.e.IntDr, x.e.IntCr })
                 .ToListAsync();
 
             decimal drSum = 0, crSum = 0;
@@ -368,7 +369,7 @@ namespace BankingPlatform.API.Service.Reports
                 else if (e.VoucherEntryType == "Dr")
                     drSum += e.VoucherAmount;
                 else
-                    crSum += e.VoucherAmount;
+                    crSum += e.VoucherAmount + (e.IntCr ?? 0); // LR: VoucherAmount=principal, IntCr=interest
             }
 
             return initial + drSum - crSum;

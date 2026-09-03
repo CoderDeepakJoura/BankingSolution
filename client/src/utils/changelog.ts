@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.47",
+    date: "2026-09-03",
+    changes: [
+      { type: "fix", text: "Loan Ledger: interest credit (recovery) entries were missing for standard loans — only principal portion was shown; now shows full principal + interest credit" },
+    ],
+  },
+  {
     version: "1.0.46",
     date: "2026-09-02",
     changes: [
