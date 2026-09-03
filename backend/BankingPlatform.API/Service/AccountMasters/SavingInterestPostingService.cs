@@ -407,23 +407,10 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                 if (isMinBalance)
                 {
-                    // Minimum balance: ignore first 10 days, find min from day 11 to end
-                    DateTime minBalStart = new DateTime(cursor.Year, cursor.Month, 11);
-                    if (minBalStart < effectiveStart) minBalStart = effectiveStart;
-                    if (minBalStart > effectiveEnd)
-                    {
-                        // Entire month is within first 10 days — skip
-                        cursor = cursor.AddMonths(1);
-                        continue;
-                    }
-
-                    // Opening of day 11 = closing of day 10 (before any transactions on day 11)
-                    // Case 1 — deposit on day 11: opening=1000, closing=1200 → min=1000 ✓
-                    // Case 2 — withdrawal on day 11: opening=1000, closing=800  → min=800  ✓
-                    decimal minBal = BalanceOnDate(minBalStart.AddDays(-1)); // day 10 closing = day 11 opening
-
-                    // Then check closing of each day from day 11 to effectiveEnd
-                    for (DateTime d = minBalStart; d <= effectiveEnd; d = d.AddDays(1))
+                    // Monthly Minimum Balance: find the minimum closing balance
+                    // across every day in the effective period (day 1 through day-end).
+                    decimal minBal = BalanceOnDate(effectiveStart);
+                    for (DateTime d = effectiveStart.AddDays(1); d <= effectiveEnd; d = d.AddDays(1))
                     {
                         decimal dayClosing = BalanceOnDate(d);
                         if (dayClosing < minBal) minBal = dayClosing;

@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.48",
+    date: "2026-09-03",
+    changes: [
+      { type: "fix", text: "Saving Interest (Monthly Minimum Balance method): minimum balance was incorrectly computed only from day 11 of the month — now correctly scans all days from day 1, and no longer skips months where activity falls in the first 10 days" },
+    ],
+  },
+  {
     version: "1.0.47",
     date: "2026-09-03",
     changes: [
