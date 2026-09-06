@@ -73,6 +73,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 InterestCalcToDate     = bal.InterestCalcToDate,
                 IntCalcMethod          = bal.IntCalcMethod,
                 ActOnIntPosting        = bal.ActOnIntPosting,
+                OverdueInstallments    = bal.OverdueInstallments,
+                OverduePrincipal       = bal.OverduePrincipal,
+                PenalBreakdown         = bal.PenalBreakdown,
             };
         }
 
@@ -384,35 +387,209 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             return result;
         }
 
-        // ── Batch Post ────────────────────────────────────────────────────────────
+        // ── Batch Post — one voucher for all accounts ─────────────────────────────
 
         public async Task<LoanInterestBatchPostResultDTO> BatchPostInterestAsync(LoanInterestBatchPostRequestDTO dto)
         {
-            int success = 0, fail = 0;
-            var errors = new List<string>();
+            int fail = 0;
+            var errors   = new List<string>();
+            var valid    = new List<(LoanInterestBatchPostItemDTO item, LoanInterestPostingInfoDTO info,
+                                     decimal stdAmt, decimal penalAmt, decimal total,
+                                     long loanHead, int crAccId, long crHead)>();
 
+            // ── Pass 1: validate every item before touching the DB ────────────────
             foreach (var item in dto.Items)
             {
-                var (result, _) = await PostInterestAsync(new LoanInterestPostingVoucherDTO
-                {
-                    BrId               = dto.BrId,
-                    LoanAccountId      = item.LoanAccountId,
-                    VoucherDate        = dto.VoucherDate,
-                    StdInterestAmount  = item.StdInterestAmount,
-                    PenalInterestAmount = item.PenalInterestAmount,
-                    Narration          = dto.Narration,
-                });
+                decimal stdAmt   = Math.Round(item.StdInterestAmount,   0, MidpointRounding.AwayFromZero);
+                decimal penalAmt = Math.Round(item.PenalInterestAmount, 0, MidpointRounding.AwayFromZero);
+                decimal total    = stdAmt + penalAmt;
 
-                if (result == "Success") success++;
-                else { fail++; errors.Add($"Account {item.LoanAccountId}: {result}"); }
+                if (total <= 0)
+                {
+                    errors.Add($"Account {item.LoanAccountId}: No interest amount to post.");
+                    fail++;
+                    continue;
+                }
+
+                var info = await GetPostableInterestAsync(item.LoanAccountId, dto.BrId, dto.VoucherDate);
+                if (info == null)
+                {
+                    errors.Add($"Account {item.LoanAccountId}: Account not found.");
+                    fail++;
+                    continue;
+                }
+
+                bool isAib = info.ActOnIntPosting == 1;
+                if (!isAib)
+                {
+                    if (stdAmt > info.UnpostedStdInterest + 0.01m)
+                    {
+                        errors.Add($"Account {item.LoanAccountId}: Standard interest ({stdAmt:N2}) exceeds unposted amount ({info.UnpostedStdInterest:N2}).");
+                        fail++;
+                        continue;
+                    }
+                    if (penalAmt > info.UnpostedPenalInterest + 0.01m)
+                    {
+                        errors.Add($"Account {item.LoanAccountId}: Penal interest ({penalAmt:N2}) exceeds unposted amount ({info.UnpostedPenalInterest:N2}).");
+                        fail++;
+                        continue;
+                    }
+                }
+
+                long loanHead = await _cf.GetAccountHeadCodeFromAccId(item.LoanAccountId, dto.BrId);
+
+                int  crAccId  = item.LoanAccountId;
+                long crHead   = loanHead;
+                var acc = await _db.accountmaster.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.ID == item.LoanAccountId && x.BranchId == dto.BrId);
+                if (acc?.GeneralProductId.HasValue == true)
+                {
+                    var rule = await _cf.GetLoanProductBranchWiseRuleInfo(dto.BrId, acc.GeneralProductId.Value);
+                    if (rule.IntIncomeAcc.HasValue && rule.IntIncomeAcc.Value > 0)
+                    {
+                        crAccId = rule.IntIncomeAcc.Value;
+                        crHead  = await _cf.GetAccountHeadCodeFromAccId(crAccId, dto.BrId);
+                    }
+                }
+
+                valid.Add((item, info, stdAmt, penalAmt, total, loanHead, crAccId, crHead));
             }
 
-            return new LoanInterestBatchPostResultDTO
+            if (valid.Count == 0)
+                return new LoanInterestBatchPostResultDTO { SuccessCount = 0, FailCount = fail, Errors = errors };
+
+            // ── Pass 2: one transaction, one voucher ──────────────────────────────
+            using var tx = await _db.Database.BeginTransactionAsync();
+            try
             {
-                SuccessCount = success,
-                FailCount    = fail,
-                Errors       = errors,
-            };
+                bool   autoVerify = await _cf.IsAutoVerification(dto.BrId);
+                string vrStatus   = autoVerify ? "V" : "A";
+                int    userId     = int.Parse(_cf.GetCurrentUserId()!);
+                int    nextVrNo   = await _cf.GetLatestVoucherNo(dto.BrId, dto.VoucherDate);
+                DateTime vrDate   = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Unspecified);
+                DateTime valDate  = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Utc);
+                string narr       = string.IsNullOrWhiteSpace(dto.Narration)
+                    ? $"Loan Interest Posting - {dto.VoucherDate:dd-MMM-yyyy}"
+                    : dto.Narration;
+
+                var voucher = new Voucher
+                {
+                    BrID             = dto.BrId,
+                    VoucherNo        = nextVrNo,
+                    VoucherType      = (int)Enums.VoucherType.Loan,
+                    VoucherSubType   = (int)Enums.VoucherSubType.InterestPosting,
+                    VoucherDate      = vrDate,
+                    ActualTime       = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                    VoucherNarration = narr,
+                    VoucherStatus    = vrStatus,
+                    AddedBy          = userId,
+                    ModifiedBy       = 0,
+                    VerifiedBy       = autoVerify ? userId : 0,
+                    OtherBrID        = 0,
+                };
+                await _db.voucher.AddAsync(voucher);
+                await _db.SaveChangesAsync();
+                int voucherId = voucher.Id;
+
+                int row = 1;
+                foreach (var (item, info, stdAmt, penalAmt, total, loanHead, crAccId, crHead) in valid)
+                {
+                    // Dr: loan account (interest charged — EntryStatus="IP")
+                    var drEntry = new VoucherCreditDebitDetails
+                    {
+                        BrId             = dto.BrId,
+                        VoucherID        = voucherId,
+                        AccountId        = item.LoanAccountId,
+                        AccHeadCode      = loanHead,
+                        VoucherAmount    = 0,
+                        VoucherEntryType = "Dr",
+                        EntryStatus      = "IP",
+                        Narration        = narr,
+                        VoucherStatus    = vrStatus,
+                        ValueDate        = valDate,
+                        VoucherSeqNo     = row++,
+                        IntDr            = total,
+                        IntCr            = null,
+                        ExpenseAmt       = 0,
+                        HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                    };
+                    await _db.vouchercreditdebitdetails.AddAsync(drEntry);
+                    await _db.SaveChangesAsync();
+                    int ipEntryId = drEntry.Id;
+
+                    // Cr: interest income GL
+                    await _db.vouchercreditdebitdetails.AddAsync(new VoucherCreditDebitDetails
+                    {
+                        BrId             = dto.BrId,
+                        VoucherID        = voucherId,
+                        AccountId        = crAccId,
+                        AccHeadCode      = crHead,
+                        VoucherAmount    = total,
+                        VoucherEntryType = "Cr",
+                        EntryStatus      = Enums.VoucherStatus.Cr.ToString(),
+                        Narration        = narr,
+                        VoucherStatus    = vrStatus,
+                        ValueDate        = valDate,
+                        VoucherSeqNo     = row++,
+                        IntDr = null, IntCr = null, ExpenseAmt = 0,
+                        HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                    });
+
+                    // VoucherRecIntDetail (Stand loans only)
+                    bool isAib = info.ActOnIntPosting == 1;
+                    if (!isAib)
+                    {
+                        if (stdAmt > 0)
+                            await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                            {
+                                BrId = dto.BrId, VAccCrDrId = ipEntryId,
+                                VoucherId = voucherId, VoucherNo = nextVrNo,
+                                EntryDate = vrDate, ValueDate = valDate,
+                                IntCatId = CAT_STD, Pamt = (double)info.PrincipalBalance,
+                                AccId = item.LoanAccountId,
+                                IntDr = (double)stdAmt, IntCr = 0, VoucherMainStatus = vrStatus,
+                            });
+                        if (penalAmt > 0)
+                            await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                            {
+                                BrId = dto.BrId, VAccCrDrId = ipEntryId,
+                                VoucherId = voucherId, VoucherNo = nextVrNo,
+                                EntryDate = vrDate, ValueDate = valDate,
+                                IntCatId = CAT_PENAL, Pamt = (double)info.PrincipalBalance,
+                                AccId = item.LoanAccountId,
+                                IntDr = (double)penalAmt, IntCr = 0, VoucherMainStatus = vrStatus,
+                            });
+                    }
+
+                    // LoanAccountBalanceDetail
+                    var ob = await _db.loanaccopeningbalance.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.AccId == item.LoanAccountId && x.BranchId == dto.BrId);
+                    await _db.loanaccountbalancedetail.AddAsync(new LoanAccountBalanceDetail
+                    {
+                        BrId = dto.BrId, LoanOpenBalId = ob?.Id ?? 0,
+                        AccountId = item.LoanAccountId,
+                        AmountDr = 0, AmountCr = 0, IntDr = total, IntCr = 0,
+                        Date = vrDate, ValueDate = valDate, Status = "IP",
+                        HeadCode = loanHead, VoucherId = voucherId,
+                    });
+
+                    await _db.SaveChangesAsync();
+                }
+
+                await tx.CommitAsync();
+                return new LoanInterestBatchPostResultDTO
+                {
+                    SuccessCount = valid.Count,
+                    FailCount    = fail,
+                    Errors       = errors,
+                };
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                errors.Add(ex.Message);
+                return new LoanInterestBatchPostResultDTO { SuccessCount = 0, FailCount = dto.Items.Count, Errors = errors };
+            }
         }
     }
 }

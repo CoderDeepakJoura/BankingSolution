@@ -15,6 +15,24 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.50",
+    date: "2026-09-06",
+    changes: [
+      { type: "new", text: "Super User Settings: new toggles to show or hide the Bank FD module and the Payroll / Salary module for each branch — both are hidden by default and must be explicitly turned on" },
+      { type: "improvement", text: "Bank FD and Payroll screens (sidebar menu, header search, account masters, voucher operations hub) are now automatically hidden for branches where the respective module is turned off in Super User Settings" },
+      { type: "improvement", text: "Toggling Bank FD or Payroll in Super User Settings now takes effect immediately across the entire app without needing to log out and back in" },
+    ],
+  },
+  {
+    version: "1.0.49",
+    date: "2026-09-06",
+    changes: [
+      { type: "fix", text: "Loan Ledger: Stand-type loans now show separate Int Dr and Int Cr columns — interest is no longer lumped into the principal advancement column, and the principal balance is unaffected by interest postings" },
+      { type: "fix", text: "Penal interest not calculated for account opened 02-Apr with first posting on 31-May (no overdue kists shown), and for second posting on 31-May after earlier posting on 30-Apr (kist due 02-May)" },
+      { type: "improvement", text: "Loan Interest Posting: interest detail popup for Stand loans now shows a per-kist penal breakdown (kist number, due date, principal, days overdue, rate, penal interest) instead of a single summary row" },
+    ],
+  },
+  {
     version: "1.0.48",
     date: "2026-09-03",
     changes: [

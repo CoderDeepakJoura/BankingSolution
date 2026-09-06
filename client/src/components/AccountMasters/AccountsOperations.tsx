@@ -5,6 +5,8 @@ import AccountOperations from './AccountActions'; // Your operations component
 import { useNavigate } from 'react-router-dom';
 import { Eye, Repeat, FileText, Bell, ChevronRight, BarChart2,PlusCircle  } from 'lucide-react'; // Added FileText, Bell, ChevronRight, BarChart2 icons
 import { useEffect } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../redux";
 
 
 // Define a simple card component for general operations within the hub
@@ -41,6 +43,8 @@ const GeneralOperationCard: React.FC<GeneralOperationCardProps> = ({ title, desc
 
 
 const AccountsModule: React.FC = () => {
+  const showBankFD = useSelector((state: RootState) => state.user.showBankFDModule);
+
   return (
     <DashboardLayout
       mainContent={
@@ -80,11 +84,13 @@ const AccountsModule: React.FC = () => {
                 addPath="/rd-acc-master"
                 modifyPath="/rd-acc-info"
               />
-              <AccountOperations
-                accountType="Bank FD Account(s)"
-                addPath="/bank-fd-account/create"
-                modifyPath="/bank-fd-account"
-              />
+              {showBankFD && (
+                <AccountOperations
+                  accountType="Bank FD Account(s)"
+                  addPath="/bank-fd-account/create"
+                  modifyPath="/bank-fd-account"
+                />
+              )}
 
               {/* Add other account types here as needed */}
             </div>

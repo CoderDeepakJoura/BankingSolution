@@ -1,6 +1,8 @@
 import React from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../redux";
 import {
   Wallet,
   TrendingDown,
@@ -39,6 +41,8 @@ interface VoucherCategory {
   badgeColor: string;
   icon: React.ReactNode;
   vouchers: VoucherItem[];
+  bankFdOnly?: boolean;
+  ibOnly?: boolean;
 }
 
 // ── Category definitions ───────────────────────────────────────────────────────
@@ -214,6 +218,7 @@ const categories: VoucherCategory[] = [
   {
     title: "Bank FD",
     description: "Mature, renew or pre-maturely close Bank Fixed Deposits",
+    bankFdOnly: true,
     headerColor: "from-blue-600 to-purple-700",
     accentColor: "text-blue-600",
     bgColor: "bg-blue-50 hover:bg-blue-100",
@@ -325,8 +330,15 @@ const CategorySection: React.FC<{ cat: VoucherCategory }> = ({ cat }) => (
 // ── Main component ─────────────────────────────────────────────────────────────
 
 const VouchersModule: React.FC = () => {
-  const navigate = useNavigate();
-  const totalVouchers = categories.reduce((s, c) => s + c.vouchers.length, 0);
+  const navigate      = useNavigate();
+  const showBankFD    = useSelector((state: RootState) => state.user.showBankFDModule);
+  const ibEnabled     = useSelector((state: RootState) => state.user.enableIBTransactions);
+
+  const visibleCategories = categories.filter(c =>
+    (!c.bankFdOnly || showBankFD) &&
+    (!c.ibOnly     || ibEnabled)
+  );
+  const totalVouchers = visibleCategories.reduce((s, c) => s + c.vouchers.length, 0);
 
   return (
     <DashboardLayout
@@ -343,7 +355,7 @@ const VouchersModule: React.FC = () => {
               <div className="flex gap-4 text-center">
                 <div className="px-5 py-3 bg-blue-50 border border-blue-200 rounded-2xl min-w-[90px]">
                   <p className="text-xs text-gray-500 mb-0.5">Categories</p>
-                  <p className="text-2xl font-bold text-blue-700">{categories.length}</p>
+                  <p className="text-2xl font-bold text-blue-700">{visibleCategories.length}</p>
                 </div>
                 <div className="px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl min-w-[90px]">
                   <p className="text-xs text-gray-500 mb-0.5">Voucher Types</p>
@@ -383,7 +395,7 @@ const VouchersModule: React.FC = () => {
             </div>
 
             {/* ── Category sections ────────────────────────────────────────── */}
-            {categories.map((cat) => (
+            {visibleCategories.map((cat) => (
               <CategorySection key={cat.title} cat={cat} />
             ))}
 

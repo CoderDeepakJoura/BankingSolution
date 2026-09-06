@@ -38,6 +38,15 @@ export interface InterestCalcSegmentDTO {
   interest: number;
 }
 
+export interface PenalBreakdownItemDTO {
+  kistNumber: number;
+  dueDate: string;
+  principalAmount: number;
+  daysOverdue: number;
+  overdueRate: number;
+  penalInterest: number;
+}
+
 export interface LoanInterestBatchItemDTO {
   loanAccId: number;
   accountNumber: string;
@@ -56,6 +65,9 @@ export interface LoanInterestBatchItemDTO {
   actOnIntPosting?: number;
   noInterestReason?: string;
   calcBreakdown?: InterestCalcSegmentDTO[];
+  overdueInstallments?: number;
+  overduePrincipal?: number;
+  penalBreakdown?: PenalBreakdownItemDTO[];
 }
 
 export interface LoanInterestBatchPostItemDTO {

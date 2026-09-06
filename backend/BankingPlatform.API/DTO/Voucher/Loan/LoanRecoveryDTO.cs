@@ -86,6 +86,8 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public List<IntRecDetailRowDTO> IntRecDetail { get; set; } = new();
         // Day-weighted breakdown (Balance / WO-schedule-fallback method only)
         public List<InterestCalcSegmentDTO>? CalcBreakdown { get; set; }
+        // Penal interest per-kist breakdown (Stand loans with overdue kists)
+        public List<PenalBreakdownItemDTO>? PenalBreakdown { get; set; }
     }
 
     public class LoanAccountSearchDTO

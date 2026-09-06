@@ -20,6 +20,9 @@ export interface LoanLedgerEntry {
   cr: number | null;
   balance: number;
   narration?: string;
+  // Stand loan separate interest columns (null for AddInBalance)
+  intDr?: number | null;
+  intCr?: number | null;
 }
 
 export interface LoanLedger {
@@ -37,6 +40,7 @@ export interface LoanLedger {
   totalDr: number;
   totalCr: number;
   closingBalance: number;
+  isStand: boolean;
   relativeName?: string;
   contactNo?: string;
   address?: string;

@@ -1,5 +1,15 @@
 namespace BankingPlatform.API.DTO.Voucher.Loan
 {
+    public class PenalBreakdownItemDTO
+    {
+        public int KistNumber { get; set; }
+        public DateTime DueDate { get; set; }
+        public decimal PrincipalAmount { get; set; }
+        public int DaysOverdue { get; set; }
+        public double OverdueRate { get; set; }
+        public decimal PenalInterest { get; set; }
+    }
+
     public class LoanInterestPostingVoucherDTO
     {
         public int BrId { get; set; }
@@ -29,6 +39,10 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public DateTime? InterestCalcToDate { get; set; }
         public string IntCalcMethod { get; set; } = "Schedule";
         public int? ActOnIntPosting { get; set; }
+        // Penal interest breakdown (Stand loans only; null when no overdue kists)
+        public int OverdueInstallments { get; set; }
+        public decimal OverduePrincipal { get; set; }
+        public List<PenalBreakdownItemDTO>? PenalBreakdown { get; set; }
     }
 
     // ── Batch calculation DTOs ────────────────────────────────────────────────────

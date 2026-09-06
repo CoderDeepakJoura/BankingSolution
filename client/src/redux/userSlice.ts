@@ -24,6 +24,8 @@ interface UserState {
   lastSeenVersion: string;
   enableIBTransactions: boolean;
   allowGSTDeduction: boolean;
+  showBankFDModule: boolean;
+  showPayrollModule: boolean;
 }
 
 const initialState: UserState = {
@@ -43,6 +45,8 @@ const initialState: UserState = {
   lastSeenVersion: "0.0.0",
   enableIBTransactions: true,
   allowGSTDeduction: true,
+  showBankFDModule: false,
+  showPayrollModule: false,
 };
 
 const userSlice = createSlice({
@@ -77,6 +81,8 @@ const userSlice = createSlice({
       state.lastSeenVersion = "0.0.0";
       state.enableIBTransactions = true;
       state.allowGSTDeduction = true;
+      state.showBankFDModule = false;
+      state.showPayrollModule = false;
     },
   },
 });

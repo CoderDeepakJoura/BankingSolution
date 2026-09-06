@@ -96,7 +96,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const isSu = useSelector((state: RootState) => state.user.isSu);
   const isMainBranch = useSelector((state: RootState) => state.user.isMainBranch);
   const branchGstNo = useSelector((state: RootState) => state.user.branchGstNo);
-  const ibEnabled = useSelector((state: RootState) => state.user.enableIBTransactions);
+  const ibEnabled       = useSelector((state: RootState) => state.user.enableIBTransactions);
+  const showBankFD      = useSelector((state: RootState) => state.user.showBankFDModule);
+  const showPayroll     = useSelector((state: RootState) => state.user.showPayrollModule);
   useBrowserNavigationControl(true);
   useEffect(() => {
     const init = async () => {
@@ -136,6 +138,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               lastSeenVersion: data.lastSeenVersion ?? "0.0.0",
               enableIBTransactions: suRes?.data?.enableIBTransactions ?? true,
               allowGSTDeduction: suRes?.data?.allowGSTDeduction ?? true,
+              showBankFDModule: suRes?.data?.showBankFDModule ?? false,
+              showPayrollModule: suRes?.data?.showPayrollModule ?? false,
             }),
           );
         } else {
@@ -276,12 +280,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {
               label: "Bank FD",
               path: "",
+              bankFdOnly: true,
               subItems: [
-                { label: "Bank FD Mature/Renew", path: "/bank-fd-mature" },
-                { label: "Bank FD Pre-Mature", path: "/bank-fd-premature" },
-                { label: "Bank FD TDS Setting", path: "/bank-fd-tds-setting" },
-                { label: "Bank FD Interest Income Setting", path: "/bank-fd-settings" },
-                { label: "FD TDS Slab", path: "/fd-tds-slab" },
+                { label: "Bank FD Account",                path: "/bank-fd-account" },
+                { label: "Bank FD Interest Posting",       path: "/bank-fd-interest-posting" },
+                { label: "Bank FD Mature/Renew",           path: "/bank-fd-mature" },
+                { label: "Bank FD Pre-Mature",             path: "/bank-fd-premature" },
+                { label: "Bank FD TDS Setting",            path: "/bank-fd-tds-setting" },
+                { label: "Bank FD Interest Income Setting",path: "/bank-fd-settings" },
+                { label: "FD TDS Slab",                    path: "/fd-tds-slab" },
               ],
             },
           ],
@@ -339,6 +346,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       icon: <Wallet size={18} />,
       label: "Payroll",
       hasSubItems: true,
+      payrollOnly: true,
       subItems: [
         {
           label: "Master",
@@ -461,6 +469,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {
           label: "Bank FD Reports",
           path: "",
+          bankFdOnly: true,
           subItems: [
             { label: "Bank FD Ledger", path: "/bank-fd-ledger" },
           ],
@@ -495,7 +504,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   const filterByRole = (items: any[]): any[] =>
     items
-      .filter((item) => (!item.suOnly || isSu) && (!item.gstOnly || hasGst) && (!item.mainBranchOnly || isMainBranch) && (!item.ibOnly || ibEnabled))
+      .filter((item) =>
+        (!item.suOnly       || isSu)        &&
+        (!item.gstOnly      || hasGst)       &&
+        (!item.mainBranchOnly || isMainBranch) &&
+        (!item.ibOnly       || ibEnabled)    &&
+        (!item.bankFdOnly   || showBankFD)   &&
+        (!item.payrollOnly  || showPayroll)
+      )
       .map((item) => ({
         ...item,
         subItems: item.subItems ? filterByRole(item.subItems) : undefined,

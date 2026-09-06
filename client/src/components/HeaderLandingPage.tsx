@@ -17,8 +17,15 @@ const SearchBar: React.FC = () => {
   const navigate                    = useNavigate();
   const isSu                        = useSelector((state: RootState) => state.user.isSu);
   const ibEnabledSearch             = useSelector((state: RootState) => state.user.enableIBTransactions);
+  const showBankFD                  = useSelector((state: RootState) => state.user.showBankFDModule);
+  const showPayroll                 = useSelector((state: RootState) => state.user.showPayrollModule);
 
-  const visibleScreens = SEARCHABLE_SCREENS.filter(s => (!s.suOnly || isSu) && (!s.ibOnly || ibEnabledSearch));
+  const visibleScreens = SEARCHABLE_SCREENS.filter(s =>
+    (!s.suOnly      || isSu)           &&
+    (!s.ibOnly      || ibEnabledSearch) &&
+    (!s.bankFdOnly  || showBankFD)      &&
+    (!s.payrollOnly || showPayroll)
+  );
 
   const filtered = searchTerm.trim().length > 0
     ? visibleScreens.filter(s =>

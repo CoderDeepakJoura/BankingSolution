@@ -159,17 +159,56 @@ namespace BankingPlatform.API.Service.Vouchers
             int vSubType = voucher.VoucherSubType;
             bool isMatureOrPremature = IsDeleteOnly(vType, vSubType);
 
-            // Account closed check — skip for mature/premature since those accounts are expected to be closed
+            // Account closed check and future-transaction guard —
+            // both skipped for mature/premature/close-account flows (those manage their own state).
             if (!isMatureOrPremature)
             {
                 var accountIds = entries.Select(e => e.AccountId).Distinct().ToList();
+
                 var closedAccs = await _context.accountmaster.AsNoTracking()
                     .Where(x => accountIds.Contains(x.ID) && x.IsAccClosed)
                     .Select(x => x.AccountName)
                     .ToListAsync();
-
                 if (closedAccs.Any())
                     return (false, $"Cannot delete: account(s) already closed — {string.Join(", ", closedAccs)}.");
+
+                // ── Future-transaction guard (all voucher types) ──────────────────
+                // Only check member accounts (AccTypeId != General) so cash/GL accounts
+                // — which appear in almost every voucher — do not block every deletion.
+                var memberAccIds = await _context.accountmaster.AsNoTracking()
+                    .Where(x => accountIds.Contains(x.ID)
+                             && x.AccTypeId != (int)Enums.AccountTypes.General)
+                    .Select(x => x.ID)
+                    .ToListAsync();
+
+                if (memberAccIds.Any())
+                {
+                    // A "later" transaction is one dated after this voucher,
+                    // or on the same date but with a higher voucher number.
+                    var futureVouchers = await _context.vouchercreditdebitdetails
+                        .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
+                        .Where(x => memberAccIds.Contains(x.e.AccountId)
+                            && x.v.BrID == branchId
+                            && x.v.VoucherStatus != "D"
+                            && x.v.Id != voucher.Id
+                            && (x.v.VoucherDate.Date > voucher.VoucherDate.Date
+                                || (x.v.VoucherDate.Date == voucher.VoucherDate.Date
+                                    && x.v.VoucherNo > voucher.VoucherNo)))
+                        .Select(x => new { x.v.VoucherNo, x.v.VoucherDate })
+                        .Distinct()
+                        .OrderBy(x => x.VoucherDate)
+                        .ThenBy(x => x.VoucherNo)
+                        .Take(5)
+                        .ToListAsync();
+
+                    if (futureVouchers.Any())
+                    {
+                        var list = string.Join(", ", futureVouchers
+                            .Select(f => $"Voucher #{f.VoucherNo} ({f.VoucherDate:dd-MMM-yyyy})"));
+                        string more = futureVouchers.Count == 5 ? " and more" : "";
+                        return (false, $"Cannot delete: later transaction(s) exist for the same account(s). Delete these first — {list}{more}.");
+                    }
+                }
             }
 
             using var tx = await _context.Database.BeginTransactionAsync();

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { ShieldCheck, ArrowLeft, Save, IndianRupee, RefreshCw } from "lucide-react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../redux";
+import { setUser } from "../../redux/userSlice";
 import Swal from "sweetalert2";
 import superUserSettingsApi, { SuperUserSettingsDTO } from "../../services/superuser/superUserSettingsApi";
 
@@ -15,10 +16,13 @@ const DEFAULT_SETTINGS: SuperUserSettingsDTO = {
   allowLoanInterestChange: false,
   enableIBTransactions: true,
   allowGSTDeduction: true,
+  showBankFDModule: false,
+  showPayrollModule: false,
 };
 
 const SuperUserSettings = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.user);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,6 +58,12 @@ const SuperUserSettings = () => {
         branchId: user.branchid,
       });
       if (res.success) {
+        dispatch(setUser({
+          showBankFDModule: settings.showBankFDModule,
+          showPayrollModule: settings.showPayrollModule,
+          enableIBTransactions: settings.enableIBTransactions,
+          allowGSTDeduction: settings.allowGSTDeduction,
+        }));
         Swal.fire({ icon: "success", title: "Saved", text: "Super User settings updated.", timer: 1500, showConfirmButton: false });
       } else {
         Swal.fire({ icon: "error", title: "Error", text: res.message || "Failed to save settings." });
@@ -75,6 +85,8 @@ const SuperUserSettings = () => {
   const featureItems = [
     { key: "enableIBTransactions" as const, label: "Inter-Branch (IB) Transactions", desc: "Enable inter-branch saving deposit and withdrawal screens and data. Disable to hide IB module for this branch." },
     { key: "allowGSTDeduction"    as const, label: "GST Deduction",                  desc: "Enable GST deduction functionality in journal vouchers. Disable to hide GST-related screens and entries." },
+    { key: "showBankFDModule"     as const, label: "Bank FD Module",                 desc: "Show Bank FD screens (TDS settings, slabs, accounts, interest posting, maturity). Disable to hide the entire Bank FD module." },
+    { key: "showPayrollModule"    as const, label: "Payroll / Salary Module",         desc: "Show Payroll screens (employee master, salary creation, attendance, reports). Disable to hide the entire Payroll module." },
   ];
 
   return (

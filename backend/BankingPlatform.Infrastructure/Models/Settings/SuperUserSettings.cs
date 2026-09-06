@@ -15,5 +15,7 @@ namespace BankingPlatform.Infrastructure.Models.Settings
         public bool allowLoanInterestChange { get; set; }
         public bool enableIBTransactions { get; set; } = true;
         public bool allowGSTDeduction { get; set; } = true;
+        public bool showBankFDModule { get; set; } = false;
+        public bool showPayrollModule { get; set; } = false;
     }
 }

@@ -437,9 +437,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                         continue;
                     }
 
-                    // Interest calculated on full month days
-                    int fullMonthDays = DateTime.DaysInMonth(cursor.Year, cursor.Month);
-                    monthlyInterest = effectiveBalance * monthRate * fullMonthDays / (100m * daysInYear);
+                    // Interest for actual effective days only (partial months use actual days, not full month)
+                    monthlyInterest = effectiveBalance * monthRate * daysInMonth / (100m * daysInYear);
                 }
                 else
                 {

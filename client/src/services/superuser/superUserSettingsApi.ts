@@ -8,6 +8,8 @@ export interface SuperUserSettingsDTO {
   allowLoanInterestChange: boolean;
   enableIBTransactions: boolean;
   allowGSTDeduction: boolean;
+  showBankFDModule: boolean;
+  showPayrollModule: boolean;
 }
 
 /** @deprecated Use SuperUserSettingsDTO */

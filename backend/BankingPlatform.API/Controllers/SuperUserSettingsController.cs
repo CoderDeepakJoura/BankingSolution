@@ -35,6 +35,8 @@ namespace BankingPlatform.API.Controllers
                     allowLoanInterestChange   = s?.allowLoanInterestChange   ?? false,
                     enableIBTransactions      = s?.enableIBTransactions      ?? true,
                     allowGSTDeduction         = s?.allowGSTDeduction         ?? true,
+                    showBankFDModule          = s?.showBankFDModule          ?? false,
+                    showPayrollModule         = s?.showPayrollModule         ?? false,
                 }
             });
         }
@@ -57,6 +59,8 @@ namespace BankingPlatform.API.Controllers
                 existing.allowLoanInterestChange   = dto.AllowLoanInterestChange;
                 existing.enableIBTransactions      = dto.EnableIBTransactions;
                 existing.allowGSTDeduction         = dto.AllowGSTDeduction;
+                existing.showBankFDModule          = dto.ShowBankFDModule;
+                existing.showPayrollModule         = dto.ShowPayrollModule;
             }
             else
             {
@@ -69,6 +73,8 @@ namespace BankingPlatform.API.Controllers
                     allowLoanInterestChange     = dto.AllowLoanInterestChange,
                     enableIBTransactions        = dto.EnableIBTransactions,
                     allowGSTDeduction           = dto.AllowGSTDeduction,
+                    showBankFDModule            = dto.ShowBankFDModule,
+                    showPayrollModule           = dto.ShowPayrollModule,
                 });
             }
 
@@ -86,5 +92,7 @@ namespace BankingPlatform.API.Controllers
         public bool AllowLoanInterestChange { get; set; }
         public bool EnableIBTransactions { get; set; }
         public bool AllowGSTDeduction { get; set; }
+        public bool ShowBankFDModule { get; set; } = false;
+        public bool ShowPayrollModule { get; set; } = false;
     }
 }

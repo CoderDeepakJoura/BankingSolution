@@ -7,6 +7,10 @@ export interface ScreenEntry {
   suOnly?: boolean;
   /** If true, only shown in search when IB transactions are enabled. */
   ibOnly?: boolean;
+  /** If true, only shown in search when Bank FD module is enabled. */
+  bankFdOnly?: boolean;
+  /** If true, only shown in search when Payroll module is enabled. */
+  payrollOnly?: boolean;
 }
 
 export const SEARCHABLE_SCREENS: ScreenEntry[] = [
@@ -132,11 +136,11 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
   { path: "/acc-service",                     label: "Update Account Service",          category: "Service Masters" },
 
   // ── Bank FD ───────────────────────────────────────────────────────────────
-  { path: "/bank-fd-tds-setting",             label: "Bank FD TDS Setting",             category: "Bank FD" },
-  { path: "/bank-fd-settings",               label: "Bank FD Interest Income Setting", category: "Bank FD" },
-  { path: "/fd-tds-slab",                     label: "FD TDS Slab",                     category: "Bank FD" },
-  { path: "/fd-tds-slab/list",                label: "FD TDS Slab List",                category: "Bank FD" },
-  { path: "/bank-fd-account",                 label: "Bank FD Account",                 category: "Bank FD" },
+  { path: "/bank-fd-tds-setting",             label: "Bank FD TDS Setting",             category: "Bank FD",         bankFdOnly: true },
+  { path: "/bank-fd-settings",               label: "Bank FD Interest Income Setting", category: "Bank FD",         bankFdOnly: true },
+  { path: "/fd-tds-slab",                     label: "FD TDS Slab",                     category: "Bank FD",         bankFdOnly: true },
+  { path: "/fd-tds-slab/list",                label: "FD TDS Slab List",                category: "Bank FD",         bankFdOnly: true },
+  { path: "/bank-fd-account",                 label: "Bank FD Account",                 category: "Bank FD",         bankFdOnly: true },
 
   // ── Inter Branch ──────────────────────────────────────────────────────────
   { path: "/other-branch-accounts",           label: "Other Branch Accounts",           category: "Inter Branch", ibOnly: true },
@@ -183,6 +187,36 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
   { path: "/member-report",                   label: "Member Report",                   category: "Member Reports" },
   { path: "/member-accounts",                 label: "Accounts Detail",                 category: "Member Reports" },
   { path: "/member-int-cert",                 label: "Interest Certificate",            category: "Member Reports" },
+
+  // ── Bank FD (continued) ───────────────────────────────────────────────────
+  { path: "/bank-fd-account/create",          label: "New Bank FD Account",             category: "Bank FD",         bankFdOnly: true },
+  { path: "/bank-fd-interest-posting",        label: "Bank FD Interest Posting",        category: "Bank FD",         bankFdOnly: true },
+  { path: "/bank-fd-mature",                  label: "Bank FD Mature/Renew",            category: "Bank FD",         bankFdOnly: true },
+  { path: "/bank-fd-premature",               label: "Bank FD Pre-Mature",              category: "Bank FD",         bankFdOnly: true },
+  { path: "/bank-fd-ledger",                  label: "Bank FD Ledger",                  category: "Bank FD Reports", bankFdOnly: true },
+
+  // ── Payroll ───────────────────────────────────────────────────────────────
+  { path: "/employee-designation-data",       label: "Employee Designation",            category: "Payroll",         payrollOnly: true },
+  { path: "/employee-master",                 label: "Employee Master",                 category: "Payroll",         payrollOnly: true },
+  { path: "/salary-component-data",           label: "Employee Wise Salary Component",  category: "Payroll",         payrollOnly: true },
+  { path: "/employee-grade-data",             label: "Employee Grade",                  category: "Payroll",         payrollOnly: true },
+  { path: "/employee-attendance",             label: "Employee Attendance",             category: "Payroll",         payrollOnly: true },
+  { path: "/employee-transfer",               label: "Employee Transfer",               category: "Payroll",         payrollOnly: true },
+  { path: "/salary-creation",                 label: "Employee Salary Creation",        category: "Payroll",         payrollOnly: true },
+  { path: "/salary-voucher",                  label: "Salary Voucher",                  category: "Payroll",         payrollOnly: true },
+  { path: "/delete-employee-salary",          label: "Delete Employee Salary Detail",   category: "Payroll",         payrollOnly: true },
+  { path: "/salary-bonus-report",             label: "Bonus Report",                    category: "Payroll",         payrollOnly: true },
+  { path: "/salary-arrear-report",            label: "Arrear Report",                   category: "Payroll",         payrollOnly: true },
+  { path: "/salary-challan-report",           label: "Salary Challan Report",           category: "Payroll",         payrollOnly: true },
+  { path: "/salary-pf-report",               label: "PF Statement Report",             category: "Payroll",         payrollOnly: true },
+  { path: "/salary-esic-report",              label: "ESIC Statement Report",           category: "Payroll",         payrollOnly: true },
+  { path: "/salary-report",                   label: "Salary Report",                   category: "Payroll",         payrollOnly: true },
+  { path: "/salary-statement-report",         label: "Employee Salary Statement",       category: "Payroll",         payrollOnly: true },
+  { path: "/salary-loan-recovery-report",     label: "Loan Recovery Detail Report",     category: "Payroll",         payrollOnly: true },
+  { path: "/payroll-settings",                label: "Payroll Settings",                category: "Payroll",         payrollOnly: true },
+  { path: "/payroll-other-branch-account",    label: "Payroll Other Branch Account",    category: "Payroll",         payrollOnly: true },
+  { path: "/salary-component-account",        label: "Salary Component Account",        category: "Payroll",         payrollOnly: true },
+  { path: "/payroll-other-settings",          label: "Employee Salary Other Setting",   category: "Payroll",         payrollOnly: true },
 
   // ── Super User ────────────────────────────────────────────────────────────
   { path: "/su-settings",                     label: "Super User Settings",             category: "Super User",       suOnly: true },

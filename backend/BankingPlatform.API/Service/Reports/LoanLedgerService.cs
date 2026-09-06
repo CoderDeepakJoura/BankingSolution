@@ -26,6 +26,9 @@ namespace BankingPlatform.API.Service.Reports
         public decimal? Cr { get; set; }
         public decimal Balance { get; set; }
         public string? Narration { get; set; }
+        // Stand loan separate interest columns (null for AddInBalance loans)
+        public decimal? IntDr { get; set; }
+        public decimal? IntCr { get; set; }
     }
 
     public class LoanLedgerDTO
@@ -44,6 +47,8 @@ namespace BankingPlatform.API.Service.Reports
         public decimal TotalDr { get; set; }
         public decimal TotalCr { get; set; }
         public decimal ClosingBalance { get; set; }
+        // true for Stand loans (ActOnIntPosting == 2): IntDr/IntCr columns shown separately
+        public bool IsStand { get; set; }
         // Account detail fields
         public string? RelativeName { get; set; }
         public string? ContactNo { get; set; }
@@ -122,6 +127,15 @@ namespace BankingPlatform.API.Service.Reports
                     .FirstOrDefaultAsync(x => x.Id == account.GeneralProductId.Value)
                 : null;
 
+            // Stand = ActOnIntPosting == 2 (interest tracked separately, not added to principal)
+            bool isStand = false;
+            if (account.GeneralProductId.HasValue)
+            {
+                var prodDef = await _context.loanproductdefinition.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.ProductId == account.GeneralProductId.Value && x.BrId == branchId);
+                isStand = prodDef?.ActOnIntPosting == 2;
+            }
+
             var session = await _context.branchsession.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.branchid == branchId && x.iscurrent);
 
@@ -186,6 +200,7 @@ namespace BankingPlatform.API.Service.Reports
 
             var emptyResult = new LoanLedgerDTO
             {
+                IsStand = isStand,
                 BranchName = branch.branchmaster_name,
                 BranchAddress = branch.branchmaster_addressline,
                 AccountName = account.AccountName ?? "",
@@ -262,23 +277,43 @@ namespace BankingPlatform.API.Service.Reports
                 var info = voucherInfoMap.GetValueOrDefault(entry.VoucherID);
                 if (info == null) continue;
 
-                // Interest posting entries (EntryStatus="IP") are stored as Cr with VoucherAmount=0
-                // and IntDr=interest amount. Treat them as Dr (increases outstanding).
                 bool isIP = entry.EntryStatus == "IP";
-                decimal? dr, cr;
-                if (isIP)
+                decimal? dr = null, cr = null, intDr = null, intCr = null;
+
+                if (isStand)
                 {
-                    dr = entry.IntDr.HasValue && entry.IntDr.Value > 0 ? entry.IntDr.Value : (decimal?)null;
-                    cr = null;
+                    // Stand loans: interest goes in separate IntDr/IntCr columns; balance = principal only
+                    if (isIP)
+                    {
+                        intDr = entry.IntDr.HasValue && entry.IntDr.Value > 0 ? entry.IntDr.Value : (decimal?)null;
+                        // Dr/Cr and Balance stay unchanged — interest does not affect principal balance
+                    }
+                    else
+                    {
+                        dr = entry.VoucherEntryType == "Dr" ? entry.VoucherAmount : (decimal?)null;
+                        // LR: principal portion in Cr, interest portion in IntCr
+                        if (entry.VoucherEntryType == "Cr")
+                        {
+                            cr    = entry.VoucherAmount > 0 ? entry.VoucherAmount : (decimal?)null;
+                            intCr = (entry.IntCr ?? 0) > 0 ? entry.IntCr : (decimal?)null;
+                        }
+                    }
                 }
                 else
                 {
-                    dr = entry.VoucherEntryType == "Dr" ? entry.VoucherAmount : (decimal?)null;
-                    // LR entries: VoucherAmount = principal, IntCr = interest portion — both are credit
-                    cr = entry.VoucherEntryType == "Cr" ? (entry.VoucherAmount + (entry.IntCr ?? 0)) : (decimal?)null;
+                    // AddInBalance: interest is embedded — single Dr/Cr columns, balance includes interest
+                    if (isIP)
+                    {
+                        dr = entry.IntDr.HasValue && entry.IntDr.Value > 0 ? entry.IntDr.Value : (decimal?)null;
+                    }
+                    else
+                    {
+                        dr = entry.VoucherEntryType == "Dr" ? entry.VoucherAmount : (decimal?)null;
+                        cr = entry.VoucherEntryType == "Cr" ? (entry.VoucherAmount + (entry.IntCr ?? 0)) : (decimal?)null;
+                    }
                 }
 
-                // Loan: Dr = advancement/interest (contra is Cr side); Cr = recovery (contra is Dr side)
+                // Contra account for "Particulars"
                 string contraType = isIP ? "Dr" : (entry.VoucherEntryType == "Dr" ? "Cr" : "Dr");
                 var contras = contraByVoucher.GetValueOrDefault(entry.VoucherID, new())
                     .Where(e => e.VoucherEntryType == contraType)
@@ -290,19 +325,21 @@ namespace BankingPlatform.API.Service.Reports
                 string particulars = isIP ? "Loan Interest Posting"
                     : (contras.Any() ? string.Join(" / ", contras) : "—");
 
-                // Loan: Dr increases outstanding, Cr (recovery) decreases outstanding
+                // Update principal running balance (Stand: Dr/Cr only, not IntDr/IntCr)
                 if (dr.HasValue) runningBalance += dr.Value;
                 else if (cr.HasValue) runningBalance -= cr.Value;
 
                 entries.Add(new LoanLedgerEntryDTO
                 {
-                    VoucherNo = info.VoucherNo,
+                    VoucherNo   = info.VoucherNo,
                     VoucherDate = info.VoucherDate,
                     Particulars = particulars,
-                    Dr = dr,
-                    Cr = cr,
-                    Balance = runningBalance,
-                    Narration = entry.Narration
+                    Dr          = dr,
+                    Cr          = cr,
+                    Balance     = runningBalance,
+                    Narration   = entry.Narration,
+                    IntDr       = intDr,
+                    IntCr       = intCr,
                 });
             }
 
@@ -320,6 +357,7 @@ namespace BankingPlatform.API.Service.Reports
                 ToDate = toDate,
                 SessionFromDate = session?.fromdate ?? fromDate,
                 SessionToDate = session?.todate ?? toDate,
+                IsStand = isStand,
                 OpeningBalance = openingBalance,
                 Entries = entries,
                 TotalDr = totalDr,

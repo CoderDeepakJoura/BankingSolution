@@ -14,6 +14,7 @@ import superUserSettingsApi from "../../../services/superuser/superUserSettingsA
 import loanInterestPostingApi, {
   LoanInterestBatchItemDTO,
   InterestCalcSegmentDTO,
+  PenalBreakdownItemDTO,
 } from "../../../services/vouchers/loan/loanInterestPostingApi";
 
 // ── Select styles ─────────────────────────────────────────────────────────────
@@ -221,7 +222,31 @@ const LoanInterestDetailPopup = ({
                     <td className="px-4 py-3 font-bold text-amber-700">{fmtAmt(item.stdInterest)}</td>
                   </tr>
                 )}
-                {item.penalInterest > 0 && (
+                {item.penalInterest > 0 && item.penalBreakdown && item.penalBreakdown.length > 0 ? (
+                  <>
+                    <tr className="bg-rose-100/60 border-b border-rose-200">
+                      <td colSpan={7} className="px-4 py-2 text-xs font-bold text-rose-700 uppercase tracking-wider">
+                        Penal Interest — Overdue Kist Breakdown
+                      </td>
+                    </tr>
+                    <tr className="bg-rose-50/40 border-b border-gray-100">
+                      {["Kist No.", "Due Date", "Principal", "Days Overdue", "Rate", "Method", "Penal Int."].map((h) => (
+                        <th key={h} className="px-4 py-2 text-left text-[10px] font-semibold text-rose-700 uppercase tracking-wider bg-rose-50">{h}</th>
+                      ))}
+                    </tr>
+                    {item.penalBreakdown.map((pb: PenalBreakdownItemDTO, i: number) => (
+                      <tr key={i} className={`border-b border-gray-100 hover:bg-rose-50/40 ${i % 2 === 0 ? "bg-white" : "bg-rose-50/20"}`}>
+                        <td className="px-4 py-2.5 font-semibold text-rose-700">#{pb.kistNumber}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{fmtDate(new Date(pb.dueDate))}</td>
+                        <td className="px-4 py-2.5 text-gray-700">{fmtAmt(pb.principalAmount)}</td>
+                        <td className="px-4 py-2.5 font-semibold text-rose-600">{pb.daysOverdue} days</td>
+                        <td className="px-4 py-2.5 text-gray-700">{pb.overdueRate}%</td>
+                        <td className="px-4 py-2.5 text-gray-500 text-xs">P&times;R&times;D/365</td>
+                        <td className="px-4 py-2.5 font-bold text-rose-700">{fmtAmt(pb.penalInterest)}</td>
+                      </tr>
+                    ))}
+                  </>
+                ) : item.penalInterest > 0 ? (
                   <tr className="bg-rose-50/30 border-b border-gray-100 hover:bg-rose-50/60">
                     <td className="px-4 py-3 font-semibold text-rose-700">Penal</td>
                     <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
@@ -231,7 +256,7 @@ const LoanInterestDetailPopup = ({
                     <td className="px-4 py-3 text-gray-500">—</td>
                     <td className="px-4 py-3 font-bold text-rose-700">{fmtAmt(item.penalInterest)}</td>
                   </tr>
-                )}
+                ) : null}
                 {item.stdRecoverable > 0 && (
                   <tr className="bg-purple-50/30 border-b border-gray-100">
                     <td className="px-4 py-3 font-semibold text-purple-700">Recoverable</td>
