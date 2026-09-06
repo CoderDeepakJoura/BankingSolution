@@ -15,12 +15,22 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.51",
+    date: "2026-09-06",
+    changes: [
+      { type: "improvement", text: "Minor updates and bug fixes" },
+    ],
+  },
+  {
     version: "1.0.50",
     date: "2026-09-06",
     changes: [
       { type: "new", text: "Super User Settings: new toggles to show or hide the Bank FD module and the Payroll / Salary module for each branch — both are hidden by default and must be explicitly turned on" },
       { type: "improvement", text: "Bank FD and Payroll screens (sidebar menu, header search, account masters, voucher operations hub) are now automatically hidden for branches where the respective module is turned off in Super User Settings" },
       { type: "improvement", text: "Toggling Bank FD or Payroll in Super User Settings now takes effect immediately across the entire app without needing to log out and back in" },
+      { type: "improvement", text: "All voucher save and update confirmations now show the actual voucher number in the success message, so the operator always knows which entry was recorded" },
+      { type: "improvement", text: "Loan Interest Posting: clicking the detail icon for a Stand-type loan now shows a full per-kist penal breakdown — kist number, due date, principal outstanding, days overdue, penal rate, and penal interest amount — instead of a single combined figure" },
+      { type: "fix", text: "Voucher deletion is now blocked when the voucher is part of a multi-step inter-branch transaction and a later step already exists — the user must remove the later step first before deleting an earlier one" },
     ],
   },
   {
