@@ -41,9 +41,28 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     .FirstOrDefaultAsync(x => x.Id == acc.MemberId.Value && x.BranchId == memBrId);
             }
 
-            // Loan terms (kist detail = loan product terms per account)
+            // Loan terms — always take the most recent kist detail row (latest LoanDate).
+            // Without ordering, EF may return an older row with OverdueInterestRate = 0.
             var kist = await _db.accountkistdetail.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.AccountId == loanAccId && x.BrId == branchId);
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId)
+                .OrderByDescending(x => x.LoanDate)
+                .FirstOrDefaultAsync();
+
+            // Effective overdue rate: use the account's stored rate; fall back to the matching
+            // slab detail's PenalIntRate when the account was created before the rate was configured.
+            double effectiveOvdRate = kist?.OverdueInterestRate ?? 0;
+            if (effectiveOvdRate == 0 && (kist?.SlabId ?? 0) > 0)
+            {
+                decimal loanAmt    = (decimal)(kist!.LoanAmountPassed ?? 0);
+                int     loanPeriod = kist.LoanPeriod ?? 0;
+                var slabDetail = await _db.loanslabdetail.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.SlabId == kist.SlabId!.Value
+                        && x.FromAmount <= loanAmt && x.ToAmount >= loanAmt
+                        && (x.PeriodFrom == null || x.PeriodFrom <= loanPeriod)
+                        && (x.PeriodTo   == null || x.PeriodTo   >= loanPeriod));
+                if ((slabDetail?.PenalIntRate ?? 0) > 0)
+                    effectiveOvdRate = slabDetail!.PenalIntRate!.Value;
+            }
 
             // Product definition — drives both interest calc method and loan interest type
             string intCalcMethod = "Schedule";
@@ -244,7 +263,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 // Overdue (penal) interest: on overdue principal at overdue rate since due date.
                 // Guard on overdueKists.Any() rather than overduePrincipal > 0 so that loans
                 // whose kist schedule lacks PrincipalAmt still get penal interest calculated.
-                if (kist != null && (kist.OverdueInterestRate ?? 0) > 0 && overdueKists.Any())
+                if (kist != null && effectiveOvdRate > 0 && overdueKists.Any())
                 {
                     decimal rawPenal = 0m;
                     penalBreakdown = new List<PenalBreakdownItemDTO>();
@@ -262,7 +281,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                 kistPrin = principalBal / overdueKists.Count;
                             int days = Math.Max(0, (today - ok.Date.Value.Date).Days);
                             decimal penalItem = Math.Round(
-                                kistPrin * (decimal)kist.OverdueInterestRate!.Value / 100m * days / 365m, 2);
+                                kistPrin * (decimal)effectiveOvdRate / 100m * days / 365m, 2);
                             rawPenal += penalItem;
                             penalBreakdown.Add(new PenalBreakdownItemDTO
                             {
@@ -270,7 +289,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                 DueDate = ok.Date.Value.Date,
                                 PrincipalAmount = kistPrin,
                                 DaysOverdue = days,
-                                OverdueRate = kist.OverdueInterestRate!.Value,
+                                OverdueRate = effectiveOvdRate,
                                 PenalInterest = penalItem,
                             });
                         }
@@ -280,14 +299,14 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         var firstOvd = overdueKists.Where(x => x.Date.HasValue).Min(x => x.Date!.Value.Date);
                         int days = Math.Max(0, (today - firstOvd).Days);
                         rawPenal = Math.Round(
-                            principalBal * (decimal)kist.OverdueInterestRate!.Value / 100m * days / 365m, 2);
+                            principalBal * (decimal)effectiveOvdRate / 100m * days / 365m, 2);
                         penalBreakdown.Add(new PenalBreakdownItemDTO
                         {
                             KistNumber = 0,
                             DueDate = firstOvd,
                             PrincipalAmount = principalBal,
                             DaysOverdue = days,
-                            OverdueRate = kist.OverdueInterestRate!.Value,
+                            OverdueRate = effectiveOvdRate,
                             PenalInterest = rawPenal,
                         });
                     }
@@ -321,7 +340,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 // Overdue penal: use kist schedule entries if available; otherwise derive
                 // overdue from KistFirstDate (Balance/MinBalance loans often have no schedule)
-                if ((kist.OverdueInterestRate ?? 0) > 0 && principalBal > 0)
+                if (effectiveOvdRate > 0 && principalBal > 0)
                 {
                     decimal rawPenal = 0m;
                     penalBreakdown = new List<PenalBreakdownItemDTO>();
@@ -339,7 +358,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                 if (kistPrin <= 0) kistPrin = principalBal / overdueKists.Count;
                                 int overDays = Math.Max(0, (today - ok.Date.Value.Date).Days);
                                 decimal penalItem = Math.Round(
-                                    kistPrin * (decimal)kist.OverdueInterestRate!.Value / 100m * overDays / 365m, 2);
+                                    kistPrin * (decimal)effectiveOvdRate / 100m * overDays / 365m, 2);
                                 rawPenal += penalItem;
                                 penalBreakdown.Add(new PenalBreakdownItemDTO
                                 {
@@ -347,7 +366,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                     DueDate = ok.Date.Value.Date,
                                     PrincipalAmount = kistPrin,
                                     DaysOverdue = overDays,
-                                    OverdueRate = kist.OverdueInterestRate!.Value,
+                                    OverdueRate = effectiveOvdRate,
                                     PenalInterest = penalItem,
                                 });
                             }
@@ -357,25 +376,25 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                             var firstOvd = overdueKists.Where(x => x.Date.HasValue).Min(x => x.Date!.Value.Date);
                             int overDays = Math.Max(0, (today - firstOvd).Days);
                             rawPenal = Math.Round(
-                                principalBal * (decimal)kist.OverdueInterestRate!.Value / 100m * overDays / 365m, 2);
+                                principalBal * (decimal)effectiveOvdRate / 100m * overDays / 365m, 2);
                             penalBreakdown.Add(new PenalBreakdownItemDTO
                             {
                                 KistNumber = 0, DueDate = firstOvd, PrincipalAmount = principalBal,
-                                DaysOverdue = overDays, OverdueRate = kist.OverdueInterestRate!.Value,
+                                DaysOverdue = overDays, OverdueRate = effectiveOvdRate,
                                 PenalInterest = rawPenal,
                             });
                         }
                     }
-                    else if (kist.KistFirstDate.Date < today.Date)
+                    else if (kist != null && kist.KistFirstDate.Date < today.Date)
                     {
                         // No kist schedule at all — first kist is past due; use KistFirstDate as start
                         int overDays = Math.Max(0, (today - kist.KistFirstDate.Date).Days);
                         rawPenal = Math.Round(
-                            principalBal * (decimal)kist.OverdueInterestRate!.Value / 100m * overDays / 365m, 2);
+                            principalBal * (decimal)effectiveOvdRate / 100m * overDays / 365m, 2);
                         penalBreakdown.Add(new PenalBreakdownItemDTO
                         {
                             KistNumber = 1, DueDate = kist.KistFirstDate.Date, PrincipalAmount = principalBal,
-                            DaysOverdue = overDays, OverdueRate = kist.OverdueInterestRate!.Value,
+                            DaysOverdue = overDays, OverdueRate = effectiveOvdRate,
                             PenalInterest = rawPenal,
                         });
                     }

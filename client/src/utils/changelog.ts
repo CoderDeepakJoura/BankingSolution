@@ -15,6 +15,14 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.51",
+    date: "2026-09-06",
+    changes: [
+      { type: "fix", text: "Loan Ledger: Stand-type loans now correctly show separate Interest Dr and Interest Cr columns — this was broken when the loan product was set up at the head office branch and viewed from a sub-branch" },
+      { type: "fix", text: "Penal interest now calculates correctly for overdue loans — the system previously picked an older loan record with no overdue rate instead of the most recent one; also falls back to the product slab's penal rate if no rate was set on the individual account" },
+    ],
+  },
+  {
     version: "1.0.50",
     date: "2026-09-06",
     changes: [

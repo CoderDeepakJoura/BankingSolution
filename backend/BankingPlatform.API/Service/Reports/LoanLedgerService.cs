@@ -127,12 +127,16 @@ namespace BankingPlatform.API.Service.Reports
                     .FirstOrDefaultAsync(x => x.Id == account.GeneralProductId.Value)
                 : null;
 
-            // Stand = ActOnIntPosting == 2 (interest tracked separately, not added to principal)
+            // Stand = ActOnIntPosting == 2 (interest tracked separately, not added to principal).
+            // Try the viewing branch first; fall back to the account's own branch (where the product was configured).
             bool isStand = false;
             if (account.GeneralProductId.HasValue)
             {
                 var prodDef = await _context.loanproductdefinition.AsNoTracking()
                     .FirstOrDefaultAsync(x => x.ProductId == account.GeneralProductId.Value && x.BrId == branchId);
+                if (prodDef == null && account.BranchId != branchId)
+                    prodDef = await _context.loanproductdefinition.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.ProductId == account.GeneralProductId.Value && x.BrId == account.BranchId);
                 isStand = prodDef?.ActOnIntPosting == 2;
             }
 
