@@ -132,8 +132,10 @@ jobs:
             ./publish/ \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/banking-api/
 
-      # Copy audit schema script then apply it (idempotent — IF NOT EXISTS throughout).
-      # Requires AUDIT_DB_URL secret: postgres://user:pass@host:5432/auditdb
+      # Copy audit schema script then apply it to every society's audit DB.
+      # Add one secret per society: AUDIT_DB_URL_1, AUDIT_DB_URL_2, AUDIT_DB_URL_3 …
+      # Format: postgresql://postgres:password@localhost:5432/auditdb_societyname
+      # All secrets are optional — missing ones are skipped gracefully.
       - name: Copy audit schema script to server
         run: |
           rsync -avz \
@@ -141,11 +143,25 @@ jobs:
             scripts/AuditScripts.sql \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/banking-api/AuditScripts.sql
 
-      - name: Apply audit database schema
+      - name: Apply audit schema to all society audit databases
+        env:
+          AUDIT_DB_URL_1: ${{ secrets.AUDIT_DB_URL_1 }}
+          AUDIT_DB_URL_2: ${{ secrets.AUDIT_DB_URL_2 }}
+          AUDIT_DB_URL_3: ${{ secrets.AUDIT_DB_URL_3 }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-            "psql '${{ secrets.AUDIT_DB_URL }}' -v ON_ERROR_STOP=0 -f /var/www/banking-api/AuditScripts.sql && echo '✅ Audit schema applied'" || echo '⚠️  Audit schema step skipped (AUDIT_DB_URL not set or psql failed)'
+          for URL_VAR in AUDIT_DB_URL_1 AUDIT_DB_URL_2 AUDIT_DB_URL_3; do
+            URL="${!URL_VAR}"
+            if [ -n "$URL" ]; then
+              echo "Applying audit schema to $URL_VAR …"
+              ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+                ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+                "psql '$URL' -v ON_ERROR_STOP=0 -f /var/www/banking-api/AuditScripts.sql \
+                 && echo '✅ $URL_VAR done'" \
+              || echo "⚠️  $URL_VAR failed — check connection string"
+            else
+              echo "ℹ️  $URL_VAR not set — skipping"
+            fi
+          done
 
       # Always runs — ensures both services are back up even if rsync failed
       - name: Start both API services & verify
