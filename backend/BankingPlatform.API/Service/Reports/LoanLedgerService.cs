@@ -281,7 +281,7 @@ namespace BankingPlatform.API.Service.Reports
                 var info = voucherInfoMap.GetValueOrDefault(entry.VoucherID);
                 if (info == null) continue;
 
-                bool isIP = entry.EntryStatus == "IP";
+                bool isIP = entry.EntryStatus == "LInterest";
                 decimal? dr = null, cr = null, intDr = null, intCr = null;
 
                 if (isStand)
@@ -289,8 +289,8 @@ namespace BankingPlatform.API.Service.Reports
                     // Stand loans: interest goes in separate IntDr/IntCr columns; balance = principal only
                     if (isIP)
                     {
-                        intDr = entry.IntDr.HasValue && entry.IntDr.Value > 0 ? entry.IntDr.Value : (decimal?)null;
-                        // Dr/Cr and Balance stay unchanged — interest does not affect principal balance
+                        intDr = entry.VoucherAmount > 0 ? entry.VoucherAmount : (decimal?)null;
+                        // Balance stays unchanged — interest does not affect principal balance for Stand
                     }
                     else
                     {
@@ -305,10 +305,10 @@ namespace BankingPlatform.API.Service.Reports
                 }
                 else
                 {
-                    // AddInBalance: interest is embedded — single Dr/Cr columns, balance includes interest
+                    // AddInBalance: interest is embedded in principal — Dr column, balance includes interest
                     if (isIP)
                     {
-                        dr = entry.IntDr.HasValue && entry.IntDr.Value > 0 ? entry.IntDr.Value : (decimal?)null;
+                        dr = entry.VoucherAmount > 0 ? entry.VoucherAmount : (decimal?)null;
                     }
                     else
                     {
@@ -326,7 +326,7 @@ namespace BankingPlatform.API.Service.Reports
                     .Distinct()
                     .ToList();
 
-                string particulars = isIP ? "Loan Interest Posting"
+                string particulars = isIP ? "Interest Posting"
                     : (contras.Any() ? string.Join(" / ", contras) : "—");
 
                 // Update principal running balance (Stand: Dr/Cr only, not IntDr/IntCr)
@@ -406,8 +406,8 @@ namespace BankingPlatform.API.Service.Reports
             decimal drSum = 0, crSum = 0;
             foreach (var e in entries)
             {
-                if (e.EntryStatus == "IP")
-                    drSum += e.IntDr ?? 0;          // interest posting increases outstanding
+                if (e.EntryStatus == "LInterest")
+                    drSum += e.VoucherAmount;       // interest posting increases outstanding (AddInBalance only; Stand same net effect for OB)
                 else if (e.VoucherEntryType == "Dr")
                     drSum += e.VoucherAmount;
                 else

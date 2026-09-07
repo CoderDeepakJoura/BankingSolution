@@ -1689,41 +1689,9 @@ CREATE TABLE IF NOT EXISTS loanguarwitness (
 );
 
 
--- =============================================================================
--- SECTION 12 : AUDIT LOG  (immutable — DB-level trigger enforces it)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS auditlog (
-    id         SERIAL          PRIMARY KEY,
-    branchid   INT             NOT NULL,
-    userid     VARCHAR(50)     NOT NULL DEFAULT '',
-    username   VARCHAR(100)    NOT NULL DEFAULT '',
-    action     VARCHAR(20)     NOT NULL,
-    module     VARCHAR(100)    NOT NULL DEFAULT '',
-    entityname VARCHAR(100)    NOT NULL,
-    entityid   VARCHAR(200)    NULL,
-    oldvalue   TEXT            NULL,
-    newvalue   TEXT            NULL,
-    ipaddress  VARCHAR(50)     NULL,
-    workingdate VARCHAR(20)    NULL,
-    createdat  TIMESTAMP       NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_auditlog_branchid   ON auditlog (branchid);
-CREATE INDEX IF NOT EXISTS idx_auditlog_createdat  ON auditlog (createdat DESC);
-CREATE INDEX IF NOT EXISTS idx_auditlog_entityname ON auditlog (entityname);
-CREATE INDEX IF NOT EXISTS idx_auditlog_userid     ON auditlog (userid);
-
-CREATE OR REPLACE FUNCTION fn_prevent_auditlog_modification()
-RETURNS TRIGGER AS $$
-BEGIN
-    RAISE EXCEPTION 'Audit log records are immutable and cannot be modified or deleted.';
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE TRIGGER trg_auditlog_immutable
-BEFORE UPDATE OR DELETE ON auditlog
-FOR EACH ROW EXECUTE FUNCTION fn_prevent_auditlog_modification();
+-- NOTE: The audit log table has been moved to a dedicated audit database.
+-- See scripts/AuditScripts.sql for the schema. Run that script against the
+-- separate audit PostgreSQL database, not this one.
 
 
 -- =============================================================================

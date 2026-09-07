@@ -15,6 +15,17 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.52",
+    date: "2026-09-08",
+    changes: [
+      { type: "new",         text: "Loan Interest Posting: new Period Detail tab shows a full period-by-period interest history from loan date — grouped columns for Standard Interest, Overdue/Penal, and Result with color-coded row types" },
+      { type: "fix",         text: "Loan Interest Posting: penal interest now correctly accrues from the kist due date — previously a kist due on the period-start checkpoint was excluded, making OVR INT always zero" },
+      { type: "fix",         text: "Loan Interest Posting: Calculation tab penal row now shows the actual overdue kist principal instead of the full loan principal" },
+      { type: "improvement", text: "Loan Interest Posting: batch items now carry overdue installments, overdue principal, and penal breakdown — these were missing from batch calculation and only available in the single-account view" },
+      { type: "new",         text: "Audit logging system introduced — a separate audit database records create/update/delete events across the platform for tamper-proof audit trails" },
+    ],
+  },
+  {
     version: "1.0.51",
     date: "2026-09-06",
     changes: [

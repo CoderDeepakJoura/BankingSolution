@@ -132,6 +132,21 @@ jobs:
             ./publish/ \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/banking-api/
 
+      # Copy audit schema script then apply it (idempotent — IF NOT EXISTS throughout).
+      # Requires AUDIT_DB_URL secret: postgres://user:pass@host:5432/auditdb
+      - name: Copy audit schema script to server
+        run: |
+          rsync -avz \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            scripts/AuditScripts.sql \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/banking-api/AuditScripts.sql
+
+      - name: Apply audit database schema
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            "psql '${{ secrets.AUDIT_DB_URL }}' -v ON_ERROR_STOP=0 -f /var/www/banking-api/AuditScripts.sql && echo '✅ Audit schema applied'" || echo '⚠️  Audit schema step skipped (AUDIT_DB_URL not set or psql failed)'
+
       # Always runs — ensures both services are back up even if rsync failed
       - name: Start both API services & verify
         if: always()

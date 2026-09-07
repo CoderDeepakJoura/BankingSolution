@@ -100,16 +100,30 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
                 .SumAsync(x => x.VoucherAmount);
 
+            // AddInBalance only: new interest postings (LInterest Dr entries) increase outstanding.
+            // Stand loans track interest separately via voucherrecintdetail — not counted here.
+            decimal lInterestPosted = 0m;
+            if (isAddInBalance)
+            {
+                lInterestPosted = await _db.vouchercreditdebitdetails.AsNoTracking()
+                    .Where(x => x.AccountId == loanAccId && x.BrId == branchId
+                             && x.EntryStatus == "LInterest"
+                             && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
+                    .SumAsync(x => x.VoucherAmount);
+            }
+
             decimal openingPrincipal = ob?.TotalBalance ?? 0m;
             decimal principalBal = openingPrincipal
                                  + obDetails.Sum(x => x.AmountDr)
                                  - obDetails.Sum(x => x.AmountCr)
                                  + advancedTotal
                                  - recoveredTotal;
-            // For AddInBalance: interest is embedded in the balance; IntDr/IntCr rows are recorded
-            // in loanaccountbalancedetail by the interest posting service
+            // AddInBalance: add historical IP rows from loanaccountbalancedetail (pre-fix migration data)
+            // and new LInterest entries from vouchercreditdebitdetails (post-fix in-system data).
+            // Stand: interest does not affect principal — tracked separately via voucherrecintdetail.
             if (isAddInBalance)
-                principalBal += obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr);
+                principalBal += obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr)
+                              + lInterestPosted;
             principalBal = Math.Max(0, principalBal);
 
             // Opening interest (migrated/imported balances)
@@ -483,7 +497,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             var events = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(x => x.AccountId == loanAccId && x.BrId == branchId
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
-                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "IP"))
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "LInterest"))
                 .OrderBy(x => x.ValueDate).ThenBy(x => x.VoucherID)
                 .Select(x => new { x.EntryStatus, x.VoucherAmount, x.IntDr, x.IntCr, x.ValueDate })
                 .ToListAsync();
@@ -492,9 +506,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             decimal balance = obNet;
             foreach (var e in events.Where(x => x.ValueDate.Date <= calcFromDate.Date))
             {
-                if (e.EntryStatus == "LA")      balance += e.VoucherAmount;
-                else if (e.EntryStatus == "LR") balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
-                else if (e.EntryStatus == "IP") balance += e.IntDr ?? 0m;
+                if (e.EntryStatus == "LA")          balance += e.VoucherAmount;
+                else if (e.EntryStatus == "LR")     balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
+                else if (e.EntryStatus == "LInterest") balance += e.VoucherAmount;
             }
             balance = Math.Max(0, balance);
 
@@ -526,9 +540,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 }
                 foreach (var e in group)
                 {
-                    if (e.EntryStatus == "LA")      balance += e.VoucherAmount;
-                    else if (e.EntryStatus == "LR") balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
-                    else if (e.EntryStatus == "IP") balance += e.IntDr ?? 0m;
+                    if (e.EntryStatus == "LA")          balance += e.VoucherAmount;
+                    else if (e.EntryStatus == "LR")     balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
+                    else if (e.EntryStatus == "LInterest") balance += e.VoucherAmount;
                 }
                 balance = Math.Max(0, balance);
                 segStart = evDate.AddDays(1);
@@ -560,17 +574,44 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             var ob = await _db.loanaccopeningbalance.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.AccId == loanAccId && x.BranchId == branchId);
 
+            // Historical obDetails rows (VoucherId = null) represent pre-migration data with no
+            // corresponding voucher. Include them in the OB so the ledger matches the outstanding.
+            // In-system rows (VoucherId > 0) already appear as IP voucher rows — don't double-count.
+            var historicalObDetails = await _db.loanaccountbalancedetail.AsNoTracking()
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId
+                         && (x.VoucherId == null || x.VoucherId == 0))
+                .ToListAsync();
+
+            // Determine AddInBalance to decide whether to include IntDr in the OB
+            var acc = await _db.accountmaster.AsNoTracking()
+                .Where(x => x.ID == loanAccId).Select(x => new { x.GeneralProductId, x.BranchId }).FirstOrDefaultAsync();
+            bool isAddInBalance = false;
+            if (acc?.GeneralProductId.HasValue == true)
+            {
+                var prodDef = await _db.loanproductdefinition.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.ProductId == acc.GeneralProductId.Value && x.BrId == branchId)
+                    ?? await _db.loanproductdefinition.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.ProductId == acc.GeneralProductId.Value && x.BrId == acc.BranchId);
+                isAddInBalance = prodDef?.ActOnIntPosting == 1;
+            }
+
+            decimal histAmtAdj = historicalObDetails.Sum(x => x.AmountDr) - historicalObDetails.Sum(x => x.AmountCr);
+            decimal histIntAdj = isAddInBalance
+                ? historicalObDetails.Sum(x => x.IntDr) - historicalObDetails.Sum(x => x.IntCr)
+                : 0m;
+            decimal effectiveOb = (ob?.TotalBalance ?? 0m) + histAmtAdj + histIntAdj;
+
             var rows = new List<LoanLedgerRowDTO>();
 
-            if (ob != null && ob.TotalBalance > 0)
+            if (effectiveOb > 0)
             {
                 rows.Add(new LoanLedgerRowDTO
                 {
-                    EntryDate   = ob.OverDueDate ?? DateTime.MinValue,
+                    EntryDate   = ob?.OverDueDate ?? DateTime.MinValue,
                     VoucherNo   = 0,
                     EntryType   = "OB",
                     Description = "Opening Balance",
-                    Dr          = ob.TotalBalance ?? 0,
+                    Dr          = effectiveOb,
                     Cr          = 0,
                 });
             }
@@ -578,7 +619,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             var vouchers = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(x => x.AccountId == loanAccId && x.BrId == branchId
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
-                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "IP"))
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "LInterest"))
                 .OrderBy(x => x.ValueDate)
                 .ThenBy(x => x.VoucherID)
                 .Select(x => new
@@ -596,17 +637,17 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
             foreach (var v in vouchers)
             {
-                bool isIP = v.EntryStatus == "IP";
+                bool isIP = v.EntryStatus == "LInterest";
                 string desc = v.EntryStatus switch
                 {
-                    "LA" => "Loan Advancement",
-                    "LR" => "Loan Recovery",
-                    "IP" => "Interest Posting",
-                    _    => v.EntryStatus ?? "",
+                    "LA"        => "Loan Advancement",
+                    "LR"        => "Loan Recovery",
+                    "LInterest" => "Interest Posting",
+                    _           => v.EntryStatus ?? "",
                 };
-                // IP entries: VoucherAmount = 0, actual amount is in IntDr (Dr side)
+                // LInterest entries: VoucherAmount = total interest (Dr side)
                 // LR entries: VoucherAmount = principal portion, IntCr = interest portion (both Cr)
-                decimal dr = isIP ? (v.IntDr ?? 0m) : (v.VoucherEntryType == "Dr" ? v.VoucherAmount : 0m);
+                decimal dr = isIP ? v.VoucherAmount : (v.VoucherEntryType == "Dr" ? v.VoucherAmount : 0m);
                 decimal cr = isIP ? 0m : (v.VoucherEntryType == "Cr" ? (v.VoucherAmount + (v.IntCr ?? 0m)) : 0m);
                 rows.Add(new LoanLedgerRowDTO
                 {

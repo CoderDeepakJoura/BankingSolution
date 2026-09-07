@@ -160,17 +160,16 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 // ── VoucherCreditDebitDetails ─────────────────────────────────────
                 int row = 1;
 
-                // Dr: Loan account (interest charged to loan — payment side in Day Book)
-                //     EntryStatus="IP", IntDr=amount, VoucherAmount=0 (loan ledger uses IntDr)
+                // Dr: Loan account (interest charged — EntryStatus="LInterest", VoucherAmount=total)
                 var drEntry = new VoucherCreditDebitDetails
                 {
                     BrId             = dto.BrId,
                     VoucherID        = voucherId,
                     AccountId        = dto.LoanAccountId,
                     AccHeadCode      = loanHead,
-                    VoucherAmount    = 0,
+                    VoucherAmount    = total,
                     VoucherEntryType = "Dr",
-                    EntryStatus      = "IP",
+                    EntryStatus      = "LInterest",
                     Narration        = narr,
                     VoucherStatus    = vrStatus,
                     ValueDate        = valDate,
@@ -208,69 +207,46 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 });
                 row++;
 
-                // ── VoucherRecIntDetail — formal interest ledger entries (Stand loans only) ─
-                // AddInBalance doesn't use this table — interest is embedded in principal via
-                // loanaccountbalancedetail.IntDr written below.
-                if (!isAddInBalance)
+                // ── VoucherRecIntDetail — interest ledger entries for ALL loan types ────────
+                // AddInBalance: IntDr = IntCr = amount (interest embedded in principal, fully posted)
+                // Stand:        IntDr = amount, IntCr = 0 (interest outstanding until recovered)
+                if (stdAmt > 0)
                 {
-                    if (stdAmt > 0)
+                    await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
                     {
-                        await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
-                        {
-                            BrId              = dto.BrId,
-                            VAccCrDrId        = ipEntryId,
-                            VoucherId         = voucherId,
-                            VoucherNo         = nextVrNo,
-                            EntryDate         = vrDate,
-                            ValueDate         = valDate,
-                            IntCatId          = CAT_STD,
-                            Pamt              = (double)info.PrincipalBalance,
-                            AccId             = dto.LoanAccountId,
-                            IntDr             = (double)stdAmt,
-                            IntCr             = 0,
-                            VoucherMainStatus = vrStatus,
-                        });
-                    }
-
-                    if (penalAmt > 0)
-                    {
-                        await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
-                        {
-                            BrId              = dto.BrId,
-                            VAccCrDrId        = ipEntryId,
-                            VoucherId         = voucherId,
-                            VoucherNo         = nextVrNo,
-                            EntryDate         = vrDate,
-                            ValueDate         = valDate,
-                            IntCatId          = CAT_PENAL,
-                            Pamt              = (double)info.PrincipalBalance,
-                            AccId             = dto.LoanAccountId,
-                            IntDr             = (double)penalAmt,
-                            IntCr             = 0,
-                            VoucherMainStatus = vrStatus,
-                        });
-                    }
+                        BrId              = dto.BrId,
+                        VAccCrDrId        = ipEntryId,
+                        VoucherId         = voucherId,
+                        VoucherNo         = nextVrNo,
+                        EntryDate         = vrDate,
+                        ValueDate         = valDate,
+                        IntCatId          = CAT_STD,
+                        Pamt              = (double)info.PrincipalBalance,
+                        AccId             = dto.LoanAccountId,
+                        IntDr             = (double)stdAmt,
+                        IntCr             = isAddInBalance ? (double)stdAmt : 0,
+                        VoucherMainStatus = vrStatus,
+                    });
                 }
 
-                // ── LoanAccountBalanceDetail — interest posting movement record ────
-                var ob = await _db.loanaccopeningbalance.AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.AccId == dto.LoanAccountId && x.BranchId == dto.BrId);
-
-                await _db.loanaccountbalancedetail.AddAsync(new LoanAccountBalanceDetail
+                if (penalAmt > 0)
                 {
-                    BrId          = dto.BrId,
-                    LoanOpenBalId = ob?.Id ?? 0,
-                    AccountId     = dto.LoanAccountId,
-                    AmountDr      = 0,
-                    AmountCr      = 0,
-                    IntDr         = total,
-                    IntCr         = 0,
-                    Date          = vrDate,
-                    ValueDate     = valDate,
-                    Status        = "IP",
-                    HeadCode      = loanHead,
-                    VoucherId     = voucherId,
-                });
+                    await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                    {
+                        BrId              = dto.BrId,
+                        VAccCrDrId        = ipEntryId,
+                        VoucherId         = voucherId,
+                        VoucherNo         = nextVrNo,
+                        EntryDate         = vrDate,
+                        ValueDate         = valDate,
+                        IntCatId          = CAT_PENAL,
+                        Pamt              = (double)info.PrincipalBalance,
+                        AccId             = dto.LoanAccountId,
+                        IntDr             = (double)penalAmt,
+                        IntCr             = isAddInBalance ? (double)penalAmt : 0,
+                        VoucherMainStatus = vrStatus,
+                    });
+                }
 
                 await _db.SaveChangesAsync();
                 await tx.CommitAsync();
@@ -315,10 +291,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     // AddInBalance: GetLoanBalanceAsync returns 0 for StdInterestOutstanding because
                     // interest is embedded in principal. Compute the new accrued interest here using
                     // the same method (Schedule/Balance/MinBalance) as configured on the product.
-                    DateTime? lastIpDate = await _db.loanaccountbalancedetail.AsNoTracking()
-                        .Where(x => x.AccountId == acc.ID && x.BrId == brId && x.Status == "IP")
-                        .OrderByDescending(x => x.Date)
-                        .Select(x => (DateTime?)x.Date)
+                    DateTime? lastIpDate = await _db.voucherrecintdetail.AsNoTracking()
+                        .Where(x => x.AccId == acc.ID && x.BrId == brId)
+                        .OrderByDescending(x => x.EntryDate)
+                        .Select(x => (DateTime?)x.EntryDate)
                         .FirstOrDefaultAsync();
 
                     aibFrom = (lastIpDate?.Date ?? bal.LoanDate) ?? aibTo;
@@ -382,8 +358,260 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     ActOnIntPosting     = bal.ActOnIntPosting,
                     NoInterestReason    = noReason,
                     CalcBreakdown       = bal.CalcBreakdown,
+                    OverdueInstallments = bal.OverdueInstallments,
+                    OverduePrincipal    = bal.OverduePrincipal,
+                    PenalBreakdown      = bal.PenalBreakdown,
                 });
             }
+            return result;
+        }
+
+        // ── Period-by-Period Interest Detail ─────────────────────────────────────
+
+        public async Task<List<LoanInterestPeriodDetailRowDTO>> GetInterestDetailAsync(
+            int loanAccId, int branchId, DateTime? asOfDate = null)
+        {
+            var result = new List<LoanInterestPeriodDetailRowDTO>();
+            DateTime calcToDate = (asOfDate ?? DateTime.Today).Date;
+
+            var acc = await _db.accountmaster.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.ID == loanAccId && x.BranchId == branchId);
+            if (acc == null) return result;
+
+            // Loan terms
+            var kistInfo = await _db.accountkistdetail.AsNoTracking()
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId)
+                .OrderByDescending(x => x.LoanDate)
+                .FirstOrDefaultAsync();
+
+            double stdRate   = kistInfo?.StandardInterestRate ?? 0;
+            double penalRate = kistInfo?.OverdueInterestRate  ?? 0;
+            DateTime? loanDate = kistInfo?.LoanDate;
+
+            // Effective penal rate fallback (identical to GetLoanBalanceAsync)
+            if (penalRate == 0 && (kistInfo?.SlabId ?? 0) > 0)
+            {
+                decimal loanAmt    = (decimal)(kistInfo!.LoanAmountPassed ?? 0);
+                int     loanPeriod = kistInfo.LoanPeriod ?? 0;
+                var slabDetail = await _db.loanslabdetail.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.SlabId == kistInfo.SlabId!.Value
+                        && x.FromAmount <= loanAmt && x.ToAmount >= loanAmt
+                        && (x.PeriodFrom == null || x.PeriodFrom <= loanPeriod)
+                        && (x.PeriodTo   == null || x.PeriodTo   >= loanPeriod));
+                if ((slabDetail?.PenalIntRate ?? 0) > 0)
+                    penalRate = slabDetail!.PenalIntRate!.Value;
+            }
+
+            bool isAddInBalance = false;
+            if (acc.GeneralProductId.HasValue)
+            {
+                var prodDef = await _db.loanproductdefinition.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.ProductId == acc.GeneralProductId.Value && x.BrId == branchId);
+                isAddInBalance = prodDef?.ActOnIntPosting == 1;
+            }
+
+            // Opening balance (migration / historical data)
+            var ob = await _db.loanaccopeningbalance.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.AccId == loanAccId && x.BranchId == branchId);
+            var obDetails = await _db.loanaccountbalancedetail.AsNoTracking()
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId)
+                .ToListAsync();
+
+            decimal openingBalance = (ob?.TotalBalance ?? 0m)
+                                   + obDetails.Sum(x => x.AmountDr)
+                                   - obDetails.Sum(x => x.AmountCr);
+            if (isAddInBalance)
+                openingBalance += obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr);
+
+            // Opening interest (for IntBal seed)
+            decimal openingIntBal = (ob?.OpenInt > 0 && ob?.OpenIntType == "Dr")
+                ? (decimal)ob!.OpenInt!.Value : 0m;
+
+            // Voucher events: LA, LR, LInterest (ValueDate is DateTime — not nullable)
+            var rawEventsDb = await _db.vouchercreditdebitdetails.AsNoTracking()
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "LInterest")
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
+                .OrderBy(x => x.ValueDate)
+                .ThenBy(x => x.Id)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.EntryStatus,
+                    x.VoucherAmount,
+                    IntCr = x.IntCr ?? 0m,
+                    x.ValueDate,
+                })
+                .ToListAsync();
+
+            // Apply .Date in-memory (avoids EF translation issues)
+            var rawEvents = rawEventsDb
+                .Select(x => new
+                {
+                    x.Id,
+                    x.EntryStatus,
+                    x.VoucherAmount,
+                    x.IntCr,
+                    EventDate = x.ValueDate.Date,
+                })
+                .ToList();
+
+            // Kist schedule (for checkpoint dates and overdue tracking)
+            var kistSchedule = await _db.accountkistschedule.AsNoTracking()
+                .Where(x => x.LoanAccId == loanAccId)
+                .OrderBy(x => x.KistNumber)
+                .ToListAsync();
+
+            // Build sorted unique checkpoint set
+            var checkpoints = new SortedSet<DateTime>();
+            if (loanDate.HasValue && loanDate.Value.Date <= calcToDate)
+                checkpoints.Add(loanDate.Value.Date);
+            foreach (var k in kistSchedule)
+                if (k.Date.HasValue && k.Date.Value.Date <= calcToDate)
+                    checkpoints.Add(k.Date.Value.Date);
+            foreach (var e in rawEvents)
+                if (e.EventDate <= calcToDate)
+                    checkpoints.Add(e.EventDate);
+            checkpoints.Add(calcToDate);
+
+            if (!checkpoints.Any()) return result;
+
+            // Group events by date
+            var eventsByDate = rawEvents
+                .Where(e => e.EventDate <= calcToDate)
+                .GroupBy(e => e.EventDate)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            decimal runningBalance = openingBalance;
+            decimal runningIntBal  = openingIntBal;
+            DateTime? prevDate = null;
+
+            foreach (var date in checkpoints)
+            {
+                // Interest accrued in [prevDate, date) using balance at prevDate
+                int     days   = prevDate.HasValue ? (date - prevDate.Value).Days : 0;
+                decimal stdInt = 0m;
+                decimal ovrInt = 0m;
+
+                if (days > 0 && runningBalance > 0 && stdRate > 0)
+                    stdInt = Math.Round(runningBalance * (decimal)stdRate / 100m * days / 365m, 2);
+
+                if (days > 0 && prevDate.HasValue && penalRate > 0)
+                {
+                    // Kists past-due at the START of this period (due on or before prevDate)
+                    var ovdAtPrev = kistSchedule
+                        .Where(k => k.Date.HasValue && k.Date.Value.Date <= prevDate!.Value)
+                        .ToList();
+                    foreach (var ok in ovdAtPrev)
+                    {
+                        decimal kistPrin = ok.PrincipalAmt
+                            ?? Math.Max(0m, (ok.KistAmount ?? 0m) - (ok.InterestAmt ?? 0m));
+                        if (kistPrin > 0)
+                            ovrInt += Math.Round(kistPrin * (decimal)penalRate / 100m * days / 365m, 2);
+                    }
+                }
+
+                // Events on this date
+                decimal drOnDate          = 0m;
+                decimal crOnDate          = 0m;
+                decimal ipOnDate          = 0m;
+                decimal intRecoveredOnDate = 0m;
+                string  particulars       = "";
+                bool    hasLa = false, hasLr = false, hasIp = false;
+
+                if (eventsByDate.TryGetValue(date, out var dateEvents))
+                {
+                    foreach (var ev in dateEvents)
+                    {
+                        switch (ev.EntryStatus)
+                        {
+                            case "LA":
+                                drOnDate       += ev.VoucherAmount;
+                                runningBalance += ev.VoucherAmount;
+                                hasLa = true;
+                                break;
+                            case "LR":
+                                crOnDate       += ev.VoucherAmount;
+                                runningBalance -= ev.VoucherAmount;
+                                intRecoveredOnDate += ev.IntCr;
+                                hasLr = true;
+                                break;
+                            case "LInterest":
+                                ipOnDate += ev.VoucherAmount;
+                                if (isAddInBalance)
+                                {
+                                    drOnDate       += ev.VoucherAmount;
+                                    runningBalance += ev.VoucherAmount;
+                                }
+                                hasIp = true;
+                                break;
+                        }
+                    }
+                    runningBalance = Math.Max(0m, runningBalance);
+
+                    if (hasLa)       particulars = "Loan Advancement";
+                    else if (hasLr && hasIp) particulars = "Recovery & Int. Posting";
+                    else if (hasLr)  particulars = "Loan Recovery";
+                    else if (hasIp)  particulars = "Interest Posting";
+                }
+
+                // Add kist label if a kist is due on this date
+                var kistsOnDate = kistSchedule
+                    .Where(k => k.Date.HasValue && k.Date.Value.Date == date)
+                    .ToList();
+                if (kistsOnDate.Any())
+                {
+                    string kistLabel = kistsOnDate.Count == 1
+                        ? $"Kist #{kistsOnDate[0].KistNumber ?? 0} Due"
+                        : $"Kists #{string.Join(", #", kistsOnDate.Select(k => k.KistNumber ?? 0))} Due";
+                    particulars = string.IsNullOrEmpty(particulars)
+                        ? kistLabel
+                        : $"{kistLabel} / {particulars}";
+                }
+
+                if (string.IsNullOrEmpty(particulars))
+                    particulars = date == calcToDate ? "As on Date" : "Balance";
+
+                // Overdue snapshot AT this date (kists strictly past-due)
+                var ovdAtDate = kistSchedule
+                    .Where(k => k.Date.HasValue && k.Date.Value.Date < date)
+                    .ToList();
+                int     odc = ovdAtDate.Count;
+                decimal odb = ovdAtDate.Sum(k =>
+                    k.PrincipalAmt ?? Math.Max(0m, (k.KistAmount ?? 0m) - (k.InterestAmt ?? 0m)));
+                int odd = odc > 0
+                    ? (int)(date - ovdAtDate.Min(k => k.Date!.Value.Date)).TotalDays
+                    : 0;
+
+                // Update running interest balance
+                runningIntBal += stdInt + ovrInt
+                    - ipOnDate          // formal posting reduces outstanding
+                    - intRecoveredOnDate; // interest recovery reduces outstanding
+                runningIntBal = Math.Max(0m, runningIntBal);
+
+                result.Add(new LoanInterestPeriodDetailRowDTO
+                {
+                    Date        = date,
+                    Particulars = particulars,
+                    Days        = days,
+                    Dr          = drOnDate,
+                    Cr          = crOnDate,
+                    StdBal      = runningBalance,
+                    Roi         = stdRate,
+                    StdInt      = stdInt,
+                    Odd         = odd,
+                    Odc         = odc,
+                    Odb         = odb,
+                    Balance     = runningBalance,
+                    Oroi        = penalRate,
+                    OvrInt      = ovrInt,
+                    TInt        = stdInt + ovrInt,
+                    IntBal      = runningIntBal,
+                });
+
+                prevDate = date;
+            }
+
             return result;
         }
 
@@ -494,16 +722,16 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 int row = 1;
                 foreach (var (item, info, stdAmt, penalAmt, total, loanHead, crAccId, crHead) in valid)
                 {
-                    // Dr: loan account (interest charged — EntryStatus="IP")
+                    // Dr: loan account (interest charged — EntryStatus="LInterest")
                     var drEntry = new VoucherCreditDebitDetails
                     {
                         BrId             = dto.BrId,
                         VoucherID        = voucherId,
                         AccountId        = item.LoanAccountId,
                         AccHeadCode      = loanHead,
-                        VoucherAmount    = 0,
+                        VoucherAmount    = total,
                         VoucherEntryType = "Dr",
-                        EntryStatus      = "IP",
+                        EntryStatus      = "LInterest",
                         Narration        = narr,
                         VoucherStatus    = vrStatus,
                         ValueDate        = valDate,
@@ -535,43 +763,31 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         HCL1 = 0, HCL2 = 0, HCL3 = 0,
                     });
 
-                    // VoucherRecIntDetail (Stand loans only)
+                    // VoucherRecIntDetail — ALL loan types
+                    // AddInBalance: IntDr = IntCr = amount; Stand: IntDr = amount, IntCr = 0
                     bool isAib = info.ActOnIntPosting == 1;
-                    if (!isAib)
-                    {
-                        if (stdAmt > 0)
-                            await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
-                            {
-                                BrId = dto.BrId, VAccCrDrId = ipEntryId,
-                                VoucherId = voucherId, VoucherNo = nextVrNo,
-                                EntryDate = vrDate, ValueDate = valDate,
-                                IntCatId = CAT_STD, Pamt = (double)info.PrincipalBalance,
-                                AccId = item.LoanAccountId,
-                                IntDr = (double)stdAmt, IntCr = 0, VoucherMainStatus = vrStatus,
-                            });
-                        if (penalAmt > 0)
-                            await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
-                            {
-                                BrId = dto.BrId, VAccCrDrId = ipEntryId,
-                                VoucherId = voucherId, VoucherNo = nextVrNo,
-                                EntryDate = vrDate, ValueDate = valDate,
-                                IntCatId = CAT_PENAL, Pamt = (double)info.PrincipalBalance,
-                                AccId = item.LoanAccountId,
-                                IntDr = (double)penalAmt, IntCr = 0, VoucherMainStatus = vrStatus,
-                            });
-                    }
-
-                    // LoanAccountBalanceDetail
-                    var ob = await _db.loanaccopeningbalance.AsNoTracking()
-                        .FirstOrDefaultAsync(x => x.AccId == item.LoanAccountId && x.BranchId == dto.BrId);
-                    await _db.loanaccountbalancedetail.AddAsync(new LoanAccountBalanceDetail
-                    {
-                        BrId = dto.BrId, LoanOpenBalId = ob?.Id ?? 0,
-                        AccountId = item.LoanAccountId,
-                        AmountDr = 0, AmountCr = 0, IntDr = total, IntCr = 0,
-                        Date = vrDate, ValueDate = valDate, Status = "IP",
-                        HeadCode = loanHead, VoucherId = voucherId,
-                    });
+                    if (stdAmt > 0)
+                        await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                        {
+                            BrId = dto.BrId, VAccCrDrId = ipEntryId,
+                            VoucherId = voucherId, VoucherNo = nextVrNo,
+                            EntryDate = vrDate, ValueDate = valDate,
+                            IntCatId = CAT_STD, Pamt = (double)info.PrincipalBalance,
+                            AccId = item.LoanAccountId,
+                            IntDr = (double)stdAmt, IntCr = isAib ? (double)stdAmt : 0,
+                            VoucherMainStatus = vrStatus,
+                        });
+                    if (penalAmt > 0)
+                        await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                        {
+                            BrId = dto.BrId, VAccCrDrId = ipEntryId,
+                            VoucherId = voucherId, VoucherNo = nextVrNo,
+                            EntryDate = vrDate, ValueDate = valDate,
+                            IntCatId = CAT_PENAL, Pamt = (double)info.PrincipalBalance,
+                            AccId = item.LoanAccountId,
+                            IntDr = (double)penalAmt, IntCr = isAib ? (double)penalAmt : 0,
+                            VoucherMainStatus = vrStatus,
+                        });
 
                     await _db.SaveChangesAsync();
                 }

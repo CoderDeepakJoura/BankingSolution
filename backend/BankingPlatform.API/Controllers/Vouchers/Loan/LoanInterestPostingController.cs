@@ -104,6 +104,24 @@ namespace BankingPlatform.API.Controllers.Vouchers.Loan
             }
         }
 
+        /// <summary>Period-by-period interest detail for a loan account (full history from loan date).</summary>
+        [HttpGet("period-detail/{loanAccId}")]
+        public async Task<IActionResult> GetPeriodDetail(int loanAccId, [FromQuery] int branchId, [FromQuery] string? asOfDate = null)
+        {
+            try
+            {
+                DateTime? calcDate = DateTime.TryParse(asOfDate, out var d) ? d : null;
+                var result = await _service.GetInterestDetailAsync(loanAccId, branchId, calcDate);
+                return Ok(new { Success = true, Data = result });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching period interest detail");
+                await _commonFunctions.LogErrors(ex, nameof(GetPeriodDetail), nameof(LoanInterestPostingController));
+                return StatusCode(500, new { Success = false, Message = ex.Message });
+            }
+        }
+
         /// <summary>Save a loan interest posting voucher.</summary>
         [HttpPost]
         public async Task<IActionResult> PostInterest([FromBody] LoanInterestPostingVoucherDTO dto)

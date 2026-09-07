@@ -30,20 +30,25 @@ using BankingPlatform.Infrastructure.Models.Services;
 using BankingPlatform.Infrastructure.Models.BankFD;
 using BankingPlatform.Infrastructure.Models.Salary;
 using BankingPlatform.Infrastructure.Configurations.Salary;
+using BankingPlatform.Infrastructure.Interfaces;
 namespace BankingPlatform.Infrastructure.Models;
 
 public partial class BankingDbContext : DbContext
 {
     private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly IAuditWriter? _auditWriter;
 
     public BankingDbContext()
     {
     }
 
-    public BankingDbContext(DbContextOptions<BankingDbContext> options, IHttpContextAccessor? httpContextAccessor = null)
+    public BankingDbContext(DbContextOptions<BankingDbContext> options,
+        IHttpContextAccessor? httpContextAccessor = null,
+        IAuditWriter? auditWriter = null)
         : base(options)
     {
         _httpContextAccessor = httpContextAccessor;
+        _auditWriter = auditWriter;
     }
 
     public virtual DbSet<User> user { get; set; }
@@ -134,7 +139,6 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<LoanProductBranchWiseRule> loanproductbranchwiserule { get; set; }
     public virtual DbSet<VoucherRecIntDetail> voucherrecintdetail { get; set; }
     public virtual DbSet<VrOdReserve> vrodreserve { get; set; }
-    public virtual DbSet<AuditLog> auditlog { get; set; }
     public virtual DbSet<NPAPlanMaster> npaplanmaster { get; set; }
     public virtual DbSet<NPAPlanCategory> npaplancategory { get; set; }
     public virtual DbSet<ExpenseCategory> expensecategory { get; set; }
@@ -180,7 +184,6 @@ public partial class BankingDbContext : DbContext
 
     private static readonly HashSet<string> _skipAuditEntities = new(StringComparer.OrdinalIgnoreCase)
     {
-        nameof(AuditLog),
         nameof(ErrorLog),
         "RefreshToken",
         "DayBeginEndInfo",
@@ -190,26 +193,14 @@ public partial class BankingDbContext : DbContext
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        EnforceAuditLogImmutability();
         var auditEntries = BuildAuditEntries();
         var result = await base.SaveChangesAsync(cancellationToken);
 
-        if (auditEntries.Count > 0)
-        {
-            auditlog.AddRange(auditEntries);
-            await base.SaveChangesAsync(cancellationToken);
-        }
+        // Fire-and-forget to separate audit DB; never let audit failures affect the caller
+        if (auditEntries.Count > 0 && _auditWriter is not null)
+            _ = _auditWriter.LogBulkAsync(auditEntries);
 
         return result;
-    }
-
-    private void EnforceAuditLogImmutability()
-    {
-        var tampered = ChangeTracker.Entries<AuditLog>()
-            .Any(e => e.State is EntityState.Modified or EntityState.Deleted);
-
-        if (tampered)
-            throw new InvalidOperationException("Audit log records are immutable and cannot be modified or deleted.");
     }
 
     private List<AuditLog> BuildAuditEntries()
@@ -243,7 +234,7 @@ public partial class BankingDbContext : DbContext
                 BranchId   = ctx.BranchId,
                 UserId     = ctx.UserId,
                 UserName   = ctx.UserName,
-                Action     = action,
+                ActionType = action,
                 Module     = ResolveModule(entry.Entity.GetType().Namespace ?? ""),
                 EntityName = typeName,
                 EntityId   = GetEntityId(entry),

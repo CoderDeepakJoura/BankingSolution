@@ -93,6 +93,10 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Reports.MemberIntCertServ
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanIntCertService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.OdReserveService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.AuditLog.AuditLogService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.AuditLog.IAuditService>(sp =>
+    sp.GetRequiredService<BankingPlatform.API.Service.AuditLog.AuditLogService>());
+builder.Services.AddScoped<BankingPlatform.Infrastructure.Interfaces.IAuditWriter>(sp =>
+    sp.GetRequiredService<BankingPlatform.API.Service.AuditLog.AuditLogService>());
 builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Loan.LoanRecoveryVoucherService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Vouchers.Loan.LoanInterestPostingService>();
 builder.Services.AddScoped<NPAPlanMasterService>();
@@ -119,6 +123,11 @@ var connectionString = builder.Configuration.GetConnectionString("BankingDatabas
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");
 builder.Services.AddDbContext<BankingDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+// Separate audit database — falls back to the main banking DB if not configured (dev mode)
+var auditConnectionString = builder.Configuration.GetConnectionString("AuditDatabase");
+builder.Services.AddDbContext<BankingPlatform.Infrastructure.DbContexts.AuditDbContext>(options =>
+    options.UseNpgsql(string.IsNullOrWhiteSpace(auditConnectionString) ? connectionString : auditConnectionString));
 
 // Configure strongly-typed JwtSettings and validate
 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>()

@@ -79,6 +79,10 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public string? NoInterestReason { get; set; }
         // Day-weighted breakdown (Balance / WO-schedule-fallback method only)
         public List<InterestCalcSegmentDTO>? CalcBreakdown { get; set; }
+        // Overdue kist info (Stand loans)
+        public int? OverdueInstallments { get; set; }
+        public decimal? OverduePrincipal { get; set; }
+        public List<PenalBreakdownItemDTO>? PenalBreakdown { get; set; }
     }
 
     public class LoanInterestBatchPostItemDTO
@@ -101,5 +105,27 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public int SuccessCount { get; set; }
         public int FailCount { get; set; }
         public List<string> Errors { get; set; } = new();
+    }
+
+    // ── Period-by-period interest detail ──────────────────────────────────────────
+
+    public class LoanInterestPeriodDetailRowDTO
+    {
+        public DateTime Date { get; set; }
+        public string Particulars { get; set; } = "";
+        public int Days { get; set; }
+        public decimal Dr { get; set; }
+        public decimal Cr { get; set; }
+        public decimal StdBal { get; set; }
+        public double Roi { get; set; }
+        public decimal StdInt { get; set; }
+        public int Odd { get; set; }
+        public int Odc { get; set; }
+        public decimal Odb { get; set; }
+        public decimal Balance { get; set; }
+        public double Oroi { get; set; }
+        public decimal OvrInt { get; set; }
+        public decimal TInt { get; set; }
+        public decimal IntBal { get; set; }
     }
 }

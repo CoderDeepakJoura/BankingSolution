@@ -15,6 +15,7 @@ import loanInterestPostingApi, {
   LoanInterestBatchItemDTO,
   InterestCalcSegmentDTO,
   PenalBreakdownItemDTO,
+  LoanInterestPeriodDetailRowDTO,
 } from "../../../services/vouchers/loan/loanInterestPostingApi";
 
 // ── Select styles ─────────────────────────────────────────────────────────────
@@ -65,7 +66,29 @@ const LoanInterestDetailPopup = ({
   item: LoanInterestBatchItemDTO;
   onClose: () => void;
 }) => {
+  const user = useSelector((state: RootState) => state.user);
   const isAddInBalance = item.actOnIntPosting === 1;
+
+  const [activeTab, setActiveTab] = useState<"calc" | "detail">("calc");
+  const [periodRows, setPeriodRows]     = useState<LoanInterestPeriodDetailRowDTO[] | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError]     = useState<string | null>(null);
+
+  // Fetch period detail when that tab is first opened
+  useEffect(() => {
+    if (activeTab !== "detail" || periodRows !== null) return;
+    setDetailLoading(true);
+    setDetailError(null);
+    const asOf = item.calcToDate ? item.calcToDate.slice(0, 10) : undefined;
+    loanInterestPostingApi
+      .getInterestPeriodDetail(item.loanAccId, user.branchid, asOf)
+      .then((res) => {
+        if (res.success && res.data) setPeriodRows(res.data);
+        else setDetailError(res.message || "Failed to load detail.");
+      })
+      .catch((err: any) => setDetailError(err?.message || "Error loading detail."))
+      .finally(() => setDetailLoading(false));
+  }, [activeTab]);
 
   const fromDate = item.calcFromDate ? new Date(item.calcFromDate) : null;
   const toDate   = item.calcToDate   ? new Date(item.calcToDate)   : null;
@@ -77,32 +100,39 @@ const LoanInterestDetailPopup = ({
 
   const fmtDate = (d: Date | null) =>
     d ? d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+  const fmtDateStr = (s: string) =>
+    fmtDate(new Date(s));
   const fmtAmt = (n: number) =>
     `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtN = (n: number) =>
+    n === 0 ? "—" : n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const totalInterest = item.totalPostable > 0
     ? item.totalPostable
     : item.stdInterest + item.penalInterest;
 
+  // Wider modal when showing period detail (16 columns)
+  const modalWidth = activeTab === "detail" ? "w-full max-w-[98vw]" : "w-full max-w-2xl";
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2"
       style={{ backgroundColor: "rgba(15,23,42,0.55)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+        className={`bg-white rounded-2xl shadow-2xl ${modalWidth} max-h-[95vh] flex flex-col overflow-hidden transition-all duration-200`}
         style={{ boxShadow: "0 25px 60px rgba(0,0,0,0.25)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="relative px-6 py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-500">
+        <div className="relative px-6 py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-500 flex-shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-11 h-11 bg-white/15 border border-white/25 rounded-xl flex items-center justify-center shadow-inner">
-              <TrendingUp className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 bg-white/15 border border-white/25 rounded-xl flex items-center justify-center shadow-inner">
+              <TrendingUp className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="text-white font-bold text-lg leading-tight tracking-tight">Interest Calculation Detail</p>
+              <p className="text-white font-bold text-base leading-tight tracking-tight">Interest Calculation Detail</p>
               <p className="text-blue-100 text-xs mt-0.5 font-medium">
                 {item.accountNumber} &nbsp;·&nbsp; {item.memberName}
                 {item.memberRelativeName && <span className="text-blue-200"> · {item.memberRelativeName}</span>}
@@ -111,7 +141,7 @@ const LoanInterestDetailPopup = ({
           </div>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/25 text-white/80 hover:text-white transition-all cursor-pointer"
+            className="absolute top-3 right-4 w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/25 text-white/80 hover:text-white transition-all cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -119,176 +149,357 @@ const LoanInterestDetailPopup = ({
         </div>
 
         {/* Summary cards */}
-        <div className="px-6 pt-5 pb-4 grid grid-cols-3 gap-3">
+        <div className="px-6 pt-4 pb-3 grid grid-cols-3 gap-3 flex-shrink-0">
           {[
-            { label: "Principal Balance",  value: fmtAmt(item.principalBalance), color: "text-slate-800", bg: "bg-slate-50 border-slate-200" },
-            { label: "Total Interest",     value: fmtAmt(totalInterest),         color: "text-blue-700",  bg: "bg-blue-50 border-blue-200"  },
-            { label: "Period (Days)",       value: days !== null ? `${days} days` : "—", color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200" },
+            { label: "Principal Balance", value: fmtAmt(item.principalBalance), color: "text-slate-800", bg: "bg-slate-50 border-slate-200" },
+            { label: "Total Interest",    value: fmtAmt(totalInterest),         color: "text-blue-700",  bg: "bg-blue-50 border-blue-200"  },
+            { label: "Period (Days)",     value: days !== null ? `${days} days` : "—", color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200" },
           ].map(({ label, value, color, bg }) => (
-            <div key={label} className={`rounded-xl border px-4 py-3 ${bg}`}>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+            <div key={label} className={`rounded-xl border px-4 py-2.5 ${bg}`}>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
               <p className={`font-bold text-sm ${color}`}>{value}</p>
             </div>
           ))}
         </div>
 
-        {/* Main content */}
-        <div className="overflow-y-auto flex-1 mx-4 mb-2 rounded-xl border border-gray-200 shadow-inner">
-          {item.noInterestReason && totalInterest === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-amber-600 gap-3">
-              <AlertCircle className="w-10 h-10" />
-              <p className="text-sm font-semibold text-center px-6">{item.noInterestReason}</p>
-            </div>
-          ) : isAddInBalance ? (
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-gradient-to-r from-blue-600 to-indigo-500">
-                  {["From Date", "To Date", "Days", "Principal", "Rate", "Method", "Interest"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="bg-white border-b border-gray-100">
-                  <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
-                  <td className="px-4 py-3 text-gray-600">{fmtDate(toDate)}</td>
-                  <td className="px-4 py-3 font-semibold text-gray-700">{days ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-700">{fmtAmt(item.principalBalance)}</td>
-                  <td className="px-4 py-3 text-gray-700">{item.stdInterestRate ?? "—"}%</td>
-                  <td className="px-4 py-3 text-gray-500">{item.intCalcMethod}</td>
-                  <td className="px-4 py-3 font-bold text-blue-700">₹{Math.round(item.stdInterest).toLocaleString("en-IN")}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr className="bg-blue-50 border-t-2 border-blue-200">
-                  <td colSpan={6} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total</td>
-                  <td className="px-4 py-3 font-extrabold text-blue-800">₹{Math.round(item.stdInterest).toLocaleString("en-IN")}</td>
-                </tr>
-              </tfoot>
-            </table>
-          ) : item.calcBreakdown && item.calcBreakdown.length > 0 ? (
-            // Day-weighted breakdown (Balance / WO-schedule-fallback method)
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-gradient-to-r from-blue-600 to-indigo-500">
-                  {["From Date", "To Date", "Days", "Balance", "Rate", "Interest"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {item.calcBreakdown.map((seg: InterestCalcSegmentDTO, i: number) => (
-                  <tr key={i} className={`border-b border-gray-100 hover:bg-amber-50/40 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"}`}>
-                    <td className="px-4 py-3 text-gray-600">{fmtDate(new Date(seg.fromDate))}</td>
-                    <td className="px-4 py-3 text-gray-600">{fmtDate(new Date(seg.toDate))}</td>
-                    <td className="px-4 py-3 font-semibold text-gray-700">{seg.days}</td>
-                    <td className="px-4 py-3 text-gray-700">{fmtAmt(seg.balance)}</td>
-                    <td className="px-4 py-3 text-gray-700">{seg.rate}%</td>
-                    <td className="px-4 py-3 font-bold text-amber-700">{fmtAmt(seg.interest)}</td>
-                  </tr>
-                ))}
-                {item.stdRecoverable > 0 && (
-                  <tr className="bg-purple-50/30 border-b border-gray-100">
-                    <td colSpan={5} className="px-4 py-3 text-xs font-semibold text-purple-700">Recoverable (posted, not yet collected)</td>
-                    <td className="px-4 py-3 font-bold text-purple-700">{fmtAmt(item.stdRecoverable)}</td>
-                  </tr>
-                )}
-              </tbody>
-              <tfoot>
-                <tr className="bg-blue-50 border-t-2 border-blue-200">
-                  <td colSpan={5} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total Postable</td>
-                  <td className="px-4 py-3 font-extrabold text-blue-800">{fmtAmt(item.totalPostable)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-gradient-to-r from-blue-600 to-indigo-500">
-                  {["Type", "From Date", "To Date", "Principal", "Rate", "Method", "Amount"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {item.stdInterest > 0 && (
-                  <tr className="bg-white border-b border-gray-100 hover:bg-amber-50/40">
-                    <td className="px-4 py-3 font-semibold text-amber-700">Standard</td>
-                    <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
-                    <td className="px-4 py-3 text-gray-600">{fmtDate(toDate)}</td>
-                    <td className="px-4 py-3 text-gray-700">{fmtAmt(item.principalBalance)}</td>
-                    <td className="px-4 py-3 text-gray-700">{item.stdInterestRate ?? "—"}%</td>
-                    <td className="px-4 py-3 text-gray-500">{item.intCalcMethod}</td>
-                    <td className="px-4 py-3 font-bold text-amber-700">{fmtAmt(item.stdInterest)}</td>
-                  </tr>
-                )}
-                {item.penalInterest > 0 && item.penalBreakdown && item.penalBreakdown.length > 0 ? (
-                  <>
-                    <tr className="bg-rose-100/60 border-b border-rose-200">
-                      <td colSpan={7} className="px-4 py-2 text-xs font-bold text-rose-700 uppercase tracking-wider">
-                        Penal Interest — Overdue Kist Breakdown
-                      </td>
-                    </tr>
-                    <tr className="bg-rose-50/40 border-b border-gray-100">
-                      {["Kist No.", "Due Date", "Principal", "Days Overdue", "Rate", "Method", "Penal Int."].map((h) => (
-                        <th key={h} className="px-4 py-2 text-left text-[10px] font-semibold text-rose-700 uppercase tracking-wider bg-rose-50">{h}</th>
+        {/* Tab bar */}
+        <div className="px-6 pb-0 flex-shrink-0 border-b border-gray-200">
+          <div className="flex gap-1">
+            {([["calc", "Calculation"], ["detail", "Period Detail"]] as const).map(([tab, label]) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-xs font-semibold rounded-t-lg transition-all cursor-pointer border-b-2 ${
+                  activeTab === tab
+                    ? "border-blue-600 text-blue-700 bg-blue-50"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        <div className="overflow-y-auto flex-1 mx-4 my-3 rounded-xl border border-gray-200 shadow-inner">
+          {/* ── Calculation tab ── */}
+          {activeTab === "calc" && (
+            <>
+              {item.noInterestReason && totalInterest === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-amber-600 gap-3">
+                  <AlertCircle className="w-10 h-10" />
+                  <p className="text-sm font-semibold text-center px-6">{item.noInterestReason}</p>
+                </div>
+              ) : isAddInBalance ? (
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-gradient-to-r from-blue-600 to-indigo-500">
+                      {["From Date", "To Date", "Days", "Principal", "Rate", "Method", "Interest"].map((h) => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
-                    {item.penalBreakdown.map((pb: PenalBreakdownItemDTO, i: number) => (
-                      <tr key={i} className={`border-b border-gray-100 hover:bg-rose-50/40 ${i % 2 === 0 ? "bg-white" : "bg-rose-50/20"}`}>
-                        <td className="px-4 py-2.5 font-semibold text-rose-700">#{pb.kistNumber}</td>
-                        <td className="px-4 py-2.5 text-gray-600">{fmtDate(new Date(pb.dueDate))}</td>
-                        <td className="px-4 py-2.5 text-gray-700">{fmtAmt(pb.principalAmount)}</td>
-                        <td className="px-4 py-2.5 font-semibold text-rose-600">{pb.daysOverdue} days</td>
-                        <td className="px-4 py-2.5 text-gray-700">{pb.overdueRate}%</td>
-                        <td className="px-4 py-2.5 text-gray-500 text-xs">P&times;R&times;D/365</td>
-                        <td className="px-4 py-2.5 font-bold text-rose-700">{fmtAmt(pb.penalInterest)}</td>
+                  </thead>
+                  <tbody>
+                    <tr className="bg-white border-b border-gray-100">
+                      <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
+                      <td className="px-4 py-3 text-gray-600">{fmtDate(toDate)}</td>
+                      <td className="px-4 py-3 font-semibold text-gray-700">{days ?? "—"}</td>
+                      <td className="px-4 py-3 text-gray-700">{fmtAmt(item.principalBalance)}</td>
+                      <td className="px-4 py-3 text-gray-700">{item.stdInterestRate ?? "—"}%</td>
+                      <td className="px-4 py-3 text-gray-500">{item.intCalcMethod}</td>
+                      <td className="px-4 py-3 font-bold text-blue-700">₹{Math.round(item.stdInterest).toLocaleString("en-IN")}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-blue-50 border-t-2 border-blue-200">
+                      <td colSpan={6} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total</td>
+                      <td className="px-4 py-3 font-extrabold text-blue-800">₹{Math.round(item.stdInterest).toLocaleString("en-IN")}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              ) : item.calcBreakdown && item.calcBreakdown.length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-gradient-to-r from-blue-600 to-indigo-500">
+                      {["From Date", "To Date", "Days", "Balance", "Rate", "Interest"].map((h) => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {item.calcBreakdown.map((seg: InterestCalcSegmentDTO, i: number) => (
+                      <tr key={i} className={`border-b border-gray-100 hover:bg-amber-50/40 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"}`}>
+                        <td className="px-4 py-3 text-gray-600">{fmtDate(new Date(seg.fromDate))}</td>
+                        <td className="px-4 py-3 text-gray-600">{fmtDate(new Date(seg.toDate))}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-700">{seg.days}</td>
+                        <td className="px-4 py-3 text-gray-700">{fmtAmt(seg.balance)}</td>
+                        <td className="px-4 py-3 text-gray-700">{seg.rate}%</td>
+                        <td className="px-4 py-3 font-bold text-amber-700">{fmtAmt(seg.interest)}</td>
                       </tr>
                     ))}
-                  </>
-                ) : item.penalInterest > 0 ? (
-                  <tr className="bg-rose-50/30 border-b border-gray-100 hover:bg-rose-50/60">
-                    <td className="px-4 py-3 font-semibold text-rose-700">Penal</td>
-                    <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
-                    <td className="px-4 py-3 text-gray-600">{fmtDate(toDate)}</td>
-                    <td className="px-4 py-3 text-gray-700">{fmtAmt(item.principalBalance)}</td>
-                    <td className="px-4 py-3 text-gray-700">{item.overdueInterestRate ?? "—"}%</td>
-                    <td className="px-4 py-3 text-gray-500">—</td>
-                    <td className="px-4 py-3 font-bold text-rose-700">{fmtAmt(item.penalInterest)}</td>
-                  </tr>
-                ) : null}
-                {item.stdRecoverable > 0 && (
-                  <tr className="bg-purple-50/30 border-b border-gray-100">
-                    <td className="px-4 py-3 font-semibold text-purple-700">Recoverable</td>
-                    <td colSpan={5} className="px-4 py-3 text-xs text-gray-400 italic">Previously accrued std interest not yet recovered</td>
-                    <td className="px-4 py-3 font-bold text-purple-700">{fmtAmt(item.stdRecoverable)}</td>
-                  </tr>
-                )}
-                {item.stdInterest === 0 && item.penalInterest === 0 && item.stdRecoverable === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">No interest components to display.</td>
-                  </tr>
-                )}
-              </tbody>
-              <tfoot>
-                <tr className="bg-blue-50 border-t-2 border-blue-200">
-                  <td colSpan={6} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total Postable</td>
-                  <td className="px-4 py-3 font-extrabold text-blue-800">{fmtAmt(item.totalPostable)}</td>
-                </tr>
-              </tfoot>
-            </table>
+                    {item.stdRecoverable > 0 && (
+                      <tr className="bg-purple-50/30 border-b border-gray-100">
+                        <td colSpan={5} className="px-4 py-3 text-xs font-semibold text-purple-700">Recoverable (posted, not yet collected)</td>
+                        <td className="px-4 py-3 font-bold text-purple-700">{fmtAmt(item.stdRecoverable)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-blue-50 border-t-2 border-blue-200">
+                      <td colSpan={5} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total Postable</td>
+                      <td className="px-4 py-3 font-extrabold text-blue-800">{fmtAmt(item.totalPostable)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-gradient-to-r from-blue-600 to-indigo-500">
+                      {["Type", "From Date", "To Date", "Principal", "Rate", "Method", "Amount"].map((h) => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {item.stdInterest > 0 && (
+                      <tr className="bg-white border-b border-gray-100 hover:bg-amber-50/40">
+                        <td className="px-4 py-3 font-semibold text-amber-700">Standard</td>
+                        <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
+                        <td className="px-4 py-3 text-gray-600">{fmtDate(toDate)}</td>
+                        <td className="px-4 py-3 text-gray-700">{fmtAmt(item.principalBalance)}</td>
+                        <td className="px-4 py-3 text-gray-700">{item.stdInterestRate ?? "—"}%</td>
+                        <td className="px-4 py-3 text-gray-500">{item.intCalcMethod}</td>
+                        <td className="px-4 py-3 font-bold text-amber-700">{fmtAmt(item.stdInterest)}</td>
+                      </tr>
+                    )}
+                    {item.penalInterest > 0 && item.penalBreakdown && item.penalBreakdown.length > 0 ? (
+                      <>
+                        <tr className="bg-rose-100/60 border-b border-rose-200">
+                          <td colSpan={7} className="px-4 py-2 text-xs font-bold text-rose-700 uppercase tracking-wider">
+                            Penal Interest — Overdue Kist Breakdown
+                          </td>
+                        </tr>
+                        <tr className="bg-rose-50/40 border-b border-gray-100">
+                          {["Kist No.", "Due Date", "Principal", "Days Overdue", "Rate", "Method", "Penal Int."].map((h) => (
+                            <th key={h} className="px-4 py-2 text-left text-[10px] font-semibold text-rose-700 uppercase tracking-wider bg-rose-50">{h}</th>
+                          ))}
+                        </tr>
+                        {item.penalBreakdown.map((pb: PenalBreakdownItemDTO, i: number) => (
+                          <tr key={i} className={`border-b border-gray-100 hover:bg-rose-50/40 ${i % 2 === 0 ? "bg-white" : "bg-rose-50/20"}`}>
+                            <td className="px-4 py-2.5 font-semibold text-rose-700">#{pb.kistNumber}</td>
+                            <td className="px-4 py-2.5 text-gray-600">{fmtDate(new Date(pb.dueDate))}</td>
+                            <td className="px-4 py-2.5 text-gray-700">{fmtAmt(pb.principalAmount)}</td>
+                            <td className="px-4 py-2.5 font-semibold text-rose-600">{pb.daysOverdue} days</td>
+                            <td className="px-4 py-2.5 text-gray-700">{pb.overdueRate}%</td>
+                            <td className="px-4 py-2.5 text-gray-500 text-xs">P&times;R&times;D/365</td>
+                            <td className="px-4 py-2.5 font-bold text-rose-700">{fmtAmt(pb.penalInterest)}</td>
+                          </tr>
+                        ))}
+                      </>
+                    ) : item.penalInterest > 0 ? (
+                      <tr className="bg-rose-50/30 border-b border-gray-100 hover:bg-rose-50/60">
+                        <td className="px-4 py-3 font-semibold text-rose-700">Penal</td>
+                        <td className="px-4 py-3 text-gray-600">{fmtDate(fromDate)}</td>
+                        <td className="px-4 py-3 text-gray-600">{fmtDate(toDate)}</td>
+                        <td className="px-4 py-3 text-gray-700">{fmtAmt(item.overduePrincipal ?? 0)}</td>
+                        <td className="px-4 py-3 text-gray-700">{item.overdueInterestRate ?? "—"}%</td>
+                        <td className="px-4 py-3 text-gray-500">—</td>
+                        <td className="px-4 py-3 font-bold text-rose-700">{fmtAmt(item.penalInterest)}</td>
+                      </tr>
+                    ) : null}
+                    {item.stdRecoverable > 0 && (
+                      <tr className="bg-purple-50/30 border-b border-gray-100">
+                        <td className="px-4 py-3 font-semibold text-purple-700">Recoverable</td>
+                        <td colSpan={5} className="px-4 py-3 text-xs text-gray-400 italic">Previously accrued std interest not yet recovered</td>
+                        <td className="px-4 py-3 font-bold text-purple-700">{fmtAmt(item.stdRecoverable)}</td>
+                      </tr>
+                    )}
+                    {item.stdInterest === 0 && item.penalInterest === 0 && item.stdRecoverable === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">No interest components to display.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-blue-50 border-t-2 border-blue-200">
+                      <td colSpan={6} className="px-4 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider">Total Postable</td>
+                      <td className="px-4 py-3 font-extrabold text-blue-800">{fmtAmt(item.totalPostable)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </>
+          )}
+
+          {/* ── Period Detail tab ── */}
+          {activeTab === "detail" && (
+            <>
+              {detailLoading ? (
+                <div className="flex items-center justify-center py-16 text-blue-600 gap-3">
+                  <svg className="animate-spin w-6 h-6" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  <span className="text-sm font-semibold">Loading period detail…</span>
+                </div>
+              ) : detailError ? (
+                <div className="flex flex-col items-center justify-center py-12 text-red-500 gap-3">
+                  <AlertCircle className="w-8 h-8" />
+                  <p className="text-sm font-semibold">{detailError}</p>
+                </div>
+              ) : !periodRows || periodRows.length === 0 ? (
+                <div className="flex items-center justify-center py-12 text-gray-400 text-sm">
+                  No period detail available for this account.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl">
+                  <table className="text-xs border-collapse w-full" style={{ minWidth: "1360px" }}>
+                    <thead className="sticky top-0 z-10">
+                      {/* Group header row */}
+                      <tr>
+                        <th colSpan={3} className="px-3 py-1.5 text-center text-[9px] font-bold text-slate-300 uppercase tracking-widest bg-slate-900 border-r-2 border-slate-600" />
+                        <th colSpan={2} className="px-3 py-1.5 text-center text-[9px] font-bold text-emerald-300 uppercase tracking-widest bg-slate-900 border-r-2 border-slate-600">
+                          Transactions
+                        </th>
+                        <th colSpan={3} className="px-3 py-1.5 text-center text-[9px] font-bold text-blue-300 uppercase tracking-widest bg-blue-900/70 border-r-2 border-blue-700">
+                          Standard Interest
+                        </th>
+                        <th colSpan={5} className="px-3 py-1.5 text-center text-[9px] font-bold text-rose-300 uppercase tracking-widest bg-rose-900/60 border-r-2 border-rose-700">
+                          Overdue / Penal
+                        </th>
+                        <th colSpan={2} className="px-3 py-1.5 text-center text-[9px] font-bold text-violet-300 uppercase tracking-widest bg-violet-900/60 border-r border-violet-700">
+                          Result
+                        </th>
+                        <th className="px-3 py-1.5 text-center text-[9px] font-bold text-purple-200 uppercase tracking-widest bg-purple-900/70" />
+                      </tr>
+                      {/* Column header row */}
+                      <tr>
+                        {/* Info */}
+                        {[
+                          { label: "Date",        cls: "text-left border-r border-slate-600 bg-slate-800" },
+                          { label: "Particulars",  cls: "text-left border-r border-slate-600 bg-slate-800" },
+                          { label: "Days",         cls: "text-right border-r-2 border-slate-600 bg-slate-800" },
+                          /* Transactions */
+                          { label: "Dr",           cls: "text-right border-r border-emerald-700/50 bg-slate-800/90" },
+                          { label: "Cr",           cls: "text-right border-r-2 border-slate-600 bg-slate-800/90" },
+                          /* Standard */
+                          { label: "STD Bal",      cls: "text-right border-r border-blue-700/50 bg-blue-950/80" },
+                          { label: "ROI",          cls: "text-right border-r border-blue-700/50 bg-blue-950/80" },
+                          { label: "STD Int",      cls: "text-right border-r-2 border-blue-700 bg-blue-950/80" },
+                          /* Overdue */
+                          { label: "ODD",          cls: "text-right border-r border-rose-800/50 bg-rose-950/70" },
+                          { label: "ODC",          cls: "text-right border-r border-rose-800/50 bg-rose-950/70" },
+                          { label: "ODB",          cls: "text-right border-r border-rose-800/50 bg-rose-950/70" },
+                          { label: "Balance",      cls: "text-right border-r border-rose-800/50 bg-rose-950/70" },
+                          { label: "OROI",         cls: "text-right border-r-2 border-rose-800 bg-rose-950/70" },
+                          /* Result */
+                          { label: "Ovr Int",      cls: "text-right border-r border-violet-800/50 bg-violet-950/70" },
+                          { label: "T Int",        cls: "text-right border-r border-violet-800/50 bg-violet-950/70" },
+                          { label: "Int Bal",      cls: "text-right bg-purple-950/80" },
+                        ].map(({ label, cls }) => (
+                          <th key={label} className={`px-2.5 py-2 text-[10px] font-bold text-slate-200 uppercase tracking-wide whitespace-nowrap ${cls}`}>
+                            {label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {periodRows.map((row, i) => {
+                        const isKistRow  = row.particulars.includes("Kist #");
+                        const isIpRow    = row.particulars.includes("Interest Posting");
+                        const isLrRow    = row.particulars.includes("Loan Recovery");
+                        const isLaRow    = row.particulars.includes("Loan Advancement");
+                        const hasOverdue = row.odc > 0;
+
+                        // Accent stripe color per row type
+                        const accentColor = isLaRow  ? "border-l-4 border-l-emerald-400"
+                          : isIpRow  ? "border-l-4 border-l-blue-400"
+                          : isLrRow  ? "border-l-4 border-l-amber-400"
+                          : isKistRow ? "border-l-4 border-l-rose-400"
+                          : "border-l-4 border-l-transparent";
+
+                        const baseBg = isLaRow   ? "bg-emerald-50/70 hover:bg-emerald-100/60"
+                          : isIpRow   ? "bg-blue-50/70 hover:bg-blue-100/60"
+                          : isLrRow   ? "bg-amber-50/70 hover:bg-amber-100/60"
+                          : isKistRow ? "bg-rose-50/50 hover:bg-rose-100/50"
+                          : i % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/80 hover:bg-slate-100/70";
+
+                        // shared cell classes
+                        const c  = "px-2.5 py-2 border-b border-gray-150 text-right whitespace-nowrap tabular-nums";
+                        const cL = "px-2.5 py-2 border-b border-gray-150 text-left whitespace-nowrap";
+                        const nil = <span className="text-slate-300 text-[10px]">–</span>;
+
+                        return (
+                          <tr key={i} className={`${baseBg} ${accentColor} transition-colors`}>
+                            {/* Info */}
+                            <td className={cL + " font-medium text-slate-600 text-[11px] border-r border-gray-200"}>{fmtDateStr(row.date)}</td>
+                            <td className={cL + " text-slate-700 font-medium border-r border-gray-200 max-w-[150px] truncate"} title={row.particulars}>{row.particulars}</td>
+                            <td className={c + " font-semibold text-slate-500 border-r-2 border-gray-300"}>{row.days > 0 ? row.days : nil}</td>
+                            {/* Transactions */}
+                            <td className={c + " text-emerald-700 font-semibold border-r border-gray-200"}>{row.dr > 0 ? fmtN(row.dr) : nil}</td>
+                            <td className={c + " text-amber-700 font-semibold border-r-2 border-gray-300"}>{row.cr > 0 ? fmtN(row.cr) : nil}</td>
+                            {/* Standard */}
+                            <td className={c + " text-slate-700 bg-blue-50/30 border-r border-blue-100"}>{fmtN(row.stdBal)}</td>
+                            <td className={c + " text-blue-600 bg-blue-50/30 border-r border-blue-100 font-medium"}>{row.roi > 0 ? `${row.roi}%` : nil}</td>
+                            <td className={c + " text-blue-700 font-bold bg-blue-50/30 border-r-2 border-blue-200"}>{row.stdInt > 0 ? fmtN(row.stdInt) : nil}</td>
+                            {/* Overdue */}
+                            <td className={c + " border-r border-rose-100 bg-rose-50/20 " + (hasOverdue ? "text-rose-600 font-semibold" : "")}>{row.odd > 0 ? row.odd : nil}</td>
+                            <td className={c + " border-r border-rose-100 bg-rose-50/20 " + (hasOverdue ? "text-rose-600 font-semibold" : "")}>{row.odc > 0 ? row.odc : nil}</td>
+                            <td className={c + " border-r border-rose-100 bg-rose-50/20 " + (hasOverdue ? "text-rose-600 font-semibold" : "")}>{row.odb > 0 ? fmtN(row.odb) : nil}</td>
+                            <td className={c + " border-r border-rose-100 bg-rose-50/20 text-slate-800 font-bold"}>{fmtN(row.balance)}</td>
+                            <td className={c + " border-r-2 border-rose-200 bg-rose-50/20 text-slate-500 font-medium"}>{row.oroi > 0 ? `${row.oroi}%` : nil}</td>
+                            {/* Result */}
+                            <td className={c + " border-r border-violet-100 bg-violet-50/20 text-rose-700 font-semibold"}>{row.ovrInt > 0 ? fmtN(row.ovrInt) : nil}</td>
+                            <td className={c + " border-r border-violet-100 bg-violet-50/20 text-indigo-700 font-bold"}>{row.tInt > 0 ? fmtN(row.tInt) : nil}</td>
+                            <td className={c + " bg-purple-50/30 text-purple-700 font-bold"}>{row.intBal > 0 ? fmtN(row.intBal) : nil}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="sticky bottom-0 z-10">
+                      <tr className="bg-gradient-to-r from-slate-800 via-slate-800 to-slate-900 text-white font-bold">
+                        <td colSpan={3} className="px-3 py-2.5 text-left border-r-2 border-slate-600">
+                          <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-300">Totals</span>
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right border-r border-slate-600 text-emerald-300 tabular-nums">
+                          {fmtN(periodRows.reduce((s, r) => s + r.dr, 0))}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right border-r-2 border-slate-600 text-amber-300 tabular-nums">
+                          {fmtN(periodRows.reduce((s, r) => s + r.cr, 0))}
+                        </td>
+                        <td colSpan={2} className="border-r-2 border-slate-600 bg-blue-900/30" />
+                        <td className="px-2.5 py-2.5 text-right border-r-2 border-slate-600 text-blue-300 tabular-nums">
+                          {fmtN(periodRows.reduce((s, r) => s + r.stdInt, 0))}
+                        </td>
+                        <td colSpan={5} className="border-r-2 border-slate-600 bg-rose-900/20" />
+                        <td className="px-2.5 py-2.5 text-right border-r border-slate-600 text-rose-300 tabular-nums">
+                          {fmtN(periodRows.reduce((s, r) => s + r.ovrInt, 0))}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right border-r border-slate-600 text-indigo-300 tabular-nums">
+                          {fmtN(periodRows.reduce((s, r) => s + r.tInt, 0))}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right text-purple-300 tabular-nums">
+                          {fmtN(periodRows[periodRows.length - 1].intBal)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        {/* Formula hint for AddInBalance (Balance/MinBalance method only) */}
-        {isAddInBalance && days !== null && item.stdInterestRate && item.intCalcMethod !== "Schedule" && (
-          <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700 font-mono">
+        {/* Formula hint (calc tab, AddInBalance, Balance/MinBalance method only) */}
+        {activeTab === "calc" && isAddInBalance && days !== null && item.stdInterestRate && item.intCalcMethod !== "Schedule" && (
+          <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700 font-mono flex-shrink-0">
             {fmtAmt(item.principalBalance)} × {item.stdInterestRate}% / 100 × {days} / 365 = ₹{Math.round(item.stdInterest).toLocaleString("en-IN")}
           </div>
         )}
 
         {/* Footer */}
-        <div className="px-6 pb-5 flex justify-center">
+        <div className="px-6 pb-4 flex justify-center flex-shrink-0">
           <button
             onClick={onClose}
             className="group flex items-center gap-2 px-8 py-2.5 rounded-xl font-semibold text-sm text-white

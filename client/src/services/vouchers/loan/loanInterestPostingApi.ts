@@ -89,6 +89,25 @@ export interface LoanInterestBatchPostResultDTO {
   errors: string[];
 }
 
+export interface LoanInterestPeriodDetailRowDTO {
+  date: string;
+  particulars: string;
+  days: number;
+  dr: number;
+  cr: number;
+  stdBal: number;
+  roi: number;
+  stdInt: number;
+  odd: number;
+  odc: number;
+  odb: number;
+  balance: number;
+  oroi: number;
+  ovrInt: number;
+  tInt: number;
+  intBal: number;
+}
+
 class LoanInterestPostingApiService extends ApiService {
   async searchAccounts(branchId: number, query: string, productId?: number): Promise<ApiResponse<LoanAccountSearchDTO[]>> {
     const base = `/LoanInterestPosting/search?branchId=${branchId}&query=${encodeURIComponent(query)}`;
@@ -124,6 +143,12 @@ class LoanInterestPostingApiService extends ApiService {
       body: JSON.stringify(dto),
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  async getInterestPeriodDetail(loanAccId: number, branchId: number, asOfDate?: string): Promise<ApiResponse<LoanInterestPeriodDetailRowDTO[]>> {
+    let url = `/LoanInterestPosting/period-detail/${loanAccId}?branchId=${branchId}`;
+    if (asOfDate) url += `&asOfDate=${asOfDate}`;
+    return this.makeRequest(url);
   }
 }
 
