@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -7,7 +7,7 @@ import Swal from "sweetalert2";
 import { FileText, FileSpreadsheet, Printer, Search } from "lucide-react";
 import loanIntCertApi, { LoanIntCert, LoanIntCertAccount, LoanIntCertProduct } from "../../services/reports/loanIntCertApi";
 import commonservice from "../../services/common/commonservice";
-import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
+import { exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
 import { getSessionFromDate } from "../../utils/sessionUtils";
 
 const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -219,6 +219,13 @@ const LoanIntCertPage: React.FC = () => {
     setTimeout(() => { win.print(); win.close(); }, 300);
   };
 
+  const handlePdf = () => {
+    if (!cert) return;
+    const win = window.open("", "_blank"); if (!win) return;
+    win.document.write(buildCertHTML(cert)); win.document.close(); win.focus();
+    setTimeout(() => win.print(), 300);
+  };
+
   const lbl = "block text-xs uppercase tracking-wide font-semibold text-slate-500 mb-1.5";
   const inp = "px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 shadow-sm";
 
@@ -264,7 +271,7 @@ const LoanIntCertPage: React.FC = () => {
               <button onClick={handleLoad} disabled={loading || !accountId}
                 className="flex items-center gap-1.5 px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-lg transition shadow-sm disabled:opacity-50">
                 {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search size={15} />}
-                {loading ? "Loading…" : "Show"}
+                {loading ? "Loadingâ€¦" : "Show"}
               </button>
               {cert && (
                 <>
@@ -272,7 +279,7 @@ const LoanIntCertPage: React.FC = () => {
                     className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition shadow-sm">
                     <Printer size={15} /> Print
                   </button>
-                  <button onClick={() => exportToPdf(buildExportConfig(cert))}
+                  <button onClick={handlePdf}
                     className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition shadow-sm">
                     <FileText size={15} /> PDF
                   </button>

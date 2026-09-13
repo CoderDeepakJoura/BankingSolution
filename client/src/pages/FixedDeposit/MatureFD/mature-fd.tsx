@@ -122,7 +122,7 @@ interface RenewValidationErrors {
 const MatureFDPage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
-  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
+  const sessionDate = user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [loading, setLoading] = useState(false);
   const [isRenewFD, setIsRenewFD] = useState(false);

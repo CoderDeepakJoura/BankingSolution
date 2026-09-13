@@ -107,7 +107,7 @@ namespace BankingPlatform.API.Service.Reports
                 .Where(x => x.BranchId == branchId
                     && (x.AccTypeId == fdType || x.AccTypeId == bankFdType)
                     && x.GeneralProductId == productId
-                    && !x.IsAccClosed)
+                    && x.IsAccClosed != true)
                 .OrderBy(x => x.AccSuffix)
                 .Select(x => new FDAccountItem
                 {

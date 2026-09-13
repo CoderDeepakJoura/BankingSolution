@@ -141,7 +141,7 @@ namespace BankingPlatform.API.Service.Reports
                     && a.AccTypeId == 1
                     && a.GeneralProductId.HasValue
                     && linkedProductIds.Contains(a.GeneralProductId.Value)
-                    && !a.IsAccClosed)
+                    && a.IsAccClosed != true)
                 .Select(a => new { a.ID, a.AccountNumber, a.AccountName, a.MemberId, a.GeneralProductId })
                 .ToListAsync();
 

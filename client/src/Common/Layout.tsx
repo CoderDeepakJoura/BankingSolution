@@ -18,6 +18,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import Header from "../components/HeaderLandingPage";
 import Footer from "../components/Footer";
 import ApiService from "../services/api";
+import { API_CONFIG } from "../constants/config";
 import superUserSettingsApi from "../services/superuser/superUserSettingsApi";
 import { useEffect } from "react";
 import WhatsNewModal from "../components/WhatsNewModal";
@@ -100,6 +101,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const showBankFD      = useSelector((state: RootState) => state.user.showBankFDModule);
   const showPayroll     = useSelector((state: RootState) => state.user.showPayrollModule);
   useBrowserNavigationControl(true);
+
+  // Heartbeat: update lastseen every 60 s so the server knows the session is still active
+  useEffect(() => {
+    const id = setInterval(() => { ApiService.heartbeat(); }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Best-effort logout signal when the browser tab / window is closed
+  useEffect(() => {
+    const handleUnload = () => {
+      navigator.sendBeacon(`${API_CONFIG.BASE_URL}/auth/logout-beacon`);
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       try {

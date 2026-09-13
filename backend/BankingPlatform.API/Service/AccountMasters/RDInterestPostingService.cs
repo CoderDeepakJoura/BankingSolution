@@ -98,7 +98,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 .Where(x => x.BranchId == branchId
                     && x.AccTypeId == (int)Enums.AccountTypes.RD
                     && x.GeneralProductId == productId
-                    && !x.IsAccClosed
+                    && x.IsAccClosed != true
                     && (filterAccountId == null || x.ID == filterAccountId))
                 .ToListAsync();
 

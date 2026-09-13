@@ -167,6 +167,14 @@ export class ApiService {
       body: JSON.stringify({ version })
     });
   }
+
+  async heartbeat(): Promise<void> {
+    try {
+      await this.makeRequest('/auth/heartbeat', { method: 'POST' });
+    } catch {
+      // heartbeat failure is non-fatal
+    }
+  }
 }
 
 

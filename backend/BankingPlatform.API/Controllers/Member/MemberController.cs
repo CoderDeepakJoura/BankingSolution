@@ -78,11 +78,11 @@ namespace BankingPlatform.API.Controllers.Member
             }
             catch (Exception ex)
             {
-                await _commonfunctions.LogErrors(ex, nameof(GetAllMembers), "GeneralAccMasterController");
+                await _commonfunctions.LogErrors(ex, nameof(GetAllMembers), "MemberController");
                 return BadRequest(new ResponseDto
                 {
                     Success = false,
-                    Message = "An error occurred while fetching General Accounts. Please try again later."
+                    Message = "An error occurred while fetching Members. Please try again later."
                 });
             }
         }

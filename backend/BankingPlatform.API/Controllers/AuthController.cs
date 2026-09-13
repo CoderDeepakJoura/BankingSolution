@@ -3,6 +3,7 @@ using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.Controllers.Member;
 using BankingPlatform.API.Controllers.ProductMasters;
 using BankingPlatform.API.DTO.WorkingDate;
+using BankingPlatform.API.Service.AuditLog;
 using BankingPlatform.Common.Common.CommonClasses;
 using BankingPlatform.Infrastructure.Models;
 using BankingPlatform.Infrastructure.Models.Auth;
@@ -52,6 +53,7 @@ namespace BankingPlatform.API.Controllers
         private readonly JwtSettings _jwtSettings;
         private readonly CommonFunctions _commonFns;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IAuditService _auditService;
         private CommonClass _commonClass;
         private ScriptPath _scriptPath;
 
@@ -63,7 +65,8 @@ namespace BankingPlatform.API.Controllers
             CommonFunctions commonFunctions,
             CommonClass commonClass,
             IHttpContextAccessor httpContextAccessor,
-            IOptions<ScriptPath> scriptPath)
+            IOptions<ScriptPath> scriptPath,
+            IAuditService auditService)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _jwtTokenService = jwtTokenService ?? throw new ArgumentNullException(nameof(jwtTokenService));
@@ -73,6 +76,7 @@ namespace BankingPlatform.API.Controllers
             _commonClass = commonClass ?? throw new ArgumentNullException(nameof(_commonClass));
             _httpContextAccessor = httpContextAccessor;
             _scriptPath = scriptPath.Value;
+            _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
         }
 
         [HttpPost("login")]
@@ -163,6 +167,13 @@ namespace BankingPlatform.API.Controllers
                 _logger.LogInformation("Successful login for user: {Username}, branch: {BranchCode}",
                     loginDto.Username, loginDto.BranchCode);
 
+                await _auditService.LogLoginAsync(
+                    user.id,
+                    branchInfo.id,
+                    user.username,
+                    HttpContext.Connection.RemoteIpAddress?.ToString(),
+                    Request.Headers.UserAgent.ToString());
+
                 // Return response with optional token
                 return Ok(new ResponseDto
                 {
@@ -189,6 +200,10 @@ namespace BankingPlatform.API.Controllers
         {
             try
             {
+                // Capture user identity from JWT before cookies are cleared
+                GetClaims(out _, out _, out _, out int brLogout, out _, out _, out _, out _,
+                    out string uidLogout, out _, out _, out _, out _, out _, out _, out _);
+
                 // Revoke refresh token in DB
                 var rawRefreshToken = Request.Cookies["RefreshToken"];
                 if (!string.IsNullOrEmpty(rawRefreshToken))
@@ -205,6 +220,9 @@ namespace BankingPlatform.API.Controllers
                         HttpOnly = true, Secure = true, SameSite = SameSiteMode.None, Path = "/api/auth"
                     });
                 }
+
+                if (int.TryParse(uidLogout, out int parsedUidLogout))
+                    await _auditService.LogLogoutAsync(parsedUidLogout, brLogout, "manual");
 
                 if (Request.Cookies.ContainsKey("AuthToken"))
                 {
@@ -305,7 +323,11 @@ namespace BankingPlatform.API.Controllers
                     scope.Complete();
                 }
 
-
+                await _auditService.LogActionAsync(
+                    AuditActionType.Login,
+                    "Auth",
+                    "Working Date Selection",
+                    description: $"Working date set to {workingDateDTO.WorkingDate}, session {workingDateDTO.sessionInfo}");
 
                 // Return response with optional token
                 return Ok(new ResponseDto
@@ -678,6 +700,43 @@ namespace BankingPlatform.API.Controllers
                 stored.IsRevoked = true;
                 await _context.SaveChangesAsync();
             }
+        }
+
+        [Authorize]
+        [HttpPost("heartbeat")]
+        public async Task<IActionResult> Heartbeat()
+        {
+            GetClaims(out _, out _, out _, out int branchId, out _, out _, out _, out _,
+                out string userId, out _, out _, out _, out _, out _, out _, out _);
+            if (int.TryParse(userId, out int parsedUserId))
+                await _auditService.UpdateHeartbeatAsync(parsedUserId, branchId);
+            return Ok();
+        }
+
+        [HttpPost("logout-beacon")]
+        public async Task<IActionResult> LogoutBeacon()
+        {
+            try
+            {
+                var rawToken = Request.Cookies["RefreshToken"];
+                if (string.IsNullOrEmpty(rawToken))
+                    return Ok();
+
+                var stored = await _context.refreshtoken
+                    .FirstOrDefaultAsync(r => r.Token == rawToken && !r.IsRevoked);
+                if (stored == null)
+                    return Ok();
+
+                stored.IsRevoked = true;
+                await _context.SaveChangesAsync();
+
+                await _auditService.LogLogoutAsync(stored.UserId, stored.BranchId, "beacon");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Beacon logout processing failed");
+            }
+            return Ok();
         }
 
         private void GetClaims(out string userName, out string branchName, out string branchCode, out int branchId, out string societyName, out string contact, out string address, out string email, out string userId, out string workingDate, out string sessionInfo, out int sessionId, out bool isFirstSession, out bool isSu, out string sessionFromDate, out string sessionToDate)

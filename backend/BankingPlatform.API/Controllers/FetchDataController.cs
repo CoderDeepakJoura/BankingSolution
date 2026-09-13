@@ -252,22 +252,40 @@ namespace BankingPlatform.API.Controllers
         {
 
             var locationInfo = await (from village in _context.village.AsNoTracking()
-                                      join zone in _context.zone.AsNoTracking() on new { zoneId = village.zoneid, branchId = village.branchid }
-                                      equals new { zoneId = zone.id, branchId = zone.branchid }
-                                      join thana in _context.thana.AsNoTracking()
+                                      join zoneJoin in _context.zone.AsNoTracking() on new { zoneId = village.zoneid, branchId = village.branchid }
+                                      equals new { zoneId = zoneJoin.id, branchId = zoneJoin.branchid } into zoneGroup
+                                      from zone in zoneGroup.DefaultIfEmpty()
+                                      join thanaJoin in _context.thana.AsNoTracking()
                                       on new { thanaId = village.thanaid, branchId = village.branchid }
-                                      equals new { thanaId = thana.id, branchId = thana.branchid }
-                                      join postOffice in _context.postoffice.AsNoTracking()
+                                      equals new { thanaId = thanaJoin.id, branchId = thanaJoin.branchid } into thanaGroup
+                                      from thana in thanaGroup.DefaultIfEmpty()
+                                      join postOfficeJoin in _context.postoffice.AsNoTracking()
                                       on new { postOfficeId = village.postofficeid, branchId = village.branchid }
-                                      equals new { postOfficeId = postOffice.id, branchId = postOffice.branchid }
-                                      join tehsil in _context.tehsil.AsNoTracking()
+                                      equals new { postOfficeId = postOfficeJoin.id, branchId = postOfficeJoin.branchid } into poGroup
+                                      from postOffice in poGroup.DefaultIfEmpty()
+                                      join tehsilJoin in _context.tehsil.AsNoTracking()
                                       on new { tehsilId = village.tehsilid, branchId = village.branchid }
-                                      equals new { tehsilId = tehsil.id, branchId = tehsil.branchid }
-                                      join patwar in _context.patwar.AsNoTracking()
+                                      equals new { tehsilId = tehsilJoin.id, branchId = tehsilJoin.branchid } into tehsilGroup
+                                      from tehsil in tehsilGroup.DefaultIfEmpty()
+                                      join patwarJoin in _context.patwar.AsNoTracking()
                                       on new { patwarId = village.patwarId, branchId = village.branchid }
-                                      equals new { patwarId = patwar.id, branchId = patwar.branchid }
+                                      equals new { patwarId = patwarJoin.id, branchId = patwarJoin.branchid } into patwarGroup
+                                      from patwar in patwarGroup.DefaultIfEmpty()
                                       where village.branchid == branchid && village.id == villageId
-                                      select new { zoneName = zone.zonename, thanaName = thana.thananame, postOfficeName = postOffice.postofficename, tehsilName = tehsil.tehsilname, zoneId = zone.id, thanaId = thana.id, postofficeId = postOffice.id, tehsilId = tehsil.id, pinCode = village.pincode, patwar = patwar.description ?? "", patwarId = patwar.id }
+                                      select new
+                                      {
+                                          zoneName     = zone     != null ? zone.zonename         : "",
+                                          thanaName    = thana    != null ? thana.thananame        : "",
+                                          postOfficeName = postOffice != null ? postOffice.postofficename : "",
+                                          tehsilName   = tehsil   != null ? tehsil.tehsilname     : "",
+                                          zoneId       = zone     != null ? zone.id     : 0,
+                                          thanaId      = thana    != null ? thana.id    : 0,
+                                          postofficeId = postOffice != null ? postOffice.id : 0,
+                                          tehsilId     = tehsil   != null ? tehsil.id   : 0,
+                                          pinCode      = village.pincode,
+                                          patwar       = patwar   != null ? (patwar.description ?? "") : "",
+                                          patwarId     = patwar   != null ? patwar.id   : 0
+                                      }
                                ).FirstOrDefaultAsync();
             if (locationInfo == null)
                 return NotFound(new ResponseDto
@@ -548,10 +566,11 @@ namespace BankingPlatform.API.Controllers
             var memberInfo = await (from p in _context.accountmaster.AsNoTracking()
                               join q in _context.member.AsNoTracking() on new { memberId = (int)p.MemberId!, memberBranchId = (int)p.MemberBranchID! }
                               equals new { memberId = q.Id, memberBranchId = q.BranchId }
-                              join k in _context.memberlocationdetails on new { memberId = q.Id , memberBranchId = q.BranchId }
-                              equals new { memberId = k.MemberId, memberBranchId = k.BranchId }
+                              join kJoin in _context.memberlocationdetails on new { memberId = q.Id , memberBranchId = q.BranchId }
+                              equals new { memberId = kJoin.MemberId, memberBranchId = kJoin.BranchId } into locGroup
+                              from k in locGroup.DefaultIfEmpty()
                               where p.BranchId == branchId && p.AccountNumber == accountNo
-                              select new { memberName = q.MemberName, relativeName = q.RelativeName, gender = q.Gender, addressLine1 =  k.AddressLine1, dateOfBirth = q.DOB, phoneNo = q.PhoneNo1, emailId = q.Email1, memberId = q.Id, memberBranchId = q.BranchId }).FirstOrDefaultAsync();
+                              select new { memberName = q.MemberName, relativeName = q.RelativeName, gender = q.Gender, addressLine1 = k != null ? k.AddressLine1 : "", dateOfBirth = q.DOB, phoneNo = q.PhoneNo1, emailId = q.Email1, memberId = q.Id, memberBranchId = q.BranchId }).FirstOrDefaultAsync();
             return Ok(new
             {
                 Success = true,
@@ -564,11 +583,12 @@ namespace BankingPlatform.API.Controllers
         public async Task<IActionResult> getMemberInfoFromMembershipNo([FromRoute] string memberShipNo, int branchId, int memberType)
         {
             var memberInfo = await (from q in _context.member.AsNoTracking()
-                              join k in _context.memberlocationdetails on new { memberId = q.Id, memberBranchId = q.BranchId }
-                              equals new { memberId = k.MemberId, memberBranchId = k.BranchId }
+                              join kJoin in _context.memberlocationdetails on new { memberId = q.Id, memberBranchId = q.BranchId }
+                              equals new { memberId = kJoin.MemberId, memberBranchId = kJoin.BranchId } into locGroup
+                              from k in locGroup.DefaultIfEmpty()
                               where q.BranchId == branchId && q.MemberType == memberType
                               && (q.NominalMembershipNo == memberShipNo || q.PermanentMembershipNo == memberShipNo)
-                              select new { memberName = q.MemberName, relativeName = q.RelativeName, gender = q.Gender, addressLine1 = k.AddressLine1, dateOfBirth = q.DOB, phoneNo = q.PhoneNo1, emailId = q.Email1, memberId = q.Id, memberBranchId = q.BranchId }).FirstOrDefaultAsync();
+                              select new { memberName = q.MemberName, relativeName = q.RelativeName, gender = q.Gender, addressLine1 = k != null ? k.AddressLine1 : "", dateOfBirth = q.DOB, phoneNo = q.PhoneNo1, emailId = q.Email1, memberId = q.Id, memberBranchId = q.BranchId }).FirstOrDefaultAsync();
             
             return Ok(new
             {
@@ -649,7 +669,7 @@ namespace BankingPlatform.API.Controllers
             if (branchId > 0 && productId > 0)
             {
                 var query = _context.accountmaster.AsNoTracking()
-                    .Where(x => x.BranchId == branchId && x.GeneralProductId == productId && x.AccTypeId == accountType && x.IsAccClosed == isClosed);
+                    .Where(x => x.BranchId == branchId && x.GeneralProductId == productId && x.AccTypeId == accountType && (isClosed ? x.IsAccClosed == true : x.IsAccClosed != true));
                 if (voucherDate.HasValue)
                     query = query.Where(x => x.AccOpeningDate.Date <= voucherDate.Value.Date);
 
@@ -690,12 +710,18 @@ namespace BankingPlatform.API.Controllers
                                             join k in _context.member.AsNoTracking()
                                                 on new { memberId = (int)p.MemberId!, memberBranchId = (int)p.MemberBranchID! }
                                                 equals new { memberId = k.Id, memberBranchId = k.BranchId }
-                                            join l in _context.savingproductrules.AsNoTracking()
+                                            // LEFT JOIN — product rules may not be configured yet
+                                            join lJoin in _context.savingproductrules.AsNoTracking()
                                                 on new { productId = q.Id, branchId = q.BranchId }
-                                                equals new { productId = l.SavingsProductId, branchId = l.BranchId }
-                                            join m in _context.memberlocationdetails.AsNoTracking()
+                                                equals new { productId = lJoin.SavingsProductId, branchId = lJoin.BranchId }
+                                                into prodRulesGroup
+                                            from l in prodRulesGroup.DefaultIfEmpty()
+                                            // LEFT JOIN — members may not have a location detail row yet
+                                            join mJoin in _context.memberlocationdetails.AsNoTracking()
                                                 on new { memberId = k.Id, memberBranchId = k.BranchId }
-                                                equals new { memberId = m.MemberId, memberBranchId = m.BranchId }
+                                                equals new { memberId = mJoin.MemberId, memberBranchId = mJoin.BranchId }
+                                                into memberLocGroup
+                                            from m in memberLocGroup.DefaultIfEmpty()
                                             // LEFT JOIN for member doc details (optional)
                                             join hJoin in _context.memberdocdetails.AsNoTracking()
                                                 on new { memberId = k.Id, memberBranchId = k.BranchId }
@@ -717,7 +743,7 @@ namespace BankingPlatform.API.Controllers
                                             where p.BranchId == branchId
                                                 && p.ID == accountId
                                                 && p.AccTypeId == accountType
-                                                && p.IsAccClosed == isClosed
+                                                && (isClosed ? p.IsAccClosed == true : p.IsAccClosed != true)
                                             select new
                                             {
                                                 MemberName = k.MemberName,
@@ -726,8 +752,8 @@ namespace BankingPlatform.API.Controllers
                                                     ? k.PermanentMembershipNo
                                                     : k.NominalMembershipNo,
                                                 AccountOpeningDate = p.AccOpeningDate.ToString("dd-MMM-yyyy"),
-                                                MinimumBalanceRequired = l.MinBalanceAmt,
-                                                Address = m.AddressLine1 ?? "",
+                                                MinimumBalanceRequired = l != null ? l.MinBalanceAmt : 0,
+                                                Address = m != null ? (m.AddressLine1 ?? "") : "",
                                                 ContactNo = k.PhoneNo1,
                                                 EmailId = k.Email1,
                                                 AadhaarNo = h != null ? h.AadhaarCardNo : "",
@@ -757,16 +783,22 @@ namespace BankingPlatform.API.Controllers
                                             join k in _context.member.AsNoTracking()
                                                 on new { memberId = (int)p.MemberId!, memberBranchId = (int)p.MemberBranchID! }
                                                 equals new { memberId = k.Id, memberBranchId = k.BranchId }
-                                            join h in _context.memberdocdetails.AsNoTracking()
+                                            // LEFT JOIN — members may not have doc details yet
+                                            join hJoin in _context.memberdocdetails.AsNoTracking()
                                                 on new { memberId = k.Id, memberBranchId = k.BranchId }
-                                                equals new { memberId = h.MemberId, memberBranchId = h.BranchId }
-                                            join m in _context.memberlocationdetails.AsNoTracking()
+                                                equals new { memberId = hJoin.MemberId, memberBranchId = hJoin.BranchId }
+                                                into memberDocGroup
+                                            from h in memberDocGroup.DefaultIfEmpty()
+                                            // LEFT JOIN — members may not have location details yet
+                                            join mJoin in _context.memberlocationdetails.AsNoTracking()
                                                 on new { memberId = k.Id, memberBranchId = k.BranchId }
-                                                equals new { memberId = m.MemberId, memberBranchId = m.BranchId }
+                                                equals new { memberId = mJoin.MemberId, memberBranchId = mJoin.BranchId }
+                                                into memberLocGroup
+                                            from m in memberLocGroup.DefaultIfEmpty()
                                             join n in _context.rdaccountdetail.AsNoTracking()
                                                 on new { accountId = p.ID, branchId = p.BranchId }
                                                 equals new { accountId = (int)n.AccId, branchId = n.BrId }
-                                                // LEFT JOIN for nominee details
+                                            // LEFT JOIN for nominee details
                                             join f in _context.membernomineedetails.AsNoTracking()
                                                 on new { memberId = k.Id, memberBranchId = k.BranchId }
                                                 equals new { memberId = f.MemberId, memberBranchId = f.BranchId }
@@ -775,7 +807,7 @@ namespace BankingPlatform.API.Controllers
                                             where p.BranchId == branchId
                                                 && p.ID == accountId
                                                 && p.AccTypeId == accountType
-                                                && p.IsAccClosed == isClosed
+                                                && (isClosed ? p.IsAccClosed == true : p.IsAccClosed != true)
                                             select new
                                             {
                                                 MemberName = k.MemberName,
@@ -784,19 +816,19 @@ namespace BankingPlatform.API.Controllers
                                                     ? k.PermanentMembershipNo
                                                     : k.NominalMembershipNo,
                                                 AccountOpeningDate = p.AccOpeningDate.ToString("dd-MMM-yyyy"),
-                                                Address = m.AddressLine1,
+                                                Address = m != null ? m.AddressLine1 : "",
                                                 ContactNo = k.PhoneNo1,
                                                 EmailId = k.Email1,
-                                                AadhaarNo = h.AadhaarCardNo,
-                                                PANCardNo = h.PanCardNo,
+                                                AadhaarNo = h != null ? h.AadhaarCardNo : "",
+                                                PANCardNo = h != null ? h.PanCardNo : "",
                                                 nomineeDetails = nominee != null ? new
                                                 {
                                                     NomineeName = nominee.NomineeName,
                                                 } : null,
                                                 MemberId = k.Id,
                                                 MemberBrId = k.BranchId,
-                                                AccountPicExt = h.MemberPicExt,
-                                                AccountSignExt = h.MemberSignExt,
+                                                AccountPicExt = h != null ? h.MemberPicExt : "",
+                                                AccountSignExt = h != null ? h.MemberSignExt : "",
                                                 rdDetails = new RDAccountDetailDTO
                                                 {
                                                     RdNumber = n.RdNumber,
@@ -1000,7 +1032,7 @@ namespace BankingPlatform.API.Controllers
             var accountsData = await _context.accountmaster
                 .Where(x=> x.MemberBranchID == memberBranchId && x.MemberId == memberId
                 && (x.AccTypeId == rdAccountType || x.AccTypeId == savingAccountType)
-                && x.IsAccClosed == false)
+                && x.IsAccClosed != true)
                 .Select(x => new
                 {
                     AccId = x.ID,
@@ -1085,7 +1117,7 @@ namespace BankingPlatform.API.Controllers
             var savingAccounts = await (from p in _context.accountmaster
                                     where p.AccTypeId == accountType
                                     && p.AccOpeningDate <= currentDate
-                                    && p.IsAccClosed == false
+                                    && p.IsAccClosed != true
                                     select new
                                     {
                                         AccId = p.ID,
@@ -1262,7 +1294,7 @@ namespace BankingPlatform.API.Controllers
                 join q in _context.rdaccountdetail.AsNoTracking()
                     on new { p.ID, p.BranchId } equals new { ID = (int)q.AccId!, BranchId = q.BrId }
                 where p.BranchId == branchId && p.GeneralProductId == rdProductId
-                    && p.AccTypeId == (int)Enums.AccountTypes.RD && q.Status == 1 && !p.IsAccClosed
+                    && p.AccTypeId == (int)Enums.AccountTypes.RD && q.Status == 1 && p.IsAccClosed != true
                     && (!voucherDate.HasValue || p.AccOpeningDate.Date <= voucherDate.Value.Date)
                 orderby p.AccSuffix
                 select new
@@ -1338,7 +1370,7 @@ namespace BankingPlatform.API.Controllers
                     on acc.ID equals det.AccountId
                 where acc.BranchId == branchId && acc.AccTypeId == accType
                    && det.BranchId == branchId && det.FDStatus == openStatus
-                   && (!acc.IsAccClosed || (acc.IsAccClosed && acc.ClosingDate > openingDate))
+                   && (acc.IsAccClosed != true || (acc.IsAccClosed == true && acc.ClosingDate > openingDate))
                    && acc.AccOpeningDate <= openingDate
                 orderby acc.AccSuffix
                 select new
@@ -1358,7 +1390,7 @@ namespace BankingPlatform.API.Controllers
             int accType = (int)Enums.AccountTypes.RD;
             var accounts = await _context.accountmaster.AsNoTracking()
                 .Where(x => x.BranchId == branchId && x.AccTypeId == accType
-                         && (!x.IsAccClosed || (x.IsAccClosed && x.ClosingDate > openingDate)) && x.AccOpeningDate <= openingDate)
+                         && (x.IsAccClosed != true || (x.IsAccClosed == true && x.ClosingDate > openingDate)) && x.AccOpeningDate <= openingDate)
                 .OrderBy(x => x.AccSuffix)
                 .Select(x => new { AccId = x.ID, AccountNumber = x.AccPrefix + "-" + x.AccSuffix, AccountName = x.AccountName })
                 .ToListAsync();
@@ -1414,17 +1446,19 @@ namespace BankingPlatform.API.Controllers
         {
             int accountType = (int)Enums.AccountTypes.Loan;
             var loanAccounts = await (from p in _context.accountmaster.AsNoTracking()
-                                      join q in _context.accountkistdetail.AsNoTracking()
+                                      join qJoin in _context.accountkistdetail.AsNoTracking()
                                       on new { accId = p.ID, branchId = p.BranchId }
-                                      equals new { accId = q.AccountId, branchId = q.BrId }
+                                      equals new { accId = qJoin.AccountId, branchId = qJoin.BrId }
+                                      into kistGroup
+                                      from q in kistGroup.DefaultIfEmpty()
                                       where p.BranchId == branchId && p.GeneralProductId == productId
-                                      && p.AccTypeId == accountType && p.IsAccClosed == false
+                                      && p.AccTypeId == accountType && p.IsAccClosed != true
                                       && p.AccOpeningDate <= currentDate
                                       select new
                                       {
                                           AccId = p.ID,
                                           AccountName = p.AccountNumber + "-" + p.AccountName,
-                                          LoanAmountPassed = q.LoanAmountPassed ?? 0
+                                          LoanAmountPassed = q != null ? (q.LoanAmountPassed ?? 0) : 0
                                       }).ToListAsync();
             return Ok(new { Success = true, data = loanAccounts });
         }
@@ -1436,7 +1470,7 @@ namespace BankingPlatform.API.Controllers
             int loanType = (int)Enums.AccountTypes.Loan;
             int shareMoneyType = (int)Enums.AccountTypes.ShareMoney;
             var accounts = await _context.accountmaster.AsNoTracking()
-                .Where(x => x.BranchId == branchId && x.AccTypeId == accountType && x.IsAccClosed == false)
+                .Where(x => x.BranchId == branchId && x.AccTypeId == accountType && x.IsAccClosed != true)
                 .Select(x => new
                 {
                     AccId = x.ID,

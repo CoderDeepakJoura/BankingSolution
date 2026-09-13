@@ -80,7 +80,7 @@ interface AccountOption {
 const PrePreMatureFDPage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
-  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
+  const sessionDate = user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : commonservice.getTodaysDate();
   const [loading, setLoading] = useState(false);
   const [isFetchingFD, setIsFetchingFD] = useState(false);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -109,7 +109,7 @@ const PrePreMatureFDPage: React.FC = () => {
     fdDetailId: 0,
     fdAccountId: 0,
     fdAccountNo: "",
-    date: user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate(),
+    date: user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : commonservice.getTodaysDate(),
     product: 0,
     preMaturityAmt: 0,
     postMaturityAmt: "0.00",

@@ -166,7 +166,7 @@ namespace BankingPlatform.API.Service.Vouchers
                 var accountIds = entries.Select(e => e.AccountId).Distinct().ToList();
 
                 var closedAccs = await _context.accountmaster.AsNoTracking()
-                    .Where(x => accountIds.Contains(x.ID) && x.IsAccClosed)
+                    .Where(x => accountIds.Contains(x.ID) && x.IsAccClosed == true)
                     .Select(x => x.AccountName)
                     .ToListAsync();
                 if (closedAccs.Any())
@@ -286,7 +286,7 @@ namespace BankingPlatform.API.Service.Vouchers
                     }
 
                     var fdAccounts = await _context.accountmaster
-                        .Where(x => fdAccountIds.Contains(x.ID) && x.IsAccClosed)
+                        .Where(x => fdAccountIds.Contains(x.ID) && x.IsAccClosed == true)
                         .ToListAsync();
                     foreach (var acc in fdAccounts)
                     {
@@ -344,7 +344,7 @@ namespace BankingPlatform.API.Service.Vouchers
                         rd.Status = (int)Enums.FDStatus.Open;
 
                     var rdAccounts = await _context.accountmaster
-                        .Where(x => rdAccountIds.Contains(x.ID) && x.IsAccClosed)
+                        .Where(x => rdAccountIds.Contains(x.ID) && x.IsAccClosed == true)
                         .ToListAsync();
                     foreach (var acc in rdAccounts)
                     {

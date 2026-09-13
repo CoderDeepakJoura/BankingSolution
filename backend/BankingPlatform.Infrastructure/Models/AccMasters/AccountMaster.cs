@@ -49,7 +49,7 @@ namespace BankingPlatform.Infrastructure.Models.AccMasters
         [Column(TypeName = "date")]
         public DateTime AccOpeningDate { get; set; }
 
-        public bool IsAccClosed { get; set; }
+        public bool? IsAccClosed { get; set; }
 
         [Column(TypeName = "date")]
         public DateTime? ClosingDate { get; set; }

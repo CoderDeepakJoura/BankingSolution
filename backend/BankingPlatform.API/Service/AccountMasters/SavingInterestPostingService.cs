@@ -83,7 +83,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 .Where(x => x.BranchId == branchId
                     && x.AccTypeId == (int)Enums.AccountTypes.Saving
                     && x.GeneralProductId == productId
-                    && !x.IsAccClosed
+                    && x.IsAccClosed != true
                     && x.AccOpeningDate <= toDate.Date)
                 .ToListAsync();
 

@@ -10,6 +10,8 @@ import rdKistVoucherApi, {
 import commonservice, {
   AccountInformation,
 } from "../../../services/common/commonservice";
+import rdLedgerApi, { RDLedger } from "../../../services/reports/rdLedgerApi";
+import { getSessionFromDate } from "../../../utils/sessionUtils";
 import {
   RDProduct,
   DebitAccount,
@@ -81,7 +83,7 @@ const RDKistVoucher: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
-  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
+  const sessionDate = user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, validateField, clearErrors, markFieldTouched } =
     useFormValidation();
 
@@ -105,6 +107,8 @@ const RDKistVoucher: React.FC = () => {
   const [pictureFile, setPictureFile] = useState<any>(null);
   const [signatureFile, setSignatureFile] = useState<any>(null);
   const [rdDetails, setRDDetails] = useState<any>(null);
+  const [ledgerData, setLedgerData] = useState<RDLedger | null>(null);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
 
   // RD Kist Voucher Data State
   const [voucherData, setVoucherData] = useState({
@@ -215,6 +219,20 @@ const RDKistVoucher: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!voucherData.accountId) {
+      setLedgerData(null);
+      return;
+    }
+    const fromDate = getSessionFromDate(user.sessionInfo, sessionDate);
+    const toDate = commonservice.parseWorkingDate(user.workingdate ?? sessionDate);
+    setLedgerLoading(true);
+    rdLedgerApi.getRDLedger(user.branchid, voucherData.accountId, fromDate, toDate)
+      .then(res => setLedgerData(res?.data ?? null))
+      .catch(() => setLedgerData(null))
+      .finally(() => setLedgerLoading(false));
+  }, [voucherData.accountId]);
+
+  useEffect(() => {
     const editVoucher = (location.state as any)?.editVoucher as VoucherPreview | undefined;
     if (!editVoucher) return;
 
@@ -274,15 +292,15 @@ const RDKistVoucher: React.FC = () => {
     if (isEditMode) return;
     const fetchData = async () => {
       try {
-        const [productsRes, debitAccountsRes, savingProductsRes] = await Promise.all([
+        const [productsResult, debitAccountsResult, savingProductsResult] = await Promise.allSettled([
           commonservice.fetch_rd_products(user.branchid, voucherData.voucherDate || undefined),
           commonservice.general_accmasters_info(user.branchid),
           commonservice.fetch_saving_products(user.branchid, voucherData.voucherDate || undefined),
         ]);
 
-        setRDProducts(productsRes.data || []);
-        setDebitAccounts(debitAccountsRes.data || []);
-        setSavingProducts(savingProductsRes.data || []);
+        if (productsResult.status === "fulfilled") setRDProducts(productsResult.value.data || []);
+        if (debitAccountsResult.status === "fulfilled") setDebitAccounts(debitAccountsResult.value.data || []);
+        if (savingProductsResult.status === "fulfilled") setSavingProducts(savingProductsResult.value.data || []);
       } catch (error) {
         console.error("Error loading data:", error);
       }
@@ -565,6 +583,7 @@ const RDKistVoucher: React.FC = () => {
     setSavingAccounts([]);
     setRDDetails(null);
     setSavingAccBalance(null);
+    setLedgerData(null);
     setActiveTab("account-info");
     clearErrors();
     setPictureFile(null);
@@ -1473,20 +1492,104 @@ const RDKistVoucher: React.FC = () => {
     </div>
   );
 
-  const renderAccountLedger = () => (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <FileText className="w-5 h-5 text-emerald-600" />
-        <h3 className="text-lg font-semibold text-gray-800">
-          Account Ledger View
-        </h3>
+  const renderAccountLedger = () => {
+    const fmt = (n: number) =>
+      n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtBal = (n: number) =>
+      `${fmt(Math.abs(n))} ${n >= 0 ? "Cr" : "Dr"}`;
+    const fmtDate = (s: string) => {
+      if (!s) return "";
+      const d = new Date(s);
+      return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <FileText className="w-5 h-5 text-emerald-600" />
+          <h3 className="text-lg font-semibold text-gray-800">Account Ledger View</h3>
+        </div>
+
+        {!voucherData.accountId ? (
+          <div className="text-center py-12 text-gray-500">
+            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm">Select an account to view the ledger</p>
+          </div>
+        ) : ledgerLoading ? (
+          <div className="text-center py-12 text-gray-500">
+            <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm">Loading ledger...</p>
+          </div>
+        ) : !ledgerData ? (
+          <div className="text-center py-12 text-gray-500">
+            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm">No ledger data found for this account</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto overflow-y-auto max-h-[480px] rounded-lg border border-gray-200 shadow-sm">
+            <div className="bg-emerald-50 px-4 py-2 text-sm text-emerald-800 flex flex-wrap gap-x-6 gap-y-1 border-b border-emerald-100">
+              <span><span className="font-medium">Account:</span> {ledgerData.accountName}</span>
+              <span><span className="font-medium">A/C No:</span> {ledgerData.accountIdentifier}</span>
+              <span><span className="font-medium">Product:</span> {ledgerData.productName}</span>
+              <span><span className="font-medium">Period:</span> {fmtDate(ledgerData.fromDate)} – {fmtDate(ledgerData.toDate)}</span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gradient-to-r from-slate-700 to-slate-800 text-white sticky top-0 z-10">
+                  <th className="px-3 py-2 text-center font-semibold w-10">S.No</th>
+                  <th className="px-3 py-2 text-center font-semibold whitespace-nowrap">Date</th>
+                  <th className="px-3 py-2 text-center font-semibold">V.No</th>
+                  <th className="px-3 py-2 text-left font-semibold">Particulars</th>
+                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Withdrawals (Dr)</th>
+                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Deposits (Cr)</th>
+                  <th className="px-3 py-2 text-right font-semibold">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="bg-amber-50">
+                  <td className="px-3 py-2 text-center text-amber-700" />
+                  <td className="px-3 py-2 text-center text-amber-700 whitespace-nowrap">{fmtDate(ledgerData.fromDate)}</td>
+                  <td className="px-3 py-2 text-center text-amber-700" />
+                  <td className="px-3 py-2 text-amber-700 font-medium">Opening Balance</td>
+                  <td className="px-3 py-2 text-right text-amber-700" />
+                  <td className="px-3 py-2 text-right text-amber-700" />
+                  <td className="px-3 py-2 text-right text-amber-800 font-semibold">{fmtBal(ledgerData.openingBalance)}</td>
+                </tr>
+                {ledgerData.entries.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                      No transactions found for the selected period.
+                    </td>
+                  </tr>
+                ) : ledgerData.entries.map((entry, i) => (
+                  <tr key={i} className={`hover:bg-emerald-50/50 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/70"}`}>
+                    <td className="px-3 py-2 text-center text-slate-500">{i + 1}</td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap text-slate-600">{fmtDate(entry.voucherDate)}</td>
+                    <td className="px-3 py-2 text-center text-slate-600">{entry.voucherNo}</td>
+                    <td className="px-3 py-2 text-slate-800">
+                      {entry.particulars}
+                      {entry.narration && <span className="text-slate-400"> — {entry.narration}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right text-red-700 font-medium">{entry.dr != null ? fmt(entry.dr) : ""}</td>
+                    <td className="px-3 py-2 text-right text-emerald-700 font-medium">{entry.cr != null ? fmt(entry.cr) : ""}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtBal(entry.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-100 border-t-2 border-slate-300">
+                  <td colSpan={4} className="px-3 py-2 text-right font-semibold text-slate-700">Total</td>
+                  <td className="px-3 py-2 text-right font-semibold text-red-700">{fmt(ledgerData.totalDr)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-emerald-700">{fmt(ledgerData.totalCr)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-800">{fmtBal(ledgerData.closingBalance)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
-      <div className="text-center py-12 text-gray-500">
-        <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-        <p className="text-sm">Ledger view content will appear here</p>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderPhotoSignature = () => (
     <div className="space-y-6">

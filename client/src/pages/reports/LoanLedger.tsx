@@ -11,10 +11,9 @@ import loanLedgerApi, {
   LoanAccountItem,
   LoanLedger,
 } from "../../services/reports/loanLedgerApi";
-import dayBookApi from "../../services/reports/dayBookApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
-import { getSessionFromDate } from "../../utils/sessionUtils";
+import { getSessionFromDate, getSessionToDate } from "../../utils/sessionUtils";
 
 const fmt = (n: number) =>
   n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -33,7 +32,6 @@ const localDate = (iso: string) => {
 const fmtDate = (iso: string) =>
   localDate(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 const fmtShort = (iso: string) => localDate(iso).toLocaleDateString("en-GB");
-const toInputDate = (iso: string) => isoDatePart(iso);
 
 const TH = ({ children, className = "" }: { children?: React.ReactNode; className?: string }) => (
   <th className={`bg-slate-800 text-white px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap sticky top-0 z-10 border-r border-slate-700 last:border-r-0 ${className}`}>
@@ -273,8 +271,8 @@ const LoanLedgerPage: React.FC = () => {
     ? commonservice.parseWorkingDate(user.workingdate)
     : new Date().toISOString().split("T")[0];
 
-  const [sessionMinDate, setSessionMinDate] = useState("");
-  const [sessionMaxDate, setSessionMaxDate] = useState(workingDate);
+  const sessionMinDate = getSessionFromDate(user.sessionInfo, workingDate);
+  const sessionMaxDate = getSessionToDate(user.sessionInfo, workingDate);
   const [products, setProducts] = useState<LoanProductItem[]>([]);
   const [accounts, setAccounts] = useState<LoanAccountItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<number | "">("");
@@ -288,15 +286,6 @@ const LoanLedgerPage: React.FC = () => {
 
   useEffect(() => {
     if (!user.branchid) return;
-    dayBookApi.getSessionDates(user.branchid).then((res) => {
-      if (res.success && res.data) {
-        const minD = toInputDate(res.data.fromDate);
-        const maxD = workingDate < toInputDate(res.data.toDate) ? workingDate : toInputDate(res.data.toDate);
-        setSessionMinDate(minD); setSessionMaxDate(maxD);
-        if (!tillDateOnly) setFromDate(minD);
-        setToDate(maxD);
-      }
-    }).catch(() => {});
     loanLedgerApi.getLoanProducts(user.branchid).then((res) => {
       if (res.success && res.data) setProducts(res.data);
     }).catch(() => {});
@@ -309,10 +298,6 @@ const LoanLedgerPage: React.FC = () => {
       if (res.success && res.data) { setAccounts(res.data); setSelectedAccount(""); }
     }).catch(() => {});
   }, [selectedProduct]);
-
-  useEffect(() => {
-    if (tillDateOnly && sessionMinDate) setFromDate(sessionMinDate);
-  }, [tillDateOnly, sessionMinDate]);
 
   const effectiveFromDate = tillDateOnly ? sessionMinDate || fromDate : fromDate;
 

@@ -42,26 +42,26 @@ namespace BankingPlatform.Infrastructure.Models.member
         [Required]
         public int VillageId1 { get; set; }
 
-        public int VillageId2 { get; set; }
+        public int? VillageId2 { get; set; }
 
         [Required]
         public int PO1 { get; set; }
 
-        public int PO2 { get; set; }
+        public int? PO2 { get; set; }
 
         [Required]
         public int Tehsil1 { get; set; }
 
-        public int Tehsil2 { get; set; }
+        public int? Tehsil2 { get; set; }
 
         [Required]
         public int ThanaId1 { get; set; }
 
-        public int ThanaId2 { get; set; }
+        public int? ThanaId2 { get; set; }
 
         [Required]
         public int ZoneId1 { get; set; }
 
-        public int ZoneId2 { get; set; }
+        public int? ZoneId2 { get; set; }
     }
 }

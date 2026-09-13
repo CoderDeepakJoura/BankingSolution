@@ -87,7 +87,7 @@ namespace BankingPlatform.API.Service.Reports
             var loanAccQuery = _db.accountmaster.AsNoTracking()
                 .Where(a => a.BranchId == branchId
                     && a.AccTypeId == (int)Enums.AccountTypes.Loan
-                    && !a.IsAccClosed);
+                    && a.IsAccClosed != true);
 
             if (productId > 0)
                 loanAccQuery = loanAccQuery.Where(a => a.GeneralProductId == productId);

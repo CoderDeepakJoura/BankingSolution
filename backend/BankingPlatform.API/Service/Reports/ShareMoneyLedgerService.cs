@@ -58,7 +58,7 @@ namespace BankingPlatform.API.Service.Reports
             var accounts = await _context.accountmaster.AsNoTracking()
                 .Where(x => x.BranchId == branchId
                     && x.AccTypeId == (int)Enums.AccountTypes.ShareMoney
-                    && !x.IsAccClosed)
+                    && x.IsAccClosed != true)
                 .OrderBy(x => x.AccountNumber)
                 .Select(x => new ShareMoneyAccountItem
                 {

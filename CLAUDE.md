@@ -111,9 +111,9 @@ Defined in `Enums.VoucherType` and `Enums.VoucherSubType`.
 | 10 | Loan Recovery |
 | 11 | Payment/Receipt |
 | 12 | Transfer |
-| 13 | Loan Interest Posting |
+| 13 | OD Reserve Posting |
 | 14 | Loan Expense |
-| 15 | Loan Interest Posting (alt) |
+| 15 | MIS Interest Posting |
 | 16 | RD Multiple Kist |
 | 19 | IB Saving Dep — HO Step 1 (HOToBranch source) |
 | 20 | IB Saving Dep — Branch Credit (HO→Br, dest branch final) |

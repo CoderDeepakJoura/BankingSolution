@@ -157,7 +157,7 @@ namespace BankingPlatform.API.DTO.AccountMasters.Loan
         public string AccountName { get; set; } = string.Empty;
         public string? RelativeName { get; set; }
         public DateTime AccOpeningDate { get; set; }
-        public bool IsAccClosed { get; set; }
+        public bool? IsAccClosed { get; set; }
         public string? ProductName { get; set; }
         public double? LoanAmountPassed { get; set; }
         public double? KistAmount { get; set; }

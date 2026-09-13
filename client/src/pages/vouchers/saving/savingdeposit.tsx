@@ -802,7 +802,7 @@ const SavingDepositVoucher: React.FC = () => {
                         2
                       );
 
-                    if (response.success) {
+                    if (response.success && response.data) {
                       setAccountData(response.data);
                       setPictureFile(null);
                       setSignatureFile(null);
@@ -1247,7 +1247,7 @@ const SavingDepositVoucher: React.FC = () => {
             <p className="text-sm">No ledger data found for this account</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+          <div className="overflow-x-auto overflow-y-auto max-h-[480px] rounded-lg border border-gray-200 shadow-sm">
             <div className="bg-blue-50 px-4 py-2 text-sm text-blue-800 flex flex-wrap gap-x-6 gap-y-1 border-b border-blue-100">
               <span><span className="font-medium">Account:</span> {ledgerData.accountName}</span>
               <span><span className="font-medium">A/C No:</span> {ledgerData.accountIdentifier}</span>
@@ -1256,7 +1256,7 @@ const SavingDepositVoucher: React.FC = () => {
             </div>
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gradient-to-r from-slate-700 to-slate-800 text-white">
+                <tr className="bg-gradient-to-r from-slate-700 to-slate-800 text-white sticky top-0 z-10">
                   <th className="px-3 py-2 text-center font-semibold w-10">S.No</th>
                   <th className="px-3 py-2 text-center font-semibold whitespace-nowrap">Date</th>
                   <th className="px-3 py-2 text-center font-semibold">V.No</th>

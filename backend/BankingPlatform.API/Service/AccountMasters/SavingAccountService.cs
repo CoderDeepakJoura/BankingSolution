@@ -224,7 +224,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             var workingDate = _commonfunctions.GetWorkingDate();
             var query = _context.accountmaster
                 .Where(x => x.BranchId == branchId && x.AccTypeId == (int)Enums.AccountTypes.Saving
-                    && !x.IsAccClosed
+                    && x.IsAccClosed != true
                     && (!workingDate.HasValue || x.AccOpeningDate.Date <= workingDate.Value.Date));
 
             // ✅ CHANGE: Bring data to memory FIRST
@@ -305,12 +305,13 @@ namespace BankingPlatform.API.Service.AccountMasters
 
             string[] validValues = new[] { "NM", "PM" };
             string membershipNo = "";
-            if (validValues.Contains(accountMaster.addedusing))
+            if (validValues.Contains(accountMaster.addedusing) && accountMaster.MemberId != null && accountMaster.MemberBranchID != null)
             {
                 int memberType = accountMaster.addedusing == "NM" ? 1 : 2;
-                membershipNo = await _commonfunctions.GetMemberShipNoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, memberType);
+                membershipNo = await _commonfunctions.GetMemberShipNoFromMemberIDandBranchID((int)accountMaster.MemberId, (int)accountMaster.MemberBranchID, memberType);
             }
-            accountMaster.AccountNumber = await _commonfunctions.GetShareMoneyAccNoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, (int)Enums.AccountTypes.ShareMoney);
+            if (accountMaster.MemberId != null && accountMaster.MemberBranchID != null)
+                accountMaster.AccountNumber = await _commonfunctions.GetShareMoneyAccNoFromMemberIDandBranchID((int)accountMaster.MemberId, (int)accountMaster.MemberBranchID, (int)Enums.AccountTypes.ShareMoney);
 
             return new CommonAccMasterDTO
             {
@@ -644,7 +645,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             var savingAccData = await _context.accountmaster.FirstOrDefaultAsync(x => x.ID == dto.DebitAccountId && x.BranchId == dto.BranchId);
             if (savingAccData == null)
                 return "Account not found.";
-            if (savingAccData.IsAccClosed)
+            if (savingAccData.IsAccClosed == true)
                 return "This account can't be closed as it has already been closed.";
 
             // Validate interest expense account up-front before entering the transaction

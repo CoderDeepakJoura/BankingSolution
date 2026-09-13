@@ -88,3 +88,30 @@ FOR EACH ROW EXECUTE FUNCTION fn_prevent_auditlog_modification();
 -- SELECT cron.schedule('archive-audit', '0 2 1 * *',
 --   $$INSERT INTO auditlog_archive SELECT * FROM auditlog WHERE createdat < NOW() - INTERVAL '3 years';
 --     DELETE FROM auditlog WHERE createdat < NOW() - INTERVAL '3 years';$$);
+
+
+-- =============================================================================
+-- USER LOGIN HISTORY
+-- Mutable companion to auditlog — tracks session duration, heartbeat, logout type.
+-- Unlike auditlog, rows here are updated (logouttime, lastseen) — no immutability trigger.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS userloginhistory (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    societycode VARCHAR(50)   NOT NULL DEFAULT '',
+    userid      INT           NOT NULL,
+    branchid    INT           NOT NULL,
+    username    VARCHAR(150)  NOT NULL DEFAULT '',
+    logintime   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    logouttime  TIMESTAMPTZ,
+    lastseen    TIMESTAMPTZ,
+    logouttype  VARCHAR(20),         -- 'manual', 'beacon', 'timeout'
+    ipaddress   VARCHAR(50),
+    useragent   VARCHAR(500)
+);
+
+CREATE INDEX IF NOT EXISTS idx_loginhistory_society   ON userloginhistory (societycode);
+CREATE INDEX IF NOT EXISTS idx_loginhistory_user      ON userloginhistory (userid, branchid);
+CREATE INDEX IF NOT EXISTS idx_loginhistory_logintime ON userloginhistory (logintime DESC);
+-- Partial index: fast lookup of currently-active sessions (logouttime IS NULL)
+CREATE INDEX IF NOT EXISTS idx_loginhistory_active    ON userloginhistory (userid, branchid) WHERE logouttime IS NULL;

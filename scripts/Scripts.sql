@@ -423,6 +423,8 @@ CREATE TABLE IF NOT EXISTS memberlocationdetails (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "IX_MemberLocationDetails_id_brid"
     ON public.memberlocationdetails (id, branchid);
+CREATE UNIQUE INDEX IF NOT EXISTS "IX_MemberLocationDetails_MemberId_BranchId"
+    ON public.memberlocationdetails (memberid, branchid);
 
 CREATE TABLE IF NOT EXISTS memberdocdetails (
     id             INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
@@ -2048,6 +2050,10 @@ ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS showpayrollmodule BOOLEAN
 
 -- interbranchvoucher: distinguishes 2-step HO-to-Branch from 3-step Branch-to-Branch flows
 ALTER TABLE interbranchvoucher ADD COLUMN IF NOT EXISTS flowtype VARCHAR(20) NOT NULL DEFAULT 'BranchToBranch';
+
+-- savingproduct / fdproduct: effectivetill allows marking a product as expired after a date
+ALTER TABLE savingproduct ADD COLUMN IF NOT EXISTS effectivetill TIMESTAMP(3) NULL;
+ALTER TABLE fdproduct     ADD COLUMN IF NOT EXISTS effectivetill TIMESTAMP(3) NULL;
 
 -- =============================================================================
 -- REFERENTIAL INTEGRITY: add missing FK constraints (idempotent — safe to re-run)

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using AuditLogModel = BankingPlatform.Infrastructure.Models.Miscalleneous.AuditLog;
+using BankingPlatform.Infrastructure.Models.Miscalleneous;
 
 namespace BankingPlatform.API.Service.AuditLog
 {
@@ -74,6 +75,15 @@ namespace BankingPlatform.API.Service.AuditLog
             string? entityName = null,
             string? entityId = null,
             string? description = null);
+
+        /// <summary>Insert a new login history row when a user successfully logs in.</summary>
+        Task LogLoginAsync(int userId, int branchId, string userName, string? ipAddress, string? userAgent);
+
+        /// <summary>Mark the active session row as logged out (logouttype = 'manual' | 'beacon').</summary>
+        Task LogLogoutAsync(int userId, int branchId, string logoutType);
+
+        /// <summary>Update lastseen timestamp for the active session (heartbeat).</summary>
+        Task UpdateHeartbeatAsync(int userId, int branchId);
     }
 
     // ── Implementation ────────────────────────────────────────────────────────
@@ -151,6 +161,76 @@ namespace BankingPlatform.API.Service.AuditLog
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to write audit action log");
+            }
+        }
+
+        // ── Login history ─────────────────────────────────────────────────────
+
+        public async Task LogLoginAsync(int userId, int branchId, string userName, string? ipAddress, string? userAgent)
+        {
+            try
+            {
+                _audit.userloginhistory.Add(new UserLoginHistory
+                {
+                    SocietyCode = GetSocietyCode(),
+                    UserId      = userId,
+                    BranchId    = branchId,
+                    UserName    = userName,
+                    LoginTime   = DateTime.UtcNow,
+                    IpAddress   = ipAddress,
+                    UserAgent   = userAgent is { Length: > 500 } u ? u[..500] : userAgent,
+                });
+                await _audit.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to log login history for user {UserId}", userId);
+            }
+        }
+
+        public async Task LogLogoutAsync(int userId, int branchId, string logoutType)
+        {
+            try
+            {
+                var code   = GetSocietyCode();
+                var active = await _audit.userloginhistory
+                    .Where(h => h.UserId == userId && h.BranchId == branchId
+                             && h.SocietyCode == code && h.LogoutTime == null)
+                    .OrderByDescending(h => h.LoginTime)
+                    .FirstOrDefaultAsync();
+                if (active is not null)
+                {
+                    active.LogoutTime = DateTime.UtcNow;
+                    active.LogoutType = logoutType;
+                    active.LastSeen   = DateTime.UtcNow;
+                    await _audit.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to log logout history for user {UserId}", userId);
+            }
+        }
+
+        public async Task UpdateHeartbeatAsync(int userId, int branchId)
+        {
+            try
+            {
+                var code   = GetSocietyCode();
+                var active = await _audit.userloginhistory
+                    .Where(h => h.UserId == userId && h.BranchId == branchId
+                             && h.SocietyCode == code && h.LogoutTime == null)
+                    .OrderByDescending(h => h.LoginTime)
+                    .FirstOrDefaultAsync();
+                if (active is not null)
+                {
+                    active.LastSeen = DateTime.UtcNow;
+                    await _audit.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to update heartbeat for user {UserId}", userId);
             }
         }
 

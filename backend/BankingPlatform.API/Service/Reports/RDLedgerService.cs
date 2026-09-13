@@ -91,7 +91,7 @@ namespace BankingPlatform.API.Service.Reports
                 .Where(x => x.BranchId == branchId
                     && x.AccTypeId == (int)Enums.AccountTypes.RD
                     && x.GeneralProductId == productId
-                    && !x.IsAccClosed)
+                    && x.IsAccClosed != true)
                 .OrderBy(x => x.AccSuffix)
                 .Select(x => new RDAccountItem
                 {

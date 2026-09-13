@@ -446,7 +446,7 @@ namespace BankingPlatform.API.Controllers.BankFD
                     : $"Bank FD Matured — LTD {detail.LTDNo} — Principal ₹{principal:N2} — Interest ₹{interest:N2}";
             string finalNarration = string.IsNullOrWhiteSpace(narration) ? defaultNarration : narration;
 
-            int subType = isPremature ? 7 : (isRenew ? 6 : 5);
+            int subType = isPremature ? (int)Enums.VoucherSubType.PreMature : (isRenew ? (int)Enums.VoucherSubType.Renew : (int)Enums.VoucherSubType.Mature);
 
             // Create voucher header
             var voucher = new Voucher
@@ -570,7 +570,7 @@ namespace BankingPlatform.API.Controllers.BankFD
             }
 
             // Update old detail status and TDS
-            detail.FDStatus = isPremature ? 3 : (isRenew ? 4 : 2);
+            detail.FDStatus = isPremature ? (int)Enums.FDStatus.Pre_Matured : (isRenew ? (int)Enums.FDStatus.Renewed : (int)Enums.FDStatus.Matured);
             detail.TdsAmount = tdsAmount;
 
             await _context.SaveChangesAsync();

@@ -13,6 +13,7 @@ namespace BankingPlatform.Infrastructure.DbContexts
         public AuditDbContext(DbContextOptions<AuditDbContext> options) : base(options) { }
 
         public DbSet<AuditLog> auditlog { get; set; }
+        public DbSet<UserLoginHistory> userloginhistory { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

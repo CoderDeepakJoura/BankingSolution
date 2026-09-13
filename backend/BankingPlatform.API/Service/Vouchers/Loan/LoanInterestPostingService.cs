@@ -13,8 +13,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
         private readonly CommonFunctions _cf;
         private readonly LoanRecoveryVoucherService _recoveryService;
 
-        private const int CAT_STD   = (int)Enums.IntCategory.StdInterest;
-        private const int CAT_PENAL = (int)Enums.IntCategory.PenalInterest;
+        private const int CAT_STD    = (int)Enums.IntCategory.StdInterest;
+        private const int CAT_PENAL  = (int)Enums.IntCategory.PenalInterest;
+        private const int CAT_STDREC = LoanRecoveryVoucherService.CAT_STDREC;
+        private const int CAT_OVDREC = LoanRecoveryVoucherService.CAT_OVDREC;
 
         public LoanInterestPostingService(BankingDbContext db, CommonFunctions cf, LoanRecoveryVoucherService recoveryService)
         {
@@ -31,7 +33,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             return await _db.accountmaster.AsNoTracking()
                 .Where(x => x.BranchId == branchId
                          && x.AccTypeId == (int)Enums.AccountTypes.Loan
-                         && !x.IsAccClosed
+                         && x.IsAccClosed != true
                          && (!productId.HasValue || x.GeneralProductId == productId)
                          && (x.AccountNumber.ToLower().Contains(q)
                              || (x.AccountName != null && x.AccountName.ToLower().Contains(q))))
@@ -260,80 +262,313 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
         }
 
         // ── Batch Calculate ───────────────────────────────────────────────────────
+        // Pre-fetches all data in ~9 bulk queries then computes entirely in-memory.
+        // Scales to thousands of accounts without the N+1 query problem.
 
         public async Task<List<LoanInterestBatchItemDTO>> BatchCalculateInterestAsync(int brId, int productId, int? accountId, DateTime? asOfDate = null)
         {
+            DateTime today = (asOfDate ?? DateTime.Today).Date;
+
+            // ── 1. All accounts for this product ──────────────────────────────────
             var accounts = await _db.accountmaster.AsNoTracking()
                 .Where(x => x.BranchId == brId
                          && x.GeneralProductId == productId
                          && x.AccTypeId == (int)Enums.AccountTypes.Loan
-                         && !x.IsAccClosed
+                         && x.IsAccClosed != true
                          && (!accountId.HasValue || x.ID == accountId.Value))
                 .OrderBy(x => x.AccountNumber)
-                .Select(x => new { x.ID, x.AccountNumber })
+                .Select(x => new { x.ID, x.AccountNumber, x.MemberId, x.MemberBranchID })
                 .ToListAsync();
 
+            if (!accounts.Any()) return new List<LoanInterestBatchItemDTO>();
+
+            var accountIds = accounts.Select(a => a.ID).ToList();
+
+            // ── 2. Bulk pre-fetch (sequential — EF Core DbContext is not thread-safe) ──
+            // 9 queries total regardless of account count vs ~13 per account previously.
+
+            // Product-level data (same for every account in this batch)
+            var prodDef = await _db.loanproductdefinition.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.ProductId == productId && x.BrId == brId);
+            var prodRec = await _db.loanproductrecovery.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.ProductId == productId && x.BrId == brId);
+
+            // Kist detail — latest row per account (ordered desc; first per group wins)
+            var kistAll = await _db.accountkistdetail.AsNoTracking()
+                .Where(x => accountIds.Contains(x.AccountId) && x.BrId == brId)
+                .OrderByDescending(x => x.LoanDate)
+                .ToListAsync();
+
+            // Members (by Id only; single-branch banks have unique member Ids)
+            var memberIds = accounts.Where(a => a.MemberId.HasValue).Select(a => a.MemberId!.Value).Distinct().ToList();
+            var memberMap = memberIds.Any()
+                ? await _db.member.AsNoTracking().Where(x => memberIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id)
+                : new Dictionary<int, BankingPlatform.Infrastructure.Models.member.Member>();
+
+            var obMap = await _db.loanaccopeningbalance.AsNoTracking()
+                .Where(x => x.AccId != null && accountIds.Contains((int)x.AccId) && x.BranchId == brId)
+                .ToDictionaryAsync(x => (int)x.AccId!);
+
+            var obDetailAll = await _db.loanaccountbalancedetail.AsNoTracking()
+                .Where(x => accountIds.Contains(x.AccountId) && x.BrId == brId)
+                .ToListAsync();
+
+            // All VCDD (LA / LR / LInterest) — principal calc + day-weighted interest
+            var vcddRaw = await _db.vouchercreditdebitdetails.AsNoTracking()
+                .Where(x => accountIds.Contains(x.AccountId) && x.BrId == brId
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "LInterest")
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
+                .OrderBy(x => x.ValueDate).ThenBy(x => x.VoucherID)
+                .Select(x => new { x.AccountId, x.EntryStatus, x.VoucherAmount, x.IntDr, x.IntCr, x.ValueDate })
+                .ToListAsync();
+
+            // VoucherRecIntDetail (interest ledger — Stand loans and AddInBalance IP dates)
+            var intEntriesAll = await _db.voucherrecintdetail.AsNoTracking()
+                .Where(x => accountIds.Contains(x.AccId) && x.BrId == brId)
+                .OrderBy(x => x.EntryDate).ThenBy(x => x.Id)
+                .ToListAsync();
+
+            // Kist schedules
+            var schedAll = await _db.accountkistschedule.AsNoTracking()
+                .Where(x => x.LoanAccId != null && accountIds.Contains((int)x.LoanAccId))
+                .OrderBy(x => x.KistNumber)
+                .ToListAsync();
+
+            // Slab details for accounts whose OverdueInterestRate = 0 but have a slab configured.
+            // Mirrors the slab-fallback logic in GetLoanBalanceAsync.
+            var slabIds = kistAll
+                .Where(k => (k.OverdueInterestRate ?? 0) == 0 && (k.SlabId ?? 0) > 0)
+                .Select(k => k.SlabId!.Value).Distinct().ToList();
+            var slabDetailsAll = slabIds.Any()
+                ? await _db.loanslabdetail.AsNoTracking()
+                    .Where(x => slabIds.Contains(x.SlabId) && x.PenalIntRate > 0)
+                    .ToListAsync()
+                : new List<BankingPlatform.Infrastructure.Models.InterestSlabs.Loan.LoanSlabDetail>();
+
+            // Build lookup maps
+            var kistMap      = kistAll.GroupBy(x => x.AccountId).ToDictionary(g => g.Key, g => g.First());
+            var obDetailMap  = obDetailAll.GroupBy(x => x.AccountId).ToDictionary(g => g.Key, g => g.ToList());
+            // Project VCDD to VcddEvent keyed by AccountId (ordering preserved from query)
+            var vcddByAcc    = vcddRaw
+                .GroupBy(x => x.AccountId)
+                .ToDictionary(g => g.Key,
+                    g => (IReadOnlyList<VcddEvent>)g.Select(x => new VcddEvent(x.EntryStatus, x.VoucherAmount, x.IntDr, x.IntCr, x.ValueDate)).ToList());
+            var intEntrMap   = intEntriesAll.GroupBy(x => x.AccId).ToDictionary(g => g.Key, g => g.ToList());
+            var schedMap     = schedAll.GroupBy(x => (int)x.LoanAccId!).ToDictionary(g => g.Key, g => g.ToList());
+
+            // Product-level constants (identical for all accounts in this batch)
+            string intCalcMethod = !string.IsNullOrWhiteSpace(prodDef?.IntCalcMethod) ? prodDef.IntCalcMethod : "Schedule";
+            int? actOnIntPosting = prodDef?.ActOnIntPosting;
+            bool isAddInBalance  = actOnIntPosting == 1;
+
+            // ── 3. Per-account computation — zero DB queries ──────────────────────
             var result = new List<LoanInterestBatchItemDTO>();
+
             foreach (var acc in accounts)
             {
-                var bal = await _recoveryService.GetLoanBalanceAsync(acc.ID, brId, asOfDate);
-                if (bal == null) continue;
+                kistMap.TryGetValue(acc.ID, out var kist);
+                memberMap.TryGetValue(acc.MemberId ?? 0, out var member);
+                obMap.TryGetValue(acc.ID, out var ob);
+                var obDetails    = obDetailMap.GetValueOrDefault(acc.ID) ?? new List<BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanAccountBalanceDetail>();
+                var vcdd         = vcddByAcc.GetValueOrDefault(acc.ID) ?? Array.Empty<VcddEvent>();
+                var intEntries   = intEntrMap.GetValueOrDefault(acc.ID) ?? new List<BankingPlatform.Infrastructure.Models.voucher.VoucherRecIntDetail>();
+                var kistSchedule = schedMap.GetValueOrDefault(acc.ID) ?? new List<BankingPlatform.Infrastructure.Models.AccMasters.Loan.AccountKistSchedule>();
 
-                decimal totalPostable = bal.StdInterestOutstanding + bal.PenalInterestOutstanding;
-                string? noReason = null;
+                // Principal balance (mirrors GetLoanBalanceAsync logic exactly)
+                decimal advancedTotal   = vcdd.Where(x => x.EntryStatus == "LA").Sum(x => x.VoucherAmount);
+                decimal recoveredTotal  = vcdd.Where(x => x.EntryStatus == "LR").Sum(x => x.VoucherAmount);
+                decimal lInterestPosted = isAddInBalance ? vcdd.Where(x => x.EntryStatus == "LInterest").Sum(x => x.VoucherAmount) : 0m;
 
-                decimal aibStdInt   = 0m;
-                DateTime? aibFrom   = null;
-                DateTime  aibTo     = asOfDate ?? DateTime.Today;
+                decimal openingPrincipal = ob?.TotalBalance ?? 0m;
+                decimal principalBal = openingPrincipal
+                    + obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr)
+                    + advancedTotal - recoveredTotal;
+                if (isAddInBalance)
+                    principalBal += obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr) + lInterestPosted;
+                principalBal = Math.Max(0, principalBal);
 
-                if (bal.ActOnIntPosting == 1)
+                string memberName = member?.MemberName ?? "";
+                string? memberRel = member?.RelativeName;
+
+                // ── AddInBalance path ─────────────────────────────────────────────
+                if (isAddInBalance)
                 {
-                    // AddInBalance: GetLoanBalanceAsync returns 0 for StdInterestOutstanding because
-                    // interest is embedded in principal. Compute the new accrued interest here using
-                    // the same method (Schedule/Balance/MinBalance) as configured on the product.
-                    DateTime? lastIpDate = await _db.voucherrecintdetail.AsNoTracking()
-                        .Where(x => x.AccId == acc.ID && x.BrId == brId)
-                        .OrderByDescending(x => x.EntryDate)
-                        .Select(x => (DateTime?)x.EntryDate)
-                        .FirstOrDefaultAsync();
+                    DateTime? lastIpDate = intEntries.Any() ? intEntries.Max(x => (DateTime?)x.EntryDate) : null;
+                    DateTime aibTo   = today;
+                    DateTime aibFrom = (lastIpDate?.Date ?? kist?.LoanDate) ?? aibTo;
+                    int days = Math.Max(0, (aibTo - aibFrom.Date).Days);
 
-                    aibFrom = (lastIpDate?.Date ?? bal.LoanDate) ?? aibTo;
-                    int days = Math.Max(0, (aibTo - aibFrom.Value.Date).Days);
-
-                    if (days > 0 && bal.PrincipalBalance > 0 && (bal.StandardInterestRate ?? 0) > 0)
+                    decimal aibStdInt = 0m;
+                    if (days > 0 && principalBal > 0 && (kist?.StandardInterestRate ?? 0) > 0)
                     {
-                        decimal rate = (decimal)bal.StandardInterestRate!.Value;
-
-                        if (bal.IntCalcMethod == "Schedule")
+                        decimal rate = (decimal)kist!.StandardInterestRate!.Value;
+                        if (intCalcMethod == "Schedule")
                         {
-                            // Sum interest amounts from kist schedule entries due after the last IP date
-                            var schedKists = await _db.accountkistschedule.AsNoTracking()
-                                .Where(x => x.LoanAccId == acc.ID
-                                         && x.Date.HasValue
-                                         && x.Date.Value.Date > aibFrom.Value.Date
-                                         && x.Date.Value.Date <= aibTo)
-                                .ToListAsync();
+                            var schedKists = kistSchedule
+                                .Where(x => x.Date.HasValue && x.Date.Value.Date > aibFrom.Date && x.Date.Value.Date <= aibTo)
+                                .ToList();
                             aibStdInt = schedKists.Sum(x => x.InterestAmt ?? 0m);
-                            // Fall back to Balance method when schedule has no interest entries
                             if (aibStdInt == 0)
-                                aibStdInt = Math.Round(bal.PrincipalBalance * rate / 100m * days / 365m, 0, MidpointRounding.AwayFromZero);
+                                aibStdInt = Math.Round(principalBal * rate / 100m * days / 365m, 0, MidpointRounding.AwayFromZero);
                         }
                         else
                         {
-                            // Balance or MinBalance: use current outstanding principal
-                            aibStdInt = Math.Round(bal.PrincipalBalance * rate / 100m * days / 365m, 0, MidpointRounding.AwayFromZero);
+                            aibStdInt = Math.Round(principalBal * rate / 100m * days / 365m, 0, MidpointRounding.AwayFromZero);
                         }
                     }
 
-                    totalPostable = aibStdInt;
-                    if (aibStdInt == 0)
-                        noReason = "No interest accrued yet";
+                    result.Add(new LoanInterestBatchItemDTO
+                    {
+                        LoanAccId           = acc.ID,
+                        AccountNumber       = acc.AccountNumber,
+                        MemberName          = memberName,
+                        MemberRelativeName  = memberRel,
+                        PrincipalBalance    = principalBal,
+                        StdInterest         = Math.Round(aibStdInt, 0, MidpointRounding.AwayFromZero),
+                        PenalInterest       = 0m,
+                        StdRecoverable      = 0m,
+                        TotalPostable       = Math.Round(aibStdInt, 0, MidpointRounding.AwayFromZero),
+                        CalcFromDate        = aibFrom,
+                        CalcToDate          = (DateTime?)aibTo,
+                        StdInterestRate     = kist?.StandardInterestRate,
+                        OverdueInterestRate = kist?.OverdueInterestRate,
+                        IntCalcMethod       = intCalcMethod,
+                        ActOnIntPosting     = actOnIntPosting,
+                        NoInterestReason    = aibStdInt == 0 ? "No interest accrued yet" : null,
+                    });
+                    continue;
                 }
-                else if (totalPostable == 0)
+
+                // ── Stand loan path ───────────────────────────────────────────────
+                double effectiveOvdRate = kist?.OverdueInterestRate ?? 0;
+                // Slab fallback: if account's own rate is 0 but a slab is configured, use it.
+                if (effectiveOvdRate == 0 && (kist?.SlabId ?? 0) > 0)
                 {
-                    if (bal.PrincipalBalance == 0)
+                    decimal loanAmt    = (decimal)(kist!.LoanAmountPassed ?? 0);
+                    int     loanPeriod = kist.LoanPeriod ?? 0;
+                    var sd = slabDetailsAll.FirstOrDefault(x => x.SlabId == kist.SlabId!.Value
+                        && x.FromAmount <= loanAmt && x.ToAmount >= loanAmt
+                        && (x.PeriodFrom == null || x.PeriodFrom <= loanPeriod)
+                        && (x.PeriodTo   == null || x.PeriodTo   >= loanPeriod));
+                    if ((sd?.PenalIntRate ?? 0) > 0)
+                        effectiveOvdRate = sd!.PenalIntRate!.Value;
+                }
+                decimal openStdInt  = (ob?.OpenInt > 0 && ob!.OpenIntType == "Dr")    ? (decimal)ob.OpenInt!.Value    : 0m;
+                decimal openOvdInt  = (ob?.OpenOverInt > 0 && ob!.OpenOverIntType == "Dr") ? (decimal)ob.OpenOverInt!.Value : 0m;
+
+                decimal postedStdInt    = (decimal)intEntries.Where(x => x.IntCatId == CAT_STD).Sum(x => x.IntDr);
+                decimal postedPenalInt  = (decimal)intEntries.Where(x => x.IntCatId == CAT_PENAL).Sum(x => x.IntDr);
+                decimal totalPosted     = postedStdInt + postedPenalInt;
+                decimal postedRecovered = (decimal)intEntries.Where(x => x.IntCatId == CAT_STDREC).Sum(x => x.IntCr);
+                decimal unpostedRecStd  = (decimal)intEntries.Where(x => x.IntCatId == CAT_STD).Sum(x => x.IntCr);
+                decimal unpostedRecPenal= (decimal)intEntries.Where(x => x.IntCatId == CAT_PENAL).Sum(x => x.IntCr);
+                decimal ovdRecPosted    = (decimal)intEntries.Where(x => x.IntCatId == CAT_OVDREC).Sum(x => x.IntDr);
+                decimal ovdRecRecovered = (decimal)intEntries.Where(x => x.IntCatId == CAT_OVDREC).Sum(x => x.IntCr);
+                decimal stdRec = Math.Max(0, totalPosted + openStdInt - postedRecovered - unpostedRecStd - unpostedRecPenal);
+                decimal ovdRec = Math.Max(0, ovdRecPosted + openOvdInt - ovdRecRecovered);
+
+                var overdueKists = kistSchedule.Where(x => x.Date.HasValue && x.Date.Value.Date < today).ToList();
+                int overdueInstallments = overdueKists.Count;
+                decimal overduePrincipal = overdueKists.Sum(x => x.PrincipalAmt ?? Math.Max(0m, (x.KistAmount ?? 0m) - (x.InterestAmt ?? 0m)));
+
+                DateTime? lastPostDate = intEntries.Any(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0)
+                    ? intEntries.Where(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0).Max(x => (DateTime?)x.EntryDate)
+                    : null;
+
+                DateTime calcFromDate = lastPostDate?.Date ?? kist?.LoanDate ?? ob?.OverDueDate ?? today;
+                DateTime calcToDate   = today;
+                decimal obNetForDWI   = openingPrincipal + obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr) + openStdInt;
+
+                decimal dynStdInt   = 0m;
+                decimal dynPenalInt = 0m;
+                List<InterestCalcSegmentDTO>? calcSegments = null;
+                List<PenalBreakdownItemDTO>? penalBreakdown = null;
+
+                // Penal helper — shared by Schedule and Balance/MinBalance branches below
+                void ComputePenal(bool requireOverdueKists)
+                {
+                    if (effectiveOvdRate <= 0 || principalBal <= 0) return;
+                    if (requireOverdueKists && !overdueKists.Any()) return;
+                    decimal rawPenal = 0m;
+                    penalBreakdown = new List<PenalBreakdownItemDTO>();
+                    if (overdueKists.Any())
+                    {
+                        bool hasPerKist = overdueKists.Any(x => (x.PrincipalAmt ?? 0m) > 0 || (x.KistAmount ?? 0m) > 0);
+                        if (hasPerKist)
+                        {
+                            foreach (var ok in overdueKists)
+                            {
+                                if (ok.Date == null) continue;
+                                decimal kp = ok.PrincipalAmt ?? Math.Max(0m, (ok.KistAmount ?? 0m) - (ok.InterestAmt ?? 0m));
+                                if (kp <= 0 && principalBal > 0) kp = principalBal / overdueKists.Count;
+                                int pd = Math.Max(0, (today - ok.Date.Value.Date).Days);
+                                decimal pi = Math.Round(kp * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
+                                rawPenal += pi;
+                                penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = ok.KistNumber ?? 0, DueDate = ok.Date.Value.Date, PrincipalAmount = kp, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = pi });
+                            }
+                        }
+                        else
+                        {
+                            var firstOvd = overdueKists.Where(x => x.Date.HasValue).Min(x => x.Date!.Value.Date);
+                            int pd = Math.Max(0, (today - firstOvd).Days);
+                            rawPenal = Math.Round(principalBal * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
+                            penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 0, DueDate = firstOvd, PrincipalAmount = principalBal, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = rawPenal });
+                        }
+                    }
+                    else if (kist != null && kist.KistFirstDate.Date < today)
+                    {
+                        int pd = Math.Max(0, (today - kist.KistFirstDate.Date).Days);
+                        rawPenal = Math.Round(principalBal * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
+                        penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 1, DueDate = kist.KistFirstDate.Date, PrincipalAmount = principalBal, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = rawPenal });
+                    }
+                    dynPenalInt = Math.Max(0, rawPenal - postedPenalInt);
+                }
+
+                if (intCalcMethod == "Schedule" && kistSchedule.Any())
+                {
+                    decimal schedIntDue = overdueKists.Sum(x => x.InterestAmt ?? 0m) + openStdInt;
+                    dynStdInt = Math.Max(0, schedIntDue - postedStdInt);
+
+                    if (dynStdInt == 0 && kist != null && (kist.StandardInterestRate ?? 0) > 0 && principalBal > 0)
+                    {
+                        var (wInt, wSegs) = LoanRecoveryVoucherService.ComputeDayWeightedInterest(
+                            vcdd, obNetForDWI, calcFromDate, calcToDate, kist.StandardInterestRate!.Value);
+                        dynStdInt = Math.Max(0, wInt);
+                        calcSegments = wSegs;
+                    }
+
+                    if (kist != null && effectiveOvdRate > 0 && overdueKists.Any())
+                        ComputePenal(requireOverdueKists: true);
+                }
+                else if (kist != null && (kist.StandardInterestRate ?? 0) > 0)
+                {
+                    if (intCalcMethod == "MinBalance")
+                    {
+                        if (principalBal > 0)
+                        {
+                            int days = Math.Max(0, (calcToDate - calcFromDate).Days);
+                            decimal effPrin = LoanRecoveryVoucherService.CalculateMinimumBalance(openingPrincipal, obDetails, calcFromDate, calcToDate);
+                            decimal rawStd = Math.Round(effPrin * (decimal)kist.StandardInterestRate!.Value / 100m * days / 365m, 2);
+                            dynStdInt = Math.Max(0, rawStd + openStdInt - postedStdInt);
+                        }
+                    }
+                    else
+                    {
+                        var (wInt, wSegs) = LoanRecoveryVoucherService.ComputeDayWeightedInterest(
+                            vcdd, obNetForDWI, calcFromDate, calcToDate, kist.StandardInterestRate!.Value);
+                        dynStdInt = Math.Max(0, wInt);
+                        calcSegments = wSegs;
+                    }
+                    ComputePenal(requireOverdueKists: false);
+                }
+
+                decimal totalPostable = dynStdInt + dynPenalInt;
+                string? noReason = null;
+                if (totalPostable == 0)
+                {
+                    if (principalBal == 0)
                         noReason = "No outstanding principal — disbursement voucher may be missing";
-                    else if (bal.StandardInterestRate == null || bal.StandardInterestRate == 0)
+                    else if ((kist?.StandardInterestRate ?? 0) == 0)
                         noReason = "Interest rate not set for this account";
                     else
                         noReason = "No interest accrued yet (loan may be too new)";
@@ -343,24 +578,24 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 {
                     LoanAccId           = acc.ID,
                     AccountNumber       = acc.AccountNumber,
-                    MemberName          = bal.MemberName,
-                    MemberRelativeName  = bal.MemberRelativeName,
-                    PrincipalBalance    = bal.PrincipalBalance,
-                    StdInterest         = Math.Round(bal.ActOnIntPosting == 1 ? aibStdInt         : bal.StdInterestOutstanding, 0, MidpointRounding.AwayFromZero),
-                    PenalInterest       = Math.Round(bal.ActOnIntPosting == 1 ? 0m                : bal.PenalInterestOutstanding, 0, MidpointRounding.AwayFromZero),
-                    StdRecoverable      = Math.Round(bal.ActOnIntPosting == 1 ? 0m                : bal.StdRecoverableOutstanding, 0, MidpointRounding.AwayFromZero),
+                    MemberName          = memberName,
+                    MemberRelativeName  = memberRel,
+                    PrincipalBalance    = principalBal,
+                    StdInterest         = Math.Round(dynStdInt,    0, MidpointRounding.AwayFromZero),
+                    PenalInterest       = Math.Round(dynPenalInt,  0, MidpointRounding.AwayFromZero),
+                    StdRecoverable      = Math.Round(stdRec,       0, MidpointRounding.AwayFromZero),
                     TotalPostable       = Math.Round(totalPostable, 0, MidpointRounding.AwayFromZero),
-                    CalcFromDate        = bal.ActOnIntPosting == 1 ? aibFrom           : bal.InterestCalcFromDate,
-                    CalcToDate          = bal.ActOnIntPosting == 1 ? (DateTime?)aibTo  : bal.InterestCalcToDate,
-                    StdInterestRate     = bal.StandardInterestRate,
-                    OverdueInterestRate = bal.OverdueInterestRate,
-                    IntCalcMethod       = bal.IntCalcMethod,
-                    ActOnIntPosting     = bal.ActOnIntPosting,
+                    CalcFromDate        = calcFromDate == today ? null : (DateTime?)calcFromDate,
+                    CalcToDate          = (DateTime?)calcToDate,
+                    StdInterestRate     = kist?.StandardInterestRate,
+                    OverdueInterestRate = kist?.OverdueInterestRate,
+                    IntCalcMethod       = intCalcMethod,
+                    ActOnIntPosting     = actOnIntPosting,
                     NoInterestReason    = noReason,
-                    CalcBreakdown       = bal.CalcBreakdown,
-                    OverdueInstallments = bal.OverdueInstallments,
-                    OverduePrincipal    = bal.OverduePrincipal,
-                    PenalBreakdown      = bal.PenalBreakdown,
+                    CalcBreakdown       = calcSegments,
+                    OverdueInstallments = overdueInstallments,
+                    OverduePrincipal    = overduePrincipal,
+                    PenalBreakdown      = penalBreakdown,
                 });
             }
             return result;
@@ -462,15 +697,18 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 .OrderBy(x => x.KistNumber)
                 .ToListAsync();
 
-            // Build sorted unique checkpoint set
+            // Build sorted unique checkpoint set.
+            // Floor: never add a date earlier than the loan date — guards against corrupted
+            // kist schedule rows where k.Date was stored with an incorrect year.
+            DateTime checkpointFloor = loanDate?.Date ?? DateTime.MinValue;
             var checkpoints = new SortedSet<DateTime>();
             if (loanDate.HasValue && loanDate.Value.Date <= calcToDate)
                 checkpoints.Add(loanDate.Value.Date);
             foreach (var k in kistSchedule)
-                if (k.Date.HasValue && k.Date.Value.Date <= calcToDate)
+                if (k.Date.HasValue && k.Date.Value.Date >= checkpointFloor && k.Date.Value.Date <= calcToDate)
                     checkpoints.Add(k.Date.Value.Date);
             foreach (var e in rawEvents)
-                if (e.EventDate <= calcToDate)
+                if (e.EventDate >= checkpointFloor && e.EventDate <= calcToDate)
                     checkpoints.Add(e.EventDate);
             checkpoints.Add(calcToDate);
 
@@ -496,18 +734,34 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 if (days > 0 && runningBalance > 0 && stdRate > 0)
                     stdInt = Math.Round(runningBalance * (decimal)stdRate / 100m * days / 365m, 2);
 
-                if (days > 0 && prevDate.HasValue && penalRate > 0)
+                if (days > 0 && prevDate.HasValue && penalRate > 0 && !isAddInBalance)
                 {
-                    // Kists past-due at the START of this period (due on or before prevDate)
+                    // Kists past-due at the START of this period (due on or before prevDate).
+                    // AddInBalance loans: interest (incl. overdue component) is baked into principal — skip.
                     var ovdAtPrev = kistSchedule
                         .Where(k => k.Date.HasValue && k.Date.Value.Date <= prevDate!.Value)
                         .ToList();
-                    foreach (var ok in ovdAtPrev)
+                    if (ovdAtPrev.Any())
                     {
-                        decimal kistPrin = ok.PrincipalAmt
-                            ?? Math.Max(0m, (ok.KistAmount ?? 0m) - (ok.InterestAmt ?? 0m));
-                        if (kistPrin > 0)
-                            ovrInt += Math.Round(kistPrin * (decimal)penalRate / 100m * days / 365m, 2);
+                        foreach (var ok in ovdAtPrev)
+                        {
+                            decimal kistPrin = ok.PrincipalAmt
+                                ?? Math.Max(0m, (ok.KistAmount ?? 0m) - (ok.InterestAmt ?? 0m));
+                            // WO/interest-only schedule: KistAmount == InterestAmt, so kistPrin = 0.
+                            // Fall back to distributing the running principal balance across overdue kists,
+                            // matching the same fallback used in GetLoanBalanceAsync / BatchCalculate.
+                            if (kistPrin <= 0 && runningBalance > 0)
+                                kistPrin = runningBalance / ovdAtPrev.Count;
+                            if (kistPrin > 0)
+                                ovrInt += Math.Round(kistPrin * (decimal)penalRate / 100m * days / 365m, 2);
+                        }
+                    }
+                    else if (kistInfo != null && kistInfo.KistFirstDate.Date <= prevDate!.Value && runningBalance > 0)
+                    {
+                        // No schedule rows at all (or none due yet) but the first kist was due by prevDate.
+                        // Fall back to the same logic as GetLoanBalanceAsync: charge penal on the full
+                        // outstanding balance, matching the no-schedule path in the single-account service.
+                        ovrInt = Math.Round(runningBalance * (decimal)penalRate / 100m * days / 365m, 2);
                     }
                 }
 

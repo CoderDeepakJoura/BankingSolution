@@ -8,15 +8,18 @@ using BankingPlatform.Infrastructure.Models.voucher;
 
 namespace BankingPlatform.API.Service.Vouchers.Loan
 {
+    // Lightweight projection used by CalculateDayWeightedInterestAsync and the bulk batch path.
+    internal record VcddEvent(string EntryStatus, decimal VoucherAmount, decimal? IntDr, decimal? IntCr, DateTime ValueDate);
+
     public class LoanRecoveryVoucherService
     {
         private readonly BankingDbContext _db;
         private readonly CommonFunctions _cf;
 
-        private const int CAT_STD   = (int)Enums.IntCategory.StdInterest;        // 1 — unposted standard
-        private const int CAT_PENAL = (int)Enums.IntCategory.PenalInterest;      // 2 — unposted penal/overdue
-        private const int CAT_STDREC = (int)Enums.IntCategory.StdRecoverable;    // 3 — posted interest
-        private const int CAT_OVDREC = (int)Enums.IntCategory.OverdueRecoverable;// 4 — overdue principal kist
+        private const int CAT_STD    = (int)Enums.IntCategory.StdInterest;        // 1 — unposted standard
+        private const int CAT_PENAL  = (int)Enums.IntCategory.PenalInterest;      // 2 — unposted penal/overdue
+        internal const int CAT_STDREC = (int)Enums.IntCategory.StdRecoverable;    // 3 — posted interest
+        internal const int CAT_OVDREC = (int)Enums.IntCategory.OverdueRecoverable;// 4 — overdue principal kist
 
         public LoanRecoveryVoucherService(BankingDbContext db, CommonFunctions cf)
         {
@@ -481,12 +484,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
         }
 
         // ── Day-weighted interest calculation ─────────────────────────────────────
-        // Computes interest on the effective outstanding balance (principal + posted-but-unpaid
-        // interest) over the period [calcFromDate+1 .. calcToDate], segmented by balance changes.
+        // Per-account async path: fetches VCDD events then delegates to the static core.
         private async Task<(decimal TotalInterest, List<InterestCalcSegmentDTO> Segments)>
             CalculateDayWeightedInterestAsync(
                 int loanAccId, int branchId,
-                decimal obNet,          // OB principal + obDetails.net + openStdInt
+                decimal obNet,
                 DateTime calcFromDate,
                 DateTime calcToDate,
                 double rate)
@@ -499,20 +501,34 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
                          && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "LInterest"))
                 .OrderBy(x => x.ValueDate).ThenBy(x => x.VoucherID)
-                .Select(x => new { x.EntryStatus, x.VoucherAmount, x.IntDr, x.IntCr, x.ValueDate })
+                .Select(x => new VcddEvent(x.EntryStatus, x.VoucherAmount, x.IntDr, x.IntCr, x.ValueDate))
                 .ToListAsync();
 
-            // Build starting effective balance at calcFromDate (events on that date included)
+            return ComputeDayWeightedInterest(events, obNet, calcFromDate, calcToDate, rate);
+        }
+
+        // Pure in-memory core — called by both the per-account async path and the bulk batch.
+        internal static (decimal TotalInterest, List<InterestCalcSegmentDTO> Segments)
+            ComputeDayWeightedInterest(
+                IReadOnlyList<VcddEvent> events,
+                decimal obNet,
+                DateTime calcFromDate,
+                DateTime calcToDate,
+                double rate)
+        {
+            if (calcFromDate.Date >= calcToDate.Date)
+                return (0m, new List<InterestCalcSegmentDTO>());
+
+            // Starting balance at calcFromDate (include events on that date)
             decimal balance = obNet;
             foreach (var e in events.Where(x => x.ValueDate.Date <= calcFromDate.Date))
             {
-                if (e.EntryStatus == "LA")          balance += e.VoucherAmount;
-                else if (e.EntryStatus == "LR")     balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
+                if (e.EntryStatus == "LA")             balance += e.VoucherAmount;
+                else if (e.EntryStatus == "LR")        balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
                 else if (e.EntryStatus == "LInterest") balance += e.VoucherAmount;
             }
             balance = Math.Max(0, balance);
 
-            // Group period events (after calcFromDate, up to and including calcToDate)
             var periodGroups = events
                 .Where(x => x.ValueDate.Date > calcFromDate.Date && x.ValueDate.Date <= calcToDate.Date)
                 .GroupBy(x => x.ValueDate.Date)
@@ -525,45 +541,32 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             foreach (var group in periodGroups)
             {
                 DateTime evDate = group.Key;
-                int days = (evDate - segStart).Days + 1; // inclusive: segStart to evDate
+                int days = (evDate - segStart).Days + 1;
                 if (days > 0 && balance > 0)
-                {
                     segments.Add(new InterestCalcSegmentDTO
                     {
-                        FromDate = segStart,
-                        ToDate   = evDate,
-                        Balance  = balance,
-                        Days     = days,
-                        Rate     = rate,
+                        FromDate = segStart, ToDate = evDate, Balance = balance, Days = days, Rate = rate,
                         Interest = Math.Round(balance * (decimal)rate / 100m * days / 365m, 2),
                     });
-                }
                 foreach (var e in group)
                 {
-                    if (e.EntryStatus == "LA")          balance += e.VoucherAmount;
-                    else if (e.EntryStatus == "LR")     balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
+                    if (e.EntryStatus == "LA")             balance += e.VoucherAmount;
+                    else if (e.EntryStatus == "LR")        balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
                     else if (e.EntryStatus == "LInterest") balance += e.VoucherAmount;
                 }
                 balance = Math.Max(0, balance);
                 segStart = evDate.AddDays(1);
             }
 
-            // Final segment after last event
             if (segStart <= calcToDate.Date && balance > 0)
             {
                 int days = (calcToDate.Date - segStart).Days + 1;
                 if (days > 0)
-                {
                     segments.Add(new InterestCalcSegmentDTO
                     {
-                        FromDate = segStart,
-                        ToDate   = calcToDate.Date,
-                        Balance  = balance,
-                        Days     = days,
-                        Rate     = rate,
+                        FromDate = segStart, ToDate = calcToDate.Date, Balance = balance, Days = days, Rate = rate,
                         Interest = Math.Round(balance * (decimal)rate / 100m * days / 365m, 2),
                     });
-                }
             }
 
             return (segments.Sum(s => s.Interest), segments);
@@ -677,7 +680,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             return await _db.accountmaster.AsNoTracking()
                 .Where(x => x.BranchId == branchId
                          && x.AccTypeId == (int)Enums.AccountTypes.Loan
-                         && !x.IsAccClosed
+                         && x.IsAccClosed != true
                          && (x.AccountNumber.ToLower().Contains(q)
                              || (x.AccountName != null && x.AccountName.ToLower().Contains(q))))
                 .OrderBy(x => x.AccountNumber)
@@ -1051,7 +1054,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
         // Reconstructs the daily principal balance from opening balance + dated movements,
         // then returns the minimum balance in [fromDate, toDate]. Used for MinBalance method.
-        private static decimal CalculateMinimumBalance(
+        internal static decimal CalculateMinimumBalance(
             decimal openingBalance,
             List<LoanAccountBalanceDetail> moves,
             DateTime fromDate,

@@ -17,7 +17,7 @@ namespace BankingPlatform.API.Service.GST
         {
             int generalType = 3; // Enums.AccountTypes.General
             return await _context.accountmaster.AsNoTracking()
-                .Where(x => x.BranchId == branchId && x.AccTypeId == generalType && !x.IsAccClosed)
+                .Where(x => x.BranchId == branchId && x.AccTypeId == generalType && x.IsAccClosed != true)
                 .OrderBy(x => x.AccountNumber)
                 .Select(x => new AccountLookupDTO
                 {

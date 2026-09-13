@@ -96,7 +96,7 @@ namespace BankingPlatform.API.Service.Reports
                 .Where(x => x.BranchId == branchId
                     && x.AccTypeId == (int)Enums.AccountTypes.Loan
                     && x.GeneralProductId == productId
-                    && !x.IsAccClosed)
+                    && x.IsAccClosed != true)
                 .OrderBy(x => x.AccountNumber)
                 .Select(x => new LoanAccountItem
                 {

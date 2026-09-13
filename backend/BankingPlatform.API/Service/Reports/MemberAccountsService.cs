@@ -143,7 +143,7 @@ namespace BankingPlatform.API.Service.Reports
 
             // All non-closed accounts for this member
             var rawAccounts = await _db.accountmaster.AsNoTracking()
-                .Where(a => a.BranchId == branchId && a.MemberId == memberId && !a.IsAccClosed)
+                .Where(a => a.BranchId == branchId && a.MemberId == memberId && a.IsAccClosed != true)
                 .OrderBy(a => a.AccTypeId).ThenBy(a => a.AccSuffix)
                 .Select(a => new
                 {

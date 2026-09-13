@@ -314,8 +314,8 @@ namespace BankingPlatform.API.Services
                 {
                     Member = MapToDTO(member),
                     Nominees = memberNominees.Select(MapToDTO).ToList(),
-                    LocationDetails = MapToDTO(memberLocation!),
-                    DocumentDetails = MapToDTO(memberDocuments!),
+                    LocationDetails = memberLocation != null ? MapToDTO(memberLocation) : null,
+                    DocumentDetails = memberDocuments != null ? MapToDTO(memberDocuments) : null,
                     AccMaster = memberAccount != null ? MapToDTO(memberAccount) : null,
                     VoucherId = voucherId
 
@@ -345,35 +345,46 @@ namespace BankingPlatform.API.Services
                            a.AccTypeId == (int)Enums.AccountTypes.ShareMoney)
                 .FirstOrDefaultAsync();
 
-            int vrSubType = (int)Enums.VoucherSubType.ShareMoney;
-            int vrType = (int)Enums.VoucherType.Member;
-            int voucherId = await _commonfunctions.GetVoucherIdFromVTypeAndSubType(vrSubType, vrType, smAccInfo!.ID, branchId);
-            var narration = await _context.voucher.Where(x => x.Id == voucherId && x.BrID == branchId).Select(x => x.VoucherNarration).FirstOrDefaultAsync() ?? "";
+            int voucherId = 0;
+            string narration = "";
+            decimal smAmount = 0;
+            VoucherCreditDebitDetails? admissionFeeInfo = null;
+            VoucherCreditDebitDetails? totalDebitInfo = null;
+            decimal openingAmount = 0;
 
-            var existingOpeningAccInfo = await _context.accopeningbalance.FirstOrDefaultAsync(x => x.BranchId == member.BranchId && x.AccTypeId == (int)Enums.AccountTypes.ShareMoney && x.AccountId == smAccInfo!.ID);
+            if (smAccInfo != null)
+            {
+                int vrSubType = (int)Enums.VoucherSubType.ShareMoney;
+                int vrType = (int)Enums.VoucherType.Member;
+                voucherId = await _commonfunctions.GetVoucherIdFromVTypeAndSubType(vrSubType, vrType, smAccInfo.ID, branchId);
+                narration = await _context.voucher.Where(x => x.Id == voucherId && x.BrID == branchId).Select(x => x.VoucherNarration).FirstOrDefaultAsync() ?? "";
 
-            List<VoucherCreditDebitDetails> voucherCreditDebitDetails = await _commonfunctions.GetVoucherInfoFromVoucherId(voucherId, branchId);
-            decimal smAmount = voucherCreditDebitDetails.Where(x => x.EntryStatus == Enums.VoucherStatus.MemberSM.ToString()).Select(x => x.VoucherAmount).FirstOrDefault();
-            var admissionFeeInfo = voucherCreditDebitDetails.FirstOrDefault(x => x.EntryStatus == Enums.VoucherStatus.Cr.ToString());
-            var totalDebitInfo = voucherCreditDebitDetails.Where(x => x.EntryStatus == Enums.VoucherStatus.Dr.ToString()).FirstOrDefault();
+                var existingOpeningAccInfo = await _context.accopeningbalance.FirstOrDefaultAsync(x => x.BranchId == member.BranchId && x.AccTypeId == (int)Enums.AccountTypes.ShareMoney && x.AccountId == smAccInfo.ID);
+                openingAmount = existingOpeningAccInfo?.OpeningAmount > 0 ? existingOpeningAccInfo.OpeningAmount : 0;
+
+                var voucherCreditDebitDetails = await _commonfunctions.GetVoucherInfoFromVoucherId(voucherId, branchId);
+                smAmount = voucherCreditDebitDetails.Where(x => x.EntryStatus == Enums.VoucherStatus.MemberSM.ToString()).Select(x => x.VoucherAmount).FirstOrDefault();
+                admissionFeeInfo = voucherCreditDebitDetails.FirstOrDefault(x => x.EntryStatus == Enums.VoucherStatus.Cr.ToString());
+                totalDebitInfo = voucherCreditDebitDetails.Where(x => x.EntryStatus == Enums.VoucherStatus.Dr.ToString()).FirstOrDefault();
+            }
 
             VoucherDTO voucherDto = new VoucherDTO
             {
                 TotalDebit = totalDebitInfo?.VoucherAmount ?? 0,
                 smAmount = smAmount,
-                admissionFeesAccountId = admissionFeeInfo != null ? admissionFeeInfo!.AccountId : 0,
-                admissionFeeAmount = admissionFeeInfo != null ? admissionFeeInfo!.VoucherAmount : 0,
+                admissionFeesAccountId = admissionFeeInfo?.AccountId ?? 0,
+                admissionFeeAmount = admissionFeeInfo?.VoucherAmount ?? 0,
                 DebitAccountId = totalDebitInfo?.AccountId ?? 0,
-                OpeningAmount = existingOpeningAccInfo?.OpeningAmount > 0 ? existingOpeningAccInfo.OpeningAmount : 0,
+                OpeningAmount = openingAmount,
                 VoucherNarration = narration,
-                admissionFeesAccount = await _commonfunctions.GetAccountNameFromAccId(admissionFeeInfo != null ? admissionFeeInfo!.AccountId : 0, branchId, true)
+                admissionFeesAccount = await _commonfunctions.GetAccountNameFromAccId(admissionFeeInfo?.AccountId ?? 0, branchId, true)
             };
 
             AccountMasterDTO accountMasterDTO = new AccountMasterDTO
             {
-                AccountNumber = smAccInfo.AccountNumber,
-                BranchId = smAccInfo.BranchId,
-                SMAccId = smAccInfo.ID
+                AccountNumber = smAccInfo?.AccountNumber ?? "",
+                BranchId = smAccInfo?.BranchId ?? branchId,
+                SMAccId = smAccInfo?.ID ?? 0
             };
 
             var memberAccountIds = await _context.accountmaster
@@ -1012,7 +1023,7 @@ namespace BankingPlatform.API.Services
             MemberId = entity.MemberId,
             MemberBranchId = entity.MemberBranchID,
             AccOpeningDate = entity.AccOpeningDate,
-            IsAccClosed = entity.IsAccClosed,
+            IsAccClosed = entity.IsAccClosed ?? false,
             ClosingDate = entity.ClosingDate,
             ClosingRemarks = entity.ClosingRemarks,
             IsAccAddedManually = entity.IsAccAddedManually,

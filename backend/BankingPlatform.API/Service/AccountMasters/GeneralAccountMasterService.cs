@@ -323,7 +323,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             MemberId = entity.MemberId,
             MemberBranchId = entity.MemberBranchID,
             AccOpeningDate = entity.AccOpeningDate,
-            IsAccClosed = entity.IsAccClosed,
+            IsAccClosed = entity.IsAccClosed ?? false,
             ClosingDate = entity.ClosingDate,
             ClosingRemarks = entity.ClosingRemarks,
             IsAccAddedManually = entity.IsAccAddedManually,

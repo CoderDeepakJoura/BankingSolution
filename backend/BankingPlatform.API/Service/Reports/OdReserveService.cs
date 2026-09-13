@@ -54,7 +54,7 @@ namespace BankingPlatform.API.Service.Reports
         public async Task<(bool, string, List<GeneralAccountDTO>?)> GetGeneralAccountsAsync(int branchId)
         {
             var accounts = await _db.accountmaster.AsNoTracking()
-                .Where(a => a.BranchId == branchId && a.AccTypeId == (int)Enums.AccountTypes.General && !a.IsAccClosed)
+                .Where(a => a.BranchId == branchId && a.AccTypeId == (int)Enums.AccountTypes.General && a.IsAccClosed != true)
                 .OrderBy(a => a.AccountNumber)
                 .Select(a => new GeneralAccountDTO
                 {
@@ -78,7 +78,7 @@ namespace BankingPlatform.API.Service.Reports
                 where a.BranchId == branchId
                     && a.AccTypeId == (int)Enums.AccountTypes.Loan
                     && (productId == 0 || a.GeneralProductId == productId)
-                    && (!a.IsAccClosed || (a.IsAccClosed && a.ClosingDate > quarterDate))
+                    && (a.IsAccClosed != true || (a.IsAccClosed == true && a.ClosingDate > quarterDate))
                 join lp in _db.loanproduct.AsNoTracking() on a.GeneralProductId equals lp.Id into lpj
                 from lp in lpj.DefaultIfEmpty()
                 select new

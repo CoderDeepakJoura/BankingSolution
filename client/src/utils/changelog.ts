@@ -16,9 +16,12 @@ export interface VersionEntry {
 export const changelog: VersionEntry[] = [
   {
     version: "1.0.53",
-    date: "2026-09-08",
+    date: "2026-09-13",
     changes: [
-      { type: "improvement", text: "Minor updates and bug fixes" },
+      { type: "fix", text: "Ledger pages (Saving, RD, Loan, FD, Share Money) now default to the current session's date range — previously the API returned the first-ever session's dates (e.g. 2018-2019), overriding the correct initial state" },
+      { type: "fix", text: "Loan Interest Posting batch: penal interest now calculates for accounts whose overdue rate is 0 but a slab is configured — the batch was missing the slab fallback that the single-account view already had" },
+      { type: "fix", text: "Loan Interest Period Detail: penal interest now accrues even when the kist schedule table is empty — falls back to KistFirstDate to determine when penal begins, matching the single-account calculation path" },
+      { type: "fix", text: "Loan Interest Posting: added guard to prevent kist dates stored before the loan date from creating incorrect period checkpoints (protects against corrupted schedule data)" },
     ],
   },
   {

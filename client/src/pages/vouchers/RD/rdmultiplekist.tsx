@@ -38,7 +38,7 @@ const RDMultipleKistVoucher: React.FC = () => {
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
   const workingDateISO = user.workingdate
-    ? commonservice.splitDate(user.workingdate)
+    ? commonservice.parseWorkingDate(user.workingdate)
     : commonservice.getTodaysDate();
 
   const [rdProducts, setRDProducts] = useState<RDProduct[]>([]);
@@ -62,12 +62,12 @@ const RDMultipleKistVoucher: React.FC = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [prodRes, debitRes] = await Promise.all([
+      const [prodResult, debitResult] = await Promise.allSettled([
         commonservice.fetch_rd_products(user.branchid, workingDateISO),
         commonservice.general_accmasters_info(user.branchid),
       ]);
-      if (prodRes.success) setRDProducts(prodRes.data ?? []);
-      if (debitRes.success) setDebitAccounts(debitRes.data ?? []);
+      if (prodResult.status === "fulfilled" && prodResult.value.success) setRDProducts(prodResult.value.data ?? []);
+      if (debitResult.status === "fulfilled" && debitResult.value.success) setDebitAccounts(debitResult.value.data ?? []);
     };
     load();
   }, [user.branchid]);
