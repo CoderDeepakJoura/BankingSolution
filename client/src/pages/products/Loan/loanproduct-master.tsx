@@ -125,12 +125,20 @@ const LoanProductMaster: React.FC = () => {
       const res = await loanProductApiService.getLoanProductById(id, user.branchid);
       if (res.success && res.data) {
         const d = res.data;
+        const defaults = makeInitial(user.branchid, sessionDate);
         setData({
+          ...defaults,
           ...d,
           loanProductDTO: {
-            ...d.loanProductDTO!,
+            ...defaults.loanProductDTO,
+            ...d.loanProductDTO,
             effectiveFrom: d.loanProductDTO?.effectiveFrom ? commonservice.splitDate(d.loanProductDTO.effectiveFrom) : sessionDate,
           },
+          loanProductDefinitionDTO: { ...defaults.loanProductDefinitionDTO, ...d.loanProductDefinitionDTO },
+          loanProductAdvancementDTO: { ...defaults.loanProductAdvancementDTO, ...d.loanProductAdvancementDTO },
+          loanProductMarginMoneyRuleDTO: { ...defaults.loanProductMarginMoneyRuleDTO, ...d.loanProductMarginMoneyRuleDTO },
+          loanProductPostingDTO: { ...defaults.loanProductPostingDTO, ...d.loanProductPostingDTO },
+          loanProductRecoveryDTO: { ...defaults.loanProductRecoveryDTO, ...d.loanProductRecoveryDTO },
         });
       } else throw new Error(res.message || "Failed to load");
     } catch (err: any) {

@@ -221,9 +221,9 @@ namespace BankingPlatform.API.Service.ProductMasters.FD
 
             // Step 5: Map all entities to DTOs
             var fdProductDTO = MapToDTO(product);
-            var fdProductRulesDTO = MapToDTO(productRules!);
-            var fdProductPostingHeadsDTO = MapToDTO(postingHeads!);
-            var fdProductInterestRulesDTO = MapToDTO(interestRules!);
+            var fdProductRulesDTO = productRules != null ? MapToDTO(productRules) : null;
+            var fdProductPostingHeadsDTO = postingHeads != null ? MapToDTO(postingHeads) : null;
+            var fdProductInterestRulesDTO = interestRules != null ? MapToDTO(interestRules) : null;
 
             // Step 6: Combine everything into a single DTO
             return new CombinedFDDTO

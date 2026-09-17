@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.54",
+    date: "2026-09-18",
+    changes: [
+      { type: "fix", text: "RD Financial Report: P&L closing voucher (Journal VType=7, SubType=39) now correctly excluded from both period Dr/Cr columns and closing balance — was being incorrectly included because the filter used the legacy SQL Server type (VType=2) instead of the new system type" },
+      { type: "fix", text: "Loan Product Master: edit mode no longer crashes with 'Cannot read ratioOrPerc of null' — backend data is now merged with safe defaults so no sub-DTO is ever null" },
+      { type: "fix", text: "Loan Product list: clicking Edit no longer throws 'Cannot read then of undefined' — CRUDOperations now handles void-returning modifyEntry without calling .then() on it" },
+      { type: "fix", text: "Saving Product Master: loading a product in edit mode now correctly restores all fields — date was computed with wrong format and null sub-DTOs were silently spread as empty objects" },
+    ],
+  },
+  {
     version: "1.0.53",
     date: "2026-09-13",
     changes: [

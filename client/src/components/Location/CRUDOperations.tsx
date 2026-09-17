@@ -225,7 +225,7 @@ const CRUDMaster = <T,>({
           ) : data.length > 0 ? (
             renderTable(
               data,
-              (item) => modifyEntry(item).then(loadData),
+              (item) => { const r = modifyEntry(item); return r && typeof (r as any).then === 'function' ? (r as any).then(loadData) : undefined; },
               (item) => deleteEntry(item).then(loadData)
             )
           ) : (

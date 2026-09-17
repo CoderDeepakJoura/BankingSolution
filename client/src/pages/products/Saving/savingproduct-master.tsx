@@ -88,7 +88,7 @@ const SavingsProductMaster = () => {
 
   const user = useSelector((state: RootState) => state.user);
 
-  const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
+  const sessionDate = user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : commonservice.getTodaysDate();
 
   const { errors, validateForm, clearErrors, markFieldTouched } =
 
@@ -114,7 +114,7 @@ const SavingsProductMaster = () => {
 
       savingsProductDTO: {
 
-        ...data.savingsProductDTO!,
+        ...(data.savingsProductDTO ?? {}),
 
         effectiveFrom: data.savingsProductDTO?.effectiveFrom
 
@@ -132,19 +132,19 @@ const SavingsProductMaster = () => {
 
       savingsProductRulesDTO: {
 
-        ...data.savingsProductRulesDTO!,
+        ...(data.savingsProductRulesDTO ?? {}),
 
       },
 
       savingsProductPostingHeadsDTO: {
 
-        ...data.savingsProductPostingHeadsDTO!,
+        ...(data.savingsProductPostingHeadsDTO ?? {}),
 
       },
 
       savingsProductInterestRulesDTO: {
 
-        ...data.savingsProductInterestRulesDTO!,
+        ...(data.savingsProductInterestRulesDTO ?? {}),
 
         applicableDate: data.savingsProductInterestRulesDTO?.applicableDate
 
@@ -382,7 +382,14 @@ const SavingsProductMaster = () => {
 
         const formattedData = formatDatesInDTO(response.data);
 
-        setCombinedSavingsData(formattedData);
+        setCombinedSavingsData((prev) => ({
+          ...prev,
+          ...formattedData,
+          savingsProductDTO: { ...prev.savingsProductDTO, ...formattedData.savingsProductDTO },
+          savingsProductRulesDTO: { ...prev.savingsProductRulesDTO, ...formattedData.savingsProductRulesDTO },
+          savingsProductPostingHeadsDTO: { ...prev.savingsProductPostingHeadsDTO, ...formattedData.savingsProductPostingHeadsDTO },
+          savingsProductInterestRulesDTO: { ...prev.savingsProductInterestRulesDTO, ...formattedData.savingsProductInterestRulesDTO },
+        }));
 
       } else {
 

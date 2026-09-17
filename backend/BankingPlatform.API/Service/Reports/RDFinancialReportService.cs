@@ -81,6 +81,9 @@ namespace BankingPlatform.API.Service.Reports
 
             var rows = new List<RDFinRowDTO>();
 
+            // SP excludes VType=2 / VSubType=39 (legacy ProfitLossAcc) from period Dr/Cr.
+            // Filter is applied inline via JOIN to voucher table in period queries below.
+
             // ══════════════════════════════════════════════════════════════════════════════
             // PART A — Non-annexure heads: per-account Dr/Cr + closing balance
             // ══════════════════════════════════════════════════════════════════════════════
@@ -100,36 +103,42 @@ namespace BankingPlatform.API.Service.Reports
                 {
                     var accIds = accounts.Select(a => a.ID).ToList();
 
-                    // Period Dr/Cr grouped by AccountId
-                    var periodBals = await _db.vouchercreditdebitdetails.AsNoTracking()
-                        .Where(d => d.BrId == branchId
+                    // Period Dr/Cr grouped by AccountId (exclude P&L closing voucher — VType=7, VSubType=39)
+                    var periodBals = await (
+                        from d in _db.vouchercreditdebitdetails.AsNoTracking()
+                        join v in _db.voucher.AsNoTracking() on d.VoucherID equals v.Id
+                        where d.BrId == branchId
                             && (d.VoucherStatus == "V" || d.VoucherStatus == "A")
                             && d.ValueDate >= fromDate.Date
                             && d.ValueDate < nextDay
-                            && accIds.Contains(d.AccountId))
-                        .GroupBy(d => d.AccountId)
-                        .Select(g => new
+                            && accIds.Contains(d.AccountId)
+                            && !(v.VoucherType == 7 && v.VoucherSubType == 39)
+                        group d by d.AccountId into g
+                        select new
                         {
                             AccountId = g.Key,
-                            Dr = g.Where(d => d.VoucherEntryType == "Dr").Sum(d => d.VoucherAmount),
-                            Cr = g.Where(d => d.VoucherEntryType == "Cr").Sum(d => d.VoucherAmount),
-                        })
-                        .ToListAsync();
+                            Dr = g.Where(x => x.VoucherEntryType == "Dr").Sum(x => x.VoucherAmount),
+                            Cr = g.Where(x => x.VoucherEntryType == "Cr").Sum(x => x.VoucherAmount),
+                        }
+                    ).ToListAsync();
 
-                    // Closing Dr/Cr (all transactions up to toDate)
-                    var closeBals = await _db.vouchercreditdebitdetails.AsNoTracking()
-                        .Where(d => d.BrId == branchId
+                    // Closing Dr/Cr (all transactions up to toDate, excluding P&L closing voucher)
+                    var closeBals = await (
+                        from d in _db.vouchercreditdebitdetails.AsNoTracking()
+                        join v in _db.voucher.AsNoTracking() on d.VoucherID equals v.Id
+                        where d.BrId == branchId
                             && (d.VoucherStatus == "V" || d.VoucherStatus == "A")
                             && d.ValueDate < nextDay
-                            && accIds.Contains(d.AccountId))
-                        .GroupBy(d => d.AccountId)
-                        .Select(g => new
+                            && accIds.Contains(d.AccountId)
+                            && !(v.VoucherType == 7 && v.VoucherSubType == 39)
+                        group d by d.AccountId into g
+                        select new
                         {
                             AccountId = g.Key,
-                            TotalDr = g.Where(d => d.VoucherEntryType == "Dr").Sum(d => d.VoucherAmount),
-                            TotalCr = g.Where(d => d.VoucherEntryType == "Cr").Sum(d => d.VoucherAmount),
-                        })
-                        .ToListAsync();
+                            TotalDr = g.Where(x => x.VoucherEntryType == "Dr").Sum(x => x.VoucherAmount),
+                            TotalCr = g.Where(x => x.VoucherEntryType == "Cr").Sum(x => x.VoucherAmount),
+                        }
+                    ).ToListAsync();
 
                     // Standard opening balances (Saving/General/RD/ShareMoney)
                     var obs = await _db.accopeningbalance.AsNoTracking()
@@ -238,34 +247,41 @@ namespace BankingPlatform.API.Service.Reports
                 var expandedHcs = childToParent.Keys.ToList();
 
                 // Period Dr/Cr per child head code, then aggregate to parent
-                var annPeriodRaw = await _db.vouchercreditdebitdetails.AsNoTracking()
-                    .Where(d => d.BrId == branchId
+                // (exclude P&L closing voucher — VType=7, VSubType=39)
+                var annPeriodRaw = await (
+                    from d in _db.vouchercreditdebitdetails.AsNoTracking()
+                    join v in _db.voucher.AsNoTracking() on d.VoucherID equals v.Id
+                    where d.BrId == branchId
                         && (d.VoucherStatus == "V" || d.VoucherStatus == "A")
                         && d.ValueDate >= fromDate.Date
                         && d.ValueDate < nextDay
-                        && expandedHcs.Contains(d.AccHeadCode))
-                    .GroupBy(d => d.AccHeadCode)
-                    .Select(g => new
+                        && expandedHcs.Contains(d.AccHeadCode)
+                        && !(v.VoucherType == 7 && v.VoucherSubType == 39)
+                    group d by d.AccHeadCode into g
+                    select new
                     {
                         HeadCode = g.Key,
-                        Dr = g.Where(d => d.VoucherEntryType == "Dr").Sum(d => d.VoucherAmount),
-                        Cr = g.Where(d => d.VoucherEntryType == "Cr").Sum(d => d.VoucherAmount),
-                    })
-                    .ToListAsync();
+                        Dr = g.Where(x => x.VoucherEntryType == "Dr").Sum(x => x.VoucherAmount),
+                        Cr = g.Where(x => x.VoucherEntryType == "Cr").Sum(x => x.VoucherAmount),
+                    }
+                ).ToListAsync();
 
-                var annCloseRaw = await _db.vouchercreditdebitdetails.AsNoTracking()
-                    .Where(d => d.BrId == branchId
+                var annCloseRaw = await (
+                    from d in _db.vouchercreditdebitdetails.AsNoTracking()
+                    join v in _db.voucher.AsNoTracking() on d.VoucherID equals v.Id
+                    where d.BrId == branchId
                         && (d.VoucherStatus == "V" || d.VoucherStatus == "A")
                         && d.ValueDate < nextDay
-                        && expandedHcs.Contains(d.AccHeadCode))
-                    .GroupBy(d => d.AccHeadCode)
-                    .Select(g => new
+                        && expandedHcs.Contains(d.AccHeadCode)
+                        && !(v.VoucherType == 7 && v.VoucherSubType == 39)
+                    group d by d.AccHeadCode into g
+                    select new
                     {
                         HeadCode = g.Key,
-                        TotalDr = g.Where(d => d.VoucherEntryType == "Dr").Sum(d => d.VoucherAmount),
-                        TotalCr = g.Where(d => d.VoucherEntryType == "Cr").Sum(d => d.VoucherAmount),
-                    })
-                    .ToListAsync();
+                        TotalDr = g.Where(x => x.VoucherEntryType == "Dr").Sum(x => x.VoucherAmount),
+                        TotalCr = g.Where(x => x.VoucherEntryType == "Cr").Sum(x => x.VoucherAmount),
+                    }
+                ).ToListAsync();
 
                 // Aggregate to parent reporting head
                 var annPeriodDr = new Dictionary<long, decimal>();
@@ -368,23 +384,27 @@ namespace BankingPlatform.API.Service.Reports
                 .OrderBy(r => headCodeById.TryGetValue(r.HeadId, out var hc) ? hc : long.MaxValue)
                 .ToList();
 
-            // Totals computed before Cash Head row so it doesn't inflate the period sums
-            var totalDr  = rows.Sum(r => r.PeriodDr);
-            var totalCr  = rows.Sum(r => r.PeriodCr);
-            var totalClCr = rows.Sum(r => r.ClosingBalance > 0 ? r.ClosingBalance : 0m);
-            var totalClDr = rows.Sum(r => r.ClosingBalance < 0 ? Math.Abs(r.ClosingBalance) : 0m);
-
             // ── PART C — Cash Head special row (mirrors SP lines 46747–46755) ─────────────
             // Dr column repurposed → closing cash balance at ToDate
             // Cr column repurposed → opening/beginning cash balance at FromDate
             {
-                const long cashMin = 110_000_000_000L;
-                const long cashMax = 110_999_999_999L;
-
-                var cashAccIds = await _db.accountmaster.AsNoTracking()
-                    .Where(a => a.BranchId == branchId && a.HeadCode >= cashMin && a.HeadCode <= cashMax)
-                    .Select(a => a.ID)
+                // SP uses LEFT(CAST(headcode,3))='110' — string prefix, not numeric range.
+                // Migrated headcodes may be shorter than 12 digits (e.g. 1100000), so a
+                // numeric range check (>= 110_000_000_000) misses them.  Match by prefix in memory.
+                var allBranchHeadCodes = await _db.accounthead.AsNoTracking()
+                    .Where(h => h.branchid == branchId)
+                    .Select(h => h.headcode)
                     .ToListAsync();
+                var cashHeadCodes = allBranchHeadCodes
+                    .Where(hc => hc.ToString().StartsWith("110"))
+                    .ToList();
+
+                var cashAccIds = cashHeadCodes.Any()
+                    ? await _db.accountmaster.AsNoTracking()
+                        .Where(a => a.BranchId == branchId && cashHeadCodes.Contains(a.HeadCode))
+                        .Select(a => a.ID)
+                        .ToListAsync()
+                    : new List<int>();
 
                 decimal cashObCr = 0m, cashObDr = 0m;
                 if (cashAccIds.Any())
@@ -396,32 +416,37 @@ namespace BankingPlatform.API.Service.Reports
                     cashObDr = cashObs.Where(ob => ob.EntryType?.ToUpper() == "DR").Sum(ob => ob.OpeningAmount);
                 }
 
+                // Filter by AccountId (reliable in migrated data); AccHeadCode is often 0.
+                // EF Core translates an empty cashAccIds.Contains() to WHERE 1=0 (no rows).
                 var cashVcToDate = await _db.vouchercreditdebitdetails.AsNoTracking()
                     .Where(d => d.BrId == branchId
                         && (d.VoucherStatus == "V" || d.VoucherStatus == "A")
                         && d.ValueDate < nextDay
-                        && d.AccHeadCode >= cashMin && d.AccHeadCode <= cashMax)
+                        && cashAccIds.Contains(d.AccountId))
                     .GroupBy(d => d.VoucherEntryType)
                     .Select(g => new { Type = g.Key, Total = g.Sum(d => d.VoucherAmount) })
                     .ToListAsync();
 
-                var fromNextDay = fromDate.Date.AddDays(1);
+                // SP 'F' mode: VDate < @FromDate (strictly before; opening = balance before the period starts)
                 var cashVcFromDate = await _db.vouchercreditdebitdetails.AsNoTracking()
                     .Where(d => d.BrId == branchId
                         && (d.VoucherStatus == "V" || d.VoucherStatus == "A")
-                        && d.ValueDate < fromNextDay
-                        && d.AccHeadCode >= cashMin && d.AccHeadCode <= cashMax)
+                        && d.ValueDate < fromDate.Date
+                        && cashAccIds.Contains(d.AccountId))
                     .GroupBy(d => d.VoucherEntryType)
                     .Select(g => new { Type = g.Key, Total = g.Sum(d => d.VoucherAmount) })
                     .ToListAsync();
 
-                decimal closingCashBal = (cashObCr - cashObDr)
-                    + (cashVcToDate.FirstOrDefault(x => x.Type == "Cr")?.Total ?? 0m)
-                    - (cashVcToDate.FirstOrDefault(x => x.Type == "Dr")?.Total ?? 0m);
+                // SP formula (GetBalanceHEAD line 35099): Balance = Debit - Credit + OpenBal
+                // where OpenBal = DR_opening - CR_opening  (Dr-normal asset account)
+                decimal closingCashBal = (cashObDr - cashObCr)
+                    + (cashVcToDate.FirstOrDefault(x => x.Type == "Dr")?.Total ?? 0m)
+                    - (cashVcToDate.FirstOrDefault(x => x.Type == "Cr")?.Total ?? 0m);
 
-                decimal openingCashBal = (cashObCr - cashObDr)
-                    + (cashVcFromDate.FirstOrDefault(x => x.Type == "Cr")?.Total ?? 0m)
-                    - (cashVcFromDate.FirstOrDefault(x => x.Type == "Dr")?.Total ?? 0m);
+                // SP 'F' mode: VDate < @FromDate (strictly before fromDate, not <= fromDate)
+                decimal openingCashBal = (cashObDr - cashObCr)
+                    + (cashVcFromDate.FirstOrDefault(x => x.Type == "Dr")?.Total ?? 0m)
+                    - (cashVcFromDate.FirstOrDefault(x => x.Type == "Cr")?.Total ?? 0m);
 
                 rows.Add(new RDFinRowDTO
                 {
@@ -437,6 +462,13 @@ namespace BankingPlatform.API.Service.Reports
                     TypeName       = "",
                 });
             }
+
+            // Totals include Cash Head Dr (closing cash) and Cr (opening cash) — mirrors SP
+            // where the Cash Head row is part of #FinalRes and summed in the grand total.
+            var totalDr   = rows.Sum(r => r.PeriodDr);
+            var totalCr   = rows.Sum(r => r.PeriodCr);
+            var totalClCr = rows.Sum(r => r.ClosingBalance > 0 ? r.ClosingBalance : 0m);
+            var totalClDr = rows.Sum(r => r.ClosingBalance < 0 ? Math.Abs(r.ClosingBalance) : 0m);
 
             return (true, "OK", new RDFinancialReportDTO
             {

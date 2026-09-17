@@ -603,15 +603,16 @@ namespace BankingPlatform.API.Service.AccountMasters
             // Fetch membership number (PM / NM mode)
             string[] membershipModes = new[] { "PM", "NM" };
             string membershipNo = "";
-            if (acc.MemberId.HasValue && acc.MemberBranchID.HasValue && membershipModes.Contains(acc.addedusing))
+            if (acc.MemberId.HasValue && acc.MemberBranchID.HasValue && acc.addedusing != null && membershipModes.Contains(acc.addedusing))
             {
                 int memberType = acc.addedusing == "NM" ? 1 : 2;
                 membershipNo = await _commonFunctions.GetMemberShipNoFromMemberIDandBranchID(
                     acc.MemberId.Value, acc.MemberBranchID.Value, memberType);
             }
 
-            acc.AccPrefix = acc.AccountNumber.Split('-')[0];
-            acc.AccSuffix = Int32.Parse(acc.AccountNumber.Split('-')[1]);
+            var accNumParts = (acc.AccountNumber ?? "").Split('-');
+            acc.AccPrefix = accNumParts[0];
+            acc.AccSuffix = accNumParts.Length > 1 && int.TryParse(accNumParts[1], out var parsedSuffix) ? parsedSuffix : 0;
             // Overwrite AccountNumber with the member's share money account number
             // (same pattern as RD/Saving GET — frontend uses this for the member lookup field)
             if (acc.MemberId.HasValue && acc.MemberBranchID.HasValue)
