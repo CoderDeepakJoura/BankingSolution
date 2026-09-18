@@ -1,6 +1,7 @@
 ﻿// BankingPlatform.API.Controllers.ProductMasters/SavingsProductController.cs
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.ProductMasters.Saving;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.API.Service.ProductMasters.Savings;
 using BankingPlatform.API.Services;
 using Microsoft.AspNetCore.Http;
@@ -15,11 +16,13 @@ namespace BankingPlatform.API.Controllers.ProductMasters
     {
         private readonly SavingsProductService _service;
         private readonly CommonFunctions _commonfunctions;
+        private readonly MasterUsageCheckerService _usageChecker;
 
-        public SavingsProductController(SavingsProductService service, CommonFunctions commonfunctions)
+        public SavingsProductController(SavingsProductService service, CommonFunctions commonfunctions, MasterUsageCheckerService usageChecker)
         {
             _service = service;
             _commonfunctions = commonfunctions;
+            _usageChecker = usageChecker;
         }
 
         /// <summary>
@@ -185,6 +188,10 @@ namespace BankingPlatform.API.Controllers.ProductMasters
         {
             try
             {
+                var usages = await _usageChecker.CheckAsync(MasterType.SavingProduct, id, branchId);
+                if (usages.Count > 0)
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 var success = await _service.DeleteProductAsync(id, branchId);
 
                 if (!success)

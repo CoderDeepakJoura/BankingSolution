@@ -1,6 +1,7 @@
 import { encryptId } from '../../../utils/encryption';
 import React, { useCallback } from "react";
 import Swal from "sweetalert2";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import LoanProductTable from "./loanproduct-table";
 import { useNavigate } from "react-router-dom";
@@ -124,19 +125,11 @@ const LoanProductMasterCRUD: React.FC = () => {
           throw new Error((res as any).message || "Failed to delete Loan Product");
         }
       } catch (err: any) {
-        await Swal.fire({
-          title: "Error!",
-          html: `<div style="text-align:left;padding:10px;">
-            <p style="margin-bottom:8px;">Failed to delete Loan Product.</p>
-            <div style="background:#fef2f2;padding:10px;border-radius:6px;border-left:4px solid #ef4444;">
-              <p style="font-size:13px;color:#991b1b;margin:0;">
-                <strong>Error:</strong> ${err.message || "Unknown error occurred"}
-              </p>
-            </div>
-          </div>`,
-          icon: "error",
-          confirmButtonColor: "#EF4444",
-        });
+        if (isMasterInUseError(err)) {
+          await showMasterInUseError(err.usages, product.productName);
+        } else {
+          await Swal.fire({ title: "Error!", text: err.message || "Failed to delete Loan Product.", icon: "error", confirmButtonColor: "#EF4444" });
+        }
       }
     }
   };

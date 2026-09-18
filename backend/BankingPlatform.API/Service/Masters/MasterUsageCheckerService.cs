@@ -1,3 +1,5 @@
+using BankingPlatform.API.Common;
+
 namespace BankingPlatform.API.Service.Masters;
 
 public enum MasterType
@@ -14,7 +16,11 @@ public enum MasterType
     Tehsil,
     Thana,
     Village,
-    Zone
+    Zone,
+    SavingProduct,
+    FDProduct,
+    RDProduct,
+    LoanProduct
 }
 
 public class UsageInfo
@@ -156,6 +162,58 @@ public class MasterUsageCheckerService
 
                 int c2 = await _context.memberlocationdetails.CountAsync(x => x.BranchId == branchId && (x.ZoneId1 == id || x.ZoneId2 == id));
                 if (c2 > 0) usages.Add(new UsageInfo { Screen = "Member Address", Count = c2 });
+                break;
+            }
+
+            case MasterType.SavingProduct:
+            {
+                int c1 = await _context.accountmaster.CountAsync(x => x.BranchId == branchId && x.GeneralProductId == id && x.AccTypeId == (int)Enums.AccountTypes.Saving);
+                if (c1 > 0) usages.Add(new UsageInfo { Screen = "Saving Account Master", Count = c1 });
+
+                int c2 = await _context.savingproductbranchwiserule.CountAsync(x => x.BranchId == branchId && x.SavingProductId == id);
+                if (c2 > 0) usages.Add(new UsageInfo { Screen = "Branch-wise Rules", Count = c2 });
+
+                int c3 = await _context.savinginterestslab.CountAsync(x => x.BranchId == branchId && x.SavingProductId == id);
+                if (c3 > 0) usages.Add(new UsageInfo { Screen = "Interest Slabs", Count = c3 });
+                break;
+            }
+
+            case MasterType.FDProduct:
+            {
+                int c1 = await _context.accountmaster.CountAsync(x => x.BranchId == branchId && x.GeneralProductId == id && x.AccTypeId == (int)Enums.AccountTypes.FD);
+                if (c1 > 0) usages.Add(new UsageInfo { Screen = "FD Account Master", Count = c1 });
+
+                int c2 = await _context.fdproductbranchwiserule.CountAsync(x => x.BranchId == branchId && x.FDProductId == id);
+                if (c2 > 0) usages.Add(new UsageInfo { Screen = "Branch-wise Rules", Count = c2 });
+
+                int c3 = await _context.fdinterestslab.CountAsync(x => x.BranchId == branchId && x.FDProductId == id);
+                if (c3 > 0) usages.Add(new UsageInfo { Screen = "Interest Slabs", Count = c3 });
+                break;
+            }
+
+            case MasterType.RDProduct:
+            {
+                int c1 = await _context.accountmaster.CountAsync(x => x.BranchId == branchId && x.GeneralProductId == id && x.AccTypeId == (int)Enums.AccountTypes.RD);
+                if (c1 > 0) usages.Add(new UsageInfo { Screen = "RD Account Master", Count = c1 });
+
+                int c2 = await _context.rdproductbranchwiserule.CountAsync(x => x.BrId == branchId && x.RDProductId == id);
+                if (c2 > 0) usages.Add(new UsageInfo { Screen = "Branch-wise Rules", Count = c2 });
+
+                int c3 = await _context.rdinterestslab.CountAsync(x => x.BranchId == branchId && x.RDProductId == id);
+                if (c3 > 0) usages.Add(new UsageInfo { Screen = "Interest Slabs", Count = c3 });
+                break;
+            }
+
+            case MasterType.LoanProduct:
+            {
+                int c1 = await _context.accountmaster.CountAsync(x => x.BranchId == branchId && x.GeneralProductId == id && x.AccTypeId == (int)Enums.AccountTypes.Loan);
+                if (c1 > 0) usages.Add(new UsageInfo { Screen = "Loan Account Master", Count = c1 });
+
+                int c2 = await _context.loanproductbranchwiserule.CountAsync(x => x.BranchId == branchId && x.LoanProductId == id);
+                if (c2 > 0) usages.Add(new UsageInfo { Screen = "Branch-wise Rules", Count = c2 });
+
+                int c3 = await _context.loanslab.CountAsync(x => x.BrId == branchId && x.LoanProductId == id);
+                if (c3 > 0) usages.Add(new UsageInfo { Screen = "Loan Slabs", Count = c3 });
                 break;
             }
         }

@@ -351,6 +351,14 @@ namespace BankingPlatform.API.Service.AccountMasters
                 int memberType = accountMaster.addedusing == "NM" ? 1 : 2;
                 membershipNo = await _commonfunctions.GetMemberShipNoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, memberType);
             }
+            // For legacy accounts: AccPrefix and AccSuffix are null/0 but AccountNumber holds the flat legacy number.
+            // Extract prefix/suffix from AccountNumber before overwriting it with the share money account number.
+            if ((accountMaster.AccPrefix == null || accountMaster.AccPrefix == "") && (accountMaster.AccSuffix == null || accountMaster.AccSuffix == 0))
+            {
+                var accNumParts = (accountMaster.AccountNumber ?? "").Split('-');
+                accountMaster.AccPrefix = accNumParts[0];
+                accountMaster.AccSuffix = accNumParts.Length > 1 && int.TryParse(accNumParts[1], out var parsedSuffix) ? parsedSuffix : 0;
+            }
             accountMaster.AccountNumber = await _commonfunctions.GetShareMoneyAccNoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, (int)Enums.AccountTypes.ShareMoney);
             string savingAccountInfo = await _commonfunctions.GetSavingAccInfoFromMemberIDandBranchID((int)accountMaster.MemberId!, (int)accountMaster.MemberBranchID!, (int)Enums.AccountTypes.Saving);
 

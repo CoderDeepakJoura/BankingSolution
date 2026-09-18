@@ -106,8 +106,8 @@ namespace BankingPlatform.API.Common.CommonFunctions
         public async Task LogErrors(Exception ex, string functionName, string screenName)
         {
             var user = _httpContextAccessor.HttpContext!.User!;
-            int branchId = Int32.Parse(user.FindFirst("branchId")?.Value!);
-            int userId = Int32.Parse(user.FindFirst("userId")?.Value!);
+            int.TryParse(user.FindFirst("branchId")?.Value, out int branchId);
+            int.TryParse(user.FindFirst("userId")?.Value, out int userId);
             var ErrorlogInfo = new ErrorLog
             {
                 BranchId = branchId,

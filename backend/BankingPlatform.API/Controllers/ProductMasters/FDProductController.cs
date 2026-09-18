@@ -1,6 +1,7 @@
 ﻿using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.ProductMasters.FD;
 using BankingPlatform.API.Service;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.API.Service.ProductMasters.FD;
 using BankingPlatform.API.Services;
 using Microsoft.AspNetCore.Http;
@@ -16,11 +17,13 @@ namespace BankingPlatform.API.Controllers.ProductMasters
     {
         private readonly FDProductService _service;
         private readonly CommonFunctions _commonfunctions;
+        private readonly MasterUsageCheckerService _usageChecker;
 
-        public FDProductController(FDProductService service, CommonFunctions commonfunctions)
+        public FDProductController(FDProductService service, CommonFunctions commonfunctions, MasterUsageCheckerService usageChecker)
         {
             _service = service;
             _commonfunctions = commonfunctions;
+            _usageChecker = usageChecker;
         }
 
         [HttpPost]
@@ -121,6 +124,10 @@ namespace BankingPlatform.API.Controllers.ProductMasters
         {
             try
             {
+                var usages = await _usageChecker.CheckAsync(MasterType.FDProduct, id, branchId);
+                if (usages.Count > 0)
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 var success = await _service.DeleteProductAsync(id, branchId);
                 if (!success) return NotFound();
                 return Ok(new ResponseDto { Success = true, Message = "FD Product deleted successfully" });

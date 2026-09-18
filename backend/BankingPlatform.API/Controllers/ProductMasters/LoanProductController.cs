@@ -1,6 +1,7 @@
 using BankingPlatform.API.Common;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.ProductMasters.Loan;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.API.Service.ProductMasters.Loan;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,11 +14,13 @@ namespace BankingPlatform.API.Controllers.ProductMasters
     {
         private readonly LoanProductService _service;
         private readonly CommonFunctions _commonFunctions;
+        private readonly MasterUsageCheckerService _usageChecker;
 
-        public LoanProductController(LoanProductService service, CommonFunctions commonFunctions)
+        public LoanProductController(LoanProductService service, CommonFunctions commonFunctions, MasterUsageCheckerService usageChecker)
         {
             _service = service;
             _commonFunctions = commonFunctions;
+            _usageChecker = usageChecker;
         }
 
         [HttpPost]
@@ -84,6 +87,10 @@ namespace BankingPlatform.API.Controllers.ProductMasters
         {
             try
             {
+                var usages = await _usageChecker.CheckAsync(MasterType.LoanProduct, id, branchId);
+                if (usages.Count > 0)
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 var success = await _service.DeleteProductAsync(id, branchId);
                 if (!success) return NotFound();
                 return Ok(new ResponseDto { Success = true, Message = "Loan Product deleted successfully." });

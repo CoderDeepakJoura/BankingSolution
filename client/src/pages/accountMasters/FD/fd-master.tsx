@@ -165,7 +165,11 @@ const FDAccountMaster = () => {
                 memberAccountNo: data.accountMasterDTO.accountNumber || "",
                 membershipNo: data.accountMasterDTO.membershipNo || "",
                 fdPrefix: data.accountMasterDTO.accPrefix || "",
-                suffix: data.accountMasterDTO.accSuffix?.toString() || "",
+                // For legacy accounts: accSuffix = 0, accPrefix holds the flat legacy number.
+                // For new accounts: accSuffix = the numeric suffix.
+                suffix: (data.accountMasterDTO.accSuffix && data.accountMasterDTO.accSuffix !== 0)
+                  ? data.accountMasterDTO.accSuffix.toString()
+                  : (data.accountMasterDTO.accPrefix || ""),
                 openingBalance: data.openingBalance?.toString() || "",
                 balanceType: data.openingBalanceType?.toString() || "Cr",
                 addedUsing: addedUsing || "A",

@@ -304,6 +304,38 @@ const LoanAccountMaster: React.FC = () => {
     setKistData(p => ({ ...p, kistPrintPart: prinPart.toString() }));
   }, [kistData.loanAmount, kistData.loanPeriod, kistData.kistInterval]);
 
+  // ── Auto-compute kist amount when rate is set and all required fields are ready ──
+  useEffect(() => {
+    const rate = parseFloat(kistData.stdIntRate);
+    if (!rate) return;
+    const loan     = parseFloat(kistData.loanAmount);
+    const period   = parseInt(kistData.loanPeriod);
+    const interval = parseInt(kistData.kistInterval);
+    if (!loan || !period || !interval || !kistData.firstKistDate || !kistData.loanNo.trim()) return;
+    loanAccountApi.calculateSchedule({
+      loanAmount:    loan,
+      stdIntRate:    rate,
+      loanPeriod:    period,
+      kistInterval:  interval,
+      firstKistDate: kistData.firstKistDate,
+      intFormulae:   kistData.intFormulae,
+      intSchedule:   kistData.intSchedule,
+    }).then(res => {
+      if (res.success && (res as any).data) {
+        const d = (res as any).data;
+        setSchedule(d.schedule ?? []);
+        setKistData(prev => ({
+          ...prev,
+          kistAmount:    d.kistAmount,
+          kistIntPart:   d.kistIntPart,
+          kistPrintPart: d.kistPrinPart?.toString() ?? prev.kistPrintPart,
+          intAmount:     d.totalInterest,
+        }));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kistData.stdIntRate]);
+
   // ── FD/RD accounts filtered by opening date ──────────────────────────────────
   useEffect(() => {
     if (!formData.openingDate) return;
@@ -343,9 +375,11 @@ const LoanAccountMaster: React.FC = () => {
           setInputMode(resolvedMode);
           setMemberType(resolvedMemberType);
 
-          const storedAccNo = acc.accountNumber ?? "";
-          const accNoParts = storedAccNo.split('-');
-          const loadedSuffix = acc.accSuffix ?? "";
+          // For legacy accounts, accSuffix = 0 and accPrefix holds the flat account number (e.g. "204").
+          // For new accounts, accSuffix = the numeric suffix, accPrefix = product code (shown as label).
+          const loadedSuffix = (acc.accSuffix && acc.accSuffix !== 0)
+            ? String(acc.accSuffix)
+            : (acc.accPrefix ?? "");
 
           setFormData(prev => ({
             ...prev, selectedProductId: acc.generalProductId ?? 0,
@@ -483,6 +517,7 @@ const LoanAccountMaster: React.FC = () => {
     const productId = opt?.value ?? 0;
     setFormData(prev => ({ ...prev, selectedProductId: productId }));
     setLoanSlabs([]);
+    setManualIntRate(false);
     setKistData(prev => ({ ...prev, slabId: 0, stdIntRate: "", overIntRate: "" }));
     if (!productId) { setProductInfo(null); return; }
 
@@ -520,10 +555,17 @@ const LoanAccountMaster: React.FC = () => {
 
   // ── Auto-detect slab by amount + period + effective date ─────────────────────
   const applySlabRates = (amountStr: string, periodStr?: string) => {
-    if (!amountStr || loanSlabs.length === 0) return;
+    if (!amountStr) return;
     const amount = parseFloat(amountStr);
-    const period = parseInt(periodStr ?? kistData.loanPeriod);
     if (isNaN(amount)) return;
+
+    if (loanSlabs.length === 0) {
+      setKistData(prev => ({ ...prev, slabId: 0, stdIntRate: "", overIntRate: "" }));
+      setManualIntRate(true);
+      return;
+    }
+
+    const period = parseInt(periodStr ?? kistData.loanPeriod);
 
     // Latest slab first (newest date wins when multiple slabs exist for a product)
     const effectiveSlabs = [...loanSlabs]

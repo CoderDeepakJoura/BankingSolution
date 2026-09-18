@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.55",
+    date: "2026-09-18",
+    changes: [
+      { type: "fix", text: "Loan Account Master: legacy accounts (migrated from SQL Server) now correctly show their account number in the A/C No. field — was showing internal DB id instead of the actual account number" },
+      { type: "fix", text: "FD Account Master: same legacy account number fix applied — suffix now correctly restored from stored account number instead of internal id" },
+      { type: "new", text: "Product deletion protection: Saving, FD, RD, and Loan products can no longer be deleted if accounts, branch-wise rules, or interest slabs reference them — a clear breakdown of where the product is in use is shown" },
+      { type: "fix", text: "Login: fixed null crash in LogErrors when JWT claims are absent (e.g. during login failure) — Int32.Parse now safely handles missing claims" },
+    ],
+  },
+  {
     version: "1.0.54",
     date: "2026-09-18",
     changes: [

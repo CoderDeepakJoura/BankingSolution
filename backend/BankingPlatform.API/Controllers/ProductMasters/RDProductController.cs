@@ -1,5 +1,6 @@
 ﻿using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.ProductMasters.RD;
+using BankingPlatform.API.Service.Masters;
 using BankingPlatform.API.Service.ProductMasters.RD;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -12,11 +13,13 @@ namespace BankingPlatform.API.Controllers.ProductMasters
     {
         private readonly RDProductService _service;
         private readonly CommonFunctions _commonfunctions;
+        private readonly MasterUsageCheckerService _usageChecker;
 
-        public RDProductController(RDProductService service, CommonFunctions commonfunctions)
+        public RDProductController(RDProductService service, CommonFunctions commonfunctions, MasterUsageCheckerService usageChecker)
         {
             _service = service;
             _commonfunctions = commonfunctions;
+            _usageChecker = usageChecker;
         }
 
         // POST api/rdproduct
@@ -140,6 +143,10 @@ namespace BankingPlatform.API.Controllers.ProductMasters
         {
             try
             {
+                var usages = await _usageChecker.CheckAsync(MasterType.RDProduct, id, branchId);
+                if (usages.Count > 0)
+                    return Conflict(new { Success = false, InUse = true, Usages = usages });
+
                 var success = await _service.DeleteProductAsync(id, branchId);
 
                 if (!success)

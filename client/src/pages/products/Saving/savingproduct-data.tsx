@@ -2,6 +2,7 @@
 import { encryptId, decryptId } from '../../../utils/encryption';
 import React, { useState, useCallback } from "react";
 import Swal from "sweetalert2";
+import { isMasterInUseError, showMasterInUseError } from "../../../utils/masterDeleteUtils";
 import CRUDMaster from "../../../components/Location/CRUDOperations";
 import SavingProductTable from "./savingproduct-table";
 import { useNavigate } from "react-router-dom";
@@ -158,25 +159,11 @@ const SavingProductMasterCRUD: React.FC = () => {
           throw new Error(deleteResponse.message || "Failed to delete Saving Product");
         }
       } catch (err: any) {
-        console.error("Delete error:", err);
-        await Swal.fire({
-          title: "Error!",
-          html: `
-            <div style="text-align:left;padding:10px;">
-              <p style="margin-bottom:8px;">Failed to delete Saving Product.</p>
-              <div style="background:#fef2f2;padding:10px;border-radius:6px;border-left:4px solid #ef4444;">
-                <p style="font-size:13px;color:#991b1b;margin:0;">
-                  <strong>Error:</strong> ${err.message || "Unknown error occurred"}
-                </p>
-              </div>
-              <p style="font-size:12px;color:#6b7280;margin-top:8px;">
-                Please try again or contact support if the issue persists.
-              </p>
-            </div>
-          `,
-          icon: "error",
-          confirmButtonColor: "#EF4444",
-        });
+        if (isMasterInUseError(err)) {
+          await showMasterInUseError(err.usages, product.productName);
+        } else {
+          await Swal.fire({ title: "Error!", text: err.message || "Failed to delete Saving Product.", icon: "error", confirmButtonColor: "#EF4444" });
+        }
       }
     }
   };
