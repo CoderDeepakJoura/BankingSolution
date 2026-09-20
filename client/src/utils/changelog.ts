@@ -15,6 +15,14 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.70",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan interest batch: expired-schedule accounts (all kists pre-session) no longer show standard interest — DWI fallback is skipped; only penal posts, matching the Period Detail which shows STD BAL = 0" },
+      { type: "fix", text: "Loan interest batch: penal day count now uses inclusive end date (+1) to match Period Detail convention across all ComputePenal paths (per-kist, no-kist, all-pre-session, kist-first-date)" },
+    ],
+  },
+  {
     version: "1.0.69",
     date: "2026-09-20",
     changes: [

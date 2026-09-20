@@ -514,6 +514,12 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     ? overdueKists.Where(x => x.Date!.Value.Date >= firstSession.Value.Date).ToList()
                     : overdueKists;
 
+                // Detect accounts whose entire kist schedule expired before the first session.
+                // These have no standard balance — every rupee is overdue; no DWI std interest should post.
+                bool allKistsPreSession = firstSession.HasValue
+                    && kistSchedule.Any()
+                    && kistSchedule.All(k => !k.Date.HasValue || k.Date.Value.Date < firstSession.Value.Date);
+
                 DateTime? lastPostDate = intEntries.Any(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0)
                     ? intEntries.Where(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0).Max(x => (DateTime?)x.EntryDate)
                     : null;
@@ -545,7 +551,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     penalBreakdown = new List<PenalBreakdownItemDTO>();
                     if (interestOverdueKists.Any())
                     {
-                        // Post-session overdue kists: break down penal per kist
+                        // Post-session overdue kists: break down penal per kist.
+                        // +1 to match the Period Detail's inclusive-end-date day count convention.
                         bool hasPerKist = interestOverdueKists.Any(x => (x.PrincipalAmt ?? 0m) > 0 || (x.KistAmount ?? 0m) > 0);
                         if (hasPerKist)
                         {
@@ -554,7 +561,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                 if (ok.Date == null) continue;
                                 decimal kp = ok.PrincipalAmt ?? Math.Max(0m, (ok.KistAmount ?? 0m) - (ok.InterestAmt ?? 0m));
                                 if (kp <= 0 && principalBal > 0) kp = principalBal / interestOverdueKists.Count;
-                                int pd = Math.Max(0, (today - ok.Date.Value.Date).Days);
+                                int pd = Math.Max(0, (today - ok.Date.Value.Date).Days + 1);
                                 decimal pi = Math.Round(kp * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
                                 rawPenal += pi;
                                 penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = ok.KistNumber ?? 0, DueDate = ok.Date.Value.Date, PrincipalAmount = kp, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = pi });
@@ -563,7 +570,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         else
                         {
                             var firstOvd = interestOverdueKists.Where(x => x.Date.HasValue).Min(x => x.Date!.Value.Date);
-                            int pd = Math.Max(0, (today - firstOvd).Days);
+                            int pd = Math.Max(0, (today - firstOvd).Days + 1);
                             rawPenal = Math.Round(principalBal * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
                             penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 0, DueDate = firstOvd, PrincipalAmount = principalBal, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = rawPenal });
                         }
@@ -571,9 +578,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     else if (overdueKists.Any())
                     {
                         // All overdue kists are pre-session — the account's full schedule has expired.
-                        // Charge penal on the outstanding principal from the first session start date.
+                        // Charge penal on the outstanding principal from the first session start date (+1 inclusive).
                         DateTime fromDate = firstSession.HasValue ? firstSession.Value.Date : overdueKists.Min(x => x.Date!.Value.Date);
-                        int pd = Math.Max(0, (today - fromDate).Days);
+                        int pd = Math.Max(0, (today - fromDate).Days + 1);
                         rawPenal = Math.Round(principalBal * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
                         penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 0, DueDate = fromDate, PrincipalAmount = principalBal, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = rawPenal });
                     }
@@ -582,7 +589,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         DateTime kistFirstClamped = kist.KistFirstDate.Date;
                         if (firstSession.HasValue && kistFirstClamped < firstSession.Value.Date)
                             kistFirstClamped = firstSession.Value.Date;
-                        int pd = Math.Max(0, (today - kistFirstClamped).Days);
+                        int pd = Math.Max(0, (today - kistFirstClamped).Days + 1);
                         rawPenal = Math.Round(principalBal * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
                         penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 1, DueDate = kist.KistFirstDate.Date, PrincipalAmount = principalBal, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = rawPenal });
                     }
@@ -598,7 +605,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     decimal schedIntDue = interestOverdueKists.Sum(x => x.InterestAmt ?? 0m);
                     dynStdInt = Math.Max(0, schedIntDue - postedStdInt);
 
-                    if (dynStdInt == 0 && effectiveStdRate > 0 && principalBal > 0)
+                    // DWI fallback: only when the schedule hasn't fully expired before the session.
+                    // Expired-schedule accounts have no standard balance — the entire principal is
+                    // overdue; posting std interest would be incorrect (Period Detail also shows 0).
+                    if (dynStdInt == 0 && effectiveStdRate > 0 && principalBal > 0 && !allKistsPreSession)
                     {
                         var (wInt, wSegs) = LoanRecoveryVoucherService.ComputeDayWeightedInterest(
                             vcdd, obNetForDWI, calcFromDate, calcToDate, effectiveStdRate);
