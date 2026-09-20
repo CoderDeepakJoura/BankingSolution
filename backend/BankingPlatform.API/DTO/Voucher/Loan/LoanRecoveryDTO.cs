@@ -6,8 +6,10 @@ namespace BankingPlatform.API.DTO.Voucher.Loan
         public int VoucherNo { get; set; }
         public string EntryType { get; set; } = "";
         public string Description { get; set; } = "";
-        public decimal Dr { get; set; }
-        public decimal Cr { get; set; }
+        public decimal Dr { get; set; }        // Advancement (LA / OB)
+        public decimal IntDr { get; set; }     // Interest posting (LInterest)
+        public decimal IntCr { get; set; }     // Interest recovery (LR interest portion)
+        public decimal Cr { get; set; }        // Principal recovery (LR principal portion)
         public decimal Balance { get; set; }
     }
 

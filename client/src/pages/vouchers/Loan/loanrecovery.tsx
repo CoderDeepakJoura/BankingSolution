@@ -620,42 +620,41 @@ const LoanRecovery: React.FC = () => {
           return (
             <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
               <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <p className="text-sm text-gray-500">No transactions found for this loan account</p>
+              <p className="text-sm text-gray-500 italic">No transactions found for this loan account</p>
             </div>
           );
         return (
-          <div className="overflow-x-auto overflow-y-auto max-h-80 rounded-lg border border-gray-200">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto overflow-y-auto max-h-96 rounded-lg border border-gray-300 shadow-sm">
+            <table className="w-full text-xs border-collapse">
               <thead className="sticky top-0 z-10">
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Voucher No</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Description</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Dr (₹)</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Cr (₹)</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Balance (₹)</th>
+                <tr style={{ background: "#1a2340" }}>
+                  {["SR.NO","DATE","V.NO","PARTICULARS","ADVANCEMENT (DR)","INT DR","INT CR","RECOVERY (CR)","BALANCE"].map(h => (
+                    <th key={h} className="px-3 py-2.5 font-semibold text-white uppercase tracking-wide whitespace-nowrap text-center border border-gray-600">{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loanLedger.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(row.entryDate) ?? "—"}</td>
-                    <td className="px-4 py-3 text-gray-700">{row.voucherNo || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        row.entryType === "LA" ? "bg-green-100 text-green-700" :
-                        row.entryType === "LR" ? "bg-blue-100 text-blue-700" :
-                        row.entryType === "IP" ? "bg-amber-100 text-amber-700" :
-                        "bg-gray-100 text-gray-600"
-                      }`}>{row.entryType}</span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{row.description}</td>
-                    <td className="px-4 py-3 text-right text-red-600 font-medium">{row.dr > 0 ? fmt(row.dr) : "—"}</td>
-                    <td className="px-4 py-3 text-right text-green-600 font-medium">{row.cr > 0 ? fmt(row.cr) : "—"}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-800">{fmt(row.balance)}</td>
-                  </tr>
-                ))}
+              <tbody>
+                {loanLedger.map((row, idx) => {
+                  const isOB = row.entryType === "OB";
+                  const bal = row.balance;
+                  const balStr = bal === 0 ? "—" : `${fmt(Math.abs(bal))} ${bal > 0 ? "Dr" : "Cr"}`;
+                  return (
+                    <tr key={idx} style={isOB ? { background: "#fffbea" } : undefined}
+                      className={!isOB ? "hover:bg-blue-50 transition-colors" : ""}>
+                      <td className="px-3 py-2 text-center border border-gray-200 text-gray-600">{idx + 1}</td>
+                      <td className={`px-3 py-2 text-center border border-gray-200 whitespace-nowrap ${isOB ? "text-orange-600 font-semibold italic" : "text-gray-700"}`}>
+                        {row.entryDate ? new Date(row.entryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "/") : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-center border border-gray-200 text-gray-600">{row.voucherNo || "—"}</td>
+                      <td className={`px-3 py-2 border border-gray-200 ${isOB ? "text-orange-600 font-semibold italic" : "text-gray-700"}`}>{row.description}</td>
+                      <td className="px-3 py-2 text-right border border-gray-200 text-gray-800">{row.dr > 0 ? fmt(row.dr) : "—"}</td>
+                      <td className="px-3 py-2 text-right border border-gray-200 text-red-700">{row.intDr > 0 ? fmt(row.intDr) : "—"}</td>
+                      <td className="px-3 py-2 text-right border border-gray-200 text-green-700">{row.intCr > 0 ? fmt(row.intCr) : "—"}</td>
+                      <td className="px-3 py-2 text-right border border-gray-200 text-green-700">{row.cr > 0 ? fmt(row.cr) : "—"}</td>
+                      <td className={`px-3 py-2 text-right border border-gray-200 font-semibold whitespace-nowrap ${isOB ? "text-orange-600 italic" : "text-gray-800"}`}>{balStr}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

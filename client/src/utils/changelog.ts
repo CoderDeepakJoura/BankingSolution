@@ -15,10 +15,17 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
-    version: "1.0.58",
+    version: "1.0.59",
     date: "2026-09-20",
     changes: [
       { type: "improvement", text: "Minor updates and bug fixes" },
+    ],
+  },
+  {
+    version: "1.0.58",
+    date: "2026-09-20",
+    changes: [
+      { type: "improvement", text: "Loan Recovery Voucher: embedded ledger redesigned to match the Loan Account Ledger report style — dark header, yellow opening balance row, separate columns for Advancement (DR), Int DR, Int CR, Recovery (CR), and Balance with Dr/Cr suffix" },
     ],
   },
   {

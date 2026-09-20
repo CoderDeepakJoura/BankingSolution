@@ -81,8 +81,10 @@ export interface LoanLedgerRowDTO {
   voucherNo: number;
   entryType: string;
   description: string;
-  dr: number;
-  cr: number;
+  dr: number;       // Advancement (LA / OB)
+  intDr: number;    // Interest posting
+  intCr: number;    // Interest recovery
+  cr: number;       // Principal recovery
   balance: number;
 }
 

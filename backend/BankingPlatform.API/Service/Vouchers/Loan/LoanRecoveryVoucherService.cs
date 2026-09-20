@@ -661,6 +661,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             foreach (var v in vouchers)
             {
                 bool isIP = v.EntryStatus == "LInterest";
+                bool isLR = v.EntryStatus == "LR";
                 string desc = v.EntryStatus switch
                 {
                     "LA"        => "Loan Advancement",
@@ -668,26 +669,33 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     "LInterest" => "Interest Posting",
                     _           => v.EntryStatus ?? "",
                 };
-                // LInterest entries: VoucherAmount = total interest (Dr side)
-                // LR entries: VoucherAmount = principal portion, IntCr = interest portion (both Cr)
-                decimal dr = isIP ? v.VoucherAmount : (v.VoucherEntryType == "Dr" ? v.VoucherAmount : 0m);
-                decimal cr = isIP ? 0m : (v.VoucherEntryType == "Cr" ? (v.VoucherAmount + (v.IntCr ?? 0m)) : 0m);
+                // Route to separate columns:
+                // LA  → Advancement Dr
+                // LInterest → Int Dr
+                // LR  → principal portion → Recovery Cr; interest portion (IntCr) → Int Cr
+                decimal advDr  = (!isIP && !isLR && v.VoucherEntryType == "Dr") ? v.VoucherAmount : 0m;
+                decimal intDr  = isIP ? v.VoucherAmount : 0m;
+                decimal intCr  = isLR ? (v.IntCr ?? 0m) : 0m;
+                decimal recCr  = isLR ? v.VoucherAmount : 0m;
                 rows.Add(new LoanLedgerRowDTO
                 {
                     EntryDate   = v.ValueDate.Date,
                     VoucherNo   = v.VoucherNo,
                     EntryType   = v.EntryStatus ?? "",
                     Description = !string.IsNullOrWhiteSpace(v.Narration) ? v.Narration : desc,
-                    Dr          = dr,
-                    Cr          = cr,
+                    Dr          = advDr,
+                    IntDr       = intDr,
+                    IntCr       = intCr,
+                    Cr          = recCr,
                 });
             }
 
-            // Compute running balance (Dr = debit = balance increases for loans)
+            // Running balance: Dr (advancement) and IntDr (interest for AddInBalance) increase balance;
+            // Cr (principal recovery) and IntCr (interest recovery) reduce it.
             decimal balance = 0;
             foreach (var r in rows)
             {
-                balance += r.Dr - r.Cr;
+                balance += r.Dr + r.IntDr - r.Cr - r.IntCr;
                 r.Balance = balance;
             }
 
