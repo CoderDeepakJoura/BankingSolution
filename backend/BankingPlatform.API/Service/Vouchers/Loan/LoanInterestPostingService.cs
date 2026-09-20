@@ -605,15 +605,54 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     decimal schedIntDue = interestOverdueKists.Sum(x => x.InterestAmt ?? 0m);
                     dynStdInt = Math.Max(0, schedIntDue - postedStdInt);
 
-                    // DWI fallback: only when the schedule hasn't fully expired before the session.
-                    // Expired-schedule accounts have no standard balance — the entire principal is
-                    // overdue; posting std interest would be incorrect (Period Detail also shows 0).
+                    // Schedule-aware fallback: only when the schedule hasn't fully expired before the session.
+                    // Mirrors Period Detail — each kist date reduces the performing balance starting from
+                    // that date, and calcFromDate is counted inclusive (unlike the generic DWI which starts
+                    // from calcFromDate+1 and ignores kist schedule balance reductions).
                     if (dynStdInt == 0 && effectiveStdRate > 0 && principalBal > 0 && !allKistsPreSession)
                     {
-                        var (wInt, wSegs) = LoanRecoveryVoucherService.ComputeDayWeightedInterest(
-                            vcdd, obNetForDWI, calcFromDate, calcToDate, effectiveStdRate);
-                        dynStdInt = Math.Max(0, wInt);
-                        calcSegments = wSegs;
+                        var schedPts = new List<DateTime> { calcFromDate };
+                        foreach (var kd in kistSchedule
+                            .Where(k => k.Date.HasValue
+                                && k.Date.Value.Date > calcFromDate
+                                && k.Date.Value.Date < calcToDate
+                                && (!firstSession.HasValue || k.Date.Value.Date >= firstSession.Value.Date))
+                            .Select(k => k.Date!.Value.Date)
+                            .Distinct()
+                            .OrderBy(d => d))
+                        {
+                            schedPts.Add(kd);
+                        }
+                        schedPts.Add(calcToDate);
+
+                        calcSegments = new List<InterestCalcSegmentDTO>();
+                        decimal wInt = 0m;
+                        for (int ci = 1; ci < schedPts.Count; ci++)
+                        {
+                            DateTime segFrom = schedPts[ci - 1];
+                            DateTime segTo   = schedPts[ci];
+                            bool isFinalSeg  = ci == schedPts.Count - 1;
+
+                            decimal ovdAtFrom = kistSchedule
+                                .Where(k => k.Date.HasValue
+                                    && k.Date.Value.Date <= segFrom
+                                    && (!firstSession.HasValue || k.Date.Value.Date >= firstSession.Value.Date))
+                                .Sum(k => k.PrincipalAmt ?? Math.Max(0m, (k.KistAmount ?? 0m) - (k.InterestAmt ?? 0m)));
+                            decimal segBal = Math.Max(0m, principalBal - ovdAtFrom);
+
+                            int segDays = (segTo - segFrom).Days + (isFinalSeg ? 1 : 0);
+                            if (segDays > 0 && segBal > 0)
+                            {
+                                decimal segInt = Math.Round(segBal * (decimal)effectiveStdRate / 100m * segDays / 365m, 2);
+                                wInt += segInt;
+                                calcSegments.Add(new InterestCalcSegmentDTO
+                                {
+                                    FromDate = segFrom, ToDate = segTo, Balance = segBal,
+                                    Days = segDays, Rate = effectiveStdRate, Interest = segInt,
+                                });
+                            }
+                        }
+                        dynStdInt = Math.Max(0, wInt - postedStdInt);
                     }
 
                     // Trigger penal whenever ANY kists are overdue (including all-pre-session accounts

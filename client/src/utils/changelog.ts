@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.71",
+    date: "2026-09-20",
+    changes: [
+      {
+        type: "fix",
+        text: "Loan interest Calculation tab: Schedule-method DWI fallback now counts calcFromDate inclusive and reduces performing balance at each kist date — fixes 1-day undercount and missing kist-reduction, matching Period Detail exactly",
+      },
+    ],
+  },
+  {
     version: "1.0.70",
     date: "2026-09-20",
     changes: [
