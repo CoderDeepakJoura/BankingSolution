@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.72",
+    date: "2026-09-21",
+    changes: [
+      {
+        type: "fix",
+        text: "Loan interest batch grid: std interest adjusted so that std + penal = total postable exactly — eliminates 1-rupee rounding split between individually-rounded components",
+      },
+    ],
+  },
+  {
     version: "1.0.71",
     date: "2026-09-20",
     changes: [

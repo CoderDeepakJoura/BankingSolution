@@ -694,6 +694,12 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         noReason = "No interest accrued yet (loan may be too new)";
                 }
 
+                // Round total first, then derive std as (total - penal) so the three values are
+                // always consistent: StdInterest + PenalInterest == TotalPostable exactly.
+                decimal rndTotal = Math.Round(totalPostable, 0, MidpointRounding.AwayFromZero);
+                decimal rndPenal = Math.Round(dynPenalInt,   0, MidpointRounding.AwayFromZero);
+                decimal rndStd   = rndTotal - rndPenal;
+
                 result.Add(new LoanInterestBatchItemDTO
                 {
                     LoanAccId           = acc.ID,
@@ -701,10 +707,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     MemberName          = memberName,
                     MemberRelativeName  = memberRel,
                     PrincipalBalance    = principalBal,
-                    StdInterest         = Math.Round(dynStdInt,    0, MidpointRounding.AwayFromZero),
-                    PenalInterest       = Math.Round(dynPenalInt,  0, MidpointRounding.AwayFromZero),
-                    StdRecoverable      = Math.Round(stdRec,       0, MidpointRounding.AwayFromZero),
-                    TotalPostable       = Math.Round(totalPostable, 0, MidpointRounding.AwayFromZero),
+                    StdInterest         = rndStd,
+                    PenalInterest       = rndPenal,
+                    StdRecoverable      = Math.Round(stdRec, 0, MidpointRounding.AwayFromZero),
+                    TotalPostable       = rndTotal,
                     CalcFromDate        = calcFromDate == today ? null : (DateTime?)calcFromDate,
                     CalcToDate          = (DateTime?)calcToDate,
                     StdInterestRate     = effectiveStdRate > 0 ? effectiveStdRate : kist?.StandardInterestRate,
