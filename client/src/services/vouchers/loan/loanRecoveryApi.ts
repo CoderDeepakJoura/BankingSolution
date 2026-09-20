@@ -77,7 +77,7 @@ export interface KistScheduleDTO {
 }
 
 export interface LoanLedgerRowDTO {
-  entryDate: string;
+  entryDate: string | null;
   voucherNo: number;
   entryType: string;
   description: string;

@@ -640,7 +640,7 @@ const LoanRecovery: React.FC = () => {
               <tbody className="divide-y divide-gray-100">
                 {loanLedger.map((row, idx) => (
                   <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(row.entryDate)}</td>
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(row.entryDate) ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-700">{row.voucherNo || "—"}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${

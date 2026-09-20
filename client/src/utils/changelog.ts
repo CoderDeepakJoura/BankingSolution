@@ -15,6 +15,22 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.58",
+    date: "2026-09-20",
+    changes: [
+      { type: "improvement", text: "Minor updates and bug fixes" },
+    ],
+  },
+  {
+    version: "1.0.57",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan Interest Posting: LimitWise loans now calculate interest correctly — rate was only being read from accountkistdetail which is empty for LimitWise; now falls back to accountlimitdetail.StandardInterestRate and OverdueInterestRate" },
+      { type: "fix", text: "Loan Recovery Voucher ledger: opening balance no longer double-counts accountlimitdetail rows when TotalBalance is already set — same root cause as the recovery outstanding fix in v1.0.56" },
+      { type: "fix", text: "Loan Recovery Voucher ledger: opening balance date no longer shows '01-January-1' (DateTime.MinValue) — now uses the account's LoanDate; shows '—' when no date is available" },
+    ],
+  },
+  {
     version: "1.0.56",
     date: "2026-09-20",
     changes: [

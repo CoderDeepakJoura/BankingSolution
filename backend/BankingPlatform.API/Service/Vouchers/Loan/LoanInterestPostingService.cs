@@ -293,6 +293,19 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             var prodRec = await _db.loanproductrecovery.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.ProductId == productId && x.BrId == brId);
 
+            // LimitWise (TypeId=4): rates live in accountlimitdetail, not accountkistdetail
+            const int LOAN_TYPE_LIMITWISE = 4;
+            bool isLimitWise = prodDef?.TypeId == LOAN_TYPE_LIMITWISE;
+            var limitDetailMap = new Dictionary<int, AccountLimitDetail>();
+            if (isLimitWise)
+            {
+                var limitAll = await _db.accountlimitdetail.AsNoTracking()
+                    .Where(x => accountIds.Contains(x.AccountId) && x.BrId == brId)
+                    .OrderByDescending(x => x.LoanDate)
+                    .ToListAsync();
+                limitDetailMap = limitAll.GroupBy(x => x.AccountId).ToDictionary(g => g.Key, g => g.First());
+            }
+
             // Kist detail — latest row per account (ordered desc; first per group wins)
             var kistAll = await _db.accountkistdetail.AsNoTracking()
                 .Where(x => accountIds.Contains(x.AccountId) && x.BrId == brId)
@@ -367,6 +380,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             foreach (var acc in accounts)
             {
                 kistMap.TryGetValue(acc.ID, out var kist);
+                limitDetailMap.TryGetValue(acc.ID, out var limitDetail);
                 memberMap.TryGetValue(acc.MemberId ?? 0, out var member);
                 obMap.TryGetValue(acc.ID, out var ob);
                 var obDetails    = obDetailMap.GetValueOrDefault(acc.ID) ?? new List<BankingPlatform.Infrastructure.Models.AccMasters.Loan.LoanAccountBalanceDetail>();
@@ -440,7 +454,16 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 }
 
                 // ── Stand loan path ───────────────────────────────────────────────
+                // LimitWise: std and overdue rates come from accountlimitdetail, not accountkistdetail.
+                double effectiveStdRate = kist?.StandardInterestRate ?? 0;
                 double effectiveOvdRate = kist?.OverdueInterestRate ?? 0;
+                DateTime? limitLoanDate = null;
+                if (isLimitWise && limitDetail != null)
+                {
+                    if (effectiveStdRate == 0) effectiveStdRate = limitDetail.StandardInterestRate;
+                    if (effectiveOvdRate == 0) effectiveOvdRate = limitDetail.OverdueInterestRate;
+                    limitLoanDate = limitDetail.LoanDate;
+                }
                 // Slab fallback: if account's own rate is 0 but a slab is configured, use it.
                 if (effectiveOvdRate == 0 && (kist?.SlabId ?? 0) > 0)
                 {
@@ -475,7 +498,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     ? intEntries.Where(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0).Max(x => (DateTime?)x.EntryDate)
                     : null;
 
-                DateTime calcFromDate = lastPostDate?.Date ?? kist?.LoanDate ?? ob?.OverDueDate ?? today;
+                DateTime calcFromDate = lastPostDate?.Date ?? kist?.LoanDate ?? limitLoanDate ?? ob?.OverDueDate ?? today;
                 DateTime calcToDate   = today;
                 decimal obNetForDWI   = openingPrincipal + obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr) + openStdInt;
 
@@ -529,18 +552,18 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     decimal schedIntDue = overdueKists.Sum(x => x.InterestAmt ?? 0m) + openStdInt;
                     dynStdInt = Math.Max(0, schedIntDue - postedStdInt);
 
-                    if (dynStdInt == 0 && kist != null && (kist.StandardInterestRate ?? 0) > 0 && principalBal > 0)
+                    if (dynStdInt == 0 && effectiveStdRate > 0 && principalBal > 0)
                     {
                         var (wInt, wSegs) = LoanRecoveryVoucherService.ComputeDayWeightedInterest(
-                            vcdd, obNetForDWI, calcFromDate, calcToDate, kist.StandardInterestRate!.Value);
+                            vcdd, obNetForDWI, calcFromDate, calcToDate, effectiveStdRate);
                         dynStdInt = Math.Max(0, wInt);
                         calcSegments = wSegs;
                     }
 
-                    if (kist != null && effectiveOvdRate > 0 && overdueKists.Any())
+                    if (effectiveOvdRate > 0 && overdueKists.Any())
                         ComputePenal(requireOverdueKists: true);
                 }
-                else if (kist != null && (kist.StandardInterestRate ?? 0) > 0)
+                else if (effectiveStdRate > 0)
                 {
                     if (intCalcMethod == "MinBalance")
                     {
@@ -548,14 +571,14 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         {
                             int days = Math.Max(0, (calcToDate - calcFromDate).Days);
                             decimal effPrin = LoanRecoveryVoucherService.CalculateMinimumBalance(openingPrincipal, obDetails, calcFromDate, calcToDate);
-                            decimal rawStd = Math.Round(effPrin * (decimal)kist.StandardInterestRate!.Value / 100m * days / 365m, 2);
+                            decimal rawStd = Math.Round(effPrin * (decimal)effectiveStdRate / 100m * days / 365m, 2);
                             dynStdInt = Math.Max(0, rawStd + openStdInt - postedStdInt);
                         }
                     }
                     else
                     {
                         var (wInt, wSegs) = LoanRecoveryVoucherService.ComputeDayWeightedInterest(
-                            vcdd, obNetForDWI, calcFromDate, calcToDate, kist.StandardInterestRate!.Value);
+                            vcdd, obNetForDWI, calcFromDate, calcToDate, effectiveStdRate);
                         dynStdInt = Math.Max(0, wInt);
                         calcSegments = wSegs;
                     }
@@ -568,7 +591,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 {
                     if (principalBal == 0)
                         noReason = "No outstanding principal — disbursement voucher may be missing";
-                    else if ((kist?.StandardInterestRate ?? 0) == 0)
+                    else if (effectiveStdRate == 0)
                         noReason = "Interest rate not set for this account";
                     else
                         noReason = "No interest accrued yet (loan may be too new)";
@@ -587,8 +610,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     TotalPostable       = Math.Round(totalPostable, 0, MidpointRounding.AwayFromZero),
                     CalcFromDate        = calcFromDate == today ? null : (DateTime?)calcFromDate,
                     CalcToDate          = (DateTime?)calcToDate,
-                    StdInterestRate     = kist?.StandardInterestRate,
-                    OverdueInterestRate = kist?.OverdueInterestRate,
+                    StdInterestRate     = effectiveStdRate > 0 ? effectiveStdRate : kist?.StandardInterestRate,
+                    OverdueInterestRate = effectiveOvdRate > 0 ? effectiveOvdRate : kist?.OverdueInterestRate,
                     IntCalcMethod       = intCalcMethod,
                     ActOnIntPosting     = actOnIntPosting,
                     NoInterestReason    = noReason,
@@ -643,6 +666,21 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 var prodDef = await _db.loanproductdefinition.AsNoTracking()
                     .FirstOrDefaultAsync(x => x.ProductId == acc.GeneralProductId.Value && x.BrId == branchId);
                 isAddInBalance = prodDef?.ActOnIntPosting == 1;
+
+                // LimitWise (TypeId=4): rates come from accountlimitdetail, not accountkistdetail
+                if (prodDef?.TypeId == 4)
+                {
+                    var limitInfo = await _db.accountlimitdetail.AsNoTracking()
+                        .Where(x => x.AccountId == loanAccId && x.BrId == branchId)
+                        .OrderByDescending(x => x.LoanDate)
+                        .FirstOrDefaultAsync();
+                    if (limitInfo != null)
+                    {
+                        if (stdRate == 0)   stdRate   = limitInfo.StandardInterestRate;
+                        if (penalRate == 0) penalRate = limitInfo.OverdueInterestRate;
+                        if (loanDate == null) loanDate = limitInfo.LoanDate;
+                    }
+                }
             }
 
             // Opening balance (migration / historical data)

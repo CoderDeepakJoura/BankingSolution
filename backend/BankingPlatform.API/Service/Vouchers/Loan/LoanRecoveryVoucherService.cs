@@ -607,11 +607,22 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 isAddInBalance = prodDef?.ActOnIntPosting == 1;
             }
 
-            decimal histAmtAdj = historicalObDetails.Sum(x => x.AmountDr) - historicalObDetails.Sum(x => x.AmountCr);
-            decimal histIntAdj = isAddInBalance
+            // historicalObDetails is the bifurcation of TotalBalance — only use it when TotalBalance is absent.
+            // Adding it on top of TotalBalance would double-count the opening principal.
+            bool hasTotalBalance = (ob?.TotalBalance ?? 0m) != 0m;
+            decimal histAmtAdj = hasTotalBalance ? 0m : historicalObDetails.Sum(x => x.AmountDr) - historicalObDetails.Sum(x => x.AmountCr);
+            decimal histIntAdj = isAddInBalance && !hasTotalBalance
                 ? historicalObDetails.Sum(x => x.IntDr) - historicalObDetails.Sum(x => x.IntCr)
                 : 0m;
             decimal effectiveOb = (ob?.TotalBalance ?? 0m) + histAmtAdj + histIntAdj;
+
+            // OB date: prefer kist's LoanDate over OverDueDate; null renders as "—" in the frontend
+            var kistForDate = await _db.accountkistdetail.AsNoTracking()
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId)
+                .OrderByDescending(x => x.LoanDate)
+                .Select(x => new { x.LoanDate })
+                .FirstOrDefaultAsync();
+            DateTime? obDate = kistForDate?.LoanDate ?? (ob?.OverDueDate != default(DateTime) ? ob?.OverDueDate : null);
 
             var rows = new List<LoanLedgerRowDTO>();
 
@@ -619,7 +630,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             {
                 rows.Add(new LoanLedgerRowDTO
                 {
-                    EntryDate   = ob?.OverDueDate ?? DateTime.MinValue,
+                    EntryDate   = obDate,
                     VoucherNo   = 0,
                     EntryType   = "OB",
                     Description = "Opening Balance",
