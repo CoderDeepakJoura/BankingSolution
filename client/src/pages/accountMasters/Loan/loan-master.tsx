@@ -1681,20 +1681,22 @@ const LoanAccountMaster: React.FC = () => {
                         <select value={openingBal.overBalType} onChange={e => setOpeningBal(p => ({ ...p, overBalType: e.target.value }))} className={inputCls}>
                           <option value="Dr">Dr</option><option value="Cr">Cr</option>
                         </select></div>
-                      <div><label className={labelCls}>Opening Interest</label>
-                        <input type="text" inputMode="decimal" value={openingBal.openInt} onChange={e => setOpeningBal(p => ({ ...p, openInt: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
-                      <div><label className={labelCls}>Int Type</label>
-                        <select value={openingBal.openIntType} onChange={e => setOpeningBal(p => ({ ...p, openIntType: e.target.value }))} className={inputCls}>
-                          <option value="Dr">Dr</option><option value="Cr">Cr</option>
-                        </select></div>
-                      <div><label className={labelCls}>Opening Overdue Int</label>
-                        <input type="text" inputMode="decimal" value={openingBal.openOverInt} onChange={e => setOpeningBal(p => ({ ...p, openOverInt: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
-                      <div><label className={labelCls}>Overdue Int Type</label>
-                        <select value={openingBal.openOverIntType} onChange={e => setOpeningBal(p => ({ ...p, openOverIntType: e.target.value }))} className={inputCls}>
-                          <option value="Dr">Dr</option><option value="Cr">Cr</option>
-                        </select></div>
-                      <div><label className={labelCls}>Overdue Date</label>
-                        <DatePicker value={openingBal.overDueDate} onChange={val => setOpeningBal(p => ({ ...p, overDueDate: val }))} max={sessionDate} workingDate={sessionDate} className={inputCls} /></div>
+                      {productInfo?.actOnIntPosting !== 1 && <>
+                        <div><label className={labelCls}>Opening Interest</label>
+                          <input type="text" inputMode="decimal" value={openingBal.openInt} onChange={e => setOpeningBal(p => ({ ...p, openInt: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                        <div><label className={labelCls}>Int Type</label>
+                          <select value={openingBal.openIntType} onChange={e => setOpeningBal(p => ({ ...p, openIntType: e.target.value }))} className={inputCls}>
+                            <option value="Dr">Dr</option><option value="Cr">Cr</option>
+                          </select></div>
+                        <div><label className={labelCls}>Opening Overdue Int</label>
+                          <input type="text" inputMode="decimal" value={openingBal.openOverInt} onChange={e => setOpeningBal(p => ({ ...p, openOverInt: num(e.target.value) }))} className={inputCls} placeholder="0" /></div>
+                        <div><label className={labelCls}>Overdue Int Type</label>
+                          <select value={openingBal.openOverIntType} onChange={e => setOpeningBal(p => ({ ...p, openOverIntType: e.target.value }))} className={inputCls}>
+                            <option value="Dr">Dr</option><option value="Cr">Cr</option>
+                          </select></div>
+                        <div><label className={labelCls}>Overdue Date</label>
+                          <DatePicker value={openingBal.overDueDate} onChange={val => setOpeningBal(p => ({ ...p, overDueDate: val }))} max={sessionDate} workingDate={sessionDate} className={inputCls} /></div>
+                      </>}
                     </div>
                   </div>
 

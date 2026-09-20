@@ -52,7 +52,7 @@ const TDF = ({ children, className = "", colSpan }: { children?: React.ReactNode
 );
 
 const LedgerTable: React.FC<{ data: LoanLedger; longNar: boolean }> = ({ data, longNar }) => {
-  const totalIntDr = data.entries.reduce((s, e) => s + (e.intDr ?? 0), 0);
+  const totalIntDr = (data.openingIntDr ?? 0) + data.entries.reduce((s, e) => s + (e.intDr ?? 0), 0);
   const totalIntCr = data.entries.reduce((s, e) => s + (e.intCr ?? 0), 0);
   const colCount = data.isStand ? 9 : 7;
   return (
@@ -77,7 +77,7 @@ const LedgerTable: React.FC<{ data: LoanLedger; longNar: boolean }> = ({ data, l
           <TD className="text-amber-800" />
           <TD className="text-amber-800 font-semibold italic">Opening Balance</TD>
           <TD className="text-amber-800" />
-          {data.isStand && <TD className="text-amber-800" />}
+          {data.isStand && <TD className="text-right text-orange-700 font-medium">{data.openingIntDr ? fmt(data.openingIntDr) : ""}</TD>}
           {data.isStand && <TD className="text-amber-800" />}
           <TD className="text-amber-800" />
           <TD className="text-right text-amber-900 font-bold">{fmtBal(data.openingBalance)}</TD>
@@ -161,12 +161,12 @@ const buildExportConfig = (data: LoanLedger, longNar: boolean): ExportConfig => 
   if (info1) rows.push({ style: "info", spanFirst: spanCount, cells: [info1] });
   if (info2) rows.push({ style: "info", spanFirst: spanCount, cells: [info2] });
   if (data.isStand) {
-    rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", "", "", "", "", "", fmtBal(data.openingBalance)] });
+    rows.push({ style: "ob", spanFirst: 4, cells: [`Opening Balance  ${fmtShort(data.fromDate)}`, "", data.openingIntDr ? fmt(data.openingIntDr) : "", "", "", "", "", fmtBal(data.openingBalance)] });
     data.entries.forEach((e, i) => {
       const par = longNar && e.narration ? `${e.particulars} -- ${e.narration}` : e.particulars;
       rows.push({ style: "normal", cells: [String(i + 1), fmtShort(e.voucherDate), String(e.voucherNo), par, e.dr != null ? fmt(e.dr) : "", e.intDr != null ? fmt(e.intDr) : "", e.intCr != null ? fmt(e.intCr) : "", e.cr != null ? fmt(e.cr) : "", fmtBal(e.balance)] });
     });
-    const totalIntDr = data.entries.reduce((s, e) => s + (e.intDr ?? 0), 0);
+    const totalIntDr = (data.openingIntDr ?? 0) + data.entries.reduce((s, e) => s + (e.intDr ?? 0), 0);
     const totalIntCr = data.entries.reduce((s, e) => s + (e.intCr ?? 0), 0);
     rows.push({ style: "total", spanFirst: 4, cells: ["Closing Balance", "", "", "", fmt(data.totalDr), fmt(totalIntDr), fmt(totalIntCr), fmt(data.totalCr), fmtBal(data.closingBalance)] });
   } else {
@@ -190,10 +190,10 @@ const buildExportConfig = (data: LoanLedger, longNar: boolean): ExportConfig => 
 
 const buildPrintHTML = (data: LoanLedger, longNar: boolean): string => {
   const isStand = data.isStand;
-  const totalIntDr = data.entries.reduce((s, e) => s + (e.intDr ?? 0), 0);
+  const totalIntDr = (data.openingIntDr ?? 0) + data.entries.reduce((s, e) => s + (e.intDr ?? 0), 0);
   const totalIntCr = data.entries.reduce((s, e) => s + (e.intCr ?? 0), 0);
   const extraCols = isStand ? `<th style="width:90px">Int Dr</th><th style="width:90px">Int Cr</th>` : "";
-  const extraObCells = isStand ? `<td></td><td></td>` : "";
+  const extraObCells = isStand ? `<td class="amt int-dr">${data.openingIntDr ? fmt(data.openingIntDr) : ""}</td><td></td>` : "";
   let sno = 0;
   let rows = `<tr class="ob-row"><td></td><td style="text-align:center">${fmtShort(data.fromDate)}</td><td></td><td>Opening Balance</td><td></td>${extraObCells}<td></td><td class="amt">${fmtBal(data.openingBalance)}</td></tr>`;
   data.entries.forEach((e) => {

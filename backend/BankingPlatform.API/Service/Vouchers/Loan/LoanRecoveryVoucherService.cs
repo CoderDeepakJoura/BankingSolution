@@ -116,17 +116,25 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             }
 
             decimal openingPrincipal = ob?.TotalBalance ?? 0m;
+            // loanaccountbalancedetail is bifurcation of TotalBalance — only use it when no TotalBalance exists.
+            // Adding it on top of TotalBalance would double-count the principal.
+            decimal obDetailPrincipalAdj = (ob == null || (ob.TotalBalance ?? 0m) == 0m)
+                ? (obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr))
+                : 0m;
             decimal principalBal = openingPrincipal
-                                 + obDetails.Sum(x => x.AmountDr)
-                                 - obDetails.Sum(x => x.AmountCr)
+                                 + obDetailPrincipalAdj
                                  + advancedTotal
                                  - recoveredTotal;
             // AddInBalance: add historical IP rows from loanaccountbalancedetail (pre-fix migration data)
             // and new LInterest entries from vouchercreditdebitdetails (post-fix in-system data).
             // Stand: interest does not affect principal — tracked separately via voucherrecintdetail.
             if (isAddInBalance)
-                principalBal += obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr)
-                              + lInterestPosted;
+            {
+                decimal obDetailIntAdj = (ob == null || (ob.TotalBalance ?? 0m) == 0m)
+                    ? (obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr))
+                    : 0m;
+                principalBal += obDetailIntAdj + lInterestPosted;
+            }
             principalBal = Math.Max(0, principalBal);
 
             // Opening interest (migrated/imported balances)
@@ -253,17 +261,16 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             List<InterestCalcSegmentDTO>? calcSegments = null;
             List<PenalBreakdownItemDTO>? penalBreakdown = null;
 
-            // OB net for day-weighted calculation (principal base before VCDD events)
-            decimal obNetForDayWeighted = openingPrincipal
-                + obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr)
-                + openStdInt;
+            // OB net for day-weighted calculation (principal base before VCDD events).
+            // openStdInt is Cat 3 (Standard Recoverable) — not part of principal, excluded here.
+            // obDetailPrincipalAdj already reflects the correct opening principal.
+            decimal obNetForDayWeighted = openingPrincipal + obDetailPrincipalAdj;
 
             if (intCalcMethod == "Schedule" && kistSchedule.Any())
             {
                 // Schedule-based: sum standard InterestAmt of all overdue kists.
-                // Subtract only postedStdInt (Cat 1 IntDr) — not totalPosted — because scheduleIntDue
-                // is standard interest only and penal is computed separately below.
-                decimal scheduleIntDue = overdueKists.Sum(x => x.InterestAmt ?? 0m) + openStdInt;
+                // openStdInt is Cat 3 (Standard Recoverable from migration) — NOT Cat 1. Do not add here.
+                decimal scheduleIntDue = overdueKists.Sum(x => x.InterestAmt ?? 0m);
                 dynStdInt = Math.Max(0, scheduleIntDue - postedStdInt);
 
                 // WO (without-interest) schedule: InterestAmt is 0 on every installment but rate
@@ -342,7 +349,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         decimal effectivePrincipal = CalculateMinimumBalance(openingPrincipal, obDetails, calcFromDate, calcToDate);
                         decimal rawStd = Math.Round(
                             effectivePrincipal * (decimal)kist.StandardInterestRate!.Value / 100m * days / 365m, 2);
-                        dynStdInt = Math.Max(0, rawStd + openStdInt - postedStdInt);
+                        dynStdInt = Math.Max(0, rawStd - postedStdInt); // openStdInt is Cat 3, not Cat 1
                     }
                 }
                 else
@@ -429,7 +436,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     recSeq = prodRec.RecoverySeq;
             }
 
-            decimal totalOut = principalBal + dynStdInt + dynPenalInt + stdRec + ovdRec;
+            // Cat 1 (dynStdInt) and Cat 2 (dynPenalInt) are unposted — run IP voucher first to post them.
+            // Only formally posted interest (Cat 3 + Cat 4) is recoverable.
+            decimal totalOut = principalBal + stdRec + ovdRec;
 
             // Map voucherrecintdetail rows to DTOs for the UI interest detail grid
             var catNames = new Dictionary<int, string>
@@ -799,9 +808,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 }
                 else if (dto.IntAmount.HasValue && dto.IntAmount.Value >= 0)
                 {
-                    // User-specified interest override: allocate only up to that amount across categories
-                    decimal totalIntOutstanding = bal.StdInterestOutstanding + bal.PenalInterestOutstanding
-                        + bal.StdRecoverableOutstanding + bal.OverdueRecoverableOutstanding;
+                    // Only Cat 3 + Cat 4 are recoverable — Cat 1/2 are unposted previews
+                    decimal totalIntOutstanding = bal.StdRecoverableOutstanding + bal.OverdueRecoverableOutstanding;
                     decimal intOverride = Math.Min(Math.Round(dto.IntAmount.Value, 2), totalIntOutstanding);
                     intRec = AllocateInt(intOverride, bal);
                     decimal intTotal2 = intRec.Values.Sum();
@@ -991,10 +999,12 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
         private static (decimal Principal, Dictionary<int, decimal> Interest) Allocate(
             decimal total, LoanRecoveryBalanceDTO bal)
         {
+            // Cat 1 (StdInterestOutstanding) and Cat 2 (PenalInterestOutstanding) are unposted —
+            // they cannot be recovered until an IP voucher formally posts them.
             var outstanding = new Dictionary<int, decimal>
             {
-                [CAT_STD]    = bal.StdInterestOutstanding,
-                [CAT_PENAL]  = bal.PenalInterestOutstanding,
+                [CAT_STD]    = 0m,
+                [CAT_PENAL]  = 0m,
                 [CAT_STDREC] = bal.StdRecoverableOutstanding,
                 [CAT_OVDREC] = bal.OverdueRecoverableOutstanding,
             };
@@ -1026,10 +1036,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
         // Used when the user manually specifies the interest portion (Stand loans).
         private static Dictionary<int, decimal> AllocateInt(decimal intAmount, LoanRecoveryBalanceDTO bal)
         {
+            // Cat 1/2 are unposted — only Cat 3 + Cat 4 can receive recovery
             var outstanding = new Dictionary<int, decimal>
             {
-                [CAT_STD]    = bal.StdInterestOutstanding,
-                [CAT_PENAL]  = bal.PenalInterestOutstanding,
+                [CAT_STD]    = 0m,
+                [CAT_PENAL]  = 0m,
                 [CAT_STDREC] = bal.StdRecoverableOutstanding,
                 [CAT_OVDREC] = bal.OverdueRecoverableOutstanding,
             };

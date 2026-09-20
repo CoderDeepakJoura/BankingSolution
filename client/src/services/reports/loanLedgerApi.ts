@@ -36,6 +36,7 @@ export interface LoanLedger {
   sessionFromDate: string;
   sessionToDate: string;
   openingBalance: number;
+  openingIntDr?: number | null;
   entries: LoanLedgerEntry[];
   totalDr: number;
   totalCr: number;

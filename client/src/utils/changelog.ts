@@ -15,6 +15,18 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.56",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan Ledger: opening interest (OpenInt) for Stand loans now appears in the INT DR column of the opening balance row — was silently missing even when set in migration data" },
+      { type: "fix", text: "Loan Ledger: total INT DR now correctly includes the opening interest in all three output paths (screen, Excel export, print)" },
+      { type: "fix", text: "Loan Recovery: fixed principal double-count — loanaccountbalancedetail (bifurcation rows) were being added on top of TotalBalance, inflating the outstanding principal" },
+      { type: "fix", text: "Loan Recovery: OpenInt (opening recoverable interest) was wrongly added to unposted standard interest (Cat 1) causing it to appear twice — it now correctly appears only in Cat 3 (Standard Recoverable)" },
+      { type: "fix", text: "Loan Recovery: unposted interest (Cat 1 Standard Interest, Cat 2 Penal Interest) removed from Total Outstanding and allocation — only formally posted interest (Cat 3 + Cat 4) is now recoverable; run an IP voucher first to make unposted interest recoverable" },
+      { type: "improvement", text: "Loan Account Master: Opening Interest, Int Type, Opening Overdue Int, Overdue Int Type, and Overdue Date fields are now hidden when the product's interest posting is set to Add in Balance — these fields are not applicable for AddInBalance loans" },
+    ],
+  },
+  {
     version: "1.0.55",
     date: "2026-09-18",
     changes: [

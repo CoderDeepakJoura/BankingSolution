@@ -49,6 +49,8 @@ namespace BankingPlatform.API.Service.Reports
         public decimal ClosingBalance { get; set; }
         // true for Stand loans (ActOnIntPosting == 2): IntDr/IntCr columns shown separately
         public bool IsStand { get; set; }
+        // Opening interest balance for Stand loans (OpenInt from loanaccopeningbalance, shown in INT DR column of OB row)
+        public decimal? OpeningIntDr { get; set; }
         // Account detail fields
         public string? RelativeName { get; set; }
         public string? ContactNo { get; set; }
@@ -183,6 +185,17 @@ namespace BankingPlatform.API.Service.Reports
 
             decimal openingBalance = await CalculateOpeningBalanceAsync(branchId, accountId, fromDate.Date);
 
+            // For Stand loans: read opening interest balance (OpenInt) separately — it is not baked into
+            // the principal balance, so it must be shown in the INT DR column of the opening balance row.
+            decimal? openingIntDr = null;
+            if (isStand)
+            {
+                var obRec = await _context.loanaccopeningbalance.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.BranchId == branchId && x.AccId == accountId);
+                if (obRec?.OpenInt > 0 && obRec.OpenIntType?.ToUpper() == "DR")
+                    openingIntDr = (decimal)obRec.OpenInt.Value;
+            }
+
             DateTime toExclusive = toDate.Date.AddDays(1);
 
             var acctDetail = new
@@ -205,6 +218,7 @@ namespace BankingPlatform.API.Service.Reports
             var emptyResult = new LoanLedgerDTO
             {
                 IsStand = isStand,
+                OpeningIntDr = openingIntDr,
                 BranchName = branch.branchmaster_name,
                 BranchAddress = branch.branchmaster_addressline,
                 AccountName = account.AccountName ?? "",
@@ -362,6 +376,7 @@ namespace BankingPlatform.API.Service.Reports
                 SessionFromDate = session?.fromdate ?? fromDate,
                 SessionToDate = session?.todate ?? toDate,
                 IsStand = isStand,
+                OpeningIntDr = openingIntDr,
                 OpeningBalance = openingBalance,
                 Entries = entries,
                 TotalDr = totalDr,
