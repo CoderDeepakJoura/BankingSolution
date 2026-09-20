@@ -15,6 +15,15 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.67",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan interest: Schedule method and penal calculation now exclude pre-session kist interest — amounts from before the first session are covered by the opening balance entry and no longer double-counted" },
+      { type: "fix", text: "Loan period detail: now starts from the first session date instead of the loan origination date; pre-session kist principals excluded from performing balance calculation" },
+      { type: "fix", text: "Loan period detail: STD BAL now reduces on the same row the kist becomes due (not the next row); overdue kist principal now shown in the Cr column as an internal STD→OVD transfer" },
+    ],
+  },
+  {
     version: "1.0.66",
     date: "2026-09-20",
     changes: [
