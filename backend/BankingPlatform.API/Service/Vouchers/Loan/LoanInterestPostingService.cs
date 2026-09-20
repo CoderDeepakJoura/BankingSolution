@@ -401,11 +401,19 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 decimal lInterestPosted = isAddInBalance ? vcdd.Where(x => x.EntryStatus == "LInterest").Sum(x => x.VoucherAmount) : 0m;
 
                 decimal openingPrincipal = ob?.TotalBalance ?? 0m;
-                decimal principalBal = openingPrincipal
-                    + obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr)
-                    + advancedTotal - recoveredTotal;
+                // loanaccountbalancedetail is a bifurcation of TotalBalance — only add it when TotalBalance is absent
+                // to avoid double-counting.
+                decimal obDetailPrincipalAdj = (ob == null || (ob.TotalBalance ?? 0m) == 0m)
+                    ? (obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr))
+                    : 0m;
+                decimal principalBal = openingPrincipal + obDetailPrincipalAdj + advancedTotal - recoveredTotal;
                 if (isAddInBalance)
-                    principalBal += obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr) + lInterestPosted;
+                {
+                    decimal obDetailIntAdj = (ob == null || (ob.TotalBalance ?? 0m) == 0m)
+                        ? (obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr))
+                        : 0m;
+                    principalBal += obDetailIntAdj + lInterestPosted;
+                }
                 principalBal = Math.Max(0, principalBal);
 
                 string memberName = member?.MemberName ?? "";
@@ -511,7 +519,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 if (firstSession.HasValue && calcFromDate.Date < firstSession.Value.Date)
                     calcFromDate = firstSession.Value.Date;
                 DateTime calcToDate   = today;
-                decimal obNetForDWI   = openingPrincipal + obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr) + openStdInt;
+                decimal obNetForDWI   = openingPrincipal + obDetailPrincipalAdj + openStdInt;
 
                 decimal dynStdInt   = 0m;
                 decimal dynPenalInt = 0m;
@@ -535,7 +543,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                 if (ok.Date == null) continue;
                                 decimal kp = ok.PrincipalAmt ?? Math.Max(0m, (ok.KistAmount ?? 0m) - (ok.InterestAmt ?? 0m));
                                 if (kp <= 0 && principalBal > 0) kp = principalBal / overdueKists.Count;
-                                int pd = Math.Max(0, (today - ok.Date.Value.Date).Days);
+                                // Clamp overdue start to first session — opening interest covers everything before it.
+                                DateTime dueDateClamped = ok.Date.Value.Date;
+                                if (firstSession.HasValue && dueDateClamped < firstSession.Value.Date)
+                                    dueDateClamped = firstSession.Value.Date;
+                                int pd = Math.Max(0, (today - dueDateClamped).Days);
                                 decimal pi = Math.Round(kp * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
                                 rawPenal += pi;
                                 penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = ok.KistNumber ?? 0, DueDate = ok.Date.Value.Date, PrincipalAmount = kp, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = pi });
@@ -543,15 +555,21 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         }
                         else
                         {
-                            var firstOvd = overdueKists.Where(x => x.Date.HasValue).Min(x => x.Date!.Value.Date);
+                            var firstOvdOriginal = overdueKists.Where(x => x.Date.HasValue).Min(x => x.Date!.Value.Date);
+                            DateTime firstOvd = firstOvdOriginal;
+                            if (firstSession.HasValue && firstOvd < firstSession.Value.Date)
+                                firstOvd = firstSession.Value.Date;
                             int pd = Math.Max(0, (today - firstOvd).Days);
                             rawPenal = Math.Round(principalBal * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
-                            penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 0, DueDate = firstOvd, PrincipalAmount = principalBal, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = rawPenal });
+                            penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 0, DueDate = firstOvdOriginal, PrincipalAmount = principalBal, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = rawPenal });
                         }
                     }
                     else if (kist != null && kist.KistFirstDate.Date < today)
                     {
-                        int pd = Math.Max(0, (today - kist.KistFirstDate.Date).Days);
+                        DateTime kistFirstClamped = kist.KistFirstDate.Date;
+                        if (firstSession.HasValue && kistFirstClamped < firstSession.Value.Date)
+                            kistFirstClamped = firstSession.Value.Date;
+                        int pd = Math.Max(0, (today - kistFirstClamped).Days);
                         rawPenal = Math.Round(principalBal * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
                         penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 1, DueDate = kist.KistFirstDate.Date, PrincipalAmount = principalBal, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = rawPenal });
                     }
@@ -694,6 +712,12 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 }
             }
 
+            // First session start date — penal interest never starts before this date.
+            var firstSessionDate = await _db.branchsession.AsNoTracking()
+                .Where(s => s.branchid == branchId && s.isfirst)
+                .Select(s => (DateTime?)s.fromdate)
+                .FirstOrDefaultAsync();
+
             // Opening balance (migration / historical data)
             var ob = await _db.loanaccopeningbalance.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.AccId == loanAccId && x.BranchId == branchId);
@@ -701,11 +725,18 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 .Where(x => x.AccountId == loanAccId && x.BrId == branchId)
                 .ToListAsync();
 
-            decimal openingBalance = (ob?.TotalBalance ?? 0m)
-                                   + obDetails.Sum(x => x.AmountDr)
-                                   - obDetails.Sum(x => x.AmountCr);
+            // loanaccountbalancedetail is a bifurcation of TotalBalance — only add it when TotalBalance is absent.
+            decimal obDetailAdjDetail = (ob == null || (ob.TotalBalance ?? 0m) == 0m)
+                ? (obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr))
+                : 0m;
+            decimal openingBalance = (ob?.TotalBalance ?? 0m) + obDetailAdjDetail;
             if (isAddInBalance)
-                openingBalance += obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr);
+            {
+                decimal obDetailIntAdjDetail = (ob == null || (ob.TotalBalance ?? 0m) == 0m)
+                    ? (obDetails.Sum(x => x.IntDr) - obDetails.Sum(x => x.IntCr))
+                    : 0m;
+                openingBalance += obDetailIntAdjDetail;
+            }
 
             // Opening interest (for IntBal seed)
             decimal openingIntBal = (ob?.OpenInt > 0 && ob?.OpenIntType == "Dr")
@@ -780,16 +811,28 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 decimal stdInt = 0m;
                 decimal ovrInt = 0m;
 
-                if (days > 0 && runningBalance > 0 && stdRate > 0)
-                    stdInt = Math.Round(runningBalance * (decimal)stdRate / 100m * days / 365m, 2);
+                // Overdue kist principal at the start of this period (due strictly before prevDate).
+                // The performing (non-overdue) portion earns standard interest; the overdue portion earns penal.
+                decimal ovdPrinAtPrev = prevDate.HasValue
+                    ? kistSchedule
+                        .Where(k => k.Date.HasValue && k.Date.Value.Date < prevDate!.Value)
+                        .Sum(k => k.PrincipalAmt ?? Math.Max(0m, (k.KistAmount ?? 0m) - (k.InterestAmt ?? 0m)))
+                    : 0m;
+                decimal performingBal = Math.Max(0m, runningBalance - ovdPrinAtPrev);
+
+                if (days > 0 && performingBal > 0 && stdRate > 0)
+                    stdInt = Math.Round(performingBal * (decimal)stdRate / 100m * days / 365m, 2);
 
                 if (days > 0 && prevDate.HasValue && penalRate > 0 && !isAddInBalance)
                 {
                     // Kists past-due at the START of this period (due on or before prevDate).
                     // AddInBalance loans: interest (incl. overdue component) is baked into principal — skip.
-                    var ovdAtPrev = kistSchedule
-                        .Where(k => k.Date.HasValue && k.Date.Value.Date <= prevDate!.Value)
-                        .ToList();
+                    // Only charge penal for periods starting on or after the first session date.
+                    // Opening interest already covers everything before that date.
+                    bool periodAfterSession = !firstSessionDate.HasValue || prevDate!.Value >= firstSessionDate.Value.Date;
+                    var ovdAtPrev = periodAfterSession
+                        ? kistSchedule.Where(k => k.Date.HasValue && k.Date.Value.Date <= prevDate!.Value).ToList()
+                        : new List<BankingPlatform.Infrastructure.Models.AccMasters.Loan.AccountKistSchedule>();
                     if (ovdAtPrev.Any())
                     {
                         foreach (var ok in ovdAtPrev)
@@ -805,7 +848,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                 ovrInt += Math.Round(kistPrin * (decimal)penalRate / 100m * days / 365m, 2);
                         }
                     }
-                    else if (kistInfo != null && kistInfo.KistFirstDate.Date <= prevDate!.Value && runningBalance > 0)
+                    else if (periodAfterSession && kistInfo != null && kistInfo.KistFirstDate.Date <= prevDate!.Value && runningBalance > 0)
                     {
                         // No schedule rows at all (or none due yet) but the first kist was due by prevDate.
                         // Fall back to the same logic as GetLoanBalanceAsync: charge penal on the full
@@ -899,13 +942,13 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     Days        = days,
                     Dr          = drOnDate,
                     Cr          = crOnDate,
-                    StdBal      = runningBalance,
+                    StdBal      = performingBal,  // performing portion only (total minus overdue kist principal)
                     Roi         = stdRate,
                     StdInt      = stdInt,
                     Odd         = odd,
                     Odc         = odc,
                     Odb         = odb,
-                    Balance     = runningBalance,
+                    Balance     = runningBalance,  // total outstanding principal
                     Oroi        = penalRate,
                     OvrInt      = ovrInt,
                     TInt        = stdInt + ovrInt,

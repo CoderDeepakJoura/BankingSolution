@@ -15,6 +15,28 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.66",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "FD interest posting: cursor now clamped to first session start date — FDs opened before the session no longer generate historical interest periods" },
+    ],
+  },
+  {
+    version: "1.0.65",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan principal balance no longer double-counts opening balance when both TotalBalance and detail rows exist" },
+      { type: "fix", text: "Loan period detail: STD BAL now shows performing balance (total minus overdue kist principal); standard interest calculated on performing balance only" },
+    ],
+  },
+  {
+    version: "1.0.64",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan penal interest: overdue kist days now clamped to first session start date — pre-session kists no longer accumulate thousands of overdue days" },
+    ],
+  },
+  {
     version: "1.0.63",
     date: "2026-09-20",
     changes: [

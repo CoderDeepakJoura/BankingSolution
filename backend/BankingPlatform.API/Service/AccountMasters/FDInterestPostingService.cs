@@ -96,6 +96,13 @@ namespace BankingPlatform.API.Service.AccountMasters
                     && (filterAccountId == null || x.ID == filterAccountId))
                 .ToListAsync();
 
+            // First session start date — interest never starts before this date because the user
+            // has entered opening balance covering everything up to (firstSessionFrom - 1).
+            var firstSession = await _context.branchsession.AsNoTracking()
+                .Where(s => s.branchid == branchId && s.isfirst)
+                .Select(s => (DateTime?)s.fromdate)
+                .FirstOrDefaultAsync();
+
             var result = new List<FDInterestAccountDTO>();
 
             foreach (var acc in accounts)
@@ -132,6 +139,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                     DateTime cursor = lastPeriodEnd.HasValue
                         ? lastPeriodEnd.Value.Date.AddDays(1)
                         : detail.FDDate.Date;
+                    // Clamp to first session start — opening balance covers everything before it.
+                    if (firstSession.HasValue && cursor.Date < firstSession.Value.Date)
+                        cursor = firstSession.Value.Date;
 
                     while (true)
                     {
@@ -230,6 +240,12 @@ namespace BankingPlatform.API.Service.AccountMasters
                         .ToListAsync();
                 }
 
+                // First session start date — interest never starts before this date.
+                var firstSessionPost = await _context.branchsession.AsNoTracking()
+                    .Where(s => s.branchid == dto.BranchId && s.isfirst)
+                    .Select(s => (DateTime?)s.fromdate)
+                    .FirstOrDefaultAsync();
+
                 // First pass: collect all resolved period postings across all accounts
                 var allPostings = new List<(int AccountId, FDAccountDetail Detail, DateTime From, DateTime To, decimal EffAmt)>();
 
@@ -265,6 +281,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                         DateTime cursor = lastPosted.HasValue
                             ? lastPosted.Value.Date.AddDays(1)
                             : detail.FDDate.Date;
+                        // Clamp to first session start — opening balance covers everything before it.
+                        if (firstSessionPost.HasValue && cursor.Date < firstSessionPost.Value.Date)
+                            cursor = firstSessionPost.Value.Date;
 
                         while (true)
                         {
