@@ -15,6 +15,15 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.69",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan interest: penal now shows for accounts whose full kist schedule expired before session start (charged on outstanding principal from first session date)" },
+      { type: "fix", text: "Loan period detail: day count now includes the end date (+1 on final period only), matching bank convention — Apr 1 to Apr 30 = 30 days" },
+      { type: "fix", text: "Loan period detail: when all kist due dates precede the first session (schedule expired), STD BAL shows 0 and full principal appears in ODB" },
+    ],
+  },
+  {
     version: "1.0.68",
     date: "2026-09-20",
     changes: [
