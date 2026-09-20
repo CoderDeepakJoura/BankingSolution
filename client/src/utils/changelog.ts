@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.60",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Balance Sheet: Net Profit now matches the P&L report — income/expense heads are restricted to the current fiscal year (April 1 onwards) instead of accumulating from all historical periods" },
+    ],
+  },
+  {
     version: "1.0.59",
     date: "2026-09-20",
     changes: [

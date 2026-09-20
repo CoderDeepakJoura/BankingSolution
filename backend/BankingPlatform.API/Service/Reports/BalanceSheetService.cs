@@ -83,6 +83,12 @@ namespace BankingPlatform.API.Service.Reports
 
             var nextDay = asOfDate.Date.AddDays(1);
 
+            // Fiscal year start (Indian: April 1). P&L heads use only the current-year period;
+            // BS heads accumulate from the beginning of time.
+            DateTime fiscalYearStart = asOfDate.Month >= 4
+                ? new DateTime(asOfDate.Year, 4, 1)
+                : new DateTime(asOfDate.Year - 1, 4, 1);
+
             // ══════════════════════════════════════════════════════════════════════════════
             // PART A — IsAnnexure=1 BS heads + P&L heads: head-level balance
             // SP's GetBalanceHEAD uses trailing-zeros prefix matching; replicate that here.
@@ -127,12 +133,30 @@ namespace BankingPlatform.API.Service.Reports
             }
             var expandedHlHcs = childToParent.Keys.ToList();
 
-            // Voucher totals grouped by AccHeadCode, then aggregated to parent reporting head
+            // Separate head code sets: BS heads use all-time range; P&L heads use fiscal year only
+            var ann1HcSet = ann1Heads.Select(h => h.headcode).ToHashSet();
+            var plHcSet   = plHeads.Select(h => h.headcode).ToHashSet();
+
+            // Expanded child headcodes mapped to their parent — partitioned by BS vs P&L
+            var bsExpandedHcs = expandedHlHcs
+                .Where(hc => childToParent.TryGetValue(hc, out var p) && ann1HcSet.Contains(p))
+                .ToList();
+            var plExpandedHcs = expandedHlHcs
+                .Where(hc => childToParent.TryGetValue(hc, out var p) && plHcSet.Contains(p))
+                .ToList();
+
+            // Fetch voucher totals per headcode — BS heads: all time; P&L heads: fiscal year only
+            // Using a single query with a date-range conditional per headcode group.
             var hlVoucherRaw = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(d => d.BrId == branchId
                     && (d.VoucherStatus == "V" || d.VoucherStatus == "A")
                     && d.ValueDate < nextDay
-                    && expandedHlHcs.Contains(d.AccHeadCode))
+                    && (
+                        // BS (ann1) heads: all dates up to asOfDate
+                        (bsExpandedHcs.Contains(d.AccHeadCode))
+                        // P&L heads: current fiscal year only (matches P&L report range)
+                        || (plExpandedHcs.Contains(d.AccHeadCode) && d.ValueDate >= fiscalYearStart)
+                    ))
                 .GroupBy(d => d.AccHeadCode)
                 .Select(g => new
                 {
