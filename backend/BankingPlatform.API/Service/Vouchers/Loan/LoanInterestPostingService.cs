@@ -524,7 +524,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 if (firstSession.HasValue && calcFromDate.Date < firstSession.Value.Date)
                     calcFromDate = firstSession.Value.Date;
                 DateTime calcToDate   = today;
-                decimal obNetForDWI   = openingPrincipal + obDetailPrincipalAdj + openStdInt;
+                // For AddInBalance loans, posted interest is capitalised into the principal, so
+                // opening std interest is part of the outstanding balance and included in DWI base.
+                // For standard loans, opening interest is tracked separately (Cat 1) and collected
+                // via loan recovery — do NOT inflate the DWI base with it.
+                decimal obNetForDWI   = openingPrincipal + obDetailPrincipalAdj + (isAddInBalance ? openStdInt : 0m);
 
                 decimal dynStdInt   = 0m;
                 decimal dynPenalInt = 0m;
@@ -576,8 +580,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 if (intCalcMethod == "Schedule" && kistSchedule.Any())
                 {
-                    // Only sum post-session kist interest — pre-session is already in openStdInt.
-                    decimal schedIntDue = interestOverdueKists.Sum(x => x.InterestAmt ?? 0m) + openStdInt;
+                    // Opening interest (openStdInt) is already tracked as Cat 1 and collected via
+                    // loan recovery — do NOT include it here. Only post NEW interest from the
+                    // post-session kist schedule. If no post-session kists have InterestAmt set,
+                    // dynStdInt stays 0 and the DWI fallback below computes the correct amount.
+                    decimal schedIntDue = interestOverdueKists.Sum(x => x.InterestAmt ?? 0m);
                     dynStdInt = Math.Max(0, schedIntDue - postedStdInt);
 
                     if (dynStdInt == 0 && effectiveStdRate > 0 && principalBal > 0)

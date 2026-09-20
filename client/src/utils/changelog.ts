@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.68",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan interest posting: opening balance interest (openStdInt) no longer included in Schedule method or DWI base — it is recovered via loan recovery, not IP; Calculation tab now shows only the new period interest (e.g. 777.53 for 172 days) instead of the inflated historical total" },
+    ],
+  },
+  {
     version: "1.0.67",
     date: "2026-09-20",
     changes: [
