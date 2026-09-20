@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.61",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Balance Sheet: reverted fiscal-year filter on P&L heads — net profit calculation restored to all-time cumulative as originally designed" },
+    ],
+  },
+  {
     version: "1.0.60",
     date: "2026-09-20",
     changes: [
