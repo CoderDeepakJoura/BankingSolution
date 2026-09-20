@@ -358,6 +358,13 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     .ToListAsync()
                 : new List<BankingPlatform.Infrastructure.Models.InterestSlabs.Loan.LoanSlabDetail>();
 
+            // First session start date for this branch — interest never starts before this date because
+            // the user has already entered opening balance + opening interest up to (firstSessionFrom - 1).
+            var firstSession = await _db.branchsession.AsNoTracking()
+                .Where(s => s.branchid == brId && s.isfirst)
+                .Select(s => (DateTime?)s.fromdate)
+                .FirstOrDefaultAsync();
+
             // Build lookup maps
             var kistMap      = kistAll.GroupBy(x => x.AccountId).ToDictionary(g => g.Key, g => g.First());
             var obDetailMap  = obDetailAll.GroupBy(x => x.AccountId).ToDictionary(g => g.Key, g => g.ToList());
@@ -499,6 +506,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     : null;
 
                 DateTime calcFromDate = lastPostDate?.Date ?? kist?.LoanDate ?? limitLoanDate ?? ob?.OverDueDate ?? today;
+                // If the account predates the first session, clamp to the session start.
+                // Opening balance + opening interest already cover everything before that date.
+                if (firstSession.HasValue && calcFromDate.Date < firstSession.Value.Date)
+                    calcFromDate = firstSession.Value.Date;
                 DateTime calcToDate   = today;
                 decimal obNetForDWI   = openingPrincipal + obDetails.Sum(x => x.AmountDr) - obDetails.Sum(x => x.AmountCr) + openStdInt;
 

@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.63",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan Interest Posting: interest calculation now starts from the branch's first session date (not the account opening date) for accounts opened before the session started — opening balance and opening interest already cover the pre-session period" },
+    ],
+  },
+  {
     version: "1.0.62",
     date: "2026-09-20",
     changes: [
