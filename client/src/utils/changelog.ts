@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.62",
+    date: "2026-09-20",
+    changes: [
+      { type: "fix", text: "Loan Recovery: Cat 1 (unposted standard) and Cat 2 (unposted penal) interest no longer included in the recoverable Int Max cap, validation, or allocation — only Cat 3 (Std. Recoverable) and Cat 4 (Overdue Recoverable) count toward recoverable interest" },
+    ],
+  },
+  {
     version: "1.0.61",
     date: "2026-09-20",
     changes: [

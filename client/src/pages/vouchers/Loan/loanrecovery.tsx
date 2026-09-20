@@ -99,8 +99,8 @@ const compactSelectStyles = (hasError = false) => ({
 
 function computeAllocation(total: number, info: LoanRecoveryBalanceDTO): IntAllocation[] {
   const outstanding: Record<number, number> = {
-    1: info.stdInterestOutstanding,
-    2: info.penalInterestOutstanding,
+    1: 0,  // Cat 1 (unposted std) — display only; run IP voucher to post before recovering
+    2: 0,  // Cat 2 (unposted penal) — display only; not recoverable until formally posted
     3: info.stdRecoverableOutstanding,
     4: info.overdueRecoverableOutstanding,
   };
@@ -489,10 +489,10 @@ const LoanRecovery: React.FC = () => {
     else if (loanBalance && totalAmt > loanBalance.totalOutstanding + 0.01)
       errs.totalAmount = `Cannot exceed outstanding balance (₹${fmt(loanBalance.totalOutstanding)})`;
     if (isStandLoan && intAmtParsed > 0) {
-      const totalIntOutstanding = (loanBalance?.stdInterestOutstanding ?? 0) + (loanBalance?.penalInterestOutstanding ?? 0)
-        + (loanBalance?.stdRecoverableOutstanding ?? 0) + (loanBalance?.overdueRecoverableOutstanding ?? 0);
+      // Only Cat 3 + Cat 4 are recoverable; Cat 1/2 are unposted previews
+      const totalIntOutstanding = (loanBalance?.stdRecoverableOutstanding ?? 0) + (loanBalance?.overdueRecoverableOutstanding ?? 0);
       if (intAmtParsed > totalIntOutstanding + 0.01)
-        errs.intAmount = `Interest cannot exceed outstanding interest (₹${fmtWhole(totalIntOutstanding)})`;
+        errs.intAmount = `Interest cannot exceed recoverable interest (₹${fmtWhole(totalIntOutstanding)})`;
     }
     if (debitRows.length === 0)
       errs.debitItems = "Add at least one debit account entry";
@@ -768,7 +768,7 @@ const LoanRecovery: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-amber-800">Total Interest</td>
                     <td className="px-6 py-4"></td>
                     <td className="px-6 py-4 text-sm text-amber-700 text-right">
-                      ₹{fmtWhole(loanBalance.stdInterestOutstanding + loanBalance.penalInterestOutstanding + loanBalance.stdRecoverableOutstanding + loanBalance.overdueRecoverableOutstanding)}
+                      ₹{fmtWhole(loanBalance.stdRecoverableOutstanding + loanBalance.overdueRecoverableOutstanding)}
                     </td>
                     {totalAmt > 0 && <td className="px-6 py-4 text-sm text-green-700 text-right">₹{fmtWhole(intTotal)}</td>}
                   </tr>
@@ -1127,7 +1127,7 @@ const LoanRecovery: React.FC = () => {
                           <Label>
                             Intt (₹)
                             <span className="ml-2 text-xs font-normal text-amber-600">
-                              (Max: ₹{fmtWhole(loanBalance!.stdInterestOutstanding + loanBalance!.penalInterestOutstanding + loanBalance!.stdRecoverableOutstanding + loanBalance!.overdueRecoverableOutstanding)})
+                              (Max: ₹{fmtWhole(loanBalance!.stdRecoverableOutstanding + loanBalance!.overdueRecoverableOutstanding)})
                             </span>
                           </Label>
                           <input
