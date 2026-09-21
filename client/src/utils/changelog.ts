@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.74",
+    date: "2026-09-21",
+    changes: [
+      {
+        type: "fix",
+        text: "Mature FD: postMaturityAmount and intPayableAmount sent as strings to backend — now correctly converted to numbers before submit (decimal? deserialization error fixed)",
+      },
+      {
+        type: "fix",
+        text: "Mature RD: generalAmount, postMaturityAmount, and intPayableAmount sent as strings — now parsed to numbers in CreditAccountDetails and MatureRDInfo before submit",
+      },
+    ],
+  },
+  {
     version: "1.0.73",
     date: "2026-09-21",
     changes: [

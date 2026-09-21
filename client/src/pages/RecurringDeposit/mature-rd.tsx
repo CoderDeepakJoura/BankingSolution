@@ -465,6 +465,7 @@ const MatureRDPage: React.FC = () => {
     try {
       const normalizedCreditAccountDetails = {
         ...accountCredit,
+        generalAmount: parseAmount(accountCredit.generalAmount),
         cashAmount: parseAmount(accountCredit.generalAmount),
         cashaccountId: accountCredit.generalAccountId,
         savingAmount: parseAmount(accountCredit.savingAmount),
@@ -485,8 +486,8 @@ const MatureRDPage: React.FC = () => {
           rdAccountId: matureRDDetail.rdAccountId,
           VoucherDate: matureRDDetail.date,
           branchId: user.branchid,
-          postMaturityAmount: matureRDDetail.postMaturityAmt,
-          intPayableAmount: matureRDDetail.intPayableAmt,
+          postMaturityAmount: parseAmount(matureRDDetail.postMaturityAmt),
+          intPayableAmount: parseAmount(matureRDDetail.intPayableAmt),
           DetailId: matureRDDetail.rdDetailId,
           ProductId: matureRDDetail.product,
           Narration: accountCredit.narration,
