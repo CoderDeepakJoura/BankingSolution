@@ -972,18 +972,26 @@ namespace BankingPlatform.API.Service.AccountMasters
                     }
 
                     decimal intDrAmt = dto.MatureRDInfo!.IntDr;
-                    decimal principalDrAmt = intDrAmt > 0 && dto.MatureRDInfo.Balance > 0
-                        ? dto.MatureRDInfo.Balance
+
+                    // Look up IntExpAccId directly from DB — don't rely on frontend sending it
+                    var rdRule = await _context.rdproductbranchwiserule
+                        .AsNoTracking()
+                        .Where(r => r.RDProductId == dto.MatureRDInfo.ProductId && r.BrId == branchId)
+                        .FirstOrDefaultAsync();
+                    int intExpAccId = rdRule?.IntExpAccId ?? 0;
+
+                    decimal principalDrAmt = intDrAmt > 0 && intExpAccId > 0
+                        ? totalDebit - intDrAmt
                         : totalDebit;
 
                     VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.RDDr.ToString(), narration, principalDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
                     _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
                     row++;
 
-                    if (intDrAmt > 0 && dto.MatureRDInfo.IntExpAccId > 0)
+                    if (intDrAmt > 0 && intExpAccId > 0)
                     {
-                        long intExpHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(dto.MatureRDInfo.IntExpAccId, branchId);
-                        VoucherCreditDebitDetails intExpDebitInfo = _memberService.voucherCreditDebitDetails(intExpHeadCode, dto.MatureRDInfo.IntExpAccId, branchId, Enums.VoucherStatus.Dr.ToString(), "Interest Expense on RD Maturity", intDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                        long intExpHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(intExpAccId, branchId);
+                        VoucherCreditDebitDetails intExpDebitInfo = _memberService.voucherCreditDebitDetails(intExpHeadCode, intExpAccId, branchId, Enums.VoucherStatus.Dr.ToString(), "Interest Expense on RD Maturity", intDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
                         _context.vouchercreditdebitdetails.Add(intExpDebitInfo);
                         row++;
                     }

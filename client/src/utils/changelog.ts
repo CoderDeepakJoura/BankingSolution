@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.77",
+    date: "2026-09-21",
+    changes: [
+      {
+        type: "fix",
+        text: "Mature RD: Interest Expense account now looked up directly from rdproductbranchwiserule in backend — no longer depends on frontend sending IntExpAccId, guarantees the Dr entry is always written correctly",
+      },
+    ],
+  },
+  {
     version: "1.0.76",
     date: "2026-09-21",
     changes: [
