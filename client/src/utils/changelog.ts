@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.76",
+    date: "2026-09-21",
+    changes: [
+      {
+        type: "fix",
+        text: "Mature RD: Interest Expense account not saving — fix swapped arguments and wrong response field (Data vs data) when fetching RD branch-wise rule for IntExpAccId",
+      },
+    ],
+  },
+  {
     version: "1.0.75",
     date: "2026-09-21",
     changes: [

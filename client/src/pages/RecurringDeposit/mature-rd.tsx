@@ -346,8 +346,9 @@ const MatureRDPage: React.FC = () => {
     if (productId && productId > 0) {
       await fetchRDAccounts(productId);
       try {
-        const ruleRes = await branchwiseruleService.get_rd_branchwiserule_data(user.branchid, productId);
-        if (ruleRes.success && ruleRes.data) setIntExpAccId(ruleRes.data.IntExpAccId || 0);
+        const ruleRes = await branchwiseruleService.get_rd_branchwiserule_data(productId, user.branchid);
+        const ruleData = (ruleRes as any).Data || (ruleRes as any).data;
+        if (ruleRes.success && ruleData) setIntExpAccId(ruleData.IntExpAccId || 0);
       } catch { /* silently ignore */ }
     }
   };
