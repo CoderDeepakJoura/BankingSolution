@@ -145,7 +145,41 @@ namespace BankingPlatform.API.Service.AccountMasters
                     await _context.accopeningbalance.AddAsync(accOpeningBalance);
                 }
 
-                // 5. Voucher + RD Detail + VoucherRDDetail
+                // 5. RD Account Detail — always saved, even for opening-balance-only entries
+                // (same pattern as FD: details must exist regardless of whether a cash voucher is created)
+                RDAccountDetail? rdAccountDetail = null;
+                if (dto.RDAccountDetailDTO != null)
+                {
+                    var rdDto = dto.RDAccountDetailDTO;
+                    rdAccountDetail = new RDAccountDetail
+                    {
+                        BrId = branchId,
+                        AccId = accountId,
+                        RdNumber = rdDto.RdNumber,
+                        RdDate = DateTime.SpecifyKind(rdDto.RdDate ?? DateTime.Now, DateTimeKind.Unspecified),
+                        RdAmount = rdDto.RdAmount ?? 0,
+                        NoOfMonths = rdDto.NoOfMonths,
+                        RdSlabId = rdDto.RdSlabId,
+                        InterestRate = rdDto.InterestRate,
+                        MaturityDate = rdDto.MaturityDate.HasValue
+                            ? DateTime.SpecifyKind(rdDto.MaturityDate.Value, DateTimeKind.Unspecified)
+                            : null,
+                        KistAmt = rdDto.KistAmt,
+                        KistInterval = rdDto.KistInterval,
+                        FirstKistDate = rdDto.FirstKistDate.HasValue
+                            ? DateTime.SpecifyKind(rdDto.FirstKistDate.Value, DateTimeKind.Unspecified)
+                            : null,
+                        PenaltyAmt = rdDto.PenaltyAmt,
+                        Status = rdDto.Status ?? (int)Enums.FDStatus.Open,
+                        MaturityAmt = rdDto.MaturityAmt,
+                        NoOfDays = rdDto.NoOfDays,
+                        CompoundingInterval = rdDto.CompoundingInterval
+                    };
+                    await _context.rdaccountdetail.AddAsync(rdAccountDetail);
+                    await _context.SaveChangesAsync();
+                }
+
+                // 6. Voucher + VoucherRDDetail (only when a real payment is being made)
                 if ((dto.CreditAccountDetails!.CashAccountId > 0 || dto.CreditAccountDetails!.SavingAccountId > 0)
                     && dto.Voucher.TotalDebit > 0)
                 {
@@ -191,40 +225,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                     await _context.SaveChangesAsync();
                     row++;
 
-                    // 6. RD Account Detail
-                    if (dto.RDAccountDetailDTO != null)
+                    // 7. Voucher RD Detail (links the voucher to the already-saved rdAccountDetail)
+                    if (rdAccountDetail != null)
                     {
-                        var rdDto = dto.RDAccountDetailDTO;
-
-                        var rdAccountDetail = new RDAccountDetail
-                        {
-                            BrId = branchId,
-                            AccId = accountId,
-                            RdNumber = rdDto.RdNumber,
-                            RdDate = DateTime.SpecifyKind(rdDto.RdDate ?? DateTime.Now, DateTimeKind.Unspecified),
-                            RdAmount = rdDto.RdAmount ?? 0,
-                            NoOfMonths = rdDto.NoOfMonths,
-                            RdSlabId = rdDto.RdSlabId,
-                            InterestRate = rdDto.InterestRate,
-                            MaturityDate = rdDto.MaturityDate.HasValue
-                                ? DateTime.SpecifyKind(rdDto.MaturityDate.Value, DateTimeKind.Unspecified)
-                                : null,
-                            KistAmt = rdDto.KistAmt,
-                            KistInterval = rdDto.KistInterval,
-                            FirstKistDate = rdDto.FirstKistDate.HasValue
-                                ? DateTime.SpecifyKind(rdDto.FirstKistDate.Value, DateTimeKind.Unspecified)
-                                : null,
-                            PenaltyAmt = rdDto.PenaltyAmt,
-                            Status = rdDto.Status ?? (int)Enums.FDStatus.Open,
-                            MaturityAmt = rdDto.MaturityAmt,
-                            NoOfDays = rdDto.NoOfDays,
-                            CompoundingInterval = rdDto.CompoundingInterval
-                        };
-
-                        await _context.rdaccountdetail.AddAsync(rdAccountDetail);
-                        await _context.SaveChangesAsync();
-
-                        // 7. Voucher RD Detail
                         var voucherRDDetail = new VoucherRDDetail
                         {
                             BrId = branchId,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import Select from "react-select";
@@ -582,7 +582,8 @@ const MatureFDPage: React.FC = () => {
       maturityDate: detail.fdMaturityDate?.split("T")[0] || "",
       intRate: detail.intRate || 0,
       receiptNo: detail.ltdNo || "",
-      intPayableAmt: Math.round(Math.max(0, maturityAmt - prev.balance)).toString(),
+      balance: detail.fdAmount || 0,
+      intPayableAmt: Math.round(Math.max(0, maturityAmt - (detail.fdAmount || 0))).toString(),
     }));
     setRenewFDDetail((prev) => ({
       ...prev,
@@ -601,9 +602,8 @@ const MatureFDPage: React.FC = () => {
 
     setIsFetchingFD(true);
     try {
-      const [response, balanceRes] = await Promise.all([
+      const [response] = await Promise.all([
         fdAccountService.getFDAccountById(accountId, user.branchid, matureFDDetail.date),
-        commonservice.get_account_balance(user.branchid, accountId),
       ]);
 
       if (response.success && response.data) {
@@ -617,9 +617,7 @@ const MatureFDPage: React.FC = () => {
         setSelectedDetailId(firstDetail.id || 0);
 
         const maturityAmt = firstDetail.maturityAmount || 0;
-        const balance = balanceRes.success && balanceRes.data != null
-          ? balanceRes.data
-          : (firstDetail.fdAmount || 0);
+        const balance = firstDetail.fdAmount || 0;
 
         setMatureFDDetail({
           fdDetailId: firstDetail.id || 0,

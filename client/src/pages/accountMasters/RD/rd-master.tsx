@@ -1,4 +1,4 @@
-// pages/AccountMasters/RDAccount/RDAccountMaster.tsx
+﻿// pages/AccountMasters/RDAccount/RDAccountMaster.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { decryptId } from "../../../utils/encryption";
 import Swal from "sweetalert2";
@@ -366,6 +366,7 @@ useEffect(() => {
         }
 
         // ── RD Detail Form
+        const accOpeningDate = acc?.accOpeningDate?.split("T")[0] || sessionDate;
         if (rd) {
           // Reverse-map kistinterval number → string key
           const reverseKistMap: Record<number, string> = {
@@ -395,6 +396,13 @@ useEffect(() => {
             compoundingInterval: rd.compoundingInterval?.toString() || "3",
             slabId: rd.rdSlabId?.toString() || "",
           });
+        } else {
+          setRdDetailForm((prev) => ({
+            ...prev,
+            rdDate: accOpeningDate,
+            firstKistDate: accOpeningDate,
+            paymentDate: accOpeningDate,
+          }));
         }
 
         // ── Joint holders

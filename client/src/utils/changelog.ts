@@ -15,6 +15,28 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.73",
+    date: "2026-09-21",
+    changes: [
+      {
+        type: "fix",
+        text: "RD account detail not saved for opening-balance-only entries — rdaccountdetail is now always saved on create, same fix as FD (bug #2)",
+      },
+      {
+        type: "fix",
+        text: "RD modify mode: firstKistDate now defaults to account opening date when no RD detail exists (accounts affected by above bug)",
+      },
+      {
+        type: "fix",
+        text: "FD mature screen: balance now shows per-certificate fdAmount instead of total account balance across all FD details",
+      },
+      {
+        type: "fix",
+        text: "Account Head save error: parent head code (12-digit) caused Int32 overflow — backend now resolves parent by head code lookup",
+      },
+    ],
+  },
+  {
     version: "1.0.72",
     date: "2026-09-21",
     changes: [

@@ -89,6 +89,15 @@ namespace BankingPlatform.API.Controllers.AccountHead
                 accountheadMasterDTO.AccountHeadName = accountheadMasterDTO.AccountHeadName?.Trim() ?? "";
                 accountheadMasterDTO.AccountHeadNameSL = accountheadMasterDTO.AccountHeadNameSL?.Trim() ?? "";
 
+                int resolvedParentId = 0;
+                if (!string.IsNullOrEmpty(accountheadMasterDTO.ParentHeadCode) &&
+                    long.TryParse(accountheadMasterDTO.ParentHeadCode, out var parentHeadCodeCreate))
+                {
+                    resolvedParentId = await _appContext.accounthead
+                        .Where(h => h.headcode == parentHeadCodeCreate && h.branchid == accountheadMasterDTO.BranchID)
+                        .Select(h => h.id)
+                        .FirstOrDefaultAsync();
+                }
 
                 await _appContext.accounthead.AddAsync(new Infrastructure.Models.AccHeads.AccountHead
                 {
@@ -98,7 +107,7 @@ namespace BankingPlatform.API.Controllers.AccountHead
                     accountheadtypeid = Convert.ToInt32(accountheadMasterDTO.AccountHeadType),
                     headcode = Convert.ToInt64(accountheadMasterDTO.HeadCode),
                     isannexure = !string.IsNullOrEmpty(accountheadMasterDTO.IsAnnexure) ? int.Parse(accountheadMasterDTO.IsAnnexure) : 0,
-                    parentid = !string.IsNullOrEmpty(accountheadMasterDTO.ParentHeadCode) ? Convert.ToInt32(accountheadMasterDTO.ParentHeadCode) : 0,
+                    parentid = resolvedParentId,
                     showinreport = !string.IsNullOrEmpty(accountheadMasterDTO.ShowInReport) ? int.Parse(accountheadMasterDTO.ShowInReport) : 0
                 });
                 await _appContext.SaveChangesAsync();
@@ -276,12 +285,22 @@ namespace BankingPlatform.API.Controllers.AccountHead
 
 
                 // Update the properties of the existing accounthead entity
+                int resolvedParentIdModify = 0;
+                if (!string.IsNullOrEmpty(accountheadMasterDTO.ParentHeadCode) &&
+                    long.TryParse(accountheadMasterDTO.ParentHeadCode, out var parentHeadCodeModify))
+                {
+                    resolvedParentIdModify = await _appContext.accounthead
+                        .Where(h => h.headcode == parentHeadCodeModify && h.branchid == accountheadMasterDTO.BranchID)
+                        .Select(h => h.id)
+                        .FirstOrDefaultAsync();
+                }
+
                 existingAccountHead.name = accountheadMasterDTO.AccountHeadName?.Trim() ?? "";
                 existingAccountHead.namesl = accountheadMasterDTO.AccountHeadNameSL?.Trim() ?? "";
                 existingAccountHead.accountheadtypeid = Convert.ToInt32(accountheadMasterDTO.AccountHeadType);
                 existingAccountHead.headcode = Convert.ToInt64(accountheadMasterDTO.HeadCode);
                 existingAccountHead.isannexure = !string.IsNullOrEmpty(accountheadMasterDTO.IsAnnexure) ? int.Parse(accountheadMasterDTO.IsAnnexure) : 0;
-                existingAccountHead.parentid = !string.IsNullOrEmpty(accountheadMasterDTO.ParentHeadCode) ? Convert.ToInt32(accountheadMasterDTO.ParentHeadCode) : 0;
+                existingAccountHead.parentid = resolvedParentIdModify;
                 existingAccountHead.showinreport = !string.IsNullOrEmpty(accountheadMasterDTO.ShowInReport) ? Convert.ToInt32(accountheadMasterDTO.ShowInReport) : 0;
 
                 // Save changes to the database
