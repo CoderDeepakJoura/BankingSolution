@@ -971,8 +971,23 @@ namespace BankingPlatform.API.Service.AccountMasters
                         row++;
                     }
 
-                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.RDDr.ToString(), narration, totalDebit, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                    decimal intDrAmt = dto.MatureRDInfo!.IntDr;
+                    decimal principalDrAmt = intDrAmt > 0 && dto.MatureRDInfo.Balance > 0
+                        ? dto.MatureRDInfo.Balance
+                        : totalDebit;
+
+                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.RDDr.ToString(), narration, principalDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
                     _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
+                    row++;
+
+                    if (intDrAmt > 0 && dto.MatureRDInfo.IntExpAccId > 0)
+                    {
+                        long intExpHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(dto.MatureRDInfo.IntExpAccId, branchId);
+                        VoucherCreditDebitDetails intExpDebitInfo = _memberService.voucherCreditDebitDetails(intExpHeadCode, dto.MatureRDInfo.IntExpAccId, branchId, Enums.VoucherStatus.Dr.ToString(), "Interest Expense on RD Maturity", intDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(intExpDebitInfo);
+                        row++;
+                    }
+
                     await _context.SaveChangesAsync();
 
                     var voucherRDDetailDebit = new VoucherRDDetail
@@ -985,8 +1000,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                         AmountCr = 0,
                         Operation = "RP",
                         VoucherDate = voucherDate,
-                        AmountDr = Convert.ToDouble(rdDetailInfo.MaturityAmt),
-                        IntDr = 0,
+                        AmountDr = Convert.ToDouble(principalDrAmt),
+                        IntDr = Convert.ToDouble(intDrAmt),
                         IntCr = 0,
                         ValueDate = voucherDate,
                         VoucherMainStatus = dto.Voucher.VoucherStatus

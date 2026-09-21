@@ -15,6 +15,24 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.75",
+    date: "2026-09-21",
+    changes: [
+      {
+        type: "improvement",
+        text: "Mature RD: Interest DR auto-fills with maturity amount minus balance when account loads (maturityAmt > balance)",
+      },
+      {
+        type: "improvement",
+        text: "Mature RD: When Interest DR > 0, voucher now posts two Dr entries — RD account debited with principal only, Interest Expense account debited with interest amount",
+      },
+      {
+        type: "improvement",
+        text: "Mature RD: Interest Payable field removed from UI (was unused)",
+      },
+    ],
+  },
+  {
     version: "1.0.74",
     date: "2026-09-21",
     changes: [

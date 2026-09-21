@@ -25,6 +25,7 @@ import { RootState } from "../../redux";
 import { SavingAccounts } from "../vouchers/saving/savingdeposit";
 import DatePicker from "../../components/DatePicker";
 import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../services/vouchers/loan/loanRecoveryApi";
+import branchwiseruleService from "../../services/branchwiserule/branchwiserules";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -114,6 +115,7 @@ const MatureRDPage: React.FC = () => {
   const [loanAccounts, setLoanAccounts] = useState<AccountOption[]>([]);
   const [loanBalance, setLoanBalance] = useState<LoanRecoveryBalanceDTO | null>(null);
   const [penalAccounts, setPenalAccounts] = useState<SavingAccounts[]>([]);
+  const [intExpAccId, setIntExpAccId] = useState<number>(0);
 
    const sessionDate =  commonservice.splitDate(user.workingdate);
   // ─── Blank Factories ────────────────────────────────────────────────────────
@@ -339,8 +341,15 @@ const MatureRDPage: React.FC = () => {
     setSelectedRDAccount(null);
     setRdAccounts([]);
     setMatureRDDetail(blankMatureDetail());
+    setIntExpAccId(0);
 
-    if (productId && productId > 0) await fetchRDAccounts(productId);
+    if (productId && productId > 0) {
+      await fetchRDAccounts(productId);
+      try {
+        const ruleRes = await branchwiseruleService.get_rd_branchwiserule_data(user.branchid, productId);
+        if (ruleRes.success && ruleRes.data) setIntExpAccId(ruleRes.data.IntExpAccId || 0);
+      } catch { /* silently ignore */ }
+    }
   };
 
   // ─── RD Account Change ───────────────────────────────────────────────────────
@@ -363,6 +372,8 @@ const MatureRDPage: React.FC = () => {
         const detail = data.rdAccountDetailDTO;
         const maturityAmt = detail?.maturityAmt || 0;
         const balance = detail?.rdAmount || 0;
+
+        const interestComponent = maturityAmt > balance ? maturityAmt - balance : 0;
 
         setMatureRDDetail({
           rdDetailId: detail?.detailId || 0,
@@ -390,6 +401,13 @@ const MatureRDPage: React.FC = () => {
           status: detail?.status || 0,
           memberDateOfBirth: data.accountMasterDTO?.dob?.split("T")[0] || "",
         });
+
+        if (interestComponent > 0) {
+          setAccountCredit((prev) => ({
+            ...prev,
+            intDr: interestComponent.toFixed(2),
+          }));
+        }
 
         Swal.fire({
           icon: "success",
@@ -421,6 +439,7 @@ const MatureRDPage: React.FC = () => {
     setSelectedLoanProductId(null);
     setLoanAccounts([]);
     setLoanBalance(null);
+    setIntExpAccId(0);
   };
 
   // ─── Submit ──────────────────────────────────────────────────────────────────
@@ -494,7 +513,9 @@ const MatureRDPage: React.FC = () => {
           PenalAmount: normalizedCreditAccountDetails.penalAmount,
           PenalAccountId: accountCredit.penalAccountId,
           IntDr: normalizedCreditAccountDetails.intDr,
-          IntCr: normalizedCreditAccountDetails.intCr
+          IntCr: normalizedCreditAccountDetails.intCr,
+          IntExpAccId: intExpAccId,
+          Balance: matureRDDetail.balance,
         },
         CreditAccountDetails: normalizedCreditAccountDetails,
       };
@@ -784,26 +805,6 @@ const MatureRDPage: React.FC = () => {
                         <div className="bg-white px-4 py-3 rounded-lg border-l-4 border-orange-500 shadow-sm">
                           <span className="text-lg font-bold text-gray-800 font-mono">₹ {matureRDDetail.penaltyAmt.toFixed(2)}</span>
                         </div>
-                      </div>
-
-                      {/* Interest Payable */}
-                      <div className="flex flex-col space-y-2">
-                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-purple-500" />
-                          Interest Payable
-                        </label>
-                        <input
-                          type="text"
-                          value={matureRDDetail.intPayableAmt}
-                          onChange={(e) =>
-                            setMatureRDDetail({
-                              ...matureRDDetail,
-                              intPayableAmt: validateNumberInput(e.target.value, 10),
-                            })
-                          }
-                          className="px-4 py-3 border-2 border-fuchsia-200 rounded-lg focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100 outline-none transition-all text-gray-700 bg-white font-mono text-lg font-bold"
-                          placeholder="0.00"
-                        />
                       </div>
 
                       {/* Pending Amount */}

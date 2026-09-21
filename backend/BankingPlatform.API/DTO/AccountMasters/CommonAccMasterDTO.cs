@@ -95,8 +95,8 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public decimal PostMaturityAmount { get; set; }
         public int PenalAccountId { get; set; }
         public decimal PreMaturityAmount { get; set; }
-        
-
+        public int IntExpAccId { get; set; }
+        public decimal Balance { get; set; }
     }
     public class AccountDocDetailsDTO
     {
