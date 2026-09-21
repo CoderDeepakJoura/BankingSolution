@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.78",
+    date: "2026-09-21",
+    changes: [
+      { type: "fix", text: "Loan Interest Posting (Stand mode): Dr entry now goes to Current Recoverable Interest account instead of loan account; Cat 3 entry created to track outstanding recoverable interest per account" },
+      { type: "fix", text: "Batch Interest Posting (Stand): single combined Dr+Cr GL entry for all accounts; per-account Cat 1/2/3 entries in interest ledger" },
+      { type: "fix", text: "StdRecoverable balance now correctly reflects new Cat 3 scheme while remaining backward-compatible with existing old-style interest postings" },
+      { type: "fix", text: "Last interest posting date detection updated to recognise new Stand IP entries (identified via Cat 3 VoucherId link) so calcFromDate advances correctly after posting" },
+    ],
+  },
+  {
     version: "1.0.77",
     date: "2026-09-21",
     changes: [

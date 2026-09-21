@@ -217,10 +217,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             decimal ovdRecPosted    = (decimal)intEntries.Where(x => x.IntCatId == CAT_OVDREC).Sum(x => x.IntDr);
             decimal ovdRecRecovered = (decimal)intEntries.Where(x => x.IntCatId == CAT_OVDREC).Sum(x => x.IntCr);
 
-            // Cat 3 (StdRecoverable) = all formally posted (std + penal) minus already recovered.
-            // Subtract unpostedRecovered to cancel auto-post entries whose IntDr inflated totalPosted
-            // but whose IntCr means the interest was immediately recovered (net effect = 0 on this pool).
-            decimal stdRec = Math.Max(0, totalPosted + openStdInt - postedRecovered - unpostedRecovered);
+            // Cat 3 IntDr = newly posted recoverable (new-style Stand IP).
+            // Adding cat3Dr handles new Stand entries (Cat1/2 IntCr = IntDr cancel out; Cat3 adds the recoverable).
+            // Backward-compat: old Stand entries have no Cat3 (cat3Dr=0), formula falls back to old behaviour.
+            decimal cat3Dr = (decimal)intEntries.Where(x => x.IntCatId == CAT_STDREC).Sum(x => x.IntDr);
+            decimal stdRec = Math.Max(0, totalPosted + openStdInt + cat3Dr - postedRecovered - unpostedRecovered);
 
             // Net overdue recoverable
             decimal ovdRec = Math.Max(0, ovdRecPosted + openOvdInt - ovdRecRecovered);
@@ -242,13 +243,16 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             decimal overduePrincipal = overdueKists.Sum(x =>
                 x.PrincipalAmt ?? Math.Max(0m, (x.KistAmount ?? 0m) - (x.InterestAmt ?? 0m)));
 
-            // Last FORMAL interest posting date — exclude auto-post entries (IntCr > 0 on Cat 1/2
-            // means it is an auto-post+recover entry from direct recovery, not an IP voucher entry).
-            // Including auto-post dates would advance calcFromDate and hide remaining unposted interest.
+            // Last FORMAL interest posting date.
+            // Old Stand IP: Cat1/2 IntCr=0. New Stand IP: Cat1/2 IntCr=IntDr but a Cat3 entry exists for same VoucherId.
+            // Auto-post (direct recovery): Cat1/2 IntDr=IntCr, no Cat3 — must NOT advance calcFromDate.
+            var ipVoucherIds = intEntries.Where(x => x.IntCatId == CAT_STDREC).Select(x => x.VoucherId).ToHashSet();
             DateTime? lastPostDate = intEntries.Any(x =>
-                    (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0)
+                    (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL)
+                    && (x.IntCr == 0 || ipVoucherIds.Contains(x.VoucherId)))
                 ? intEntries
-                    .Where(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0)
+                    .Where(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL)
+                             && (x.IntCr == 0 || ipVoucherIds.Contains(x.VoucherId)))
                     .Max(x => (DateTime?)x.EntryDate)
                 : null;
 

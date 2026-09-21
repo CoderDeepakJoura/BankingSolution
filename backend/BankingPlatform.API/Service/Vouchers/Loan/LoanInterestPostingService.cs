@@ -147,8 +147,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 var acc = await _db.accountmaster.AsNoTracking()
                     .FirstOrDefaultAsync(x => x.ID == dto.LoanAccountId && x.BranchId == dto.BrId);
 
-                int  intIncomeAccId = 0;
-                long intIncomeHead  = 0;
+                int  intIncomeAccId  = 0;
+                long intIncomeHead   = 0;
+                int  currentRecAccId = 0;
+                long currentRecHead  = 0;
                 if (acc?.GeneralProductId.HasValue == true)
                 {
                     var rule = await _cf.GetLoanProductBranchWiseRuleInfo(dto.BrId, acc.GeneralProductId.Value);
@@ -157,26 +159,35 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         intIncomeAccId = rule.IntIncomeAcc.Value;
                         intIncomeHead  = await _cf.GetAccountHeadCodeFromAccId(intIncomeAccId, dto.BrId);
                     }
+                    if (!isAddInBalance && rule.CurrentRecoverableIntAcc.HasValue && rule.CurrentRecoverableIntAcc.Value > 0)
+                    {
+                        currentRecAccId = rule.CurrentRecoverableIntAcc.Value;
+                        currentRecHead  = await _cf.GetAccountHeadCodeFromAccId(currentRecAccId, dto.BrId);
+                    }
                 }
 
                 // ── VoucherCreditDebitDetails ─────────────────────────────────────
                 int row = 1;
 
-                // Dr: Loan account (interest charged — EntryStatus="LInterest", VoucherAmount=total)
+                // Stand: Dr = CurrentRecoverableIntAcc; AddInBalance: Dr = loan account (LInterest)
+                bool useRecAcc = !isAddInBalance && currentRecAccId > 0;
+                int  drAccIdSingle = useRecAcc ? currentRecAccId : dto.LoanAccountId;
+                long drHeadSingle  = useRecAcc ? currentRecHead  : loanHead;
+
                 var drEntry = new VoucherCreditDebitDetails
                 {
                     BrId             = dto.BrId,
                     VoucherID        = voucherId,
-                    AccountId        = dto.LoanAccountId,
-                    AccHeadCode      = loanHead,
+                    AccountId        = drAccIdSingle,
+                    AccHeadCode      = drHeadSingle,
                     VoucherAmount    = total,
                     VoucherEntryType = "Dr",
-                    EntryStatus      = "LInterest",
+                    EntryStatus      = useRecAcc ? "Dr" : "LInterest",
                     Narration        = narr,
                     VoucherStatus    = vrStatus,
                     ValueDate        = valDate,
                     VoucherSeqNo     = row,
-                    IntDr            = total,
+                    IntDr            = useRecAcc ? (decimal?)null : total,
                     IntCr            = null,
                     ExpenseAmt       = 0,
                     HCL1 = 0, HCL2 = 0, HCL3 = 0,
@@ -186,8 +197,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 int ipEntryId = drEntry.Id;
                 row++;
 
-                // Cr: Interest Income account (income recognized — receipt side in Day Book)
-                //     Falls back to loan account if no income account configured
+                // Cr: Interest Income account — falls back to loan account if not configured
                 int  crAccId = intIncomeAccId > 0 ? intIncomeAccId : dto.LoanAccountId;
                 long crHead  = intIncomeHead  > 0 ? intIncomeHead  : loanHead;
 
@@ -209,9 +219,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 });
                 row++;
 
-                // ── VoucherRecIntDetail — interest ledger entries for ALL loan types ────────
-                // AddInBalance: IntDr = IntCr = amount (interest embedded in principal, fully posted)
-                // Stand:        IntDr = amount, IntCr = 0 (interest outstanding until recovered)
+                // ── VoucherRecIntDetail ───────────────────────────────────────────
+                // Cat 1/2: IntDr = IntCr = amount for both AiB and Stand (interest recorded and accounted for).
+                // Cat 3 (Stand only): IntDr = total, IntCr = 0 — tracks outstanding recoverable interest.
                 if (stdAmt > 0)
                 {
                     await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
@@ -226,7 +236,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         Pamt              = (double)info.PrincipalBalance,
                         AccId             = dto.LoanAccountId,
                         IntDr             = (double)stdAmt,
-                        IntCr             = isAddInBalance ? (double)stdAmt : 0,
+                        IntCr             = (double)stdAmt,
                         VoucherMainStatus = vrStatus,
                     });
                 }
@@ -245,7 +255,26 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         Pamt              = (double)info.PrincipalBalance,
                         AccId             = dto.LoanAccountId,
                         IntDr             = (double)penalAmt,
-                        IntCr             = isAddInBalance ? (double)penalAmt : 0,
+                        IntCr             = (double)penalAmt,
+                        VoucherMainStatus = vrStatus,
+                    });
+                }
+
+                if (!isAddInBalance)
+                {
+                    await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                    {
+                        BrId              = dto.BrId,
+                        VAccCrDrId        = ipEntryId,
+                        VoucherId         = voucherId,
+                        VoucherNo         = nextVrNo,
+                        EntryDate         = vrDate,
+                        ValueDate         = valDate,
+                        IntCatId          = CAT_STDREC,
+                        Pamt              = (double)info.PrincipalBalance,
+                        AccId             = dto.LoanAccountId,
+                        IntDr             = (double)total,
+                        IntCr             = 0,
                         VoucherMainStatus = vrStatus,
                     });
                 }
@@ -498,11 +527,14 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 decimal postedPenalInt  = (decimal)intEntries.Where(x => x.IntCatId == CAT_PENAL).Sum(x => x.IntDr);
                 decimal totalPosted     = postedStdInt + postedPenalInt;
                 decimal postedRecovered = (decimal)intEntries.Where(x => x.IntCatId == CAT_STDREC).Sum(x => x.IntCr);
+                decimal cat3Dr          = (decimal)intEntries.Where(x => x.IntCatId == CAT_STDREC).Sum(x => x.IntDr);
                 decimal unpostedRecStd  = (decimal)intEntries.Where(x => x.IntCatId == CAT_STD).Sum(x => x.IntCr);
                 decimal unpostedRecPenal= (decimal)intEntries.Where(x => x.IntCatId == CAT_PENAL).Sum(x => x.IntCr);
                 decimal ovdRecPosted    = (decimal)intEntries.Where(x => x.IntCatId == CAT_OVDREC).Sum(x => x.IntDr);
                 decimal ovdRecRecovered = (decimal)intEntries.Where(x => x.IntCatId == CAT_OVDREC).Sum(x => x.IntCr);
-                decimal stdRec = Math.Max(0, totalPosted + openStdInt - postedRecovered - unpostedRecStd - unpostedRecPenal);
+                // cat3Dr handles new-style Stand IP entries (Cat3.IntDr = posted recoverable);
+                // backward-compat: old Stand entries have no Cat3, so cat3Dr=0 and formula falls back to old behaviour.
+                decimal stdRec = Math.Max(0, totalPosted + openStdInt + cat3Dr - postedRecovered - unpostedRecStd - unpostedRecPenal);
                 decimal ovdRec = Math.Max(0, ovdRecPosted + openOvdInt - ovdRecRecovered);
 
                 var overdueKists = kistSchedule.Where(x => x.Date.HasValue && x.Date.Value.Date < today).ToList();
@@ -520,8 +552,13 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     && kistSchedule.Any()
                     && kistSchedule.All(k => !k.Date.HasValue || k.Date.Value.Date < firstSession.Value.Date);
 
-                DateTime? lastPostDate = intEntries.Any(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0)
-                    ? intEntries.Where(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL) && x.IntCr == 0).Max(x => (DateTime?)x.EntryDate)
+                // Old Stand IP: Cat1/2 IntCr=0. New Stand IP: Cat1/2 IntCr=IntDr but a Cat3 entry exists for same VoucherId.
+                var ipVoucherIds = intEntries.Where(x => x.IntCatId == CAT_STDREC).Select(x => x.VoucherId).ToHashSet();
+                DateTime? lastPostDate = intEntries.Any(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL)
+                        && (x.IntCr == 0 || ipVoucherIds.Contains(x.VoucherId)))
+                    ? intEntries.Where(x => (x.IntCatId == CAT_STD || x.IntCatId == CAT_PENAL)
+                            && (x.IntCr == 0 || ipVoucherIds.Contains(x.VoucherId)))
+                        .Max(x => (DateTime?)x.EntryDate)
                     : null;
 
                 DateTime calcFromDate = lastPostDate?.Date ?? kist?.LoanDate ?? limitLoanDate ?? ob?.OverDueDate ?? today;
@@ -1089,7 +1126,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             var errors   = new List<string>();
             var valid    = new List<(LoanInterestBatchPostItemDTO item, LoanInterestPostingInfoDTO info,
                                      decimal stdAmt, decimal penalAmt, decimal total,
-                                     long loanHead, int crAccId, long crHead)>();
+                                     long loanHead, int crAccId, long crHead, bool isAib, int drAccId, long drHead)>();
 
             // ── Pass 1: validate every item before touching the DB ────────────────
             foreach (var item in dto.Items)
@@ -1132,8 +1169,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 long loanHead = await _cf.GetAccountHeadCodeFromAccId(item.LoanAccountId, dto.BrId);
 
-                int  crAccId  = item.LoanAccountId;
-                long crHead   = loanHead;
+                int  crAccId = item.LoanAccountId;
+                long crHead  = loanHead;
+                int  drAccId = item.LoanAccountId;
+                long drHead  = loanHead;
                 var acc = await _db.accountmaster.AsNoTracking()
                     .FirstOrDefaultAsync(x => x.ID == item.LoanAccountId && x.BranchId == dto.BrId);
                 if (acc?.GeneralProductId.HasValue == true)
@@ -1144,9 +1183,14 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         crAccId = rule.IntIncomeAcc.Value;
                         crHead  = await _cf.GetAccountHeadCodeFromAccId(crAccId, dto.BrId);
                     }
+                    if (!isAib && rule.CurrentRecoverableIntAcc.HasValue && rule.CurrentRecoverableIntAcc.Value > 0)
+                    {
+                        drAccId = rule.CurrentRecoverableIntAcc.Value;
+                        drHead  = await _cf.GetAccountHeadCodeFromAccId(drAccId, dto.BrId);
+                    }
                 }
 
-                valid.Add((item, info, stdAmt, penalAmt, total, loanHead, crAccId, crHead));
+                valid.Add((item, info, stdAmt, penalAmt, total, loanHead, crAccId, crHead, isAib, drAccId, drHead));
             }
 
             if (valid.Count == 0)
@@ -1186,52 +1230,102 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 int voucherId = voucher.Id;
 
                 int row = 1;
-                foreach (var (item, info, stdAmt, penalAmt, total, loanHead, crAccId, crHead) in valid)
+
+                // ── Stand accounts: ONE combined Dr + ONE combined Cr ─────────────
+                var validStand = valid.Where(v => !v.isAib).ToList();
+                var validAib   = valid.Where(v => v.isAib).ToList();
+                int standIpEntryId = 0;
+
+                if (validStand.Any())
                 {
-                    // Dr: loan account (interest charged — EntryStatus="LInterest")
+                    decimal standSum = validStand.Sum(v => v.total);
+                    var fs = validStand[0];  // all same product → same drAccId / crAccId
+
+                    var standDrEntry = new VoucherCreditDebitDetails
+                    {
+                        BrId = dto.BrId, VoucherID = voucherId,
+                        AccountId = fs.drAccId, AccHeadCode = fs.drHead,
+                        VoucherAmount = standSum, VoucherEntryType = "Dr", EntryStatus = "Dr",
+                        Narration = narr, VoucherStatus = vrStatus, ValueDate = valDate, VoucherSeqNo = row++,
+                        IntDr = null, IntCr = null, ExpenseAmt = 0, HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                    };
+                    await _db.vouchercreditdebitdetails.AddAsync(standDrEntry);
+                    await _db.SaveChangesAsync();
+                    standIpEntryId = standDrEntry.Id;
+
+                    await _db.vouchercreditdebitdetails.AddAsync(new VoucherCreditDebitDetails
+                    {
+                        BrId = dto.BrId, VoucherID = voucherId,
+                        AccountId = fs.crAccId, AccHeadCode = fs.crHead,
+                        VoucherAmount = standSum, VoucherEntryType = "Cr", EntryStatus = Enums.VoucherStatus.Cr.ToString(),
+                        Narration = narr, VoucherStatus = vrStatus, ValueDate = valDate, VoucherSeqNo = row++,
+                        IntDr = null, IntCr = null, ExpenseAmt = 0, HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                    });
+
+                    // Per-account voucherrecintdetail for Stand
+                    foreach (var (item, info, stdAmt, penalAmt, total, loanHead, crAccId, crHead, isAib, drAccId, drHead) in validStand)
+                    {
+                        if (stdAmt > 0)
+                            await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                            {
+                                BrId = dto.BrId, VAccCrDrId = standIpEntryId,
+                                VoucherId = voucherId, VoucherNo = nextVrNo,
+                                EntryDate = vrDate, ValueDate = valDate,
+                                IntCatId = CAT_STD, Pamt = (double)info.PrincipalBalance,
+                                AccId = item.LoanAccountId,
+                                IntDr = (double)stdAmt, IntCr = (double)stdAmt,
+                                VoucherMainStatus = vrStatus,
+                            });
+                        if (penalAmt > 0)
+                            await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                            {
+                                BrId = dto.BrId, VAccCrDrId = standIpEntryId,
+                                VoucherId = voucherId, VoucherNo = nextVrNo,
+                                EntryDate = vrDate, ValueDate = valDate,
+                                IntCatId = CAT_PENAL, Pamt = (double)info.PrincipalBalance,
+                                AccId = item.LoanAccountId,
+                                IntDr = (double)penalAmt, IntCr = (double)penalAmt,
+                                VoucherMainStatus = vrStatus,
+                            });
+                        // Cat 3 — outstanding recoverable (IntCr filled on recovery)
+                        await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                        {
+                            BrId = dto.BrId, VAccCrDrId = standIpEntryId,
+                            VoucherId = voucherId, VoucherNo = nextVrNo,
+                            EntryDate = vrDate, ValueDate = valDate,
+                            IntCatId = CAT_STDREC, Pamt = (double)info.PrincipalBalance,
+                            AccId = item.LoanAccountId,
+                            IntDr = (double)total, IntCr = 0,
+                            VoucherMainStatus = vrStatus,
+                        });
+                    }
+                    await _db.SaveChangesAsync();
+                }
+
+                // ── AddInBalance accounts: per-account Dr + Cr (unchanged) ────────
+                foreach (var (item, info, stdAmt, penalAmt, total, loanHead, crAccId, crHead, isAib, drAccId, drHead) in validAib)
+                {
                     var drEntry = new VoucherCreditDebitDetails
                     {
-                        BrId             = dto.BrId,
-                        VoucherID        = voucherId,
-                        AccountId        = item.LoanAccountId,
-                        AccHeadCode      = loanHead,
-                        VoucherAmount    = total,
-                        VoucherEntryType = "Dr",
-                        EntryStatus      = "LInterest",
-                        Narration        = narr,
-                        VoucherStatus    = vrStatus,
-                        ValueDate        = valDate,
-                        VoucherSeqNo     = row++,
-                        IntDr            = total,
-                        IntCr            = null,
-                        ExpenseAmt       = 0,
-                        HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                        BrId = dto.BrId, VoucherID = voucherId,
+                        AccountId = item.LoanAccountId, AccHeadCode = loanHead,
+                        VoucherAmount = total, VoucherEntryType = "Dr", EntryStatus = "LInterest",
+                        Narration = narr, VoucherStatus = vrStatus, ValueDate = valDate, VoucherSeqNo = row++,
+                        IntDr = total, IntCr = null, ExpenseAmt = 0, HCL1 = 0, HCL2 = 0, HCL3 = 0,
                     };
                     await _db.vouchercreditdebitdetails.AddAsync(drEntry);
                     await _db.SaveChangesAsync();
                     int ipEntryId = drEntry.Id;
 
-                    // Cr: interest income GL
                     await _db.vouchercreditdebitdetails.AddAsync(new VoucherCreditDebitDetails
                     {
-                        BrId             = dto.BrId,
-                        VoucherID        = voucherId,
-                        AccountId        = crAccId,
-                        AccHeadCode      = crHead,
-                        VoucherAmount    = total,
-                        VoucherEntryType = "Cr",
-                        EntryStatus      = Enums.VoucherStatus.Cr.ToString(),
-                        Narration        = narr,
-                        VoucherStatus    = vrStatus,
-                        ValueDate        = valDate,
-                        VoucherSeqNo     = row++,
-                        IntDr = null, IntCr = null, ExpenseAmt = 0,
-                        HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                        BrId = dto.BrId, VoucherID = voucherId,
+                        AccountId = crAccId, AccHeadCode = crHead,
+                        VoucherAmount = total, VoucherEntryType = "Cr", EntryStatus = Enums.VoucherStatus.Cr.ToString(),
+                        Narration = narr, VoucherStatus = vrStatus, ValueDate = valDate, VoucherSeqNo = row++,
+                        IntDr = null, IntCr = null, ExpenseAmt = 0, HCL1 = 0, HCL2 = 0, HCL3 = 0,
                     });
 
-                    // VoucherRecIntDetail — ALL loan types
-                    // AddInBalance: IntDr = IntCr = amount; Stand: IntDr = amount, IntCr = 0
-                    bool isAib = info.ActOnIntPosting == 1;
                     if (stdAmt > 0)
                         await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
                         {
@@ -1240,7 +1334,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                             EntryDate = vrDate, ValueDate = valDate,
                             IntCatId = CAT_STD, Pamt = (double)info.PrincipalBalance,
                             AccId = item.LoanAccountId,
-                            IntDr = (double)stdAmt, IntCr = isAib ? (double)stdAmt : 0,
+                            IntDr = (double)stdAmt, IntCr = (double)stdAmt,
                             VoucherMainStatus = vrStatus,
                         });
                     if (penalAmt > 0)
@@ -1251,7 +1345,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                             EntryDate = vrDate, ValueDate = valDate,
                             IntCatId = CAT_PENAL, Pamt = (double)info.PrincipalBalance,
                             AccId = item.LoanAccountId,
-                            IntDr = (double)penalAmt, IntCr = isAib ? (double)penalAmt : 0,
+                            IntDr = (double)penalAmt, IntCr = (double)penalAmt,
                             VoucherMainStatus = vrStatus,
                         });
 
