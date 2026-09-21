@@ -882,6 +882,21 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 })
                 .ToList();
 
+            // Stand mode (v1.0.78+): IP entries no longer write VCDD on the loan account.
+            // Fetch Cat 3 (StdRecoverable) entries from voucherrecintdetail to show IP events in the ledger.
+            var standIpByDate = new Dictionary<DateTime, decimal>();
+            if (!isAddInBalance)
+            {
+                var cat3Rows = await _db.voucherrecintdetail.AsNoTracking()
+                    .Where(x => x.AccId == loanAccId && x.BrId == branchId
+                             && x.IntCatId == CAT_STDREC && x.IntDr > 0)
+                    .Select(x => new { x.EntryDate, x.IntDr })
+                    .ToListAsync();
+                standIpByDate = cat3Rows
+                    .GroupBy(x => x.EntryDate.Date)
+                    .ToDictionary(g => g.Key, g => (decimal)g.Sum(x => x.IntDr));
+            }
+
             // Kist schedule (for checkpoint dates and overdue tracking)
             var kistSchedule = await _db.accountkistschedule.AsNoTracking()
                 .Where(x => x.LoanAccId == loanAccId)
@@ -901,6 +916,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             foreach (var e in rawEvents)
                 if (e.EventDate >= checkpointFloor && e.EventDate <= calcToDate)
                     checkpoints.Add(e.EventDate);
+            foreach (var d in standIpByDate.Keys)
+                if (d >= checkpointFloor && d <= calcToDate)
+                    checkpoints.Add(d);
             checkpoints.Add(calcToDate);
 
             // Clamp to first session — pre-session periods are covered by the opening balance entry.
@@ -1049,6 +1067,15 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     else if (hasLr && hasIp) particulars = "Recovery & Int. Posting";
                     else if (hasLr)  particulars = "Loan Recovery";
                     else if (hasIp)  particulars = "Interest Posting";
+                }
+
+                // Stand mode (v1.0.78+): surface new-style IP events from Cat3 voucherrecintdetail
+                if (!isAddInBalance && standIpByDate.TryGetValue(date, out var standIpAmt) && !hasIp)
+                {
+                    ipOnDate += standIpAmt;
+                    hasIp = true;
+                    if (hasLr) particulars = "Recovery & Int. Posting";
+                    else if (string.IsNullOrEmpty(particulars)) particulars = "Interest Posting";
                 }
 
                 // Add kist label if a kist is due on this date

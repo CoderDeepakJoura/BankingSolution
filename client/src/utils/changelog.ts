@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.79",
+    date: "2026-09-21",
+    changes: [
+      { type: "fix", text: "Loan ledger now shows Interest Posting row for Stand mode after v1.0.78 — new-style IP entries (Cat3 voucherrecintdetail) are surfaced in GetInterestDetailAsync and correctly reduce running interest balance" },
+    ],
+  },
+  {
     version: "1.0.78",
     date: "2026-09-21",
     changes: [
