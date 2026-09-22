@@ -122,6 +122,7 @@ const BankFDAccountForm: React.FC = () => {
   // Detail entry form state
   const [editingRowKey, setEditingRowKey] = useState<number | null>(null);
   const [entry, setEntry] = useState<DetailRow>(emptyDetail(0));
+  const [intRateStr, setIntRateStr] = useState<string>("");
 
   // Account head selection
   const [accountHeadId, setAccountHeadId] = useState<number>(0);
@@ -284,6 +285,7 @@ const BankFDAccountForm: React.FC = () => {
 
   const clearEntry = () => {
     setEntry(emptyDetail(0));
+    setIntRateStr("");
     setEditingRowKey(null);
   };
 
@@ -329,6 +331,7 @@ const BankFDAccountForm: React.FC = () => {
 
   const handleEditRow = (row: DetailRow) => {
     setEntry({ ...row });
+    setIntRateStr(row.intRate > 0 ? row.intRate.toFixed(2) : "");
     setEditingRowKey(row.rowKey);
   };
 
@@ -709,10 +712,17 @@ const BankFDAccountForm: React.FC = () => {
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={entry.intRate || ""}
+                        value={intRateStr}
                         onChange={e => {
                           const v = e.target.value;
-                          if (/^\d*\.?\d{0,2}$/.test(v)) setEntryField("intRate", v === "" ? 0 : parseFloat(v) || 0);
+                          if (/^\d*\.?\d{0,2}$/.test(v)) {
+                            setIntRateStr(v);
+                            setEntryField("intRate", v === "" ? 0 : parseFloat(v) || 0);
+                          }
+                        }}
+                        onBlur={() => {
+                          const n = parseFloat(intRateStr);
+                          setIntRateStr(n > 0 ? n.toFixed(2) : "");
                         }}
                         className={numInputCls}
                         placeholder="0.00"

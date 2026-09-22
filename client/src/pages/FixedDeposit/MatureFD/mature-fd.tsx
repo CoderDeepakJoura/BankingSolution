@@ -1463,10 +1463,10 @@ const MatureFDPage: React.FC = () => {
 
                       <div className="border-t border-gray-100" />
 
-                      {/* ── Row 3: Auto-calculated fields (read-only) ── */}
+                      {/* ── Row 3: Calculated fields (editable override) ── */}
                       <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                          Auto-calculated (from slab API)
+                          Calculated from slab — editable if needed
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 
@@ -1479,9 +1479,12 @@ const MatureFDPage: React.FC = () => {
                               <input
                                 type="text"
                                 value={renewFDDetail.intRate}
-                                readOnly
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  if (v === "" || /^\d*\.?\d*$/.test(v)) handleRenewFieldChange("intRate", v);
+                                }}
                                 placeholder="Auto from slab"
-                                className="w-full px-3 py-2.5 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-600 outline-none cursor-not-allowed text-sm"
+                                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg bg-white text-gray-800 outline-none focus:border-purple-400 cursor-text text-sm"
                               />
                               {isFetchingRenewInfo && (
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -1514,11 +1517,10 @@ const MatureFDPage: React.FC = () => {
                             </label>
                             <DatePicker
                               value={renewFDDetail.maturityDate}
-                              disabled
                               className={`w-full px-3 py-2.5 border-2 ${
-                                validationErrors.maturityDate ? "border-red-300" : "border-gray-100"
-                              } rounded-lg outline-none text-sm`}
-                              onChange={() => {}}
+                                validationErrors.maturityDate ? "border-red-300" : "border-gray-200"
+                              } rounded-lg outline-none focus:border-purple-400 text-sm`}
+                              onChange={(val) => handleRenewFieldChange("maturityDate", val)}
                             />
                             {validationErrors.maturityDate && (
                               <p className="text-xs text-red-500 mt-1">{validationErrors.maturityDate}</p>
@@ -1533,12 +1535,14 @@ const MatureFDPage: React.FC = () => {
                             <input
                               type="text"
                               value={renewFDDetail.maturityAmount}
-                              readOnly
-                              disabled
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (v === "" || /^\d*\.?\d*$/.test(v)) handleRenewFieldChange("maturityAmount", v);
+                              }}
                               placeholder="Auto-calculated"
                               className={`w-full px-3 py-2.5 border-2 ${
-                                validationErrors.maturityAmount ? "border-red-300" : "border-gray-100"
-                              } rounded-lg bg-gray-50 text-gray-700 font-mono font-bold cursor-not-allowed text-sm`}
+                                validationErrors.maturityAmount ? "border-red-300" : "border-gray-200"
+                              } rounded-lg bg-white text-gray-700 font-mono font-bold focus:border-purple-400 cursor-text text-sm`}
                             />
                             {validationErrors.maturityAmount && (
                               <p className="text-xs text-red-500 mt-1">{validationErrors.maturityAmount}</p>

@@ -31,6 +31,21 @@ namespace BankingPlatform.API.Controllers.BankFD
         public decimal RenewMaturityAmount { get; set; }
         // Optional: operator-overridden maturity amount (principal + edited interest)
         public decimal? OverrideMaturityAmount { get; set; }
+        // Renew detail overrides
+        public string? RenewLtdNo { get; set; }
+        public DateTime? RenewFdDate { get; set; }
+        public decimal? RenewIntRate { get; set; }
+        public int? RenewIntCompInterval { get; set; }
+        public decimal? RenewSerialNo { get; set; }
+        public decimal? RenewAmount { get; set; }   // override new principal
+        public List<VoucherLineDTO> VoucherLines { get; set; } = new();
+    }
+
+    public class VoucherLineDTO
+    {
+        public int AccId { get; set; }
+        public decimal Amount { get; set; }
+        public string DrOrCr { get; set; } = "Cr";
     }
 
     public class SaveInterestIncomeSettingDTO
@@ -266,7 +281,11 @@ namespace BankingPlatform.API.Controllers.BankFD
                     dto.TDSAmount, dto.TDSAccId, dto.Narration,
                     dto.IsRenew, dto.RenewMonths, dto.RenewDays, dto.RenewMaturityAmount,
                     isPremature: false, penaltyRate: 0, effectiveRate: 0, preMatureAmount: 0,
-                    overrideMaturityAmount: dto.OverrideMaturityAmount);
+                    overrideMaturityAmount: dto.OverrideMaturityAmount,
+                    renewLtdNo: dto.RenewLtdNo, renewFdDate: dto.RenewFdDate,
+                    renewIntRate: dto.RenewIntRate, renewIntCompInterval: dto.RenewIntCompInterval,
+                    renewSerialNo: dto.RenewSerialNo, renewAmount: dto.RenewAmount,
+                    voucherLines: dto.VoucherLines);
 
                 if (msg != null) return BadRequest(new ResponseDto { Success = false, Message = msg });
 
@@ -414,7 +433,11 @@ namespace BankingPlatform.API.Controllers.BankFD
             string narration,
             bool isRenew, int renewMonths, int renewDays, decimal renewMaturityAmount,
             bool isPremature, double penaltyRate, double effectiveRate, decimal preMatureAmount,
-            decimal? overrideMaturityAmount = null)
+            decimal? overrideMaturityAmount = null,
+            string? renewLtdNo = null, DateTime? renewFdDate = null,
+            decimal? renewIntRate = null, int? renewIntCompInterval = null,
+            decimal? renewSerialNo = null, decimal? renewAmount = null,
+            List<VoucherLineDTO>? voucherLines = null)
         {
             var detail = await _context.bankfdaccountdetail
                 .FirstOrDefaultAsync(d => d.ID == detailId && d.BrId == branchId && d.AccId == accId);
@@ -471,17 +494,19 @@ namespace BankingPlatform.API.Controllers.BankFD
             long bfdHeadCode = await _commonFunctions.GetAccountHeadCodeFromAccId(accId, branchId);
 
             // ── Voucher entries ──────────────────────────────────────────────────────
-            // Dr: Payout Account (net received = closureAmount - tds)
+            bool hasManualLines = voucherLines != null && voucherLines.Count > 0;
+
+            // Dr: Payout Account — auto only when no manual lines provided
             decimal netPayout = closureAmount - tdsAmount;
             VoucherCreditDebitDetails vcrPayout = null!;
-            if (!isRenew && payoutAccId > 0 && netPayout > 0)
+            if (!hasManualLines && !isRenew && payoutAccId > 0 && netPayout > 0)
             {
                 long payoutHead = await _commonFunctions.GetAccountHeadCodeFromAccId(payoutAccId, branchId);
                 vcrPayout = MakeEntry(payoutHead, payoutAccId, branchId, "Dr", finalNarration, netPayout, voucherStatus, vDate, voucher.Id, row++);
                 _context.vouchercreditdebitdetails.Add(vcrPayout);
             }
 
-            // Dr: TDS Account (if TDS applies and tdsAccId is set)
+            // Dr: TDS Account (always auto when TDS applies)
             if (tdsAmount > 0 && tdsAccId.HasValue && tdsAccId.Value > 0)
             {
                 long tdsHead = await _commonFunctions.GetAccountHeadCodeFromAccId(tdsAccId.Value, branchId);
@@ -489,16 +514,27 @@ namespace BankingPlatform.API.Controllers.BankFD
                     MakeEntry(tdsHead, tdsAccId.Value, branchId, "Dr", "TDS Deducted at Source", tdsAmount, voucherStatus, vDate, voucher.Id, row++));
             }
 
-            // Cr: BFD Account (principal — closing the FD)
+            // Cr: BFD Account (principal — always auto)
             VoucherCreditDebitDetails vcrBfd = MakeEntry(bfdHeadCode, accId, branchId, "Cr", finalNarration, principal, voucherStatus, vDate, voucher.Id, row++);
             _context.vouchercreditdebitdetails.Add(vcrBfd);
 
-            // Cr: Interest Income Account (interest earned)
-            if (interest > 0 && intIncomeAccId > 0)
+            // Cr: Interest Income — auto only when no manual lines provided
+            if (!hasManualLines && interest > 0 && intIncomeAccId > 0)
             {
                 long intHead = await _commonFunctions.GetAccountHeadCodeFromAccId(intIncomeAccId, branchId);
                 _context.vouchercreditdebitdetails.Add(
                     MakeEntry(intHead, intIncomeAccId, branchId, "Cr", "Interest Income — Bank FD", interest, voucherStatus, vDate, voucher.Id, row++));
+            }
+
+            // Manual voucher lines (when operator enters entries explicitly)
+            if (hasManualLines)
+            {
+                foreach (var line in voucherLines!)
+                {
+                    long lineHead = await _commonFunctions.GetAccountHeadCodeFromAccId(line.AccId, branchId);
+                    _context.vouchercreditdebitdetails.Add(
+                        MakeEntry(lineHead, line.AccId, branchId, line.DrOrCr, finalNarration, line.Amount, voucherStatus, vDate, voucher.Id, row++));
+                }
             }
 
             // If renew: Dr New BFD detail (new FD with closureAmount - tds as new principal)
@@ -506,28 +542,35 @@ namespace BankingPlatform.API.Controllers.BankFD
             VoucherCreditDebitDetails? vcrNewBfd = null;
             if (isRenew)
             {
-                decimal newPrincipal = closureAmount - tdsAmount;
-                var matDate = CalcMaturityDate(vDate, renewMonths, renewDays);
+                DateTime renewStartDate = renewFdDate.HasValue
+                    ? DateTime.SpecifyKind(renewFdDate.Value, DateTimeKind.Unspecified)
+                    : vDate;
+                decimal newPrincipal = renewAmount ?? (closureAmount - tdsAmount);
+                double newIntRate = renewIntRate.HasValue ? (double)renewIntRate.Value : detail.IntRate;
+                int newIntComp = renewIntCompInterval ?? detail.IntCompInterval;
+                var matDate = CalcMaturityDate(renewStartDate, renewMonths, renewDays);
+                string newLtdNo = !string.IsNullOrWhiteSpace(renewLtdNo) ? renewLtdNo : detail.LTDNo + "R";
                 newDetail = new BankFDAccountDetail
                 {
                     BrId = branchId,
                     AccId = accId,
-                    LTDNo = detail.LTDNo + "R",
-                    FDDate = vDate,
+                    LTDNo = newLtdNo,
+                    FDDate = renewStartDate,
                     FDAmount = newPrincipal,
                     FDPeriodMonths = renewMonths,
                     FDPeriodDays = renewDays,
-                    IntRate = detail.IntRate,
-                    IntCompInterval = detail.IntCompInterval,
+                    IntRate = newIntRate,
+                    IntCompInterval = newIntComp,
                     FDMaturityDate = matDate,
                     MaturityAmount = renewMaturityAmount,
                     FDStatus = 1,
-                    TdsAmount = 0
+                    TdsAmount = 0,
+                    SerialNo = renewSerialNo
                 };
                 await _context.bankfdaccountdetail.AddAsync(newDetail);
                 await _context.SaveChangesAsync();
 
-                vcrNewBfd = MakeEntry(bfdHeadCode, accId, branchId, "Dr", $"Bank FD Renewed — new period {renewMonths}m {renewDays}d", newPrincipal, voucherStatus, vDate, voucher.Id, row++);
+                vcrNewBfd = MakeEntry(bfdHeadCode, accId, branchId, "Dr", $"Bank FD Renewed — new period {renewMonths}m {renewDays}d", newPrincipal, voucherStatus, renewStartDate, voucher.Id, row++);
                 _context.vouchercreditdebitdetails.Add(vcrNewBfd);
             }
 
@@ -561,7 +604,7 @@ namespace BankingPlatform.API.Controllers.BankFD
                     FDAccId = accId,
                     FDAccDetId = newDetail.ID,
                     AmountCr = 0,
-                    AmountDr = closureAmount - tdsAmount,
+                    AmountDr = newDetail.FDAmount,
                     Operation = "RC",
                     ValueDate = vDate,
                     VoucherDate = vDate,

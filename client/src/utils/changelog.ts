@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.86",
+    date: "2026-09-22",
+    changes: [
+      { type: "new", text: "Bank FD Renew: fully editable renew section — LTD No, Serial No, FD Date, New Principal, Interest Rate, Compounding, Maturity Date, Maturity Amount" },
+      { type: "new", text: "Bank FD Mature/Renew: manual Voucher Detail entry grid replaces fixed payout/interest account selectors — any number of general accounts with Dr/Cr and balance validation against maturity amount" },
+      { type: "fix", text: "Bank FD Account: interest rate decimal input no longer loses the decimal point while typing" },
+      { type: "fix", text: "Bank FD Renew: voucherbfddetail RC row now stores the actual new principal (respects user override) instead of closureAmount minus TDS" },
+    ],
+  },
+  {
     version: "1.0.85",
     date: "2026-09-22",
     changes: [

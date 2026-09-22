@@ -49,6 +49,12 @@ export interface BFDIntIncomeSettingItem {
   intIncomeAccId: number;
 }
 
+export interface VoucherLineDTO {
+  accId: number;
+  amount: number;
+  drOrCr: "Dr" | "Cr";
+}
+
 export interface BankFDMatureRequestDTO {
   branchId: number;
   accId: number;
@@ -64,6 +70,15 @@ export interface BankFDMatureRequestDTO {
   renewDays: number;
   renewMaturityAmount: number;
   overrideMaturityAmount?: number;
+  // Manual voucher lines (replaces payoutAccId + intIncomeAccId)
+  voucherLines?: VoucherLineDTO[];
+  // Renew detail overrides
+  renewLtdNo?: string;
+  renewFdDate?: string;
+  renewIntRate?: number;
+  renewIntCompInterval?: number;
+  renewSerialNo?: number;
+  renewAmount?: number;
 }
 
 export interface BankFDPreMatureRequestDTO {

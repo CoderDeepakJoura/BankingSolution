@@ -21,10 +21,19 @@ const compLabel = (v: number) => ({ 12: "Monthly", 4: "Quarterly", 2: "Half-Year
 
 interface GenAcc { value: number; label: string; }
 
+interface VoucherLine {
+  key: number;
+  accId: number;
+  accName: string;
+  amount: number;
+  amountStr: string;
+  drOrCr: "Dr" | "Cr";
+}
+
 const BankFDMaturePage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
-  const workingDate = commonservice.parseWorkingDate(user.workingdate);
+  const workingDate = commonservice.parseWorkingDate(user.workingdate ?? "");
 
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<BFDAccountOption[]>([]);
@@ -40,9 +49,12 @@ const BankFDMaturePage: React.FC = () => {
   const [tdsRate, setTdsRate] = useState(0);
   const [tdsAmount, setTdsAmount] = useState(0);
 
-  // Payout
-  const [payoutAccId, setPayoutAccId] = useState<number | null>(null);
-  const [intIncomeAccId, setIntIncomeAccId] = useState<number | null>(null);
+  // Manual voucher entry
+  const [voucherLines, setVoucherLines] = useState<VoucherLine[]>([]);
+  const [entryAccId, setEntryAccId] = useState<number | null>(null);
+  const [entryAmtStr, setEntryAmtStr] = useState("");
+  const [entryDrOrCr, setEntryDrOrCr] = useState<"Dr" | "Cr">("Cr");
+  const [lineKey, setLineKey] = useState(1);
   const [narration, setNarration] = useState("");
 
   // Interest override — null means use DB-derived value
@@ -53,6 +65,16 @@ const BankFDMaturePage: React.FC = () => {
   const [renewMonths, setRenewMonths] = useState("");
   const [renewDays, setRenewDays] = useState("");
   const [renewMatAmt, setRenewMatAmt] = useState(0);
+  const [renewFdDate, setRenewFdDate] = useState("");
+  const [renewLtdNo, setRenewLtdNo] = useState("");
+  const [renewSerialNoStr, setRenewSerialNoStr] = useState("");
+  const [renewIntRateStr, setRenewIntRateStr] = useState("");
+  const [renewIntRate, setRenewIntRate] = useState(0);
+  const [renewCompInterval, setRenewCompInterval] = useState(4);
+  const [renewAmountStr, setRenewAmountStr] = useState("");
+  const [renewAmount, setRenewAmount] = useState(0);
+  const [renewMatDate, setRenewMatDate] = useState("");
+  const [renewMatAmtStr, setRenewMatAmtStr] = useState("");
 
   const selectStyles = {
     control: (b: any, s: any) => ({
@@ -93,7 +115,6 @@ const BankFDMaturePage: React.FC = () => {
     const hasSetting = !!data.tdsSetting;
     setHasTDSSetting(hasSetting);
     setTdsAccId(hasSetting ? data.tdsSetting!.tdsAccId : null);
-    setIntIncomeAccId(data.intIncomeSetting?.intIncomeAccId ?? null);
   };
 
   const handleDetailSelect = (detail: BFDDetailItem) => {
@@ -113,8 +134,10 @@ const BankFDMaturePage: React.FC = () => {
   };
 
   const resetPayoutSection = () => {
-    setPayoutAccId(null);
-    setIntIncomeAccId(null);
+    setVoucherLines([]);
+    setEntryAccId(null);
+    setEntryAmtStr("");
+    setEntryDrOrCr("Cr");
     setNarration("");
     setTdsRate(0);
     setTdsAmount(0);
@@ -122,6 +145,16 @@ const BankFDMaturePage: React.FC = () => {
     setRenewMonths("");
     setRenewDays("");
     setRenewMatAmt(0);
+    setRenewFdDate("");
+    setRenewLtdNo("");
+    setRenewSerialNoStr("");
+    setRenewIntRateStr("");
+    setRenewIntRate(0);
+    setRenewCompInterval(4);
+    setRenewAmountStr("");
+    setRenewAmount(0);
+    setRenewMatDate("");
+    setRenewMatAmtStr("");
   };
 
   const handleReset = () => {
@@ -132,38 +165,98 @@ const BankFDMaturePage: React.FC = () => {
     resetPayoutSection();
   };
 
-  // Recalculate renew maturity amount when period changes
+  const calcEffectiveMatAmt = (det: BFDDetailItem) => {
+    const baseInt = Math.max(0, det.maturityAmount - det.fdAmount);
+    const effInt = overrideInterest !== null ? overrideInterest : baseInt;
+    return det.fdAmount + effInt;
+  };
+
+  // Pre-populate renew fields when toggling on
+  const handleRenewToggle = (checked: boolean) => {
+    setIsRenew(checked);
+    if (checked && selectedDetail) {
+      const netPrincipal = calcEffectiveMatAmt(selectedDetail) - (hasTDSSetting ? tdsAmount : 0);
+      setRenewFdDate(workingDate);
+      setRenewIntRate(selectedDetail.intRate);
+      setRenewIntRateStr(selectedDetail.intRate.toFixed(2));
+      setRenewCompInterval(selectedDetail.intCompInterval);
+      setRenewAmount(netPrincipal);
+      setRenewAmountStr(netPrincipal.toFixed(2));
+      setRenewMonths(selectedDetail.fdPeriodMonths > 0 ? selectedDetail.fdPeriodMonths.toString() : "");
+      setRenewDays(selectedDetail.fdPeriodDays > 0 ? selectedDetail.fdPeriodDays.toString() : "");
+    }
+  };
+
+  // Step 1: recalc maturity DATE from period inputs (months / days / fdDate)
   useEffect(() => {
-    if (!selectedDetail || !isRenew) return;
+    if (!isRenew || !renewFdDate) return;
     const months = parseInt(renewMonths) || 0;
     const days = parseInt(renewDays) || 0;
-    if (!months && !days) { setRenewMatAmt(0); return; }
-    const baseInt = Math.max(0, selectedDetail.maturityAmount - selectedDetail.fdAmount);
-    const effInt = overrideInterest !== null ? overrideInterest : baseInt;
-    const effMatAmt = selectedDetail.fdAmount + effInt;
-    const newPrincipal = effMatAmt - tdsAmount;
-    const newFDDate = workingDate;
-    const start = new Date(newFDDate);
+    if (!months && !days) { setRenewMatDate(""); return; }
+    const start = new Date(renewFdDate);
     const end = new Date(start);
     end.setMonth(end.getMonth() + months);
     end.setDate(end.getDate() + days);
-    const matDate = end.toISOString().split("T")[0];
-    const amt = calcBFDMaturityAmount(newPrincipal, selectedDetail.intRate, selectedDetail.intCompInterval, newFDDate, matDate);
+    setRenewMatDate(end.toISOString().split("T")[0]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renewMonths, renewDays, renewFdDate, isRenew]);
+
+  // Step 2: recalc maturity AMOUNT from matDate + principal + rate + compounding
+  // Runs whenever the user edits maturity date directly OR any upstream calc input changes
+  useEffect(() => {
+    if (!selectedDetail || !isRenew || !renewMatDate || !renewFdDate) {
+      if (isRenew && !renewMatDate) { setRenewMatAmt(0); setRenewMatAmtStr(""); }
+      return;
+    }
+    const effNetPrincipal = calcEffectiveMatAmt(selectedDetail) - (hasTDSSetting ? tdsAmount : 0);
+    const principal = renewAmount > 0 ? renewAmount : effNetPrincipal;
+    const rate = renewIntRate > 0 ? renewIntRate : selectedDetail.intRate;
+    const comp = renewCompInterval || selectedDetail.intCompInterval;
+    const amt = calcBFDMaturityAmount(principal, rate, comp, renewFdDate, renewMatDate);
     setRenewMatAmt(amt);
-  }, [renewMonths, renewDays, isRenew, selectedDetail, tdsAmount, overrideInterest]);
+    setRenewMatAmtStr(amt > 0 ? amt.toFixed(2) : "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renewMatDate, renewAmount, renewIntRate, renewCompInterval,
+      selectedDetail, tdsAmount, overrideInterest, hasTDSSetting, isRenew, renewFdDate]);
+
+  const handleAddLine = () => {
+    const amt = parseFloat(entryAmtStr) || 0;
+    if (!entryAccId) { Swal.fire("Warning", "Select an account.", "warning"); return; }
+    if (amt <= 0) { Swal.fire("Warning", "Enter a valid amount.", "warning"); return; }
+    const acc = generalAccounts.find(a => a.value === entryAccId);
+    setVoucherLines(prev => [...prev, {
+      key: lineKey, accId: entryAccId, accName: acc?.label ?? "", amount: amt, amountStr: amt.toFixed(2), drOrCr: entryDrOrCr,
+    }]);
+    setLineKey(k => k + 1);
+    setEntryAccId(null);
+    setEntryAmtStr("");
+  };
 
   const handleSubmit = async () => {
     if (!selectedDetail || !selectedAccId) {
       Swal.fire("Warning", "Please select an FD detail.", "warning"); return;
     }
-    if (!isRenew && !payoutAccId) {
-      Swal.fire("Warning", "Please select a Payout Account.", "warning"); return;
-    }
-    if (!intIncomeAccId) {
-      Swal.fire("Warning", "Please select an Interest Income Account.", "warning"); return;
-    }
     if (isRenew && !parseInt(renewMonths) && !parseInt(renewDays)) {
       Swal.fire("Warning", "Please enter the renewal period (months or days).", "warning"); return;
+    }
+    if (voucherLines.length === 0) {
+      Swal.fire("Warning", "Add at least one voucher entry.", "warning"); return;
+    }
+
+    // Balance check — compare full voucher (auto + manual)
+    const manualDr = voucherLines.filter(l => l.drOrCr === "Dr").reduce((s, l) => s + l.amount, 0);
+    const manualCr = voucherLines.filter(l => l.drOrCr === "Cr").reduce((s, l) => s + l.amount, 0);
+    const autoTDS   = hasTDSSetting ? tdsAmount : 0;
+    const principal = selectedDetail.fdAmount;
+    const renewPrin = isRenew ? (renewAmount > 0 ? renewAmount : Math.max(0, effectiveMaturityAmount - autoTDS)) : 0;
+    const fullDr = manualDr + autoTDS + renewPrin;
+    const fullCr = manualCr + principal;
+    const diff = Math.abs(fullDr - fullCr);
+    if (diff > 0.5) {
+      Swal.fire("Warning",
+        `Voucher is out of balance by ₹${fmt(diff)}.\n\nTotal Dr: ₹${fmt(fullDr)}\nTotal Cr: ₹${fmt(fullCr)}\n\nMaturity Amount: ₹${fmt(effectiveMaturityAmount)}`,
+        "warning");
+      return;
     }
 
     setLoading(true);
@@ -176,8 +269,8 @@ const BankFDMaturePage: React.FC = () => {
         accId: selectedAccId,
         detailId: selectedDetail.id,
         voucherDate: workingDate,
-        payoutAccId: payoutAccId ?? 0,
-        intIncomeAccId: intIncomeAccId!,
+        payoutAccId: 0,
+        intIncomeAccId: 0,
         tDSAmount: hasTDSSetting ? tdsAmount : 0,
         tDSAccId: hasTDSSetting && tdsAmount > 0 ? tdsAccId : null,
         narration,
@@ -186,6 +279,15 @@ const BankFDMaturePage: React.FC = () => {
         renewDays: parseInt(renewDays) || 0,
         renewMaturityAmount: renewMatAmt,
         overrideMaturityAmount: effMatAmt,
+        voucherLines: voucherLines.map(l => ({ accId: l.accId, amount: l.amount, drOrCr: l.drOrCr })),
+        ...(isRenew && {
+          renewFdDate: renewFdDate || undefined,
+          renewLtdNo: renewLtdNo || undefined,
+          renewIntRate: renewIntRate > 0 ? renewIntRate : undefined,
+          renewIntCompInterval: renewCompInterval || undefined,
+          renewSerialNo: parseFloat(renewSerialNoStr) || undefined,
+          renewAmount: renewAmount > 0 ? renewAmount : undefined,
+        }),
       });
       await Swal.fire({ icon: "success", title: "Success!", text: (res as any).message || "Saved successfully.", timer: 1800, showConfirmButton: false });
       handleReset();
@@ -405,7 +507,7 @@ const BankFDMaturePage: React.FC = () => {
                   <div className="px-6 py-4 border-b border-gray-200 bg-purple-50/40">
                     <label className="flex items-center gap-3 cursor-pointer w-fit">
                       <div className="relative">
-                        <input type="checkbox" checked={isRenew} onChange={e => setIsRenew(e.target.checked)} className="sr-only peer" />
+                        <input type="checkbox" checked={isRenew} onChange={e => handleRenewToggle(e.target.checked)} className="sr-only peer" />
                         <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600" />
                       </div>
                       <div>
@@ -415,68 +517,223 @@ const BankFDMaturePage: React.FC = () => {
                     </label>
 
                     {isRenew && (
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-5">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Renewal Period — Months</label>
-                          <input type="number" value={renewMonths} min={0} onChange={e => setRenewMonths(e.target.value.replace(/\D/g, ""))}
-                            className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500" placeholder="e.g. 12" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Renewal Period — Days</label>
-                          <input type="number" value={renewDays} min={0} onChange={e => setRenewDays(e.target.value.replace(/\D/g, ""))}
-                            className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500" placeholder="e.g. 0" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">New Principal (after TDS)</label>
-                          <div className="px-3 py-2.5 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-700 font-mono text-sm">
-                            ₹{Math.round(Math.max(0, effectiveMaturityAmount - (hasTDSSetting ? tdsAmount : 0))).toLocaleString("en-IN")}
+                      <div className="mt-5 space-y-4">
+                        {/* Row 1: LTD No, Receipt No, Renew FD Date, Amount */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">LTD No</label>
+                            <input type="text" value={renewLtdNo}
+                              onChange={e => setRenewLtdNo(e.target.value)}
+                              placeholder={`${selectedDetail?.ltdNo ?? ""}R`}
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Serial / Receipt No</label>
+                            <input type="text" value={renewSerialNoStr}
+                              onChange={e => { const v = e.target.value; if (/^\d*$/.test(v)) setRenewSerialNoStr(v); }}
+                              placeholder="Optional"
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Renew FD Date <span className="text-red-500">*</span></label>
+                            <DatePicker value={renewFdDate} onChange={v => setRenewFdDate(v)}
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">New Principal (₹) <span className="text-red-500">*</span></label>
+                            <input type="text" value={renewAmountStr}
+                              onChange={e => {
+                                const v = e.target.value;
+                                if (/^\d*\.?\d{0,2}$/.test(v)) {
+                                  setRenewAmountStr(v);
+                                  setRenewAmount(parseFloat(v) || 0);
+                                }
+                              }}
+                              onBlur={() => { const n = parseFloat(renewAmountStr); setRenewAmountStr(n > 0 ? n.toFixed(2) : ""); }}
+                              placeholder="0.00"
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500 font-mono"
+                            />
                           </div>
                         </div>
-                        {renewMatAmt > 0 && (
-                          <div className="sm:col-span-3 bg-purple-50 border border-purple-200 rounded-lg px-4 py-2.5 text-sm text-purple-800">
-                            Projected new maturity amount: <span className="font-bold font-mono">₹{fmt(renewMatAmt)}</span>
+
+                        {/* Row 2: Months, Days, Int Rate, Compounding */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Months <span className="text-red-500">*</span></label>
+                            <input type="text" value={renewMonths}
+                              onChange={e => setRenewMonths(e.target.value.replace(/\D/g, ""))}
+                              placeholder="e.g. 12"
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500"
+                            />
                           </div>
-                        )}
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Days</label>
+                            <input type="text" value={renewDays}
+                              onChange={e => setRenewDays(e.target.value.replace(/\D/g, ""))}
+                              placeholder="e.g. 0"
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Int Rate % <span className="text-red-500">*</span></label>
+                            <input type="text" value={renewIntRateStr}
+                              onChange={e => {
+                                const v = e.target.value;
+                                if (/^\d*\.?\d{0,2}$/.test(v)) {
+                                  setRenewIntRateStr(v);
+                                  setRenewIntRate(parseFloat(v) || 0);
+                                }
+                              }}
+                              onBlur={() => { const n = parseFloat(renewIntRateStr); setRenewIntRateStr(n > 0 ? n.toFixed(2) : ""); }}
+                              placeholder="0.00"
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Compounding <span className="text-red-500">*</span></label>
+                            <select value={renewCompInterval} onChange={e => setRenewCompInterval(parseInt(e.target.value))}
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500 bg-white cursor-pointer">
+                              <option value={12}>Monthly</option>
+                              <option value={4}>Quarterly</option>
+                              <option value={2}>Half-Yearly</option>
+                              <option value={1}>Yearly</option>
+                              <option value={0}>No Compounding</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Row 3: Maturity Date (editable) + Maturity Amount (editable) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Maturity Date</label>
+                            <DatePicker value={renewMatDate} onChange={v => setRenewMatDate(v)}
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Maturity Amount (₹)</label>
+                            <input type="text" value={renewMatAmtStr}
+                              onChange={e => {
+                                const v = e.target.value;
+                                if (/^\d*\.?\d{0,2}$/.test(v)) {
+                                  setRenewMatAmtStr(v);
+                                  setRenewMatAmt(parseFloat(v) || 0);
+                                }
+                              }}
+                              onBlur={() => { const n = parseFloat(renewMatAmtStr); setRenewMatAmtStr(n > 0 ? n.toFixed(2) : ""); }}
+                              placeholder="Auto-calculated"
+                              className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg text-sm outline-none focus:border-purple-500 font-mono"
+                            />
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Payout section */}
+                  {/* Voucher Detail */}
                   <div className="p-6 border-b border-gray-200">
                     <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-green-500" /> Accounts
+                      <DollarSign className="w-4 h-4 text-green-500" /> Voucher Detail
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {!isRenew && (
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Payout Account (Dr) <span className="text-red-500">*</span></label>
-                          <Select
-                            options={generalAccounts}
-                            value={generalAccounts.find(o => o.value === payoutAccId) ?? null}
-                            onChange={o => setPayoutAccId(o?.value ?? null)}
-                            placeholder="Cash / bank account..."
-                            isClearable styles={selectStyles}
-                            menuPortalTarget={document.body} menuPosition="fixed"
-                          />
-                        </div>
-                      )}
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Interest Income Account (Cr) <span className="text-red-500">*</span></label>
+
+                    {/* Entry form */}
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4 items-end">
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Account <span className="text-red-500">*</span></label>
                         <Select
                           options={generalAccounts}
-                          value={generalAccounts.find(o => o.value === intIncomeAccId) ?? null}
-                          onChange={o => setIntIncomeAccId(o?.value ?? null)}
-                          placeholder="Interest income GL..."
+                          value={generalAccounts.find(o => o.value === entryAccId) ?? null}
+                          onChange={o => setEntryAccId(o?.value ?? null)}
+                          placeholder="Select general account..."
                           isClearable styles={selectStyles}
                           menuPortalTarget={document.body} menuPosition="fixed"
                         />
                       </div>
-                      <div className={!isRenew ? "" : "sm:col-span-2"}>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Narration</label>
-                        <input value={narration} onChange={e => setNarration(e.target.value)}
-                          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500"
-                          placeholder="Optional narration..." />
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Amount <span className="text-red-500">*</span></label>
+                        <input
+                          type="text" value={entryAmtStr}
+                          onChange={e => { const v = e.target.value; if (/^\d*\.?\d{0,2}$/.test(v)) setEntryAmtStr(v); }}
+                          onBlur={() => { const n = parseFloat(entryAmtStr); setEntryAmtStr(n > 0 ? n.toFixed(2) : ""); }}
+                          placeholder="0.00"
+                          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500 font-mono"
+                        />
                       </div>
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Type</label>
+                          <select value={entryDrOrCr} onChange={e => setEntryDrOrCr(e.target.value as "Dr" | "Cr")}
+                            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500 bg-white cursor-pointer">
+                            <option value="Dr">Dr</option>
+                            <option value="Cr">Cr</option>
+                          </select>
+                        </div>
+                        <button onClick={handleAddLine}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-all whitespace-nowrap">
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Entries grid */}
+                    {voucherLines.length > 0 && (() => {
+                      const totalDr = voucherLines.filter(l => l.drOrCr === "Dr").reduce((s, l) => s + l.amount, 0);
+                      const totalCr = voucherLines.filter(l => l.drOrCr === "Cr").reduce((s, l) => s + l.amount, 0);
+                      const diff = Math.abs(totalDr - totalCr);
+                      return (
+                        <div className="rounded-lg border border-gray-200 overflow-hidden mb-4">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gradient-to-r from-gray-700 to-gray-600 text-white">
+                              <tr>
+                                <th className="px-3 py-2.5 text-left font-semibold w-10">Sr.</th>
+                                <th className="px-3 py-2.5 text-left font-semibold">Credit Account</th>
+                                <th className="px-3 py-2.5 text-right font-semibold w-36">Amount Dr</th>
+                                <th className="px-3 py-2.5 text-right font-semibold w-36">Amount Cr</th>
+                                <th className="px-3 py-2.5 w-10"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {voucherLines.map((l, i) => (
+                                <tr key={l.key} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                                  <td className="px-3 py-2 text-gray-500">{i + 1}</td>
+                                  <td className="px-3 py-2 text-gray-800">{l.accName}</td>
+                                  <td className="px-3 py-2 text-right font-mono text-red-700">{l.drOrCr === "Dr" ? `₹${fmt(l.amount)}` : "—"}</td>
+                                  <td className="px-3 py-2 text-right font-mono text-green-700">{l.drOrCr === "Cr" ? `₹${fmt(l.amount)}` : "—"}</td>
+                                  <td className="px-3 py-2 text-center">
+                                    <button onClick={() => setVoucherLines(prev => prev.filter(x => x.key !== l.key))}
+                                      className="text-red-400 hover:text-red-600 text-xs font-bold">✕</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-gray-100 border-t-2 border-gray-300">
+                              <tr>
+                                <td colSpan={2} className="px-3 py-2 text-right text-sm font-bold text-gray-700">Total</td>
+                                <td className="px-3 py-2 text-right font-mono font-bold text-red-700">₹{fmt(totalDr)}</td>
+                                <td className="px-3 py-2 text-right font-mono font-bold text-green-700">₹{fmt(totalCr)}</td>
+                                <td />
+                              </tr>
+                            </tfoot>
+                          </table>
+                          {diff > 0.5 && (
+                            <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-t border-amber-200 text-amber-800 text-xs font-medium">
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                              Manual entries out of balance by ₹{fmt(diff)} — Maturity Amount: ₹{fmt(effectiveMaturityAmount)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Narration */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Narration</label>
+                      <input value={narration} onChange={e => setNarration(e.target.value)}
+                        className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500"
+                        placeholder="Optional narration..." />
                     </div>
                   </div>
 
