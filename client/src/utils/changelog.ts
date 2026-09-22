@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.90",
+    date: "2026-09-22",
+    changes: [
+      { type: "improvement", text: "Premature RD: Int Posting Amt is now editable so users can enter a custom interest amount before submitting" },
+    ],
+  },
+  {
     version: "1.0.89",
     date: "2026-09-22",
     changes: [

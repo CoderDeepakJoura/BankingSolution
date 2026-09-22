@@ -518,9 +518,14 @@ const PrematureRDPage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       <div className="flex flex-col">
                         <label className="text-sm font-semibold text-gray-700 mb-2">Int Posting Amt</label>
-                        <div className="px-4 py-3 border-2 border-emerald-100 rounded-lg bg-gray-50 font-mono text-gray-700">
-                          {amount(credit.incomeAmount).toFixed(2)}
-                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={credit.incomeAmount}
+                          onChange={(e) => setCredit((c) => ({ ...c, incomeAmount: e.target.value }))}
+                          className="px-4 py-3 border-2 border-emerald-300 rounded-lg bg-white font-mono text-gray-700 focus:outline-none focus:border-emerald-500"
+                        />
                       </div>
                       <div className="flex flex-col">
                         <label className="text-sm font-semibold text-gray-700 mb-2">Expense Amount (Dr)</label>
