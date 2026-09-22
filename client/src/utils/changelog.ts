@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.87",
+    date: "2026-09-22",
+    changes: [
+      { type: "fix", text: "Loan interest posting: Schedule-method loans with stale kist InterestAmt (e.g. ₹10 contracted vs ₹696 actual) now correctly post the balance-based DWI amount — the fallback DWI calculation now always runs and max(schedule, DWI) is used" },
+    ],
+  },
+  {
     version: "1.0.86",
     date: "2026-09-22",
     changes: [

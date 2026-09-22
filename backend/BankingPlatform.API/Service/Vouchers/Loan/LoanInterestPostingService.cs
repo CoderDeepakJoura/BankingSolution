@@ -630,16 +630,16 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 {
                     // Opening interest (openStdInt) is already tracked as Cat 1 and collected via
                     // loan recovery — do NOT include it here. Only post NEW interest from the
-                    // post-session kist schedule. If no post-session kists have InterestAmt set,
-                    // dynStdInt stays 0 and the DWI fallback below computes the correct amount.
+                    // post-session kist schedule.
                     decimal schedIntDue = interestOverdueKists.Sum(x => x.InterestAmt ?? 0m);
-                    dynStdInt = Math.Max(0, schedIntDue - postedStdInt);
+                    decimal schedBasedInt = Math.Max(0, schedIntDue - postedStdInt);
+                    dynStdInt = schedBasedInt;
 
-                    // Schedule-aware fallback: only when the schedule hasn't fully expired before the session.
-                    // Mirrors Period Detail — each kist date reduces the performing balance starting from
-                    // that date, and calcFromDate is counted inclusive (unlike the generic DWI which starts
-                    // from calcFromDate+1 and ignores kist schedule balance reductions).
-                    if (dynStdInt == 0 && effectiveStdRate > 0 && principalBal > 0 && !allKistsPreSession)
+                    // Always compute the schedule-aware DWI and take max(schedBased, dwiBased).
+                    // This ensures heavily-overdue loans whose kist schedule InterestAmt is stale
+                    // (e.g. ₹10 contractual vs ₹696 actual accrual) still post the correct amount.
+                    // For normal loans the two values are close and max is harmless.
+                    if (effectiveStdRate > 0 && principalBal > 0 && !allKistsPreSession)
                     {
                         var schedPts = new List<DateTime> { calcFromDate };
                         foreach (var kd in kistSchedule
@@ -682,7 +682,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                 });
                             }
                         }
-                        dynStdInt = Math.Max(0, wInt - postedStdInt);
+                        decimal dwiBasedInt = Math.Max(0, wInt - postedStdInt);
+                        dynStdInt = Math.Max(schedBasedInt, dwiBasedInt);
                     }
 
                     // Trigger penal whenever ANY kists are overdue (including all-pre-session accounts
