@@ -512,6 +512,11 @@ const FDAccountMaster = () => {
   const [editingFdIndex, setEditingFdIndex] = useState<number | null>(null);
   const [fdDaysInAYear, setFdDaysInAYear] = useState<number>(360);
 
+  // Add FD to Existing Account mode
+  const [addToExistingMode, setAddToExistingMode] = useState(false);
+  const [existingFdAccOptions, setExistingFdAccOptions] = useState<{ value: number; label: string }[]>([]);
+  const [selectedExistingAccId, setSelectedExistingAccId] = useState<number | null>(null);
+
   // Voucher payment mode
   const [voucherPaymentMode, setVoucherPaymentMode] = useState<
     "byCashGL" | "bySaving" | "both"
@@ -860,6 +865,16 @@ const FDAccountMaster = () => {
         }));
 
         clearMemberAndFdDetails();
+        setSelectedExistingAccId(null);
+        if (addToExistingMode) {
+          const accRes = await fdAccountService.getOpenFDAccountsByProduct(selectedOption.value, user.branchid);
+          if (accRes.success && Array.isArray(accRes.data)) {
+            setExistingFdAccOptions(accRes.data.map((a: any) => ({
+              value: a.accId,
+              label: `${a.accPrefix ?? ""}-${a.accSuffix ?? ""} ${a.accountName}`,
+            })));
+          }
+        }
 
         if (hadMemberDetails || hadFdDetails || hadMisDetails) {
           Swal.fire({
@@ -892,6 +907,78 @@ const FDAccountMaster = () => {
           });
         }
       }
+    }
+  };
+
+  const handleExistingModeToggle = async (checked: boolean) => {
+    setAddToExistingMode(checked);
+    setSelectedExistingAccId(null);
+    setExistingFdAccOptions([]);
+    clearMemberAndFdDetails();
+    if (checked && formData.accountMasterDTO.fdProductId) {
+      const res = await fdAccountService.getOpenFDAccountsByProduct(formData.accountMasterDTO.fdProductId, user.branchid);
+      if (res.success && Array.isArray(res.data)) {
+        setExistingFdAccOptions(res.data.map((a: any) => ({
+          value: a.accId,
+          label: `${a.accPrefix ?? ""}-${a.accSuffix ?? ""} ${a.accountName}`,
+        })));
+      }
+    }
+  };
+
+  const handleExistingAccountSelect = async (opt: any) => {
+    if (!opt) { setSelectedExistingAccId(null); return; }
+    setSelectedExistingAccId(opt.value);
+    try {
+      Swal.fire({ title: "Loading account...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      const res = await fdAccountService.getFDAccountById(opt.value, user.branchid, undefined);
+      Swal.close();
+      if (res.success && res.data) {
+        const data = res.data;
+        setFormData((prev) => ({
+          ...prev,
+          accountMasterDTO: {
+            ...prev.accountMasterDTO,
+            fdPrefix: data.accountMasterDTO.accPrefix || "",
+            suffix: data.accountMasterDTO.accSuffix ? data.accountMasterDTO.accSuffix.toString() : "",
+            memberAccountNo: data.accountMasterDTO.accountNumber || "",
+            membershipNo: data.accountMasterDTO.membershipNo || "",
+            addedUsing: data.accountMasterDTO.addedUsing || "A",
+          },
+          memberDetails: { memberId: data.accountMasterDTO.memberId, memberBranchId: data.accountMasterDTO.memberBranchId } as any,
+        }));
+        setMemberDetailsData({
+          memberName: data.accountMasterDTO.accountName || "",
+          gender: Number(data.accountMasterDTO.gender) || 0,
+          memberId: data.accountMasterDTO.memberId || 0,
+          memberBranchId: data.accountMasterDTO.memberBranchId || 0,
+          dateOfBirth: data.accountMasterDTO.dob?.split("T")[0] || "",
+          mobileNo: data.accountMasterDTO.phoneNo1 || "",
+          emailId: data.accountMasterDTO.email || "",
+          addressLine1: data.accountMasterDTO.addressLine || "",
+          relativeName: data.accountMasterDTO.relativeName || "",
+        });
+        // Load nominees
+        if (data.accNomineeDTO && data.accNomineeDTO.length > 0) {
+          setIsNomineeRequired(true);
+          setNominees(data.accNomineeDTO.map((n: any) => ({
+            branchId: n.branchId,
+            nomineeName: n.nomineeName,
+            dateOfBirth: n.nomineeDob?.split("T")[0] || sessionDate,
+            relationWithAccountHolder: n.relationWithAccHolder,
+            address: n.addressLine || "",
+            nomineeDate: n.nomineeDate?.split("T")[0] || sessionDate,
+            guardianName: n.nameOfGuardian || "",
+            isMinor: n.isMinor === 1,
+          })));
+        }
+        // Clear FD details — user will add a new one
+        setFdDetailsList([]);
+        setEditingFdIndex(null);
+      }
+    } catch (e: any) {
+      Swal.close();
+      Swal.fire("Error", e.message || "Failed to load account", "error");
     }
   };
 
@@ -1627,7 +1714,9 @@ const FDAccountMaster = () => {
       };
       const response = isEditMode
         ? await fdAccountService.updateFDAccount(dto)
-        : await fdAccountService.createFDAccount(dto);
+        : addToExistingMode && selectedExistingAccId
+          ? await fdAccountService.addFDDetailToExisting(selectedExistingAccId, dto)
+          : await fdAccountService.createFDAccount(dto);
 
       if (response.success) {
         clearErrors();
@@ -1636,7 +1725,7 @@ const FDAccountMaster = () => {
           icon: "success",
           title: "Success!",
           text: `${showMIS ? "MIS" : "FD"} Account ${
-            isEditMode ? "updated" : "created"
+            isEditMode ? "updated" : addToExistingMode ? "FD detail added to existing account" : "created"
           } successfully!`,
           timer: 1500,
           showConfirmButton: false,
@@ -1747,6 +1836,9 @@ const FDAccountMaster = () => {
     setActiveTab("fdDetail");
     setUnlockedTabs(["fdDetail", "misDetail"]);
     setCompletedTabs(new Set());
+    setAddToExistingMode(false);
+    setSelectedExistingAccId(null);
+    setExistingFdAccOptions([]);
     clearErrors();
     setShowValidationSummary(false);
   };
@@ -1836,8 +1928,10 @@ const FDAccountMaster = () => {
           errs.push("Account Opening Date is required");
         if (!formData.accountMasterDTO.suffix?.trim())
           errs.push("Account Suffix is required");
-        if (!formData.memberDetails)
+        if (!addToExistingMode && !formData.memberDetails)
           errs.push("Please search and confirm a member before proceeding");
+        if (addToExistingMode && !selectedExistingAccId)
+          errs.push("Please select an existing FD account");
         if (showMIS ? misDetailsList.length === 0 : fdDetailsList.length === 0)
           errs.push(`At least one ${showMIS ? "MIS" : "FD"} detail must be added`);
         break;
@@ -1927,6 +2021,40 @@ const FDAccountMaster = () => {
             />
           </FormField>
 
+          {/* Add FD to Existing Account toggle */}
+          {!isEditMode && !showMIS && (
+            <div className="flex flex-col justify-center">
+              <label className="block text-sm font-medium text-gray-700 mb-2">FD In Existing Acc</label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={addToExistingMode}
+                  onChange={(e) => handleExistingModeToggle(e.target.checked)}
+                  className="w-5 h-5 rounded accent-blue-600 cursor-pointer"
+                />
+                <span className="text-sm text-gray-600">Add new FD to existing account</span>
+              </label>
+            </div>
+          )}
+
+          {/* Existing FD Account selector */}
+          {addToExistingMode && !isEditMode && (
+            <div className="flex flex-col md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                FD Account <span className="text-red-500">*</span>
+              </label>
+              <Select
+                options={existingFdAccOptions}
+                value={existingFdAccOptions.find((o) => o.value === selectedExistingAccId) || null}
+                onChange={handleExistingAccountSelect}
+                placeholder="Select existing FD account..."
+                isClearable
+                styles={{ control: (b: any) => ({ ...b, cursor: "pointer", minHeight: "42px" }), menuPortal: (b: any) => ({ ...b, zIndex: 9999 }) }}
+                menuPortalTarget={document.body}
+              />
+            </div>
+          )}
+
           {/* Account Opening Date */}
           <FormField
             name="accountOpeningDate"
@@ -1946,8 +2074,8 @@ const FDAccountMaster = () => {
             />
           </FormField>
 
-          {/* Search By Toggle */}
-          <div className="space-y-2">
+          {/* Search By Toggle — hidden in existing-account mode */}
+          <div className={`space-y-2${addToExistingMode ? " hidden" : ""}`}>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Search By:
             </label>
@@ -2035,8 +2163,8 @@ const FDAccountMaster = () => {
             </div>
           )}
 
-          {/* Member Account/Membership Number */}
-          <div className="space-y-2 md:col-span-3">
+          {/* Member Account/Membership Number — hidden in existing-account mode */}
+          <div className={`space-y-2 md:col-span-3${addToExistingMode ? " hidden" : ""}`}>
             <FormField
               name={
                 inputMode === "account" ? "memberAccountNo" : "membershipNo"

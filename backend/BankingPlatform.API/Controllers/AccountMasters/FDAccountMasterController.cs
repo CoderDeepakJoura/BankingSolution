@@ -195,5 +195,36 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                 });
             }
         }
+
+        [HttpGet("open-accounts/{productId}/{branchId}")]
+        public async Task<IActionResult> GetOpenFDAccountsByProduct(int productId, int branchId)
+        {
+            try
+            {
+                var result = await _service.GetOpenFDAccountsByProductAsync(productId, branchId);
+                return Ok(new { Success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                await _commonfunctions.LogErrors(ex, nameof(GetOpenFDAccountsByProduct), nameof(FDAccountMasterController));
+                return BadRequest(new ResponseDto { Success = false, Message = "Error fetching FD accounts." });
+            }
+        }
+
+        [HttpPost("{existingAccountId}/add-fd-detail")]
+        public async Task<IActionResult> AddFDDetailToExisting(int existingAccountId, [FromBody] CommonAccMasterDTO dto)
+        {
+            try
+            {
+                var result = await _service.AddFDDetailToExistingAccountAsync(existingAccountId, dto);
+                if (result != "Success") return BadRequest(new ResponseDto { Success = false, Message = result });
+                return Ok(new ResponseDto { Success = true, Message = "FD detail added successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _commonfunctions.LogErrors(ex, nameof(AddFDDetailToExisting), nameof(FDAccountMasterController));
+                return BadRequest(new ResponseDto { Success = false, Message = "Error adding FD detail to existing account." });
+            }
+        }
     }
 }

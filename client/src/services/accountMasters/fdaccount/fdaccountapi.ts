@@ -385,6 +385,18 @@ class FDAccountService extends ApiService {
       }
     );
   }
+  async getOpenFDAccountsByProduct(productId: number, branchId: number): Promise<ApiResponse<any>> {
+    return this.makeRequest(`/FDAccountMaster/open-accounts/${productId}/${branchId}`, { method: "GET" });
+  }
+
+  async addFDDetailToExisting(existingAccountId: number, dto: CommonAccMasterDTO): Promise<ApiResponse<any>> {
+    return this.makeRequest(`/FDAccountMaster/${existingAccountId}/add-fd-detail`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dto),
+    });
+  }
+
   async preMatureFD(
    dto: any
   ): Promise<ApiResponse<ResponseDto>> {
