@@ -217,33 +217,13 @@ namespace BankingPlatform.API.Service.Reports
                     {
                         loan.TotalBalance, loan.BalType,
                         loan.OverDueBal,   loan.OverBalType,
-                        loan.OpenInt,      loan.OpenIntType,
-                        loan.OpenOverInt,  loan.OpenOverIntType,
                         PrincipalHc = acc.HeadCode,
-                        ProductId   = acc.GeneralProductId,
                     }
                 ).ToListAsync();
-
-                // RecoverableIntHeadCode per product for interest distribution
-                var hlLoanProductIds = hlLoanObsRaw
-                    .Where(x => x.ProductId.HasValue)
-                    .Select(x => x.ProductId!.Value)
-                    .Distinct().ToList();
-                var hlLoanPostingMap = new Dictionary<int, long?>();
-                if (hlLoanProductIds.Any())
-                {
-                    hlLoanPostingMap = await _db.loanproductposting.AsNoTracking()
-                        .Where(p => p.BrId == branchId && hlLoanProductIds.Contains(p.ProductId))
-                        .ToDictionaryAsync(p => p.ProductId, p => p.RecoverableIntHeadCode);
-                }
 
                 foreach (var item in hlLoanObsRaw)
                 {
                     var hc = childToParent.TryGetValue(item.PrincipalHc, out var ph) ? ph : item.PrincipalHc;
-                    long? rawIntHc = item.ProductId.HasValue
-                        ? hlLoanPostingMap.GetValueOrDefault(item.ProductId!.Value)
-                        : null;
-                    var intHc = (rawIntHc.HasValue && rawIntHc.Value != 0) ? rawIntHc.Value : hc;
 
                     void AddToHl(long headCode, decimal? amount, string? balType)
                     {
@@ -255,12 +235,9 @@ namespace BankingPlatform.API.Service.Reports
                             hlObCr[headCode] = hlObCr.GetValueOrDefault(headCode) + a;
                     }
 
-                    // Principal + Overdue → accountmaster HeadCode
+                    // Principal + Overdue → accountmaster HeadCode (legacy SP uses TotalBalance only; OpenInt is excluded)
                     AddToHl(hc, item.TotalBalance, item.BalType);
                     AddToHl(hc, item.OverDueBal,   item.OverBalType);
-                    // Interest → RecoverableIntHeadCode (or same head if not configured)
-                    AddToHl(intHc, item.OpenInt,     item.OpenIntType);
-                    AddToHl(intHc, item.OpenOverInt, item.OpenOverIntType);
                 }
             }
 

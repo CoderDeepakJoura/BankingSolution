@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.82",
+    date: "2026-09-22",
+    changes: [
+      { type: "fix", text: "Balance Sheet: exclude loan opening interest (OpenInt) from headline head calculation — matches legacy SP behaviour; fixes spurious 'Interest Recoverable' balance on balance sheet" },
+    ],
+  },
+  {
     version: "1.0.81",
     date: "2026-09-22",
     changes: [
