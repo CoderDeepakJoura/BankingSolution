@@ -34,7 +34,7 @@ import {
   CombinedLoanAccountDTO,
 } from "../../../services/accountMasters/loanaccount/loanaccountapi";
 import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
-import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../../services/vouchers/loan/loanRecoveryApi";
+import loanRecoveryApi, { LoanRecoveryBalanceDTO, LoanLedgerRowDTO } from "../../../services/vouchers/loan/loanRecoveryApi";
 
 const ACCOUNT_TYPES = { Loan: 1, Saving: 2, General: 3, RD: 5, FD: 6 };
 
@@ -119,6 +119,7 @@ const LoanAdvancementVoucher: React.FC = () => {
   const [creditAccountsForRow, setCreditAccountsForRow] = useState<{ accId: number; accountName: string }[]>([]);
   const [loanAccountData, setLoanAccountData] = useState<CombinedLoanAccountDTO | null>(null);
   const [loanBalance, setLoanBalance] = useState<LoanRecoveryBalanceDTO | null>(null);
+  const [loanLedger, setLoanLedger] = useState<LoanLedgerRowDTO[]>([]);
   const [guarantorNames, setGuarantorNames] = useState<Record<string, string>>({});
   const [creditItems, setCreditItems] = useState<CreditRow[]>([]);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
@@ -272,6 +273,7 @@ const LoanAdvancementVoucher: React.FC = () => {
       setFormData((p) => ({ ...p, loanAccountId: 0, loanAmountPassed: 0, totalAmount: "" }));
       setLoanAccountData(null);
       setLoanBalance(null);
+      setLoanLedger([]);
       setGuarantorNames({});
       setCreditItems([]);
       setEditingRowId(null);
@@ -283,6 +285,7 @@ const LoanAdvancementVoucher: React.FC = () => {
     setFormData((p) => ({ ...p, loanAccountId: sel.value, loanAmountPassed: acc?.loanAmountPassed ?? 0, totalAmount: "" }));
     setLoanAccountData(null);
     setLoanBalance(null);
+    setLoanLedger([]);
     setGuarantorNames({});
     setCreditItems([]);
     setEditingRowId(null);
@@ -292,6 +295,9 @@ const LoanAdvancementVoucher: React.FC = () => {
     await loadAccountDetails(sel.value);
     loanRecoveryApi.getBalance(sel.value, user.branchid).then((res) => {
       if (res.success && res.data) setLoanBalance(res.data);
+    });
+    loanRecoveryApi.getLedger(sel.value, user.branchid).then((res) => {
+      if (res.success && res.data) setLoanLedger(res.data);
     });
   };
 
@@ -561,10 +567,48 @@ const LoanAdvancementVoucher: React.FC = () => {
         );
 
       case "ledger":
+        if (loanLedger.length === 0)
+          return (
+            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <p className="text-sm text-gray-500 italic">No transactions found for this loan account</p>
+            </div>
+          );
         return (
-          <div className="text-center py-12 text-gray-500">
-            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <p className="text-sm">Ledger view coming soon</p>
+          <div className="overflow-x-auto overflow-y-auto max-h-96 rounded-lg border border-gray-300 shadow-sm">
+            <table className="w-full text-xs border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr style={{ background: "#1a2340" }}>
+                  {["SR.NO","DATE","V.NO","PARTICULARS","ADVANCEMENT (DR)","INT DR","INT CR","RECOVERY (CR)","BALANCE"].map(h => (
+                    <th key={h} className="px-3 py-2.5 font-semibold text-white uppercase tracking-wide whitespace-nowrap text-center border border-gray-600">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loanLedger.map((row, idx) => {
+                  const isOB = row.entryType === "OB";
+                  const bal = row.balance;
+                  const fmtN = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                  const balStr = bal === 0 ? "—" : `${fmtN(Math.abs(bal))} ${bal > 0 ? "Dr" : "Cr"}`;
+                  return (
+                    <tr key={idx} style={isOB ? { background: "#fffbea" } : undefined}
+                      className={!isOB ? "hover:bg-blue-50 transition-colors" : ""}>
+                      <td className="px-3 py-2 text-center border border-gray-200 text-gray-600">{idx + 1}</td>
+                      <td className={`px-3 py-2 text-center border border-gray-200 whitespace-nowrap ${isOB ? "text-orange-600 font-semibold italic" : "text-gray-700"}`}>
+                        {row.entryDate ? new Date(row.entryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-center border border-gray-200 text-gray-600">{row.voucherNo || "—"}</td>
+                      <td className={`px-3 py-2 border border-gray-200 ${isOB ? "text-orange-600 font-semibold italic" : "text-gray-700"}`}>{row.description}</td>
+                      <td className="px-3 py-2 text-right border border-gray-200 text-gray-800">{row.dr > 0 ? fmtN(row.dr) : "—"}</td>
+                      <td className="px-3 py-2 text-right border border-gray-200 text-red-700">{row.intDr > 0 ? fmtN(row.intDr) : "—"}</td>
+                      <td className="px-3 py-2 text-right border border-gray-200 text-green-700">{row.intCr > 0 ? fmtN(row.intCr) : "—"}</td>
+                      <td className="px-3 py-2 text-right border border-gray-200 text-green-700">{row.cr > 0 ? fmtN(row.cr) : "—"}</td>
+                      <td className={`px-3 py-2 text-right border border-gray-200 font-semibold whitespace-nowrap ${isOB ? "text-orange-600 italic" : "text-gray-800"}`}>{balStr}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         );
 

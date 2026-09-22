@@ -15,6 +15,16 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.80",
+    date: "2026-09-22",
+    changes: [
+      { type: "fix", text: "Loan Ledger Report now shows Interest Posting rows for Stand mode — fetches Cat3 (STDREC) entries from voucherrecintdetail since new-style Stand IP no longer writes VCDD for the loan account" },
+      { type: "fix", text: "Loan Recovery voucher now credits Current Recoverable Interest account (reversing the IP Dr) instead of Interest Income account for Stand mode loans" },
+      { type: "fix", text: "Loan Recovery in-screen ledger now shows Stand IP rows from Cat3 entries; balance formula corrected so Stand IP does not affect principal balance" },
+      { type: "new", text: "Loan Advancement: Ledger tab implemented — shows full transaction history with Advancement Dr, Int Dr, Int Cr, Recovery Cr columns" },
+    ],
+  },
+  {
     version: "1.0.79",
     date: "2026-09-21",
     changes: [

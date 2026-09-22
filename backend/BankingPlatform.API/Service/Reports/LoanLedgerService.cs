@@ -1,4 +1,5 @@
 using BankingPlatform.API.Common;
+using BankingPlatform.Infrastructure.Models.voucher;
 using Microsoft.EntityFrameworkCore;
 
 namespace BankingPlatform.API.Service.Reports
@@ -265,7 +266,47 @@ namespace BankingPlatform.API.Service.Reports
                 .Where(x => voucherIdList.Contains(x.VoucherID) && x.AccountId == accountId)
                 .ToListAsync();
 
-            if (!accountEntries.Any())
+            // Stand loans: new-style IP writes Dr to CurrentRecoverableIntAcc (not the loan account),
+            // so no VCDD entry exists for the loan account. Fetch Cat3 (STDREC=3) entries instead.
+            var standIpByVoucher = new Dictionary<long, (int VoucherNo, DateTime VoucherDate, decimal IntDr)>();
+            if (isStand)
+            {
+                const int CAT_STDREC = 3;
+                var cat3List = await _context.voucherrecintdetail.AsNoTracking()
+                    .Where(x => x.AccId == accountId && x.BrId == branchId
+                             && x.IntCatId == CAT_STDREC && x.IntDr > 0
+                             && x.EntryDate >= fromDate.Date && x.EntryDate < toExclusive)
+                    .Select(x => new { x.VoucherId, x.IntDr })
+                    .ToListAsync();
+
+                if (cat3List.Any())
+                {
+                    var cat3VIds = cat3List.Select(x => x.VoucherId).Distinct().ToList();
+                    var cat3Vouchers = await _context.voucher.AsNoTracking()
+                        .Where(x => cat3VIds.Contains(x.Id) && x.VoucherStatus != "D")
+                        .Select(x => new { x.Id, x.VoucherNo, x.VoucherDate })
+                        .ToListAsync();
+                    var cat3VMap = cat3Vouchers.ToDictionary(x => x.Id, x => (x.VoucherNo, VoucherDate: x.VoucherDate.Date));
+
+                    // Skip vouchers already handled via legacy VCDD LInterest entries (avoid double-count)
+                    var legacyIpIds = accountEntries
+                        .Where(e => e.EntryStatus == "LInterest")
+                        .Select(e => e.VoucherID)
+                        .ToHashSet();
+
+                    foreach (var c in cat3List)
+                    {
+                        if (legacyIpIds.Contains(c.VoucherId)) continue;
+                        if (!cat3VMap.TryGetValue(c.VoucherId, out var v)) continue;
+                        if (standIpByVoucher.TryGetValue(c.VoucherId, out var ex))
+                            standIpByVoucher[c.VoucherId] = (ex.VoucherNo, ex.VoucherDate, ex.IntDr + (decimal)c.IntDr);
+                        else
+                            standIpByVoucher[c.VoucherId] = (v.VoucherNo, v.VoucherDate, (decimal)c.IntDr);
+                    }
+                }
+            }
+
+            if (!accountEntries.Any() && !standIpByVoucher.Any())
                 return (true, "No entries found for this account.", emptyResult);
 
             var relevantVoucherIds = accountEntries.Select(e => e.VoucherID).Distinct().ToList();
@@ -285,13 +326,33 @@ namespace BankingPlatform.API.Service.Reports
             decimal runningBalance = openingBalance;
             var entries = new List<LoanLedgerEntryDTO>();
 
-            var sorted = accountEntries
-                .OrderBy(e => voucherInfoMap.GetValueOrDefault(e.VoucherID)?.VoucherDate ?? DateTime.MinValue)
-                .ThenBy(e => voucherInfoMap.GetValueOrDefault(e.VoucherID)?.VoucherNo ?? 0)
-                .ToList();
-
-            foreach (var entry in sorted)
+            // Unified event list: regular VCDD entries + Stand IP entries from Cat3, sorted by date/voucher
+            var allEvents = new List<(bool isStandIp, DateTime date, int voucherNo, VoucherCreditDebitDetails? entry, decimal standIntDr)>();
+            foreach (var e in accountEntries)
             {
+                var inf = voucherInfoMap.GetValueOrDefault(e.VoucherID);
+                if (inf != null) allEvents.Add((false, inf.VoucherDate, inf.VoucherNo, e, 0m));
+            }
+            foreach (var kv in standIpByVoucher)
+                allEvents.Add((true, kv.Value.VoucherDate, kv.Value.VoucherNo, null, kv.Value.IntDr));
+            allEvents = allEvents.OrderBy(e => e.date).ThenBy(e => e.voucherNo).ToList();
+
+            foreach (var ev in allEvents)
+            {
+                if (ev.isStandIp)
+                {
+                    entries.Add(new LoanLedgerEntryDTO
+                    {
+                        VoucherNo   = ev.voucherNo,
+                        VoucherDate = ev.date,
+                        Particulars = "Interest Posting",
+                        Balance     = runningBalance,
+                        IntDr       = ev.standIntDr > 0 ? ev.standIntDr : (decimal?)null,
+                    });
+                    continue;
+                }
+
+                var entry = ev.entry!;
                 var info = voucherInfoMap.GetValueOrDefault(entry.VoucherID);
                 if (info == null) continue;
 

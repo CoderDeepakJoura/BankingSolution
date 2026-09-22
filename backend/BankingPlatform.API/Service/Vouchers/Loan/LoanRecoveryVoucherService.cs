@@ -694,12 +694,54 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 });
             }
 
-            // Running balance: Dr (advancement) and IntDr (interest for AddInBalance) increase balance;
-            // Cr (principal recovery) and IntCr (interest recovery) reduce it.
+            // Stand loans: new-style IP has no VCDD for the loan account; fetch Cat3 (STDREC) entries.
+            if (!isAddInBalance)
+            {
+                var cat3 = await _db.voucherrecintdetail.AsNoTracking()
+                    .Where(x => x.AccId == loanAccId && x.BrId == branchId
+                             && x.IntCatId == CAT_STDREC && x.IntDr > 0)
+                    .Select(x => new { x.EntryDate, x.VoucherId, x.IntDr })
+                    .ToListAsync();
+
+                if (cat3.Any())
+                {
+                    var legacyIpIds = vouchers
+                        .Where(v => v.EntryStatus == "LInterest")
+                        .Select(v => v.VoucherNo) // VoucherNo here holds VoucherID (long)
+                        .ToHashSet();
+
+                    var cat3VIds = cat3.Select(x => x.VoucherId).Distinct().ToList();
+                    var cat3VMap = await _db.voucher.AsNoTracking()
+                        .Where(x => cat3VIds.Contains(x.Id) && x.VoucherStatus != "D")
+                        .Select(x => new { x.Id, x.VoucherNo, x.VoucherDate })
+                        .ToDictionaryAsync(x => x.Id);
+
+                    var ipByVoucher = cat3
+                        .Where(c => !legacyIpIds.Contains(c.VoucherId) && cat3VMap.ContainsKey(c.VoucherId))
+                        .GroupBy(c => c.VoucherId)
+                        .Select(g => new LoanLedgerRowDTO
+                        {
+                            EntryDate   = cat3VMap[g.Key].VoucherDate.Date,
+                            VoucherNo   = cat3VMap[g.Key].VoucherNo,
+                            EntryType   = "LInterest",
+                            Description = "Interest Posting",
+                            IntDr       = (decimal)g.Sum(x => x.IntDr),
+                        });
+
+                    rows.AddRange(ipByVoucher);
+                    // Re-sort to put IP rows in correct chronological position
+                    rows = rows.OrderBy(r => r.EntryDate ?? DateTime.MinValue).ThenBy(r => r.VoucherNo).ToList();
+                }
+            }
+
+            // Running balance: Dr (advancement) increases principal balance; Cr (principal recovery) reduces it.
+            // For AddInBalance loans, IntDr (IP) also increases and IntCr (interest recovery) reduces.
+            // For Stand loans, IntDr/IntCr are display-only — principal balance is unaffected by interest.
             decimal balance = 0;
             foreach (var r in rows)
             {
-                balance += r.Dr + r.IntDr - r.Cr - r.IntCr;
+                balance += r.Dr - r.Cr;
+                if (isAddInBalance) balance += r.IntDr - r.IntCr;
                 r.Balance = balance;
             }
 
@@ -805,8 +847,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 bool isAddInBalance = bal.ActOnIntPosting == 1;
 
-                // Fetch interest income account (needed for Stand loans Day Book Cr entry)
-                int intIncomeAccId = 0;
+                // Fetch CurrentRecoverableIntAcc for Stand loans — Cr entry on recovery reverses the Dr posted at IP time
+                int currentRecoverableAccId = 0;
                 if (!isAddInBalance)
                 {
                     var productId = await _db.accountmaster.AsNoTracking()
@@ -817,7 +859,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     {
                         var bwr = await _db.loanproductbranchwiserule.AsNoTracking()
                             .FirstOrDefaultAsync(x => x.LoanProductId == productId.Value && x.BranchId == dto.BrId);
-                        intIncomeAccId = bwr?.IntIncomeAcc ?? 0;
+                        currentRecoverableAccId = bwr?.CurrentRecoverableIntAcc ?? 0;
                     }
                 }
 
@@ -928,15 +970,15 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     row++;
                 }
 
-                // Cr entry — interest income account (Day Book "Interest Recovered" line)
-                if (!isAddInBalance && intTotal > 0 && intIncomeAccId > 0)
+                // Cr entry — CurrentRecoverableIntAcc (reverses the Dr posted at IP time for Stand loans)
+                if (!isAddInBalance && intTotal > 0 && currentRecoverableAccId > 0)
                 {
-                    long intHead = await _cf.GetAccountHeadCodeFromAccId(intIncomeAccId, dto.BrId);
+                    long intHead = await _cf.GetAccountHeadCodeFromAccId(currentRecoverableAccId, dto.BrId);
                     var intCrEntry = new VoucherCreditDebitDetails
                     {
                         BrId             = dto.BrId,
                         VoucherID        = voucherId,
-                        AccountId        = intIncomeAccId,
+                        AccountId        = currentRecoverableAccId,
                         AccHeadCode      = intHead,
                         VoucherAmount    = intTotal,
                         VoucherEntryType = "Cr",
