@@ -519,11 +519,13 @@ const PrematureRDPage: React.FC = () => {
                       <div className="flex flex-col">
                         <label className="text-sm font-semibold text-gray-700 mb-2">Int Posting Amt</label>
                         <input
-                          type="number"
-                          min="0"
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           value={credit.incomeAmount}
-                          onChange={(e) => setCredit((c) => ({ ...c, incomeAmount: e.target.value }))}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "" || /^\d*\.?\d{0,2}$/.test(v)) setCredit((c) => ({ ...c, incomeAmount: v }));
+                          }}
                           className="px-4 py-3 border-2 border-emerald-300 rounded-lg bg-white font-mono text-gray-700 focus:outline-none focus:border-emerald-500"
                         />
                       </div>
