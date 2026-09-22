@@ -600,6 +600,51 @@ namespace BankingPlatform.API.Service.AccountMasters
                 };
             }).ToList();
 
+            // If stored schedule has no interest breakdown but the product mandates it, recompute.
+            // This fixes old accounts created before InterestAmt/PrincipalAmt columns existed.
+            const int INT_SCHED_WITHOUT = 2;
+            bool allInterestZero = scheduleDTO.All(s => (s.InterestAmt ?? 0m) == 0m);
+            if (allInterestZero && kistDetail != null && scheduleDTO.Count > 0
+                && (kistDetail.StandardInterestRate ?? 0) > 0)
+            {
+                var prodDef = await _context.loanproductdefinition.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.ProductId == acc.GeneralProductId && x.BrId == brId);
+                if ((prodDef?.IntSchedule ?? 0) != INT_SCHED_WITHOUT)
+                {
+                    var calcReq = new CalculateScheduleRequestDTO
+                    {
+                        LoanAmount    = (decimal)(kistDetail.LoanAmountPassed ?? 0),
+                        StdIntRate    = (decimal)(kistDetail.StandardInterestRate ?? 0),
+                        LoanPeriod    = kistDetail.LoanPeriod ?? 0,
+                        KistInterval  = kistDetail.KistInterval ?? 1,
+                        FirstKistDate = kistDetail.KistFirstDate,
+                        IntFormulae   = prodDef?.IntFormulae ?? 1,
+                        IntSchedule   = prodDef?.IntSchedule ?? 1,
+                    };
+                    var resp = CalculateSchedule(calcReq);
+                    if (resp.Schedule.Count == scheduleDTO.Count)
+                    {
+                        decimal rp = (decimal)(kistDetail.LoanAmountPassed ?? 0);
+                        scheduleDTO = resp.Schedule.Select((s, i) =>
+                        {
+                            rp -= s.PrincipalAmt ?? 0m;
+                            return new AccountKistScheduleDTO
+                            {
+                                Id           = scheduleDTO[i].Id,
+                                BrId         = brId,
+                                LoanAccId    = accountId,
+                                KistNumber   = s.KistNumber,
+                                Date         = scheduleDTO[i].Date,
+                                KistAmount   = s.KistAmount,
+                                PrincipalAmt = s.PrincipalAmt,
+                                InterestAmt  = s.InterestAmt,
+                                RunningPrincipal = rp,
+                            };
+                        }).ToList();
+                    }
+                }
+            }
+
             // Fetch membership number (PM / NM mode)
             string[] membershipModes = new[] { "PM", "NM" };
             string membershipNo = "";

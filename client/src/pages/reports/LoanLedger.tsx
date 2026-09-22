@@ -490,24 +490,42 @@ const LoanLedgerPage: React.FC = () => {
                     <LedgerTable data={data} longNar={withLongNarration} />
                   </div>
 
-                  <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-blue-500">
-                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Opening Balance</p>
-                      <p className="text-lg font-bold text-blue-700 mt-1">₹{fmtBal(data.openingBalance)}</p>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-red-500">
-                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Advancement / Interest</p>
-                      <p className="text-lg font-bold text-red-700 mt-1">₹{fmt(data.totalDr)}</p>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-emerald-500">
-                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Recovery</p>
-                      <p className="text-lg font-bold text-emerald-700 mt-1">₹{fmt(data.totalCr)}</p>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-violet-500">
-                      <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Closing Balance</p>
-                      <p className="text-lg font-bold text-violet-700 mt-1">₹{fmtBal(data.closingBalance)}</p>
-                    </div>
-                  </div>
+                  {(() => {
+                    const sumIntDr = data.entries.reduce((s, e) => s + (e.intDr ?? 0), 0);
+                    const sumIntCr = data.entries.reduce((s, e) => s + (e.intCr ?? 0), 0);
+                    return (
+                      <div className={`mt-5 grid gap-4 ${data.isStand ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-4"}`}>
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-blue-500">
+                          <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Opening Balance</p>
+                          <p className="text-lg font-bold text-blue-700 mt-1">₹{fmtBal(data.openingBalance)}</p>
+                        </div>
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-red-500">
+                          <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">{data.isStand ? "Total Advancement" : "Total Advancement / Interest"}</p>
+                          <p className="text-lg font-bold text-red-700 mt-1">₹{fmt(data.totalDr)}</p>
+                        </div>
+                        {data.isStand && (
+                          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-orange-500">
+                            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Int Dr</p>
+                            <p className="text-lg font-bold text-orange-700 mt-1">₹{fmt(sumIntDr)}</p>
+                          </div>
+                        )}
+                        {data.isStand && (
+                          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-teal-500">
+                            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Int Cr</p>
+                            <p className="text-lg font-bold text-teal-700 mt-1">₹{fmt(sumIntCr)}</p>
+                          </div>
+                        )}
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-emerald-500">
+                          <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Recovery</p>
+                          <p className="text-lg font-bold text-emerald-700 mt-1">₹{fmt(data.totalCr)}</p>
+                        </div>
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm border-t-4 border-t-violet-500">
+                          <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Closing Balance</p>
+                          <p className="text-lg font-bold text-violet-700 mt-1">₹{fmtBal(data.closingBalance)}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}

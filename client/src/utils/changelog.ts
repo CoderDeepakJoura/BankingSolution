@@ -15,6 +15,14 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.81",
+    date: "2026-09-22",
+    changes: [
+      { type: "fix", text: "Loan Ledger Report summary cards: Stand loans now show separate Total Int Dr and Total Int Cr cards; Total Advancement / Interest was showing ₹0 because IntDr was not included" },
+      { type: "fix", text: "Kist schedule in Loan Recovery / Advancement now shows correct Principal and Interest breakdown — old accounts where InterestAmt was never stored are recomputed on the fly from the product formula" },
+    ],
+  },
+  {
     version: "1.0.80",
     date: "2026-09-22",
     changes: [
