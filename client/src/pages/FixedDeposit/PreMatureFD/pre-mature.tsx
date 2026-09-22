@@ -25,6 +25,7 @@ import { RootState } from "../../../redux";
 import { SavingAccounts } from "../../vouchers/saving/savingdeposit";
 import DatePicker from "../../../components/DatePicker";
 import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../../services/vouchers/loan/loanRecoveryApi";
+import branchwiseruleService from "../../../services/branchwiserule/branchwiserules";
 
 interface FDProduct {
   id: number;
@@ -65,6 +66,8 @@ interface AccountCreditDetail {
   loanAmount: string;
   loanIntAmount: string;
   intPostingAmt: number;
+  intDr: string;
+  intCr: string;
   closingCharges: number;
   tdsAmount: number;
   loanAccBalance: number;
@@ -133,12 +136,15 @@ const PrePreMatureFDPage: React.FC = () => {
     loanAmount: "0.00",
     loanIntAmount: "0.00",
     intPostingAmt: 0,
+    intDr: "0",
+    intCr: "0",
     closingCharges: 0,
     tdsAmount: 0,
     loanAccBalance: 0,
     cashAccBalance: 0,
     narration: "",
   });
+  const [intExpAccId, setIntExpAccId] = useState<number>(0);
 
   const calculatePendingAmount = () => {
     const totalCredited =
@@ -273,6 +279,7 @@ const PrePreMatureFDPage: React.FC = () => {
     setFdAccounts([]);
     setOpenFDDetails([]);
     setSelectedDetailId(null);
+    setIntExpAccId(0);
     setPreMatureFDDetail({
       fdDetailId: 0, fdAccountId: 0, fdAccountNo: "",
       date: sessionDate, product: 0,
@@ -281,7 +288,13 @@ const PrePreMatureFDPage: React.FC = () => {
       receiptNo: "", deductedTDS: 0, balance: 0,
       intPayableAmt: "0.00", pendingAmount: 0,
     });
-    if (productId && productId > 0) await fetchFDAccounts(productId);
+    if (productId && productId > 0) {
+      await fetchFDAccounts(productId);
+      try {
+        const ruleRes = await branchwiseruleService.get_fd_branchwiserule_data(productId, user.branchid);
+        if (ruleRes.success && ruleRes.data) setIntExpAccId(ruleRes.data.IntExpenseAccount || 0);
+      } catch { /* rule fetch is best-effort */ }
+    }
   };
 
   const handleDetailSelect = (detailId: number | null) => {
@@ -290,16 +303,20 @@ const PrePreMatureFDPage: React.FC = () => {
     const detail = openFDDetails.find((d: any) => d.id === detailId);
     if (!detail) return;
     const preMaturityAmt = Math.round(detail.preMaturityAmount || 0);
-    setPreMatureFDDetail((prev) => ({
-      ...prev,
-      fdDetailId: detail.id,
-      preMaturityAmt,
-      fdDate: detail.fdDate?.split("T")[0] || "",
-      maturityDate: detail.fdMaturityDate?.split("T")[0] || "",
-      intRate: detail.intRate || 0,
-      receiptNo: detail.ltdNo || "",
-      intPayableAmt: Math.round(Math.max(0, preMaturityAmt - prev.balance)).toString(),
-    }));
+    setPreMatureFDDetail((prev) => {
+      const interestComponent = Math.max(0, preMaturityAmt - prev.balance);
+      setAccountCredit((c) => ({ ...c, intDr: interestComponent.toFixed(2), intPostingAmt: Math.round(interestComponent) }));
+      return {
+        ...prev,
+        fdDetailId: detail.id,
+        preMaturityAmt,
+        fdDate: detail.fdDate?.split("T")[0] || "",
+        maturityDate: detail.fdMaturityDate?.split("T")[0] || "",
+        intRate: detail.intRate || 0,
+        receiptNo: detail.ltdNo || "",
+        intPayableAmt: Math.round(interestComponent).toString(),
+      };
+    });
   };
 
   const handleLoanProductChange = async (productId: number | null) => {
@@ -359,6 +376,7 @@ const PrePreMatureFDPage: React.FC = () => {
         const balance = balanceRes.success && balanceRes.data != null
           ? balanceRes.data
           : (firstDetail.fdAmount || 0);
+        const interestComponent = Math.max(0, preMaturityAmt - balance);
         setPreMatureFDDetail({
           fdDetailId: firstDetail.id || 0,
           fdAccountId: accountId,
@@ -374,9 +392,10 @@ const PrePreMatureFDPage: React.FC = () => {
           receiptNo: firstDetail.ltdNo || "",
           deductedTDS: firstDetail.tdsAmount || 0,
           balance,
-          intPayableAmt: Math.round(Math.max(0, preMaturityAmt - balance)).toString(),
+          intPayableAmt: Math.round(interestComponent).toString(),
           pendingAmount: preMaturityAmt,
         });
+        setAccountCredit((prev) => ({ ...prev, intDr: interestComponent.toFixed(2), intPostingAmt: Math.round(interestComponent) }));
         Swal.fire({
           icon: "success", title: "FD Details Loaded",
           text: `Account: ${data.accountMasterDTO?.accountNumber}${details.length > 1 ? ` — ${details.length} open certificates` : ""}`,
@@ -420,9 +439,11 @@ const PrePreMatureFDPage: React.FC = () => {
       generalAccountId: 0, generalAmount: "0.00",
       savingAccountId: 0, savingAmount: "0.00",
       loanAccountId: 0, loanAmount: "0.00", loanIntAmount: "0.00",
-      intPostingAmt: 0, closingCharges: 0, tdsAmount: 0,
+      intPostingAmt: 0, intDr: "0", intCr: "0",
+      closingCharges: 0, tdsAmount: 0,
       loanAccBalance: 0, cashAccBalance: 0, narration: "",
     });
+    setIntExpAccId(0);
     setSelectedLoanProductId(null);
     setLoanAccounts([]);
     setLoanBalance(null);
@@ -470,7 +491,8 @@ const PrePreMatureFDPage: React.FC = () => {
         branchId: user.branchid,
         postMaturityAmount: 0,
         preMaturityAmount: Number(preMatureFDDetail.preMaturityAmt) || 0,
-        intPayableAmount: Number(preMatureFDDetail.intPayableAmt),
+        IntDr: parseFloat(accountCredit.intDr) || 0,
+        IntCr: parseFloat(accountCredit.intCr) || 0,
         DetailId: preMatureFDDetail.fdDetailId,
         ProductId: preMatureFDDetail.product,
         isRenewFD: false,
@@ -770,23 +792,15 @@ const PrePreMatureFDPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Int Payable Amt */}
+                    {/* Int Posting Amt (auto-filled, read-only) */}
                     <div className="flex flex-col space-y-2">
                       <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         <div className="w-2 h-2 bg-gradient-to-r from-violet-500 to-purple-500 rounded-full"></div>
-                        Interest Payable
+                        Int Posting Amt
                       </label>
-                      <input
-                        type="text"
-                        value={preMatureFDDetail.intPayableAmt}
-                        onChange={(e) => {
-                          const validated = validateNumberInput(e.target.value, 10);
-                          setPreMatureFDDetail({ ...preMatureFDDetail, intPayableAmt: validated });
-                        }}
-                        maxLength={10}
-                        className="px-4 py-3 border-2 border-violet-200 rounded-lg focus:border-violet-500 focus:ring-2 focus:ring-violet-100 outline-none transition-all duration-300 text-gray-700 bg-white font-mono text-lg font-bold"
-                        placeholder="0.00"
-                      />
+                      <div className="bg-white px-4 py-3 rounded-lg border-l-4 border-violet-500 shadow-sm">
+                        <span className="text-lg font-bold text-gray-800 font-mono">₹ {(parseFloat(accountCredit.intDr) || 0).toFixed(2)}</span>
+                      </div>
                     </div>
 
                     {/* Pending Amount */}
@@ -1026,17 +1040,9 @@ const PrePreMatureFDPage: React.FC = () => {
                               <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
                               Int Posting Amt
                             </label>
-                            <input
-                              type="text"
-                              value={accountCredit.intPostingAmt}
-                              onChange={(e) => {
-                                const validated = validateNumberInput(e.target.value, 10);
-                                setAccountCredit({ ...accountCredit, intPostingAmt: Number(validated || 0) });
-                              }}
-                              maxLength={10}
-                              className="px-4 py-3 border-2 border-emerald-200 rounded-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all duration-300 text-gray-700 bg-white font-mono"
-                              placeholder="0.00"
-                            />
+                            <div className="px-4 py-3 border-2 border-emerald-100 rounded-lg bg-gray-50 font-mono text-gray-700">
+                              {(parseFloat(accountCredit.intDr) || 0).toFixed(2)}
+                            </div>
                           </div>
                           <div className="flex flex-col">
                             <label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">

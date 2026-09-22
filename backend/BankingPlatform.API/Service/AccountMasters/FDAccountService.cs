@@ -667,16 +667,14 @@ namespace BankingPlatform.API.Service.AccountMasters
                                    ?? claimsPrincipal?.FindFirst("UserId")?.Value
                                    ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     int branchId = (int)dto.MatureOrRenewFDInfo.BranchId!;
-                    decimal principalAmount = fdDetailInfo.FDAmount;
-                    decimal intPayableAmount = dto.MatureOrRenewFDInfo!.IntPayableAmount ?? 0m;
-                    int intPayableAccount = 0;
-                    if (intPayableAmount > 0 && dto.MatureOrRenewFDInfo.ProductId.HasValue)
-                    {
-                        var rule = await _context.fdproductbranchwiserule
-                            .AsNoTracking()
-                            .FirstOrDefaultAsync(r => r.FDProductId == dto.MatureOrRenewFDInfo.ProductId.Value && r.BranchId == branchId);
-                        intPayableAccount = rule?.IntPayableAccount ?? 0;
-                    }
+                    decimal intDrAmt = dto.MatureOrRenewFDInfo!.IntDr;
+                    var fdRule = await _context.fdproductbranchwiserule
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(r => r.FDProductId == dto.MatureOrRenewFDInfo.ProductId!.Value && r.BranchId == branchId);
+                    int intExpAccId = fdRule?.IntExpenseAccount ?? 0;
+                    decimal principalDrAmt = intDrAmt > 0 && intExpAccId > 0
+                        ? totalDebit - intDrAmt
+                        : totalDebit;
                     int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureOrRenewFDInfo!.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureOrRenewFDInfo?.Narration ?? ("FD " + (dto.MatureOrRenewFDInfo!.IsRenew ? "Renewed" : "Matured") + " .");
@@ -794,17 +792,17 @@ namespace BankingPlatform.API.Service.AccountMasters
                         row++;
                     }
 
-                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.FDDr.ToString(), narration, principalAmount, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.FDDr.ToString(), narration, principalDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
 
                     _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
-                    if (intPayableAmount > 0 && intPayableAccount > 0)
+                    row++;
+
+                    if (intDrAmt > 0 && intExpAccId > 0)
                     {
+                        long intExpHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(intExpAccId, branchId);
+                        VoucherCreditDebitDetails intExpDebitInfo = _memberService.voucherCreditDebitDetails(intExpHeadCode, intExpAccId, branchId, Enums.VoucherStatus.Dr.ToString(), "Interest Expense on FD Maturity", intDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(intExpDebitInfo);
                         row++;
-                        VoucherCreditDebitDetails intDebitInfo = _memberService.voucherCreditDebitDetails(
-                            await _commonfunctions.GetAccountHeadCodeFromAccId(intPayableAccount, branchId),
-                            intPayableAccount, branchId, Enums.VoucherStatus.Dr.ToString(),
-                            narration, intPayableAmount, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
-                        _context.vouchercreditdebitdetails.Add(intDebitInfo);
                     }
                     await _context.SaveChangesAsync();
 
@@ -820,7 +818,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                         Operation = "RP",
                         ValueDate = dto.MatureOrRenewFDInfo!.IsRenew ? DateTime.SpecifyKind(dto.FDAccountDetailDTOSingle!.FDDate, DateTimeKind.Utc) : voucherDate,
                         VoucherDate = voucherDate,
-                        IntDr = 0,
+                        IntDr = intDrAmt,
                         IntCr = 0,
                         VoucherMainStatus = dto.Voucher.VoucherStatus
                     };
@@ -867,16 +865,14 @@ namespace BankingPlatform.API.Service.AccountMasters
                                    ?? claimsPrincipal?.FindFirst("UserId")?.Value
                                    ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     int branchId = (int)dto.MatureOrRenewFDInfo.BranchId!;
-                    decimal principalAmount = fdDetailInfo.FDAmount;
-                    decimal intPayableAmount = dto.MatureOrRenewFDInfo!.IntPayableAmount ?? 0m;
-                    int intPayableAccount = 0;
-                    if (intPayableAmount > 0 && dto.MatureOrRenewFDInfo.ProductId.HasValue)
-                    {
-                        var rule = await _context.fdproductbranchwiserule
-                            .AsNoTracking()
-                            .FirstOrDefaultAsync(r => r.FDProductId == dto.MatureOrRenewFDInfo.ProductId.Value && r.BranchId == branchId);
-                        intPayableAccount = rule?.IntPayableAccount ?? 0;
-                    }
+                    decimal intDrAmt = dto.MatureOrRenewFDInfo!.IntDr;
+                    var fdRule = await _context.fdproductbranchwiserule
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(r => r.FDProductId == dto.MatureOrRenewFDInfo.ProductId!.Value && r.BranchId == branchId);
+                    int intExpAccId = fdRule?.IntExpenseAccount ?? 0;
+                    decimal principalDrAmt = intDrAmt > 0 && intExpAccId > 0
+                        ? totalDebit - intDrAmt
+                        : totalDebit;
                     int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureOrRenewFDInfo!.VoucherDate);
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureOrRenewFDInfo?.Narration ?? ("FD Pre-Matured") + " .";
@@ -907,20 +903,19 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                     DateTime valueDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
                     int row = 1;
-                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.FDDr.ToString(), narration, principalAmount, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.FDDr.ToString(), narration, principalDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
 
                     _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
-                    if (intPayableAmount > 0 && intPayableAccount > 0)
+                    row++;
+
+                    if (intDrAmt > 0 && intExpAccId > 0)
                     {
+                        long intExpHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(intExpAccId, branchId);
+                        VoucherCreditDebitDetails intExpDebitInfo = _memberService.voucherCreditDebitDetails(intExpHeadCode, intExpAccId, branchId, Enums.VoucherStatus.Dr.ToString(), "Interest Expense on FD Pre-Maturity", intDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(intExpDebitInfo);
                         row++;
-                        VoucherCreditDebitDetails intDebitInfo = _memberService.voucherCreditDebitDetails(
-                            await _commonfunctions.GetAccountHeadCodeFromAccId(intPayableAccount, branchId),
-                            intPayableAccount, branchId, Enums.VoucherStatus.Dr.ToString(),
-                            narration, intPayableAmount, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
-                        _context.vouchercreditdebitdetails.Add(intDebitInfo);
                     }
                     await _context.SaveChangesAsync();
-                    row++;
 
 
 

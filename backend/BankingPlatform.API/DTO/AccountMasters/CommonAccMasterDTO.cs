@@ -76,6 +76,8 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public DateTime VoucherDate { get; set; }
         public decimal? PostMaturityAmount { get; set; }
         public decimal? IntPayableAmount { get; set; }
+        public decimal IntDr { get; set; }
+        public decimal IntCr { get; set; }
         public bool IsRenew { get; set; }
         public string? Narration { get; set; }
     }

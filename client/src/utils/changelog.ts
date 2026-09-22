@@ -15,6 +15,14 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.83",
+    date: "2026-09-22",
+    changes: [
+      { type: "improvement", text: "Mature/Pre-Mature FD & RD: hide Interest Payable field; auto-fill Int Posting Amt as maturity minus balance; Dr Interest Expense account from product branch-wise rule" },
+      { type: "improvement", text: "Temporarily disable future-transaction deletion guard to allow data corrections" },
+    ],
+  },
+  {
     version: "1.0.82",
     date: "2026-09-22",
     changes: [

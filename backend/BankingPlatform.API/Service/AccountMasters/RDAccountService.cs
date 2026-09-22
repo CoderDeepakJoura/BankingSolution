@@ -1085,12 +1085,34 @@ namespace BankingPlatform.API.Service.AccountMasters
                     await _context.SaveChangesAsync();
 
                     DateTime valueDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
+                    decimal intDrAmt = dto.MatureRDInfo!.IntDr;
+
+                    // Look up IntExpAccId directly from DB — don't rely on frontend sending it
+                    var rdRule = await _context.rdproductbranchwiserule
+                        .AsNoTracking()
+                        .Where(r => r.RDProductId == dto.MatureRDInfo.ProductId && r.BrId == branchId)
+                        .FirstOrDefaultAsync();
+                    int intExpAccId = rdRule?.IntExpAccId ?? 0;
+
+                    decimal principalDrAmt = intDrAmt > 0 && intExpAccId > 0
+                        ? totalDebit - intDrAmt
+                        : totalDebit;
+
                     int row = 1;
 
-                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.RDDr.ToString(), narration, totalDebit, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                    VoucherCreditDebitDetails voucherDebitInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId), accountId, branchId, Enums.VoucherStatus.RDDr.ToString(), narration, principalDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
                     _context.vouchercreditdebitdetails.Add(voucherDebitInfo);
-                    await _context.SaveChangesAsync();
                     row++;
+
+                    if (intDrAmt > 0 && intExpAccId > 0)
+                    {
+                        long intExpHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(intExpAccId, branchId);
+                        VoucherCreditDebitDetails intExpDebitInfo = _memberService.voucherCreditDebitDetails(intExpHeadCode, intExpAccId, branchId, Enums.VoucherStatus.Dr.ToString(), "Interest Expense on RD Pre-Maturity", intDrAmt, dto.Voucher.VoucherStatus, valueDate, "Dr", voucherInfo.Id, row);
+                        _context.vouchercreditdebitdetails.Add(intExpDebitInfo);
+                        row++;
+                    }
+
+                    await _context.SaveChangesAsync();
 
                     if (dto.CreditAccountDetails!.SavingAccountId > 0 && dto.CreditAccountDetails!.SavingAmount > 0)
                     {
@@ -1135,8 +1157,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                         AmountCr = 0,
                         Operation = "RP",
                         VoucherDate = voucherDate,
-                        AmountDr = Convert.ToDouble(dto.MatureRDInfo.PreMaturityAmount),
-                        IntDr = 0,
+                        AmountDr = Convert.ToDouble(principalDrAmt),
+                        IntDr = Convert.ToDouble(intDrAmt),
                         IntCr = 0,
                         ValueDate = voucherDate,
                         VoucherMainStatus = dto.Voucher.VoucherStatus

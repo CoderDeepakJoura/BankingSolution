@@ -29,6 +29,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import { SavingAccounts } from "../../vouchers/saving/savingdeposit";
 import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../../services/vouchers/loan/loanRecoveryApi";
+import branchwiseruleService from "../../../services/branchwiserule/branchwiserules";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -94,6 +95,8 @@ interface AccountCreditDetail {
   loanAmount: number;
   loanIntAmount: number;
   intPostingAmt: number;
+  intDr: string;
+  intCr: string;
   closingCharges: number;
   tdsAmount: number;
   loanAccBalance: number;
@@ -207,6 +210,8 @@ const MatureFDPage: React.FC = () => {
     loanAmount: 0,
     loanIntAmount: 0,
     intPostingAmt: 0,
+    intDr: "0",
+    intCr: "0",
     closingCharges: 0,
     tdsAmount: 0,
     loanAccBalance: 0,
@@ -215,6 +220,7 @@ const MatureFDPage: React.FC = () => {
   });
 
   const [accountCredit, setAccountCredit] = useState<AccountCreditDetail>(blankCredit());
+  const [intExpAccId, setIntExpAccId] = useState<number>(0);
 
   // ─── Pending Amount Calculation ───────────────────────────────────────────
 
@@ -563,9 +569,17 @@ const MatureFDPage: React.FC = () => {
     setSelectedDetailId(null);
     setMatureFDDetail(blankMatureDetail());
     setRenewFDDetail(blankRenewDetail());
+    setAccountCredit(blankCredit());
+    setIntExpAccId(0);
     setValidationErrors({});
 
-    if (productId && productId > 0) await fetchFDAccounts(productId);
+    if (productId && productId > 0) {
+      await fetchFDAccounts(productId);
+      try {
+        const ruleRes = await branchwiseruleService.get_fd_branchwiserule_data(productId, user.branchid);
+        if (ruleRes.success && ruleRes.data) setIntExpAccId(ruleRes.data.IntExpenseAccount || 0);
+      } catch { /* rule fetch is best-effort */ }
+    }
   };
 
   const handleDetailSelect = (detailId: number | null) => {
@@ -574,6 +588,8 @@ const MatureFDPage: React.FC = () => {
     const detail = openFDDetails.find((d: any) => d.id === detailId);
     if (!detail) return;
     const maturityAmt = detail.maturityAmount || 0;
+    const balance = detail.fdAmount || 0;
+    const interestComponent = Math.max(0, maturityAmt - balance);
     setMatureFDDetail((prev) => ({
       ...prev,
       fdDetailId: detail.id,
@@ -582,8 +598,13 @@ const MatureFDPage: React.FC = () => {
       maturityDate: detail.fdMaturityDate?.split("T")[0] || "",
       intRate: detail.intRate || 0,
       receiptNo: detail.ltdNo || "",
-      balance: detail.fdAmount || 0,
-      intPayableAmt: Math.round(Math.max(0, maturityAmt - (detail.fdAmount || 0))).toString(),
+      balance,
+      intPayableAmt: Math.round(interestComponent).toString(),
+    }));
+    setAccountCredit((prev) => ({
+      ...prev,
+      intDr: interestComponent.toFixed(2),
+      intPostingAmt: Math.round(interestComponent),
     }));
     setRenewFDDetail((prev) => ({
       ...prev,
@@ -618,6 +639,7 @@ const MatureFDPage: React.FC = () => {
 
         const maturityAmt = firstDetail.maturityAmount || 0;
         const balance = firstDetail.fdAmount || 0;
+        const interestComponent = Math.max(0, maturityAmt - balance);
 
         setMatureFDDetail({
           fdDetailId: firstDetail.id || 0,
@@ -634,10 +656,15 @@ const MatureFDPage: React.FC = () => {
           receiptNo: firstDetail.ltdNo || "",
           deductedTDS: firstDetail.tdsAmount || 0,
           balance,
-          intPayableAmt: Math.round(Math.max(0, maturityAmt - balance)).toString(),
+          intPayableAmt: Math.round(interestComponent).toString(),
           pendingAmount: Math.max(maturityAmt, balance),
           memberDateOfBirth: data.accountMasterDTO?.dob?.split("T")[0] || "",
         });
+        setAccountCredit((prev) => ({
+          ...prev,
+          intDr: interestComponent.toFixed(2),
+          intPostingAmt: Math.round(interestComponent),
+        }));
 
         const prefix = data.accountMasterDTO?.accPrefix || "";
         const suffix = (data.accountMasterDTO?.accSuffix || "").toString();
@@ -696,6 +723,7 @@ const MatureFDPage: React.FC = () => {
     setMatureFDDetail(blankMatureDetail());
     setRenewFDDetail(blankRenewDetail());
     setAccountCredit(blankCredit());
+    setIntExpAccId(0);
     setSelectedLoanProductId(null);
     setLoanAccounts([]);
     setLoanBalance(null);
@@ -774,7 +802,8 @@ const MatureFDPage: React.FC = () => {
         VoucherDate: matureFDDetail.date,
         branchId: user.branchid,
         postMaturityAmount: parseFloat(matureFDDetail.postMaturityAmt || "0") || 0,
-        intPayableAmount: parseFloat(matureFDDetail.intPayableAmt || "0") || 0,
+        IntDr: parseFloat(accountCredit.intDr) || 0,
+        IntCr: parseFloat(accountCredit.intCr) || 0,
         DetailId: matureFDDetail.fdDetailId,
         ProductId: matureFDDetail.product,
         isRenew: isRenewFD,
@@ -1136,24 +1165,15 @@ const MatureFDPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Int Payable */}
+                    {/* Int Posting Amt (auto-filled, read-only) */}
                     <div className="flex flex-col space-y-2">
                       <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         <div className="w-2 h-2 bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" />
-                        Interest Payable
+                        Int Posting Amt
                       </label>
-                      <input
-                        type="text"
-                        value={matureFDDetail.intPayableAmt}
-                        onChange={(e) =>
-                          setMatureFDDetail({
-                            ...matureFDDetail,
-                            intPayableAmt: validateNumberInput(e.target.value, 10),
-                          })
-                        }
-                        className="px-4 py-3 border-2 border-violet-200 rounded-lg focus:border-violet-500 focus:ring-2 focus:ring-violet-100 outline-none transition-all text-gray-700 bg-white font-mono text-lg font-bold"
-                        placeholder="0.00"
-                      />
+                      <div className="bg-white px-4 py-3 rounded-lg border-l-4 border-violet-500 shadow-sm">
+                        <span className="text-lg font-bold text-gray-800 font-mono">₹ {(parseFloat(accountCredit.intDr) || 0).toFixed(2)}</span>
+                      </div>
                     </div>
 
                     {/* Pending Amount */}
@@ -1760,8 +1780,13 @@ const MatureFDPage: React.FC = () => {
                     {activeTab === "additional" && (
                       <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-6 border border-emerald-200">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          <div className="flex flex-col">
+                            <label className="text-sm font-semibold text-gray-700 mb-2">Int Posting Amt</label>
+                            <div className="px-4 py-3 border-2 border-emerald-100 rounded-lg bg-gray-50 font-mono text-gray-700">
+                              {(parseFloat(accountCredit.intDr) || 0).toFixed(2)}
+                            </div>
+                          </div>
                           {[
-                            { label: "Int Posting Amt", field: "intPostingAmt" as const },
                             { label: "Closing Charges", field: "closingCharges" as const },
                             { label: "TDS Amount", field: "tdsAmount" as const },
                           ].map(({ label, field }) => (

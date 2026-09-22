@@ -24,6 +24,7 @@ import { RootState } from "../../redux";
 import { SavingAccounts } from "../vouchers/saving/savingdeposit";
 import DatePicker from "../../components/DatePicker";
 import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../services/vouchers/loan/loanRecoveryApi";
+import branchwiseruleService from "../../services/branchwiserule/branchwiserules";
 
 type Option = { value: number; label: string };
 type RDProduct = { id: number; productName: string };
@@ -60,6 +61,7 @@ const PrematureRDPage: React.FC = () => {
   const [selectedLoanProductId, setSelectedLoanProductId] = useState<number | null>(null);
   const [loanOptions, setLoanOptions] = useState<Option[]>([]);
   const [loanBalance, setLoanBalance] = useState<LoanRecoveryBalanceDTO | null>(null);
+  const [intExpAccId, setIntExpAccId] = useState<number>(0);
 
   const [personal, setPersonal] = useState({
     name: "", relativeName: "", relation: "", gender: "", addressLine: "", station: "", phoneNo: "", aadhaar: "", pan: "",
@@ -106,6 +108,7 @@ const PrematureRDPage: React.FC = () => {
     setSelectedProduct(null);
     setSelectedAccount(null);
     setRdAccounts([]);
+    setIntExpAccId(0);
     setPersonal({ name: "", relativeName: "", relation: "", gender: "", addressLine: "", station: "", phoneNo: "", aadhaar: "", pan: "" });
     setRd({ date: sessionDate, rdAccountId: 0, rdNo: "", rdDate: "", rdAmount: 0, rdPeriod: 0, kistAmount: 0, kistInterval: 0, maturityAmt: 0, maturityDate: "", preMaturityAmt: "0.00", interestRate: 0, balance: 0, savingProduct: "", savingAccNo: "", savingAccName: "", savingBal: 0, DetailId: 0 });
     setCredit({ cashAccountId: 0, cashAmount: "", savingAccountId: 0, savingAmount: "", loanAccountId: 0, loanBalance: 0, loanAmount: "", loanIntAmount: "", incomeAccountId: 0, incomeAmount: "", expenseAmount: "", closingCharges: "", narration: "" });
@@ -141,21 +144,34 @@ const PrematureRDPage: React.FC = () => {
   const onProductChange = async (productId: number | null) => {
     setSelectedProduct(productId);
     setSelectedAccount(null);
+    setIntExpAccId(0);
     setPersonal({ name: "", relativeName: "", relation: "", gender: "", addressLine: "", station: "", phoneNo: "", aadhaar: "", pan: "" });
     setRd({ ...rd, rdAccountId: 0, rdNo: "", savingProduct: rdProducts.find((x) => x.id === productId)?.productName || "" });
     if (!productId) return setRdAccounts([]);
-    const response = await commonservice.fetch_RD_Open_Accounts_For_Premature(user.branchid, productId, sessionDate);
-    setRdAccounts(response.success && Array.isArray(response.data) ? response.data : []);
+    const [accountsRes] = await Promise.all([
+      commonservice.fetch_RD_Open_Accounts_For_Premature(user.branchid, productId, sessionDate),
+    ]);
+    setRdAccounts(accountsRes.success && Array.isArray(accountsRes.data) ? accountsRes.data : []);
+    try {
+      const ruleRes = await branchwiseruleService.get_rd_branchwiserule_data(productId, user.branchid);
+      if (ruleRes.success && ruleRes.data) setIntExpAccId(ruleRes.data.IntExpAccId || 0);
+    } catch { /* rule fetch is best-effort */ }
   };
 
   const onAccountChange = async (accountId: number | null) => {
     setSelectedAccount(accountId);
     if (!accountId || !selectedProduct) return;
-    const response = await rdAccountService.getRDAccountById(accountId, user.branchid, sessionDate);
+    const [response, balanceRes] = await Promise.all([
+      rdAccountService.getRDAccountById(accountId, user.branchid, sessionDate),
+      commonservice.get_account_balance(user.branchid, accountId),
+    ]);
     if (!response.success || !response.data) return Swal.fire("Error", response.message || "Failed to fetch RD details", "error");
     const data = response.data;
     const detail = data.rdAccountDetailDTO || {};
     const master = data.accountMasterDTO || {};
+    const actualBalance = balanceRes.success && balanceRes.data != null ? balanceRes.data : (detail.rdAmount || 0);
+    const preMaturityAmt = Math.round(data.preMaturityAmount || detail.maturityAmt || 0);
+    const interestComponent = Math.max(0, preMaturityAmt - actualBalance);
     setPersonal({
       name: master.accountName || "", relativeName: master.relativeName || "", relation: "", gender: genderText(master.gender),
       addressLine: master.addressLine || "", station: "", phoneNo: master.phoneNo1 || "", aadhaar: "", pan: "",
@@ -171,15 +187,16 @@ const PrematureRDPage: React.FC = () => {
       kistInterval: detail.kistInterval || 0,
       maturityAmt: detail.maturityAmt || 0,
       maturityDate: detail.maturityDate?.split("T")[0] || "",
-      preMaturityAmt: Math.round(data.preMaturityAmount || detail.maturityAmt || 0).toString(),
+      preMaturityAmt: preMaturityAmt.toString(),
       interestRate: detail.interestRate || 0,
-      balance: detail.rdAmount || 0,
+      balance: actualBalance,
       savingProduct: "",
       savingAccNo: "",
       savingAccName: data.savingAccountName || "",
       savingBal: 0,
       DetailId: detail.detailId || 0,
     });
+    setCredit((prev) => ({ ...prev, incomeAmount: interestComponent.toFixed(2) }));
   };
 
   const submit = async () => {
@@ -209,15 +226,16 @@ const PrematureRDPage: React.FC = () => {
           DetailId: rd.DetailId,
           CreditAccountId: credit.savingAccountId || credit.cashAccountId || credit.loanAccountId,
           DebitAccountId: credit.cashAccountId,
-          IncomeAccountId: credit.incomeAccountId,
           VoucherDate: rd.date,
           TotalAmount: totalSettlement,
           TotalInterestAmount: amount(credit.incomeAmount),
           Narration: credit.narration,
           ClosingCharges: normalizedCreditAccountDetails.closingCharges,
-          RDProductId: selectedProduct || 0,
+          ProductId: selectedProduct || 0,
           IsPrematureClosure: true,
           PreMaturityAmount: amount(rd.preMaturityAmt),
+          IntDr: amount(credit.incomeAmount),
+          IntCr: 0,
         },
         CreditAccountDetails: normalizedCreditAccountDetails,
       };
@@ -499,28 +517,10 @@ const PrematureRDPage: React.FC = () => {
                   <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-6 border border-emerald-200">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       <div className="flex flex-col">
-                        <label className="text-sm font-semibold text-gray-700 mb-2">Income Account (Cr)</label>
-                        <Select
-                          options={generalOptions}
-                          value={generalOptions.find((x) => x.value === credit.incomeAccountId) || null}
-                          onChange={(o) => setCredit({ ...credit, incomeAccountId: Number(o?.value) || 0 })}
-                          placeholder="Select income account"
-                          isClearable
-                          styles={selectStyles}
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="text-sm font-semibold text-gray-700 mb-2">Income Amount (Cr)</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={credit.incomeAmount}
-                          onChange={(e) => setCredit({ ...credit, incomeAmount: numberInput(e.target.value) })}
-                          className="px-4 py-3 border-2 border-emerald-200 rounded-lg focus:border-emerald-500 outline-none font-mono bg-white"
-                          placeholder="0.00"
-                        />
+                        <label className="text-sm font-semibold text-gray-700 mb-2">Int Posting Amt</label>
+                        <div className="px-4 py-3 border-2 border-emerald-100 rounded-lg bg-gray-50 font-mono text-gray-700">
+                          {amount(credit.incomeAmount).toFixed(2)}
+                        </div>
                       </div>
                       <div className="flex flex-col">
                         <label className="text-sm font-semibold text-gray-700 mb-2">Expense Amount (Dr)</label>
