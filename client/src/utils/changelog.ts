@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.88",
+    date: "2026-09-22",
+    changes: [
+      { type: "fix", text: "Loan interest posting: DWI standard interest no longer zeroes out on old loans — cumulative historical Cat 1 postings were incorrectly subtracted from current-period DWI (wInt covers only the current period so no subtraction needed)" },
+    ],
+  },
+  {
     version: "1.0.87",
     date: "2026-09-22",
     changes: [

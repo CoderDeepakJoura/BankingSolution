@@ -682,7 +682,12 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                 });
                             }
                         }
-                        decimal dwiBasedInt = Math.Max(0, wInt - postedStdInt);
+                        // wInt covers only the current period (calcFromDate → calcToDate).
+                        // postedStdInt is the cumulative ALL-TIME Cat 1 total — subtracting it
+                        // wrongly makes dynStdInt=0 for old loans with large historical postings.
+                        // The current period's interest (wInt) has not been posted yet by definition
+                        // (calcFromDate is the last-post date), so use wInt directly.
+                        decimal dwiBasedInt = Math.Max(0m, wInt);
                         dynStdInt = Math.Max(schedBasedInt, dwiBasedInt);
                     }
 
