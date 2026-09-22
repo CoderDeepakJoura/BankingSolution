@@ -230,7 +230,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     accSuffix = x.AccSuffix,
                     accountNumber = x.AccountNumber,
                     memberId = x.MemberId,
-                    memberBranchId = x.MemberBranchId,
+                    memberBranchId = x.MemberBranchID,
                 })
                 .ToListAsync();
             return accounts.Cast<object>().ToList();
