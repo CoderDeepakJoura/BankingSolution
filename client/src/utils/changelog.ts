@@ -15,6 +15,14 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.89",
+    date: "2026-09-22",
+    changes: [
+      { type: "fix", text: "Loan interest posting: penal interest now includes pre-session overdue balance (ODB) in the current-period calculation — previously only post-session kists were charged penal, ignoring the large pre-session ODB accruing since calcFromDate" },
+      { type: "improvement", text: "Loan interest posting: removed manual-override exceeds-unposted validation so users can post custom interest amounts directly" },
+    ],
+  },
+  {
     version: "1.0.88",
     date: "2026-09-22",
     changes: [

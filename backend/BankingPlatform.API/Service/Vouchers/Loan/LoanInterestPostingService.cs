@@ -604,6 +604,28 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                             rawPenal = Math.Round(principalBal * (decimal)effectiveOvdRate / 100m * pd / 365m, 2);
                             penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 0, DueDate = firstOvd, PrincipalAmount = principalBal, DaysOverdue = pd, OverdueRate = effectiveOvdRate, PenalInterest = rawPenal });
                         }
+
+                        // Pre-session overdue kists: their accumulated penal before the session is in the
+                        // opening balance. But penal on that same ODB for the CURRENT period (since calcFromDate)
+                        // is new and must also be posted. Add it here so it is not silently skipped.
+                        if (firstSession.HasValue)
+                        {
+                            var preSessionOverdue = overdueKists
+                                .Where(x => x.Date.HasValue && x.Date.Value.Date < firstSession.Value.Date)
+                                .ToList();
+                            if (preSessionOverdue.Any())
+                            {
+                                decimal preODB = preSessionOverdue.Sum(k =>
+                                    k.PrincipalAmt ?? Math.Max(0m, (k.KistAmount ?? 0m) - (k.InterestAmt ?? 0m)));
+                                if (preODB > 0)
+                                {
+                                    int prePd = Math.Max(0, (today - calcFromDate.Date).Days + 1);
+                                    decimal preRaw = Math.Round(preODB * (decimal)effectiveOvdRate / 100m * prePd / 365m, 2);
+                                    rawPenal += preRaw;
+                                    penalBreakdown.Add(new PenalBreakdownItemDTO { KistNumber = 0, DueDate = calcFromDate, PrincipalAmount = preODB, DaysOverdue = prePd, OverdueRate = effectiveOvdRate, PenalInterest = preRaw });
+                                }
+                            }
+                        }
                     }
                     else if (overdueKists.Any())
                     {
@@ -1177,21 +1199,6 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 }
 
                 bool isAib = info.ActOnIntPosting == 1;
-                if (!isAib)
-                {
-                    if (stdAmt > info.UnpostedStdInterest + 0.01m)
-                    {
-                        errors.Add($"Account {item.LoanAccountId}: Standard interest ({stdAmt:N2}) exceeds unposted amount ({info.UnpostedStdInterest:N2}).");
-                        fail++;
-                        continue;
-                    }
-                    if (penalAmt > info.UnpostedPenalInterest + 0.01m)
-                    {
-                        errors.Add($"Account {item.LoanAccountId}: Penal interest ({penalAmt:N2}) exceeds unposted amount ({info.UnpostedPenalInterest:N2}).");
-                        fail++;
-                        continue;
-                    }
-                }
 
                 long loanHead = await _cf.GetAccountHeadCodeFromAccId(item.LoanAccountId, dto.BrId);
 
