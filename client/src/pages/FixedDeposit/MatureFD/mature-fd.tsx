@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import Select from "react-select";
@@ -221,6 +221,7 @@ const MatureFDPage: React.FC = () => {
 
   const [accountCredit, setAccountCredit] = useState<AccountCreditDetail>(blankCredit());
   const [intExpAccId, setIntExpAccId] = useState<number>(0);
+  const productSelectRef = useRef<any>(null);
 
   // ─── Pending Amount Calculation ───────────────────────────────────────────
 
@@ -848,6 +849,7 @@ const MatureFDPage: React.FC = () => {
         showConfirmButton: false,
       });
       handleReset();
+      setTimeout(() => productSelectRef.current?.focus(), 100);
     } catch (error: any) {
       Swal.fire("Error", error.message || "Failed to process FD", "error");
     } finally {
@@ -971,6 +973,7 @@ const MatureFDPage: React.FC = () => {
                       Product <span className="text-red-500 text-xs">*</span>
                     </label>
                     <Select
+                      ref={productSelectRef}
                       options={fdProductOptions}
                       value={fdProductOptions.find((o) => o.value === selectedProduct) || null}
                       onChange={(option) => handleProductChange(option?.value || null)}
@@ -1050,11 +1053,20 @@ const MatureFDPage: React.FC = () => {
                         <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full" />
                         Maturity Amount
                       </label>
-                      <div className="bg-white px-4 py-3 rounded-lg border-l-4 border-green-500 shadow-sm">
-                        <span className="text-lg font-bold text-gray-800 font-mono">
-                          ₹ {matureFDDetail.maturityAmt.toFixed(2)}
-                        </span>
-                      </div>
+                      <input
+                        type="text"
+                        value={matureFDDetail.maturityAmt === 0 ? "" : matureFDDetail.maturityAmt.toFixed(2)}
+                        onChange={(e) => {
+                          const val = validateNumberInput(e.target.value, 12);
+                          const num = parseFloat(val) || 0;
+                          const balance = matureFDDetail.balance;
+                          const interestComponent = Math.max(0, num - balance);
+                          setMatureFDDetail((prev) => ({ ...prev, maturityAmt: num }));
+                          setAccountCredit((prev) => ({ ...prev, intDr: interestComponent.toFixed(2), intPostingAmt: Math.round(interestComponent) }));
+                        }}
+                        className="px-4 py-3 border-2 border-green-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none transition-all text-gray-700 bg-white font-mono text-lg font-bold"
+                        placeholder="0.00"
+                      />
                     </div>
 
                     {/* Post Maturity */}
@@ -1099,14 +1111,12 @@ const MatureFDPage: React.FC = () => {
                         <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full" />
                         Maturity Date
                       </label>
-                      <div className="bg-white px-4 py-3 rounded-lg border-l-4 border-purple-500 shadow-sm">
-                        <span className="text-base font-semibold text-gray-800">
-                          {matureFDDetail.maturityDate &&
-                            new Date(matureFDDetail.maturityDate).toLocaleDateString("en-GB", {
-                              day: "2-digit", month: "short", year: "numeric",
-                            })}
-                        </span>
-                      </div>
+                      <DatePicker
+                        value={matureFDDetail.maturityDate}
+                        onChange={(val) => setMatureFDDetail((prev) => ({ ...prev, maturityDate: val }))}
+                        workingDate={sessionDate}
+                        className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg focus:border-purple-500 outline-none"
+                      />
                     </div>
 
                     {/* Saving Account Name */}
@@ -1165,15 +1175,22 @@ const MatureFDPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Int Posting Amt (auto-filled, read-only) */}
+                    {/* Int Posting Amt */}
                     <div className="flex flex-col space-y-2">
                       <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         <div className="w-2 h-2 bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" />
                         Int Posting Amt
                       </label>
-                      <div className="bg-white px-4 py-3 rounded-lg border-l-4 border-violet-500 shadow-sm">
-                        <span className="text-lg font-bold text-gray-800 font-mono">₹ {(parseFloat(accountCredit.intDr) || 0).toFixed(2)}</span>
-                      </div>
+                      <input
+                        type="text"
+                        value={accountCredit.intDr === "0" ? "" : accountCredit.intDr}
+                        onChange={(e) => {
+                          const val = validateNumberInput(e.target.value, 12);
+                          setAccountCredit((prev) => ({ ...prev, intDr: val || "0", intPostingAmt: parseFloat(val) || 0 }));
+                        }}
+                        className="px-4 py-3 border-2 border-violet-200 rounded-lg focus:border-violet-500 focus:ring-2 focus:ring-violet-100 outline-none transition-all text-gray-700 bg-white font-mono text-lg font-bold"
+                        placeholder="0.00"
+                      />
                     </div>
 
                     {/* Pending Amount */}

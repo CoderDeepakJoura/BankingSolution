@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useFormValidation } from "../../../services/Validations/voucher/saving/savingdeposit";
 import { FormField } from "../../../components/Validations/FormField";
 import Swal from "sweetalert2";
@@ -77,6 +77,8 @@ const SavingDepositVoucher: React.FC = () => {
   const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, validateField, clearErrors, markFieldTouched } =
     useFormValidation();
+
+  const productSelectRef = useRef<any>(null);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
@@ -540,6 +542,7 @@ const SavingDepositVoucher: React.FC = () => {
           navigate("/voucher-search");
         } else {
           handleReset();
+          setTimeout(() => productSelectRef.current?.focus(), 100);
         }
       } else {
         throw new Error(response.message || "Failed to save transaction");
@@ -547,7 +550,10 @@ const SavingDepositVoucher: React.FC = () => {
 
       clearErrors();
       setFieldErrors([]);
-      if (!isEditMode) handleReset();
+      if (!isEditMode) {
+        handleReset();
+        setTimeout(() => productSelectRef.current?.focus(), 100);
+      }
     } catch (error: any) {
       console.error("Save Error:", error);
       await Swal.fire({
@@ -716,6 +722,7 @@ const SavingDepositVoucher: React.FC = () => {
             errors={errorsByField.savingProduct || []}
           >
             <Select
+              ref={productSelectRef}
               id="savingProduct"
               options={savingProductOptions}
               value={

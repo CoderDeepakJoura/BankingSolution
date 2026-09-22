@@ -15,6 +15,14 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.84",
+    date: "2026-09-22",
+    changes: [
+      { type: "fix", text: "Fix loan interest posting for LimitWise (OD) accounts — backend now reads rates from accountlimitdetail, enabling correct day-weighted interest calculation" },
+      { type: "improvement", text: "Saving Deposit & Withdrawal: after saving a voucher, focus returns to the product dropdown automatically" },
+    ],
+  },
+  {
     version: "1.0.83",
     date: "2026-09-22",
     changes: [

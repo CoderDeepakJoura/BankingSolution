@@ -51,9 +51,19 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 .OrderByDescending(x => x.LoanDate)
                 .FirstOrDefaultAsync();
 
+            // LimitWise accounts (TypeId=4) store loan terms in accountlimitdetail instead of accountkistdetail.
+            AccountLimitDetail? limitDetail = null;
+            if (kist == null)
+            {
+                limitDetail = await _db.accountlimitdetail.AsNoTracking()
+                    .Where(x => x.AccountId == loanAccId && x.BrId == branchId)
+                    .OrderByDescending(x => x.LoanDate)
+                    .FirstOrDefaultAsync();
+            }
+
             // Effective overdue rate: use the account's stored rate; fall back to the matching
             // slab detail's PenalIntRate when the account was created before the rate was configured.
-            double effectiveOvdRate = kist?.OverdueInterestRate ?? 0;
+            double effectiveOvdRate = kist?.OverdueInterestRate ?? limitDetail?.OverdueInterestRate ?? 0;
             if (effectiveOvdRate == 0 && (kist?.SlabId ?? 0) > 0)
             {
                 decimal loanAmt    = (decimal)(kist!.LoanAmountPassed ?? 0);
@@ -256,7 +266,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     .Max(x => (DateTime?)x.EntryDate)
                 : null;
 
-            DateTime calcFromDate = lastPostDate?.Date ?? kist?.LoanDate ?? ob?.OverDueDate ?? today;
+            DateTime calcFromDate = lastPostDate?.Date ?? kist?.LoanDate ?? limitDetail?.LoanDate ?? ob?.OverDueDate ?? today;
             DateTime calcToDate   = today;
 
             // ── Dynamic unposted interest (not yet formally posted) ───────────────
@@ -342,8 +352,13 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     dynPenalInt = Math.Max(0, rawPenal - postedPenalInt);
                 }
             }
-            else if (kist != null && (kist.StandardInterestRate ?? 0) > 0)
+            else if ((kist != null && (kist.StandardInterestRate ?? 0) > 0)
+                  || (limitDetail != null && limitDetail.StandardInterestRate > 0))
             {
+                double effectiveStdRate = kist != null
+                    ? (kist.StandardInterestRate ?? 0)
+                    : limitDetail!.StandardInterestRate;
+
                 if (intCalcMethod == "MinBalance")
                 {
                     // MinBalance: interest on minimum balance over the period (single balance, no breakdown)
@@ -352,7 +367,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         int days = Math.Max(0, (calcToDate - calcFromDate).Days);
                         decimal effectivePrincipal = CalculateMinimumBalance(openingPrincipal, obDetails, calcFromDate, calcToDate);
                         decimal rawStd = Math.Round(
-                            effectivePrincipal * (decimal)kist.StandardInterestRate!.Value / 100m * days / 365m, 2);
+                            effectivePrincipal * (decimal)effectiveStdRate / 100m * days / 365m, 2);
                         dynStdInt = Math.Max(0, rawStd - postedStdInt); // openStdInt is Cat 3, not Cat 1
                     }
                 }
@@ -361,7 +376,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     // Balance method: day-weighted interest on effective outstanding (principal + posted interest)
                     var (wInt, wSegs) = await CalculateDayWeightedInterestAsync(
                         loanAccId, branchId, obNetForDayWeighted,
-                        calcFromDate, calcToDate, kist.StandardInterestRate!.Value);
+                        calcFromDate, calcToDate, effectiveStdRate);
                     dynStdInt = Math.Max(0, wInt);
                     calcSegments = wSegs;
                 }
@@ -471,10 +486,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 MemberRelativeName           = member?.RelativeName,
                 PhoneNo                      = member?.PhoneNo1,
                 MembershipNo                 = member?.PermanentMembershipNo ?? member?.NominalMembershipNo,
-                LoanNo                       = kist?.LoanNo,
-                LoanDate                     = kist?.LoanDate,
-                StandardInterestRate         = kist?.StandardInterestRate,
-                OverdueInterestRate          = kist?.OverdueInterestRate,
+                LoanNo                       = kist?.LoanNo ?? limitDetail?.LoanNo,
+                LoanDate                     = kist?.LoanDate ?? limitDetail?.LoanDate,
+                StandardInterestRate         = kist?.StandardInterestRate ?? limitDetail?.StandardInterestRate,
+                OverdueInterestRate          = kist?.OverdueInterestRate ?? limitDetail?.OverdueInterestRate,
                 KistAmount                   = kist?.KistAmount.HasValue == true ? (decimal)kist.KistAmount!.Value : null,
                 PrincipalBalance             = principalBal,
                 StdInterestOutstanding       = dynStdInt,       // Cat 1: unposted standard interest
