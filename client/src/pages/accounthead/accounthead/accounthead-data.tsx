@@ -47,7 +47,7 @@ const addAccountHead = async (
   const parentOptions = parents
     .map(
       (parent) =>
-        `<option value="${parent.accountHeadId}">${parent.accountHeadName}</option>`
+        `<option value="${parent.headCode || parent.HeadCode || ""}">${parent.accountHeadName}</option>`
     )
     .join("");
 
@@ -348,7 +348,7 @@ const modifyAccountHead = async (
     .filter((parent) => parent.accountHeadId !== AccountHead.accountHeadId) // remove current row
     .map(
       (parent) =>
-        `<option value="${parent.accountHeadId}" ${
+        `<option value="${parent.headCode || parent.HeadCode || ""}" ${
           parent.accountHeadId === AccountHead.parentId ? "selected" : ""
         }>
        ${parent.accountHeadName}

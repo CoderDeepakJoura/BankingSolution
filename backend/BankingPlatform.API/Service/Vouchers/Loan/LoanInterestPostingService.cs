@@ -98,18 +98,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 if (total <= 0)
                     return ("No interest amount to post.", 0);
 
-                // Validate against actual unposted interest (skipped for AddInBalance — no separate interest ledger)
+                // Fetch account info (needed for account head resolution below)
                 var info = await GetPostableInterestAsync(dto.LoanAccountId, dto.BrId, dto.VoucherDate);
                 if (info == null)
                     return ("Loan account not found.", 0);
                 bool isAddInBalance = info.ActOnIntPosting == 1;
-                if (!isAddInBalance)
-                {
-                    if (stdAmt > info.UnpostedStdInterest + 0.01m)
-                        return ($"Standard interest ({stdAmt:N2}) exceeds unposted amount ({info.UnpostedStdInterest:N2}).", 0);
-                    if (penalAmt > info.UnpostedPenalInterest + 0.01m)
-                        return ($"Penal interest ({penalAmt:N2}) exceeds unposted amount ({info.UnpostedPenalInterest:N2}).", 0);
-                }
 
                 // ── Voucher header ────────────────────────────────────────────────
                 int nextVrNo    = await _cf.GetLatestVoucherNo(dto.BrId, dto.VoucherDate);

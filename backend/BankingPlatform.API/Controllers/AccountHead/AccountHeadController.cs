@@ -107,7 +107,7 @@ namespace BankingPlatform.API.Controllers.AccountHead
                     accountheadtypeid = Convert.ToInt32(accountheadMasterDTO.AccountHeadType),
                     headcode = Convert.ToInt64(accountheadMasterDTO.HeadCode),
                     isannexure = !string.IsNullOrEmpty(accountheadMasterDTO.IsAnnexure) ? int.Parse(accountheadMasterDTO.IsAnnexure) : 0,
-                    parentid = resolvedParentId,
+                    parentid = resolvedParentId == 0 ? null : (int?)resolvedParentId,
                     showinreport = !string.IsNullOrEmpty(accountheadMasterDTO.ShowInReport) ? int.Parse(accountheadMasterDTO.ShowInReport) : 0
                 });
                 await _appContext.SaveChangesAsync();
@@ -138,21 +138,21 @@ namespace BankingPlatform.API.Controllers.AccountHead
         {
             try
             {
-                var query = _appContext.accounthead.AsNoTracking();
+                var query = _appContext.accounthead.AsNoTracking()
+                    .Where(x => x.branchid == branchId);
 
                 if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
                 {
-                    var term = filter.SearchTerm;
+                    var termLower = filter.SearchTerm.Trim().ToLower();
+                    long.TryParse(filter.SearchTerm.Trim(), out var headCodeSearch);
                     query = query.Where(z =>
-                        z.name.ToLower().Contains(term.ToLower()) ||
-                        z.headcode.ToString().ToLower().Contains(term.ToLower()) ||
-
-                        z.namesl != null && z.namesl.ToLower().Contains(term.ToLower()));
+                        z.name.ToLower().Contains(termLower) ||
+                        (headCodeSearch != 0 && z.headcode == headCodeSearch) ||
+                        (z.namesl != null && z.namesl.ToLower().Contains(termLower)));
                 }
                 var totalCount = await query.CountAsync();
 
                 var itemsRaw = await query
-                         .Where(x=> x.branchid == branchId)
                          .OrderBy(z => z.name)
                          .Skip((filter.PageNumber - 1) * filter.PageSize)
                          .Take(filter.PageSize)
@@ -300,7 +300,7 @@ namespace BankingPlatform.API.Controllers.AccountHead
                 existingAccountHead.accountheadtypeid = Convert.ToInt32(accountheadMasterDTO.AccountHeadType);
                 existingAccountHead.headcode = Convert.ToInt64(accountheadMasterDTO.HeadCode);
                 existingAccountHead.isannexure = !string.IsNullOrEmpty(accountheadMasterDTO.IsAnnexure) ? int.Parse(accountheadMasterDTO.IsAnnexure) : 0;
-                existingAccountHead.parentid = resolvedParentIdModify;
+                existingAccountHead.parentid = resolvedParentIdModify == 0 ? null : (int?)resolvedParentIdModify;
                 existingAccountHead.showinreport = !string.IsNullOrEmpty(accountheadMasterDTO.ShowInReport) ? Convert.ToInt32(accountheadMasterDTO.ShowInReport) : 0;
 
                 // Save changes to the database

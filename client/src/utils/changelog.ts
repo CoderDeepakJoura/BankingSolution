@@ -15,6 +15,17 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.85",
+    date: "2026-09-22",
+    changes: [
+      { type: "fix", text: "Balance Sheet: Bank FD opening balances now included — bankfdaccountopeningbalance was missing from the calculation (legacy SP AccTypeId=8 branch was not ported)" },
+      { type: "fix", text: "Account Head search no longer crashes with 'unexpected error' — EF Core could not translate headcode.ToString() to SQL; replaced with direct numeric match" },
+      { type: "fix", text: "Account Head search pagination total now reflects current branch only (was counting across all branches)" },
+      { type: "fix", text: "Account Head modify: clearing the parent field now saves NULL instead of 0" },
+      { type: "fix", text: "Account Head create/modify: parent dropdown now submits the 12-digit head code that the backend expects, not the row ID" },
+    ],
+  },
+  {
     version: "1.0.84",
     date: "2026-09-22",
     changes: [

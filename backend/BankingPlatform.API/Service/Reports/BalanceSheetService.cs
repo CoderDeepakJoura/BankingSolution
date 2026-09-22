@@ -206,7 +206,24 @@ namespace BankingPlatform.API.Service.Reports
                         hlObCr[hc] = hlObCr.GetValueOrDefault(hc) + amt;
                 }
 
-                // 3. Loan opening balance — join via accountmaster.HeadCode
+                // 3. Bank FD opening balance — HeadCode stored directly on the row (legacy SP: AccTypeId=8 branch)
+                var hlBankFdObs = await _db.bankfdaccountopeningbalance.AsNoTracking()
+                    .Where(b => b.BranchID == branchId
+                             && b.HeadCode.HasValue
+                             && expandedHlHcs.Contains(b.HeadCode.Value))
+                    .Select(b => new { b.HeadCode, b.Balance, b.BalanceType })
+                    .ToListAsync();
+
+                foreach (var b in hlBankFdObs)
+                {
+                    var hc = childToParent.TryGetValue(b.HeadCode!.Value, out var ph) ? ph : b.HeadCode.Value;
+                    if (b.BalanceType?.ToUpper() == "DR")
+                        hlObDr[hc] = hlObDr.GetValueOrDefault(hc) + b.Balance;
+                    else
+                        hlObCr[hc] = hlObCr.GetValueOrDefault(hc) + b.Balance;
+                }
+
+                // 4. Loan opening balance — join via accountmaster.HeadCode
                 //    loanaccopeningbalance.HeadCode is always NULL in DB; SP matches via accountmaster
                 var hlLoanObsRaw = await (
                     from loan in _db.loanaccopeningbalance.AsNoTracking()
@@ -308,6 +325,20 @@ namespace BankingPlatform.API.Service.Reports
                         a0ObDr[fd.AccountId] = a0ObDr.GetValueOrDefault(fd.AccountId) + amt;
                     else
                         a0ObCr[fd.AccountId] = a0ObCr.GetValueOrDefault(fd.AccountId) + amt;
+                }
+
+                // Bank FD OB — keyed by AccountId (legacy SP: AccTypeId=8 branch)
+                var ann0BankFdObs = await _db.bankfdaccountopeningbalance.AsNoTracking()
+                    .Where(b => b.BranchID == branchId && ann0AccIds.Contains(b.AccountId))
+                    .Select(b => new { b.AccountId, b.Balance, b.BalanceType })
+                    .ToListAsync();
+
+                foreach (var b in ann0BankFdObs)
+                {
+                    if (b.BalanceType?.ToUpper() == "DR")
+                        a0ObDr[b.AccountId] = a0ObDr.GetValueOrDefault(b.AccountId) + b.Balance;
+                    else
+                        a0ObCr[b.AccountId] = a0ObCr.GetValueOrDefault(b.AccountId) + b.Balance;
                 }
 
                 // Ann0 loan OB — join via accountmaster to avoid relying on loanaccopeningbalance.BranchId
