@@ -168,6 +168,7 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
 
   // ── Loan Reports ──────────────────────────────────────────────────────────
   { path: "/loan-npa-report",                 label: "Loan NPA Report",                 category: "Loan Reports" },
+  { path: "/loan-overdue-report",             label: "Loan Overdue Report",             category: "Loan Reports" },
   { path: "/npa-ledger",                      label: "NPA Ledger",                      category: "Loan Reports" },
   { path: "/loan-advancement-report",         label: "Loan Advancement Report",         category: "Loan Reports" },
   { path: "/loan-recovery-report",            label: "Loan Recovery Report",            category: "Loan Reports" },
