@@ -173,6 +173,7 @@ import ProfitLossPage from "../pages/reports/ProfitLoss";
 import TrialBalancePage from "../pages/reports/TrialBalance";
 import JournalBookPage from "../pages/reports/JournalBook";
 import LoanNPAPage from "../pages/reports/LoanNPA";
+import LoanOverduePage from "../pages/reports/LoanOverdue";
 import NpaLedgerPage from "../pages/reports/NpaLedger";
 import LoanAdvancementReportPage from "../pages/reports/LoanAdvancement";
 import LoanRecoveryReportPage from "../pages/reports/LoanRecovery";
@@ -481,6 +482,7 @@ export const ROUTES: RouteEntry[] = [
 
   // ── Loan Reports ──────────────────────────────────────────────────────────
   { path: "/loan-npa-report",                 element: <LoanNPAPage />,                 label: "Loan NPA Report",          category: "Loan Reports" },
+  { path: "/loan-overdue-report",             element: <LoanOverduePage />,             label: "Loan Overdue Report",       category: "Loan Reports" },
   { path: "/npa-ledger",                      element: <NpaLedgerPage />,               label: "NPA Ledger",               category: "Loan Reports" },
   { path: "/loan-advancement-report",         element: <LoanAdvancementReportPage />,   label: "Loan Advancement Report",  category: "Loan Reports" },
   { path: "/loan-recovery-report",            element: <LoanRecoveryReportPage />,      label: "Loan Recovery Report",     category: "Loan Reports" },

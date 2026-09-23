@@ -82,6 +82,7 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Reports.ProfitLossService
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.HeadLedgerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.GeneralLedgerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanNPAService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanOverdueReportService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.TrialBalanceService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.JournalBookService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.LoanAdvancementService>();
