@@ -15,10 +15,17 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.95",
+    date: "2026-09-23",
+    changes: [
+      { type: "improvement", text: "Minor updates and bug fixes" },
+    ],
+  },
+  {
     version: "1.0.94",
     date: "2026-09-23",
     changes: [
-      { type: "new", text: "Loan Overdue Report: per-account outstanding principal, Cat3 interest, overdue amount, OD instalments, and guarantor names — modelled on legacy CSAS_SP_RPT_GetOverDueLoanDtl / CSAS_SP_GetLoanOverDueAmt" },
+      { type: "new", text: "Loan Overdue Report: per-account outstanding principal, interest, overdue amount, OD instalments, and guarantor names" },
     ],
   },
   {
