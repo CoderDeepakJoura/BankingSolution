@@ -76,9 +76,9 @@ export class ApiService {
       const response = await fetch(url, config);
 
       if (response.status === 401) {
-        // Don't attempt refresh for auth endpoints themselves
-        const isAuthEndpoint = endpoint.includes('/auth/');
-        if (!_retry && !isAuthEndpoint) {
+        // Only skip refresh for endpoints that would cause an infinite loop
+        const skipRefresh = endpoint.includes('/auth/login') || endpoint.includes('/auth/refresh') || endpoint.includes('/auth/logout');
+        if (!_retry && !skipRefresh) {
           const refreshed = await this.tryRefreshToken();
           if (refreshed) {
             return this.makeRequest<T>(endpoint, options, true);
@@ -118,6 +118,7 @@ export class ApiService {
         // Normalize PascalCase Success/Message from backend anonymous types
         if (parsed.Success !== undefined && parsed.success === undefined) parsed.success = parsed.Success;
         if (parsed.Message !== undefined && parsed.message === undefined) parsed.message = parsed.Message;
+        if (parsed.HasActiveSession !== undefined && parsed.hasActiveSession === undefined) parsed.hasActiveSession = parsed.HasActiveSession;
         return { ...(parsed as ApiResponse<T>) };
       }
 
@@ -132,10 +133,10 @@ export class ApiService {
   }
 
   // Auth methods
-  async login(username: string, password: string, branchcode: string): Promise<ApiResponse<AuthResponse>> {
+  async login(username: string, password: string, branchcode: string, forceLogin = false): Promise<ApiResponse<AuthResponse>> {
     return this.makeRequest<AuthResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password, branchcode })
+      body: JSON.stringify({ username, password, branchcode, forceLogin })
     });
   }
 

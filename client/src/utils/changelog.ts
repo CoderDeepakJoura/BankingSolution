@@ -15,6 +15,27 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.1",
+    date: "2026-09-23",
+    changes: [
+      { type: "fix", text: "Single Session Login: login itself was being blocked by stale cookie — auth paths now exempt from stamp check" },
+      { type: "fix", text: "Single Session Login: token refresh was skipped for all /auth/ paths, causing spurious session-expired on every login" },
+      { type: "improvement", text: "Single Session Login: displaced session now kicked within 15 seconds via heartbeat (was 60 s)" },
+      { type: "improvement", text: "Single Session Login: settings cached per-branch (IMemoryCache) — only 1 DB query per request instead of 2" },
+      { type: "fix", text: "Opening balance: setting amount to 0 in Saving/RD account modify now deletes the existing record instead of silently ignoring it" },
+      { type: "improvement", text: "Voucher deletion: future-transaction hierarchy guard re-enabled — cannot delete a voucher if later vouchers exist for the same account" },
+      { type: "improvement", text: "Session Expired page redesigned with clear reasons (timeout, logged in elsewhere, unauthorized access, etc.)" },
+    ],
+  },
+  {
+    version: "1.1.0",
+    date: "2026-09-23",
+    changes: [
+      { type: "fix", text: "Single Session Login: fixed logout loop — working date JWT now carries session stamp correctly" },
+      { type: "improvement", text: "Single Session Login: now shows confirmation dialog when another session is active, instead of silently displacing it" },
+    ],
+  },
+  {
     version: "1.0.99",
     date: "2026-09-23",
     changes: [

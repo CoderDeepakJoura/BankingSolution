@@ -572,11 +572,10 @@ namespace BankingPlatform.API.Service.AccountMasters
                 }
 
                 
+                var accOpeningBalDetail = await _context.accopeningbalance
+                    .FirstOrDefaultAsync(w => w.AccountId == accountId && w.BranchId == branchId);
                 if (dto.Voucher!.OpeningAmount > 0)
                 {
-                    var accOpeningBalDetail = await _context.accopeningbalance
-                 .AsNoTracking()
-                 .FirstOrDefaultAsync(w => w.AccountId == accountId && w.BranchId == branchId);
                     if (accOpeningBalDetail != null)
                     {
                         accOpeningBalDetail.OpeningAmount = (decimal)dto.Voucher.OpeningAmount;
@@ -588,6 +587,10 @@ namespace BankingPlatform.API.Service.AccountMasters
                         AccOpeningBalance accOpeningBalance = _memberService.AccOpeningBalance((decimal)dto.Voucher.OpeningAmount, (int)Enums.AccountTypes.Saving, accountId, branchId, dto.Voucher.OpeningBalanceType!);
                         await _context.accopeningbalance.AddAsync(accOpeningBalance);
                     }
+                }
+                else if (accOpeningBalDetail != null)
+                {
+                    _context.accopeningbalance.Remove(accOpeningBalDetail);
                 }
 
                 await _context.SaveChangesAsync();

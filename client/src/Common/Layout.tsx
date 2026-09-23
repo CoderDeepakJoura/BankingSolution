@@ -102,9 +102,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const showPayroll     = useSelector((state: RootState) => state.user.showPayrollModule);
   useBrowserNavigationControl(true);
 
-  // Heartbeat: update lastseen every 60 s so the server knows the session is still active
+  // Heartbeat: validates session every 15 s — displaced sessions are caught promptly
   useEffect(() => {
-    const id = setInterval(() => { ApiService.heartbeat(); }, 60_000);
+    const id = setInterval(() => { ApiService.heartbeat(); }, 15_000);
     return () => clearInterval(id);
   }, []);
 

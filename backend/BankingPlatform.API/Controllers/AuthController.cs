@@ -35,6 +35,8 @@ namespace BankingPlatform.API.Controllers
 
         [Required(ErrorMessage = "Branch code is required")]
         public string BranchCode { get; set; } = ""!;
+
+        public bool ForceLogin { get; set; } = false;
     }
 
     public class AcknowledgeVersionDto
@@ -161,15 +163,27 @@ namespace BankingPlatform.API.Controllers
                 user.failedloginattempts = 0;
                 user.lockoutuntil = null;
 
-                // Single-session enforcement: if enabled, rotate stamp and revoke all existing refresh tokens
+                // Single-session enforcement
                 var settings = await _context.superusersettings.AsNoTracking()
                     .FirstOrDefaultAsync(s => s.branchid == branchInfo.id);
                 string sessionStamp = "";
                 if (settings?.enforceSingleSession == true)
                 {
+                    // Check for an existing active session
+                    bool hasActiveSession = !string.IsNullOrEmpty(user.sessionstamp)
+                        && await _context.refreshtoken
+                            .AnyAsync(r => r.UserId == user.id && r.BranchId == branchInfo.id
+                                && !r.IsRevoked && r.ExpiresAt > DateTime.UtcNow);
+
+                    if (hasActiveSession && !loginDto.ForceLogin)
+                    {
+                        // Ask the user to confirm before displacing the other session
+                        return Ok(new { Success = false, HasActiveSession = true, Message = "Another session is already active for this account." });
+                    }
+
+                    // ForceLogin or no active session — rotate stamp and revoke old tokens
                     sessionStamp = Guid.NewGuid().ToString();
                     user.sessionstamp = sessionStamp;
-                    // Revoke all active refresh tokens so old sessions cannot refresh
                     var activeTokens = await _context.refreshtoken
                         .Where(r => r.UserId == user.id && r.BranchId == branchInfo.id && !r.IsRevoked)
                         .ToListAsync();
@@ -306,7 +320,16 @@ namespace BankingPlatform.API.Controllers
                 var sessionFromDate = selectedSession?.fromdate.ToString("yyyy-MM-dd") ?? "";
                 var sessionToDate   = selectedSession?.todate.ToString("yyyy-MM-dd") ?? "";
 
-                setClaims(userName, branchName, branchCode, branchId, societyName, contact, address, email, userId, workingDateDTO.WorkingDate, workingDateDTO.sessionInfo, workingDateDTO.sessionId, isFirstSession, isSu, sessionFromDate, sessionToDate);
+                // Carry forward the session stamp so the new JWT remains valid under single-session enforcement
+                string currentSessionStamp = "";
+                if (int.TryParse(userId, out int parsedUserIdWd))
+                {
+                    var dbUserWd = await _context.user.AsNoTracking()
+                        .FirstOrDefaultAsync(u => u.id == parsedUserIdWd && u.branchid == branchId);
+                    currentSessionStamp = dbUserWd?.sessionstamp ?? "";
+                }
+
+                setClaims(userName, branchName, branchCode, branchId, societyName, contact, address, email, userId, workingDateDTO.WorkingDate, workingDateDTO.sessionInfo, workingDateDTO.sessionId, isFirstSession, isSu, sessionFromDate, sessionToDate, sessionStamp: currentSessionStamp);
 
                 var tokenExpiration = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes);
                 var token = _jwtTokenService.GenerateToken(tokenExpiration);
@@ -640,13 +663,29 @@ namespace BankingPlatform.API.Controllers
                 var snapshot = JsonSerializer.Deserialize<RefreshClaimsSnapshot>(stored.ClaimsSnapshot)
                     ?? throw new InvalidOperationException("Failed to deserialize claims snapshot.");
 
-                // Carry the current session stamp from DB so the refreshed JWT stays valid
+                // Validate session stamp: if another login rotated the stamp, this refresh token belongs to the displaced session
                 string currentStamp = "";
                 if (int.TryParse(snapshot.UserId, out int refreshUserId))
                 {
-                    var dbUser = await _context.user.AsNoTracking()
-                        .FirstOrDefaultAsync(u => u.id == refreshUserId && u.branchid == stored.BranchId);
-                    currentStamp = dbUser?.sessionstamp ?? "";
+                    var settings = await _context.superusersettings.AsNoTracking()
+                        .FirstOrDefaultAsync(s => s.branchid == stored.BranchId);
+
+                    if (settings?.enforceSingleSession == true)
+                    {
+                        var dbUser = await _context.user.AsNoTracking()
+                            .FirstOrDefaultAsync(u => u.id == refreshUserId && u.branchid == stored.BranchId);
+                        currentStamp = dbUser?.sessionstamp ?? "";
+
+                        // Stamp mismatch means a new login displaced this session — reject it
+                        if (!string.IsNullOrEmpty(currentStamp) &&
+                            !string.IsNullOrEmpty(snapshot.SessionStamp) &&
+                            !string.Equals(snapshot.SessionStamp, currentStamp, StringComparison.Ordinal))
+                        {
+                            stored.IsRevoked = true;
+                            await _context.SaveChangesAsync();
+                            return Unauthorized(new ResponseDto { Success = false, Message = "Session expired. Your account was logged in from another location." });
+                        }
+                    }
                 }
 
                 setClaims(snapshot.UserName, snapshot.BranchName, snapshot.BranchCode, snapshot.BranchId,
@@ -662,12 +701,34 @@ namespace BankingPlatform.API.Controllers
                 var newRefreshRaw = JwtTokenService.GenerateRefreshToken();
                 stored.ReplacedByToken = newRefreshRaw;
 
+                // Re-serialize snapshot with updated stamp so the next refresh also validates correctly
+                var updatedSnapshot = JsonSerializer.Serialize(new RefreshClaimsSnapshot
+                {
+                    UserName = snapshot.UserName,
+                    BranchCode = snapshot.BranchCode,
+                    BranchId = snapshot.BranchId,
+                    BranchName = snapshot.BranchName,
+                    SocietyName = snapshot.SocietyName,
+                    ContactNo = snapshot.ContactNo,
+                    Address = snapshot.Address,
+                    Email = snapshot.Email,
+                    UserId = snapshot.UserId,
+                    WorkingDate = snapshot.WorkingDate,
+                    SessionInfo = snapshot.SessionInfo,
+                    SessionId = snapshot.SessionId,
+                    IsFirstSession = snapshot.IsFirstSession,
+                    IsSu = snapshot.IsSu,
+                    SessionFromDate = snapshot.SessionFromDate,
+                    SessionToDate = snapshot.SessionToDate,
+                    SessionStamp = currentStamp
+                });
+
                 await _context.refreshtoken.AddAsync(new RefreshToken
                 {
                     Token = newRefreshRaw,
                     UserId = stored.UserId,
                     BranchId = stored.BranchId,
-                    ClaimsSnapshot = stored.ClaimsSnapshot,
+                    ClaimsSnapshot = updatedSnapshot,
                     ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays),
                     IsRevoked = false,
                     CreatedAt = DateTime.UtcNow
@@ -725,7 +786,8 @@ namespace BankingPlatform.API.Controllers
                 IsFirstSession = _commonClass.isFirstSession,
                 IsSu = _commonClass.isSu,
                 SessionFromDate = _commonClass.sessionFromDate,
-                SessionToDate = _commonClass.sessionToDate
+                SessionToDate = _commonClass.sessionToDate,
+                SessionStamp = _commonClass.sessionStamp
             });
 
             await _context.refreshtoken.AddAsync(new RefreshToken
@@ -859,5 +921,6 @@ namespace BankingPlatform.API.Controllers
         public bool IsSu { get; set; }
         public string SessionFromDate { get; set; } = "";
         public string SessionToDate { get; set; } = "";
+        public string SessionStamp { get; set; } = "";
     }
 }

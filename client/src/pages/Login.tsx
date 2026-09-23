@@ -13,13 +13,29 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate(); 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-
+  const doLogin = async (forceLogin = false) => {
     try {
-      const data = await ApiService.login(username, password, branchcode);
+      const data = await ApiService.login(username, password, branchcode, forceLogin);
+
+      if ((data as any).hasActiveSession) {
+        setIsLoading(false);
+        const result = await Swal.fire({
+          icon: "warning",
+          title: "Active Session Found",
+          text: "This account is already logged in from another location. Do you want to log out from there and continue here?",
+          showCancelButton: true,
+          confirmButtonText: "Yes, Login Here",
+          cancelButtonText: "Cancel",
+          confirmButtonColor: "#2563eb",
+          cancelButtonColor: "#6b7280",
+        });
+        if (result.isConfirmed) {
+          setIsLoading(true);
+          await doLogin(true);
+        }
+        return;
+      }
+
       if (!data.success) {
         Swal.fire({
           icon: "error",
@@ -31,19 +47,22 @@ const Login = () => {
         return;
       }
       navigate("/workingdate");
-    } catch (error) {
+    } catch (error: any) {
       Swal.fire({
-          icon: "error",
-          title: "Login Failed",
-          text: error.message || "Something went wrong.",
-          confirmButtonColor: "#2563eb",
-        });
-        setIsLoading(false);
-        return;
-      
-    } finally {
+        icon: "error",
+        title: "Login Failed",
+        text: error.message || "Something went wrong.",
+        confirmButtonColor: "#2563eb",
+      });
       setIsLoading(false);
     }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    await doLogin(false);
+    setIsLoading(false);
   };
 
   return (

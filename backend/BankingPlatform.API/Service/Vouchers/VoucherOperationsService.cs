@@ -173,39 +173,38 @@ namespace BankingPlatform.API.Service.Vouchers
                     return (false, $"Cannot delete: account(s) already closed — {string.Join(", ", closedAccs)}.");
 
                 // ── Future-transaction guard (all voucher types) ──────────────────
-                // TEMPORARILY COMMENTED OUT — uncomment when needed
-                // var memberAccIds = await _context.accountmaster.AsNoTracking()
-                //     .Where(x => accountIds.Contains(x.ID)
-                //              && x.AccTypeId != (int)Enums.AccountTypes.General)
-                //     .Select(x => x.ID)
-                //     .ToListAsync();
-                //
-                // if (memberAccIds.Any())
-                // {
-                //     var futureVouchers = await _context.vouchercreditdebitdetails
-                //         .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
-                //         .Where(x => memberAccIds.Contains(x.e.AccountId)
-                //             && x.v.BrID == branchId
-                //             && x.v.VoucherStatus != "D"
-                //             && x.v.Id != voucher.Id
-                //             && (x.v.VoucherDate.Date > voucher.VoucherDate.Date
-                //                 || (x.v.VoucherDate.Date == voucher.VoucherDate.Date
-                //                     && x.v.VoucherNo > voucher.VoucherNo)))
-                //         .Select(x => new { x.v.VoucherNo, x.v.VoucherDate })
-                //         .Distinct()
-                //         .OrderBy(x => x.VoucherDate)
-                //         .ThenBy(x => x.VoucherNo)
-                //         .Take(5)
-                //         .ToListAsync();
-                //
-                //     if (futureVouchers.Any())
-                //     {
-                //         var list = string.Join(", ", futureVouchers
-                //             .Select(f => $"Voucher #{f.VoucherNo} ({f.VoucherDate:dd-MMM-yyyy})"));
-                //         string more = futureVouchers.Count == 5 ? " and more" : "";
-                //         return (false, $"Cannot delete: later transaction(s) exist for the same account(s). Delete these first — {list}{more}.");
-                //     }
-                // }
+                var memberAccIds = await _context.accountmaster.AsNoTracking()
+                    .Where(x => accountIds.Contains(x.ID)
+                             && x.AccTypeId != (int)Enums.AccountTypes.General)
+                    .Select(x => x.ID)
+                    .ToListAsync();
+
+                if (memberAccIds.Any())
+                {
+                    var futureVouchers = await _context.vouchercreditdebitdetails
+                        .Join(_context.voucher, e => e.VoucherID, v => v.Id, (e, v) => new { e, v })
+                        .Where(x => memberAccIds.Contains(x.e.AccountId)
+                            && x.v.BrID == branchId
+                            && x.v.VoucherStatus != "D"
+                            && x.v.Id != voucher.Id
+                            && (x.v.VoucherDate.Date > voucher.VoucherDate.Date
+                                || (x.v.VoucherDate.Date == voucher.VoucherDate.Date
+                                    && x.v.VoucherNo > voucher.VoucherNo)))
+                        .Select(x => new { x.v.VoucherNo, x.v.VoucherDate })
+                        .Distinct()
+                        .OrderBy(x => x.VoucherDate)
+                        .ThenBy(x => x.VoucherNo)
+                        .Take(5)
+                        .ToListAsync();
+
+                    if (futureVouchers.Any())
+                    {
+                        var list = string.Join(", ", futureVouchers
+                            .Select(f => $"Voucher #{f.VoucherNo} ({f.VoucherDate:dd-MMM-yyyy})"));
+                        string more = futureVouchers.Count == 5 ? " and more" : "";
+                        return (false, $"Cannot delete: later transaction(s) exist for the same account(s). Delete these first — {list}{more}.");
+                    }
+                }
             }
 
             using var tx = await _context.Database.BeginTransactionAsync();

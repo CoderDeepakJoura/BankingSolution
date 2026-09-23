@@ -40,6 +40,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddLogging();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<GeneralAccountMasterService>();
 builder.Services.AddScoped<CasteService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.EmployeeDesignationService>();
