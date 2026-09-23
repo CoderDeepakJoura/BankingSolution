@@ -33,13 +33,9 @@ public static class PasswordHasher
         var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100_000, HashAlgorithmName.SHA256);
         byte[] hash = pbkdf2.GetBytes(32);
 
-        // Compare byte by byte
-        for (int i = 0; i < 32; i++)
-        {
-            if (hashBytes[i + 16] != hash[i])
-                return false;
-        }
-
-        return true;
+        // Constant-time comparison to prevent timing side-channel attacks
+        var expected = new byte[32];
+        Buffer.BlockCopy(hashBytes, 16, expected, 0, 32);
+        return CryptographicOperations.FixedTimeEquals(hash, expected);
     }
 }

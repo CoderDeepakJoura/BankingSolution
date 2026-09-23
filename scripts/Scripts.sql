@@ -2044,9 +2044,17 @@ ALTER TABLE loanaccountbalancedetail ADD COLUMN IF NOT EXISTS entrytype VARCHAR(
 -- user: tracks the last app version the user acknowledged in the What's New modal
 ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS lastseenversion VARCHAR(20) DEFAULT '0.0.0';
 
+-- user: session stamp for single-session enforcement (rotated on each new login when enabled)
+ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS sessionstamp VARCHAR(36) NULL;
+
+-- user: account lockout — track consecutive failed logins and temporary lock expiry
+ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS failedloginattempts INT NOT NULL DEFAULT 0;
+ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS lockoutuntil TIMESTAMP NULL;
+
 -- superusersettings: module visibility flags (false = hide the module from all users in this branch)
-ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS showbankfdmodule  BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS showpayrollmodule BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS showbankfdmodule       BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS showpayrollmodule      BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS enforcesinglesession   BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- interbranchvoucher: distinguishes 2-step HO-to-Branch from 3-step Branch-to-Branch flows
 ALTER TABLE interbranchvoucher ADD COLUMN IF NOT EXISTS flowtype VARCHAR(20) NOT NULL DEFAULT 'BranchToBranch';

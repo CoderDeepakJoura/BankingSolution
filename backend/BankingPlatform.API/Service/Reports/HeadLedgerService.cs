@@ -186,6 +186,17 @@ namespace BankingPlatform.API.Service.Reports
                 }
             }
 
+            var bankFdObMap = new Dictionary<int, decimal>();
+            {
+                var bfdObs = await _db.bankfdaccountopeningbalance.AsNoTracking()
+                    .Where(b => accountIds.Contains(b.AccountId) && b.BranchID == branchId)
+                    .Select(b => new { b.AccountId, b.Balance, b.BalanceType })
+                    .ToListAsync();
+                foreach (var b in bfdObs)
+                    bankFdObMap[b.AccountId] = bankFdObMap.GetValueOrDefault(b.AccountId)
+                        + (b.BalanceType?.ToUpper() == "DR" ? b.Balance : -b.Balance);
+            }
+
             var loanObMap = new Dictionary<int, decimal>();
             {
                 var loanObs = await (
@@ -210,8 +221,9 @@ namespace BankingPlatform.API.Service.Reports
 
             decimal GetInitialOB(int accId)
             {
-                if (loanObMap.TryGetValue(accId, out var lb)) return lb;
-                if (fdObMap.TryGetValue(accId, out var fb))   return fb;
+                if (loanObMap.TryGetValue(accId, out var lb))    return lb;
+                if (bankFdObMap.TryGetValue(accId, out var bfb)) return bfb;
+                if (fdObMap.TryGetValue(accId, out var fb))      return fb;
                 var ob = obRecords.GetValueOrDefault(accId);
                 if (ob == null) return 0m;
                 return ob.EntryType?.ToUpper() == "DR" ? ob.OpeningAmount : -ob.OpeningAmount;
@@ -404,6 +416,17 @@ namespace BankingPlatform.API.Service.Reports
                 }
             }
 
+            var bankFdObMap = new Dictionary<int, decimal>();
+            {
+                var bfdObs = await _db.bankfdaccountopeningbalance.AsNoTracking()
+                    .Where(b => accountIds.Contains(b.AccountId) && b.BranchID == branchId)
+                    .Select(b => new { b.AccountId, b.Balance, b.BalanceType })
+                    .ToListAsync();
+                foreach (var b in bfdObs)
+                    bankFdObMap[b.AccountId] = bankFdObMap.GetValueOrDefault(b.AccountId)
+                        + (b.BalanceType?.ToUpper() == "DR" ? b.Balance : -b.Balance);
+            }
+
             var loanObMap = new Dictionary<int, decimal>();
             {
                 var loanObs = await (
@@ -428,8 +451,9 @@ namespace BankingPlatform.API.Service.Reports
 
             decimal GetInitialOB(int accId)
             {
-                if (loanObMap.TryGetValue(accId, out var lb)) return lb;
-                if (fdObMap.TryGetValue(accId, out var fb))   return fb;
+                if (loanObMap.TryGetValue(accId, out var lb))    return lb;
+                if (bankFdObMap.TryGetValue(accId, out var bfb)) return bfb;
+                if (fdObMap.TryGetValue(accId, out var fb))      return fb;
                 var ob = obRecords.GetValueOrDefault(accId);
                 if (ob == null) return 0m;
                 return ob.EntryType?.ToUpper() == "DR" ? ob.OpeningAmount : -ob.OpeningAmount;

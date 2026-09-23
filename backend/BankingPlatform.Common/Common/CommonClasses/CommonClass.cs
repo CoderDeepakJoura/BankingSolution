@@ -19,5 +19,6 @@
         public bool isSu { get; set; }
         public string sessionFromDate { get; set; } = ""!;
         public string sessionToDate { get; set; } = ""!;
+        public string sessionStamp { get; set; } = ""!;
     }
 }

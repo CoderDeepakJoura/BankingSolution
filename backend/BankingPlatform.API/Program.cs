@@ -168,6 +168,7 @@ builder.Services.AddCors(options =>
 // Configure rate limiting for authentication endpoints
 builder.Services.AddRateLimiter(options =>
 {
+    // Strict limit on auth endpoints (login, refresh) — prevents brute-force
     options.AddFixedWindowLimiter("Auth", opt =>
     {
         opt.PermitLimit = 10;
@@ -175,6 +176,17 @@ builder.Services.AddRateLimiter(options =>
         opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         opt.QueueLimit = 0;
     });
+
+    // General API limit per IP — prevents enumeration and DoS
+    options.AddFixedWindowLimiter("Api", opt =>
+    {
+        opt.PermitLimit = 200;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
 
@@ -366,6 +378,17 @@ var app = builder.Build();
 // Apply CORS early in the pipeline
 app.UseCors("_myAllowSpecificOrigins");
 
+// Security headers on every response
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers.Append("X-Frame-Options", "DENY");
+    ctx.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    ctx.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+    ctx.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    ctx.Response.Headers.Append("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    await next();
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -386,9 +409,9 @@ else
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
-
+app.UseMiddleware<BankingPlatform.API.Common.SingleSessionMiddleware>();
 app.UseAuthorization();
-app.MapControllers();
+app.MapControllers().RequireRateLimiting("Api");
 
 // Auto-apply any pending EF Core migrations on startup
 //using (var scope = app.Services.CreateScope())

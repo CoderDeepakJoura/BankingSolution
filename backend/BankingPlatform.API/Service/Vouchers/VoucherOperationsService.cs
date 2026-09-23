@@ -293,7 +293,7 @@ namespace BankingPlatform.API.Service.Vouchers
                 }
 
                 // Bank FD mature / premature / renew — reopen the Bank FD detail
-                if (vType == (int)Enums.VoucherType.FD && isMatureOrPremature && bfdVoucherDetails.Any())
+                if (vType == (int)Enums.VoucherType.BankFD && isMatureOrPremature && bfdVoucherDetails.Any())
                 {
                     if (vSubType == (int)Enums.VoucherSubType.Renew)
                     {

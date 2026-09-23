@@ -728,8 +728,10 @@ const LoanInterestPostingVoucher: React.FC = () => {
               : undefined,
           });
         }
-        // Re-calculate to refresh table
-        await handleShow();
+        // Clear the grid so the user clicks Show again for fresh data
+        setBatchItems([]);
+        setCheckedIds(new Set());
+        setHasShown(false);
       } else {
         throw new Error("Unexpected response from server.");
       }

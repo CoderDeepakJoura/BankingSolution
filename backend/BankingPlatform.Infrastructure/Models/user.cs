@@ -22,4 +22,7 @@ public partial class User
     public int isbranchsu { get; set; }
     public int usertype { get; set; }
     public string lastseenversion { get; set; } = "0.0.0";
+    public string? sessionstamp { get; set; }
+    public int failedloginattempts { get; set; } = 0;
+    public DateTime? lockoutuntil { get; set; }
 }

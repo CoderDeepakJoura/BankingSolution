@@ -68,6 +68,7 @@ namespace BankingPlatform.API.Controllers.BankFD
         public double PenaltyRate { get; set; } = 1.0;
         public double EffectiveRate { get; set; }
         public decimal PreMatureAmount { get; set; }
+        public List<VoucherLineDTO> VoucherLines { get; set; } = new();
     }
 
     // ──────────────────────────── Controller ────────────────────────────
@@ -314,7 +315,8 @@ namespace BankingPlatform.API.Controllers.BankFD
                     dto.VoucherDate, dto.PayoutAccId, dto.IntIncomeAccId,
                     dto.TDSAmount, dto.TDSAccId, dto.Narration,
                     isRenew: false, renewMonths: 0, renewDays: 0, renewMaturityAmount: 0,
-                    isPremature: true, dto.PenaltyRate, dto.EffectiveRate, dto.PreMatureAmount);
+                    isPremature: true, dto.PenaltyRate, dto.EffectiveRate, dto.PreMatureAmount,
+                    voucherLines: dto.VoucherLines.Count > 0 ? dto.VoucherLines : null);
 
                 if (msg != null) return BadRequest(new ResponseDto { Success = false, Message = msg });
 

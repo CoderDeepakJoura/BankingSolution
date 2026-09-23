@@ -94,6 +94,7 @@ export interface BankFDPreMatureRequestDTO {
   penaltyRate: number;
   effectiveRate: number;
   preMatureAmount: number;
+  voucherLines?: { accId: number; amount: number; drOrCr: string }[];
 }
 
 class BankFDMatureApiService extends ApiService {

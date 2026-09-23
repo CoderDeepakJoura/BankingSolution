@@ -10,6 +10,7 @@ export interface SuperUserSettingsDTO {
   allowGSTDeduction: boolean;
   showBankFDModule: boolean;
   showPayrollModule: boolean;
+  enforceSingleSession: boolean;
 }
 
 /** @deprecated Use SuperUserSettingsDTO */

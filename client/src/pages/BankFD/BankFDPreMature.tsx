@@ -20,6 +20,15 @@ const compLabel = (v: number) => ({ 12: "Monthly", 4: "Quarterly", 2: "Half-Year
 
 interface GenAcc { value: number; label: string; }
 
+interface VoucherLine {
+  key: number;
+  accId: number;
+  accName: string;
+  amount: number;
+  amountStr: string;
+  drOrCr: "Dr" | "Cr";
+}
+
 const BankFDPreMaturePage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
@@ -46,10 +55,14 @@ const BankFDPreMaturePage: React.FC = () => {
   const [tdsRate, setTdsRate] = useState(0);
   const [tdsAmount, setTdsAmount] = useState(0);
 
-  // Payout
-  const [payoutAccId, setPayoutAccId] = useState<number | null>(null);
-  const [intIncomeAccId, setIntIncomeAccId] = useState<number | null>(null);
   const [narration, setNarration] = useState("");
+
+  // Manual voucher entry
+  const [voucherLines, setVoucherLines] = useState<VoucherLine[]>([]);
+  const [entryAccId, setEntryAccId] = useState<number | null>(null);
+  const [entryAmtStr, setEntryAmtStr] = useState("");
+  const [entryDrOrCr, setEntryDrOrCr] = useState<"Dr" | "Cr">("Cr");
+  const [lineKey, setLineKey] = useState(1);
 
   const selectStyles = {
     control: (b: any, s: any) => ({
@@ -88,7 +101,6 @@ const BankFDPreMaturePage: React.FC = () => {
     const hasSetting = !!data.tdsSetting;
     setHasTDSSetting(hasSetting);
     setTdsAccId(hasSetting ? data.tdsSetting!.tdsAccId : null);
-    setIntIncomeAccId(data.intIncomeSetting?.intIncomeAccId ?? null);
   };
 
   const recalcPreMature = (detail: BFDDetailItem, penalty: number) => {
@@ -124,12 +136,13 @@ const BankFDPreMaturePage: React.FC = () => {
   };
 
   const resetPayoutSection = () => {
-    setPayoutAccId(null);
-    setIntIncomeAccId(null);
     setNarration("");
     setTdsRate(0);
     setTdsAmount(0);
     setPreMatureAmount(0);
+    setVoucherLines([]);
+    setEntryAccId(null);
+    setEntryAmtStr("");
   };
 
   const handleReset = () => {
@@ -141,15 +154,33 @@ const BankFDPreMaturePage: React.FC = () => {
     resetPayoutSection();
   };
 
+  const handleAddLine = () => {
+    const amt = parseFloat(entryAmtStr) || 0;
+    if (!entryAccId) { Swal.fire("Warning", "Select an account.", "warning"); return; }
+    if (amt <= 0) { Swal.fire("Warning", "Enter a valid amount.", "warning"); return; }
+    const acc = generalAccounts.find(a => a.value === entryAccId);
+    setVoucherLines(prev => [...prev, {
+      key: lineKey, accId: entryAccId, accName: acc?.label ?? "", amount: amt, amountStr: amt.toFixed(2), drOrCr: entryDrOrCr,
+    }]);
+    setLineKey(k => k + 1);
+    setEntryAccId(null);
+    setEntryAmtStr("");
+  };
+
   const handleSubmit = async () => {
     if (!selectedDetail || !selectedAccId) {
       Swal.fire("Warning", "Please select an FD detail.", "warning"); return;
     }
-    if (!payoutAccId) {
-      Swal.fire("Warning", "Please select a Payout Account.", "warning"); return;
+    if (voucherLines.length === 0) {
+      Swal.fire("Warning", "Add at least one voucher entry.", "warning"); return;
     }
-    if (!intIncomeAccId) {
-      Swal.fire("Warning", "Please select an Interest Income Account.", "warning"); return;
+
+    const manualDr = voucherLines.filter(l => l.drOrCr === "Dr").reduce((s, l) => s + l.amount, 0);
+    const manualCr = voucherLines.filter(l => l.drOrCr === "Cr").reduce((s, l) => s + l.amount, 0);
+    const diff = Math.abs(manualDr - manualCr);
+    if (diff > 0.5) {
+      Swal.fire("Warning", `Voucher is out of balance by ₹${fmt(diff)}.`, "warning");
+      return;
     }
 
     const effectiveRate = Math.max(0, selectedDetail.intRate - penaltyRate);
@@ -161,14 +192,15 @@ const BankFDPreMaturePage: React.FC = () => {
         accId: selectedAccId,
         detailId: selectedDetail.id,
         voucherDate: workingDate,
-        payoutAccId: payoutAccId!,
-        intIncomeAccId: intIncomeAccId!,
+        payoutAccId: 0,
+        intIncomeAccId: 0,
         tDSAmount: hasTDSSetting ? tdsAmount : 0,
         tDSAccId: hasTDSSetting && tdsAmount > 0 ? tdsAccId : null,
         narration,
         penaltyRate,
         effectiveRate,
         preMatureAmount: effectivePreMatureAmount,
+        voucherLines: voucherLines.map(l => ({ accId: l.accId, amount: l.amount, drOrCr: l.drOrCr })),
       });
       await Swal.fire({ icon: "success", title: "Success!", text: (res as any).message || "Saved successfully.", timer: 1800, showConfirmButton: false });
       handleReset();
@@ -414,40 +446,108 @@ const BankFDPreMaturePage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Accounts section */}
+                  {/* Voucher Detail */}
                   <div className="p-6 border-b border-gray-200">
                     <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-green-500" /> Accounts
+                      <DollarSign className="w-4 h-4 text-green-500" /> Voucher Detail
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Payout Account (Dr) <span className="text-red-500">*</span></label>
+
+                    {/* Entry form */}
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4 items-end">
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Account</label>
                         <Select
                           options={generalAccounts}
-                          value={generalAccounts.find(o => o.value === payoutAccId) ?? null}
-                          onChange={o => setPayoutAccId(o?.value ?? null)}
-                          placeholder="Cash / bank account..."
+                          value={generalAccounts.find(o => o.value === entryAccId) ?? null}
+                          onChange={o => setEntryAccId(o?.value ?? null)}
+                          placeholder="Select general account..."
                           isClearable styles={selectStyles}
                           menuPortalTarget={document.body} menuPosition="fixed"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Interest Income Account (Cr) <span className="text-red-500">*</span></label>
-                        <Select
-                          options={generalAccounts}
-                          value={generalAccounts.find(o => o.value === intIncomeAccId) ?? null}
-                          onChange={o => setIntIncomeAccId(o?.value ?? null)}
-                          placeholder="Interest income GL..."
-                          isClearable styles={selectStyles}
-                          menuPortalTarget={document.body} menuPosition="fixed"
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Amount</label>
+                        <input
+                          type="text" value={entryAmtStr}
+                          onChange={e => { const v = e.target.value; if (/^\d*\.?\d{0,2}$/.test(v)) setEntryAmtStr(v); }}
+                          onBlur={() => { const n = parseFloat(entryAmtStr); setEntryAmtStr(n > 0 ? n.toFixed(2) : ""); }}
+                          placeholder="0.00"
+                          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500 font-mono"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Narration</label>
-                        <input value={narration} onChange={e => setNarration(e.target.value)}
-                          className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500"
-                          placeholder="Optional narration..." />
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Type</label>
+                          <select value={entryDrOrCr} onChange={e => setEntryDrOrCr(e.target.value as "Dr" | "Cr")}
+                            className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500 bg-white cursor-pointer">
+                            <option value="Dr">Dr</option>
+                            <option value="Cr">Cr</option>
+                          </select>
+                        </div>
+                        <button onClick={handleAddLine}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-all whitespace-nowrap">
+                          + Add
+                        </button>
                       </div>
+                    </div>
+
+                    {/* Entries grid */}
+                    {voucherLines.length > 0 && (() => {
+
+                      const totalDr = voucherLines.filter(l => l.drOrCr === "Dr").reduce((s, l) => s + l.amount, 0);
+                      const totalCr = voucherLines.filter(l => l.drOrCr === "Cr").reduce((s, l) => s + l.amount, 0);
+                      const diff = Math.abs(totalDr - totalCr);
+                      return (
+                        <div className="rounded-lg border border-gray-200 overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gradient-to-r from-gray-700 to-gray-600 text-white">
+                              <tr>
+                                <th className="px-3 py-2.5 text-left font-semibold w-10">Sr.</th>
+                                <th className="px-3 py-2.5 text-left font-semibold">Account</th>
+                                <th className="px-3 py-2.5 text-right font-semibold w-36">Amount Dr</th>
+                                <th className="px-3 py-2.5 text-right font-semibold w-36">Amount Cr</th>
+                                <th className="px-3 py-2.5 w-10"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {voucherLines.map((l, i) => (
+                                <tr key={l.key} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                                  <td className="px-3 py-2 text-gray-500">{i + 1}</td>
+                                  <td className="px-3 py-2 text-gray-800">{l.accName}</td>
+                                  <td className="px-3 py-2 text-right font-mono text-red-700">{l.drOrCr === "Dr" ? `₹${fmt(l.amount)}` : "—"}</td>
+                                  <td className="px-3 py-2 text-right font-mono text-green-700">{l.drOrCr === "Cr" ? `₹${fmt(l.amount)}` : "—"}</td>
+                                  <td className="px-3 py-2 text-center">
+                                    <button onClick={() => setVoucherLines(prev => prev.filter(x => x.key !== l.key))}
+                                      className="text-red-400 hover:text-red-600 text-xs font-bold">✕</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-gray-100 border-t-2 border-gray-300">
+                              <tr>
+                                <td colSpan={2} className="px-3 py-2 text-right text-sm font-bold text-gray-700">Total</td>
+                                <td className="px-3 py-2 text-right font-mono font-bold text-red-700">₹{fmt(totalDr)}</td>
+                                <td className="px-3 py-2 text-right font-mono font-bold text-green-700">₹{fmt(totalCr)}</td>
+                                <td />
+                              </tr>
+                            </tfoot>
+                          </table>
+                          {diff > 0.5 && (
+                            <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-t border-amber-200 text-amber-800 text-xs font-medium">
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                              Manual entries out of balance by ₹{fmt(diff)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Narration */}
+                    <div className="mt-4">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Narration</label>
+                      <input value={narration} onChange={e => setNarration(e.target.value)}
+                        className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500"
+                        placeholder="Optional narration..." />
                     </div>
                   </div>
 

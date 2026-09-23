@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ShieldCheck, ArrowLeft, Save, IndianRupee, RefreshCw } from "lucide-react";
+import { ShieldCheck, ArrowLeft, Save, IndianRupee, RefreshCw, Lock } from "lucide-react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS: SuperUserSettingsDTO = {
   allowGSTDeduction: true,
   showBankFDModule: false,
   showPayrollModule: false,
+  enforceSingleSession: false,
 };
 
 const SuperUserSettings = () => {
@@ -196,6 +197,43 @@ const SuperUserSettings = () => {
                         </button>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Security Section */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                  <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-100">
+                    <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center">
+                      <Lock className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-gray-800">Security</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Access and session controls for all users in this branch.</p>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    <div className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Single Session Login</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          When enabled, logging in from a new device or browser immediately invalidates all other active sessions for that user.
+                          Only one active session per user is allowed at a time.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => toggle("enforceSingleSession")}
+                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none cursor-pointer flex-shrink-0 ml-6 ${
+                          settings.enforceSingleSession ? "bg-red-600" : "bg-gray-200"
+                        }`}
+                        aria-label="Toggle Single Session Login"
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                            settings.enforceSingleSession ? "translate-x-6" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
                 </div>
 

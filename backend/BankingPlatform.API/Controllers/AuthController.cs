@@ -129,15 +129,55 @@ namespace BankingPlatform.API.Controllers
                     return Unauthorized(new ResponseDto { Success = false, Message = "User is not authorized to login." });
                 }
 
+                // Account lockout check
+                if (user.lockoutuntil.HasValue && user.lockoutuntil.Value > DateTime.UtcNow)
+                {
+                    var remaining = (int)Math.Ceiling((user.lockoutuntil.Value - DateTime.UtcNow).TotalMinutes);
+                    _logger.LogWarning("Login blocked — account locked: {Username}, branch: {BranchCode}", loginDto.Username, loginDto.BranchCode);
+                    return StatusCode(429, new ResponseDto { Success = false, Message = $"Account temporarily locked due to too many failed attempts. Try again in {remaining} minute(s)." });
+                }
+
                 bool isPasswordValid = PasswordHasher.VerifyPassword(loginDto.Password, user.password);
                 if (!isPasswordValid)
                 {
                     _logger.LogWarning("Failed login attempt - wrong password for user: {Username}, branch: {BranchCode}",
                         loginDto.Username, loginDto.BranchCode);
+
+                    const int maxAttempts = 5;
+                    const int lockoutMinutes = 15;
+                    user.failedloginattempts += 1;
+                    if (user.failedloginattempts >= maxAttempts)
+                    {
+                        user.lockoutuntil = DateTime.UtcNow.AddMinutes(lockoutMinutes);
+                        user.failedloginattempts = 0;
+                        await _context.SaveChangesAsync();
+                        return StatusCode(429, new ResponseDto { Success = false, Message = $"Too many failed attempts. Account locked for {lockoutMinutes} minutes." });
+                    }
+                    await _context.SaveChangesAsync();
                     return BadRequest(new ResponseDto { Success = false, Message = "Invalid credentials." });
                 }
 
-                setClaims(user.username, branchInfo.branchmaster_name, branchInfo.branchmaster_code, branchInfo.id, "", branchInfo.branchmaster_phoneno1, branchInfo.branchmaster_addressline, branchInfo.branchmaster_emailid, user.id.ToString(), "", "", 0, false, user.issu == 1);
+                // Successful login — clear any lockout state
+                user.failedloginattempts = 0;
+                user.lockoutuntil = null;
+
+                // Single-session enforcement: if enabled, rotate stamp and revoke all existing refresh tokens
+                var settings = await _context.superusersettings.AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.branchid == branchInfo.id);
+                string sessionStamp = "";
+                if (settings?.enforceSingleSession == true)
+                {
+                    sessionStamp = Guid.NewGuid().ToString();
+                    user.sessionstamp = sessionStamp;
+                    // Revoke all active refresh tokens so old sessions cannot refresh
+                    var activeTokens = await _context.refreshtoken
+                        .Where(r => r.UserId == user.id && r.BranchId == branchInfo.id && !r.IsRevoked)
+                        .ToListAsync();
+                    foreach (var t in activeTokens) t.IsRevoked = true;
+                    await _context.SaveChangesAsync();
+                }
+
+                setClaims(user.username, branchInfo.branchmaster_name, branchInfo.branchmaster_code, branchInfo.id, "", branchInfo.branchmaster_phoneno1, branchInfo.branchmaster_addressline, branchInfo.branchmaster_emailid, user.id.ToString(), "", "", 0, false, user.issu == 1, sessionStamp: sessionStamp);
 
                 // Short-lived JWT forces working-date selection before full session is granted
                 var tokenExpiration = DateTime.UtcNow.AddMinutes(5);
@@ -268,7 +308,7 @@ namespace BankingPlatform.API.Controllers
 
                 setClaims(userName, branchName, branchCode, branchId, societyName, contact, address, email, userId, workingDateDTO.WorkingDate, workingDateDTO.sessionInfo, workingDateDTO.sessionId, isFirstSession, isSu, sessionFromDate, sessionToDate);
 
-                var tokenExpiration = DateTime.UtcNow.AddDays(_jwtSettings.ExpiryDays);
+                var tokenExpiration = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes);
                 var token = _jwtTokenService.GenerateToken(tokenExpiration);
 
                 var baseCookieOpts = new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.None, Path = "/" };
@@ -439,6 +479,9 @@ namespace BankingPlatform.API.Controllers
         [HttpPost("run-script")]
         public async Task<IActionResult> RunSeleniumScript()
         {
+            if (!ClaimsHelper.GetIsSu(User))
+                return Forbid();
+
             try
             {
                 string scriptPath;
@@ -597,12 +640,21 @@ namespace BankingPlatform.API.Controllers
                 var snapshot = JsonSerializer.Deserialize<RefreshClaimsSnapshot>(stored.ClaimsSnapshot)
                     ?? throw new InvalidOperationException("Failed to deserialize claims snapshot.");
 
+                // Carry the current session stamp from DB so the refreshed JWT stays valid
+                string currentStamp = "";
+                if (int.TryParse(snapshot.UserId, out int refreshUserId))
+                {
+                    var dbUser = await _context.user.AsNoTracking()
+                        .FirstOrDefaultAsync(u => u.id == refreshUserId && u.branchid == stored.BranchId);
+                    currentStamp = dbUser?.sessionstamp ?? "";
+                }
+
                 setClaims(snapshot.UserName, snapshot.BranchName, snapshot.BranchCode, snapshot.BranchId,
                     snapshot.SocietyName, snapshot.ContactNo, snapshot.Address, snapshot.Email,
                     snapshot.UserId, snapshot.WorkingDate, snapshot.SessionInfo, snapshot.SessionId, snapshot.IsFirstSession, snapshot.IsSu,
-                    snapshot.SessionFromDate, snapshot.SessionToDate);
+                    snapshot.SessionFromDate, snapshot.SessionToDate, sessionStamp: currentStamp);
 
-                var tokenExpiration = DateTime.UtcNow.AddDays(_jwtSettings.ExpiryDays);
+                var tokenExpiration = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes);
                 var newJwt = _jwtTokenService.GenerateToken(tokenExpiration);
 
                 // Rotate: revoke old refresh token, issue new one
@@ -763,7 +815,7 @@ namespace BankingPlatform.API.Controllers
             bool.TryParse(principal.FindFirst("isSu")?.Value, out isSu);
         }
 
-        private void setClaims(string userName, string branchName, string branchCode, int branchId, string societyName, string contact, string address, string email, string userId, string workingDate, string sessionInfo, int sessionId, bool isFirstSession, bool isSu, string sessionFromDate = "", string sessionToDate = "")
+        private void setClaims(string userName, string branchName, string branchCode, int branchId, string societyName, string contact, string address, string email, string userId, string workingDate, string sessionInfo, int sessionId, bool isFirstSession, bool isSu, string sessionFromDate = "", string sessionToDate = "", string sessionStamp = "")
         {
             _commonClass.branchCode = branchCode;
             _commonClass.branchId = branchId;
@@ -781,6 +833,7 @@ namespace BankingPlatform.API.Controllers
             _commonClass.isSu = isSu;
             _commonClass.sessionFromDate = sessionFromDate;
             _commonClass.sessionToDate = sessionToDate;
+            _commonClass.sessionStamp = sessionStamp;
         }
     }
     public class ScriptPath

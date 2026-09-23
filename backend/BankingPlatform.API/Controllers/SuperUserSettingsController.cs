@@ -37,6 +37,7 @@ namespace BankingPlatform.API.Controllers
                     allowGSTDeduction         = s?.allowGSTDeduction         ?? true,
                     showBankFDModule          = s?.showBankFDModule          ?? false,
                     showPayrollModule         = s?.showPayrollModule         ?? false,
+                    enforceSingleSession      = s?.enforceSingleSession      ?? false,
                 }
             });
         }
@@ -61,6 +62,7 @@ namespace BankingPlatform.API.Controllers
                 existing.allowGSTDeduction         = dto.AllowGSTDeduction;
                 existing.showBankFDModule          = dto.ShowBankFDModule;
                 existing.showPayrollModule         = dto.ShowPayrollModule;
+                existing.enforceSingleSession      = dto.EnforceSingleSession;
             }
             else
             {
@@ -75,6 +77,7 @@ namespace BankingPlatform.API.Controllers
                     allowGSTDeduction           = dto.AllowGSTDeduction,
                     showBankFDModule            = dto.ShowBankFDModule,
                     showPayrollModule           = dto.ShowPayrollModule,
+                    enforceSingleSession        = dto.EnforceSingleSession,
                 });
             }
 
@@ -94,5 +97,6 @@ namespace BankingPlatform.API.Controllers
         public bool AllowGSTDeduction { get; set; }
         public bool ShowBankFDModule { get; set; } = false;
         public bool ShowPayrollModule { get; set; } = false;
+        public bool EnforceSingleSession { get; set; } = false;
     }
 }

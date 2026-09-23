@@ -61,11 +61,14 @@ public class JwtTokenService
             new Claim("sessionToDate", _commonClass.sessionToDate)
         };
 
+        if (!string.IsNullOrEmpty(_commonClass.sessionStamp))
+            claims.Add(new Claim("session_stamp", _commonClass.sessionStamp));
+
         var token = new JwtSecurityToken(
             issuer: _jwtSettings.Issuer,
             audience: _jwtSettings.Audience,
             claims: claims,
-            expires: expiresAt ?? DateTime.UtcNow.AddDays(_jwtSettings.ExpiryDays),
+            expires: expiresAt ?? DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes),
             signingCredentials: credentials
         );
 

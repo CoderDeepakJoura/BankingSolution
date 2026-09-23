@@ -15,6 +15,18 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.99",
+    date: "2026-09-23",
+    changes: [
+      { type: "fix", text: "Head Ledger (In Detail) and Head Ledger (Consolidate On Accounts) now correctly show opening balance for Bank FD accounts" },
+      { type: "new", text: "Bank FD Pre-Mature: Voucher Detail grid added — operator enters all Dr/Cr entries manually, same as Mature/Renew" },
+      { type: "new", text: "Single Session Login setting added in Super User Settings — prevents concurrent logins for the same user" },
+      { type: "fix", text: "Bank FD status (Open/Mature/Pre-Mature) now correctly reverts when deleting a maturity or pre-maturity voucher" },
+      { type: "fix", text: "Loan Interest Posting grid clears after posting instead of reloading with zero values" },
+      { type: "improvement", text: "Security hardening: account lockout after 5 failed logins, JWT expiry reduced to 60 minutes, constant-time password comparison" },
+    ],
+  },
+  {
     version: "1.0.98",
     date: "2026-09-23",
     changes: [
