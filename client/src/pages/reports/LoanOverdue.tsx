@@ -159,7 +159,7 @@ const LoanOverdue: React.FC = () => {
   const navigate  = useNavigate();
   const user      = useSelector((s: RootState) => s.user);
   const branchId  = user.branchid;
-  const workingDate = commonservice.parseWorkingDate(user.workingdate);
+  const workingDate = user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : new Date().toISOString().split("T")[0];
 
   const [asOfDate,    setAsOfDate]    = useState(workingDate);
   const [products,    setProducts]    = useState<LoanOverdueProductItem[]>([]);
