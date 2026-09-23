@@ -453,6 +453,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: "",
           subItems: [
             { label: "Loan NPA Report",         path: "/loan-npa-report"         },
+            { label: "Loan Overdue Report",     path: "/loan-overdue-report"     },
             { label: "NPA Ledger",              path: "/npa-ledger"              },
             { label: "Loan Advancement Report",  path: "/loan-advancement-report" },
             { label: "Loan Recovery Report",     path: "/loan-recovery-report"    },

@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.0.98",
+    date: "2026-09-23",
+    changes: [
+      { type: "fix", text: "Loan Overdue Report now renders correctly — fixed blank page caused by layout prop mismatch" },
+    ],
+  },
+  {
     version: "1.0.97",
     date: "2026-09-23",
     changes: [
