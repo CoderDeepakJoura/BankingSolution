@@ -1,4 +1,4 @@
-using BankingPlatform.API.Common;
+﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.Voucher.Loan;
 using BankingPlatform.Infrastructure.Models.AccMasters.Loan;
@@ -105,7 +105,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 bool isAddInBalance = info.ActOnIntPosting == 1;
 
                 // ── Voucher header ────────────────────────────────────────────────
-                int nextVrNo    = await _cf.GetLatestVoucherNo(dto.BrId, dto.VoucherDate);
+                using var _vrLease = await _cf.ReserveVoucherNoAsync(dto.BrId, dto.VoucherDate);
+                int nextVrNo = _vrLease.VoucherNo;
                 bool autoVerify = await _cf.IsAutoVerification(dto.BrId);
                 string vrStatus = autoVerify ? "V" : "A";
                 int userId      = int.Parse(_cf.GetCurrentUserId()!);
@@ -1236,7 +1237,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 bool   autoVerify = await _cf.IsAutoVerification(dto.BrId);
                 string vrStatus   = autoVerify ? "V" : "A";
                 int    userId     = int.Parse(_cf.GetCurrentUserId()!);
-                int    nextVrNo   = await _cf.GetLatestVoucherNo(dto.BrId, dto.VoucherDate);
+                using var _vrLease = await _cf.ReserveVoucherNoAsync(dto.BrId, dto.VoucherDate);
+                int nextVrNo = _vrLease.VoucherNo;
                 DateTime vrDate   = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Unspecified);
                 DateTime valDate  = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Utc);
                 string narr       = string.IsNullOrWhiteSpace(dto.Narration)

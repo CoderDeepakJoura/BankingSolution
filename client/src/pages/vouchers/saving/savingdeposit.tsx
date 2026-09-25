@@ -40,6 +40,7 @@ import DashboardLayout from "../../../Common/Layout";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
+import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
 import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
 import savingLedgerApi, { SavingLedger } from "../../../services/reports/savingLedgerApi";
 
@@ -74,6 +75,7 @@ const SavingDepositVoucher: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
+  const { printAfterSave } = useVoucherPrint();
   const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, validateField, clearErrors, markFieldTouched } =
     useFormValidation();
@@ -235,6 +237,11 @@ const SavingDepositVoucher: React.FC = () => {
     // Load full products list for display (no date filter in edit mode)
     commonservice.fetch_saving_products(user.branchid).then(res => {
       if (res.success) setSavingProducts(res.data ?? []);
+    });
+
+    // Load debit accounts (skipped by the non-edit useEffect which bails on isEditMode)
+    commonservice.general_accmasters_info(user.branchid).then(res => {
+      if (res.success) setDebitAccounts(res.data ?? []);
     });
   }, []);
 
@@ -529,6 +536,7 @@ const SavingDepositVoucher: React.FC = () => {
       }
 
       if (response.success) {
+        if (!isEditMode && response.message) await printAfterSave(response.message, 2, 2);
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",

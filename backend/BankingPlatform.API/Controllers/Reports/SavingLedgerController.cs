@@ -1,3 +1,4 @@
+using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.Service.Reports;
 using Microsoft.AspNetCore.Authorization;
@@ -58,7 +59,9 @@ namespace BankingPlatform.API.Controllers.Reports
             [FromQuery] int branchId,
             [FromQuery] int accountId,
             [FromQuery] string fromDate,
-            [FromQuery] string toDate)
+            [FromQuery] string toDate,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 0)
         {
             try
             {
@@ -72,6 +75,16 @@ namespace BankingPlatform.API.Controllers.Reports
 
                 if (!success)
                     return BadRequest(new { Success = false, Message = message });
+
+                // pageSize = 0 means return all entries (backward-compatible default)
+                if (data != null && pageSize > 0)
+                {
+                    var paged = PaginatedResult<SavingLedgerEntryDTO>.From(data.Entries, page, pageSize);
+                    data.Entries = paged.Items;
+                    return Ok(new { Success = true, Message = message, Data = data, Pagination = new {
+                        paged.Page, paged.PageSize, paged.TotalCount, paged.TotalPages, paged.HasPrevious, paged.HasNext
+                    }});
+                }
 
                 return Ok(new { Success = true, Message = message, Data = data });
             }

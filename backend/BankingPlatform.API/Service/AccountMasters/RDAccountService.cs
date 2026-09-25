@@ -184,7 +184,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                     && dto.Voucher.TotalDebit > 0)
                 {
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.Voucher.VoucherDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.Voucher.VoucherDate);
+                    int nextVrNo = _vrLease.VoucherNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.Voucher.VoucherNarration ?? "";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.Voucher.VoucherDate, DateTimeKind.Unspecified);
@@ -913,7 +914,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                                    ?? claimsPrincipal?.FindFirst("UserId")?.Value
                                    ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     int branchId = (int)dto.MatureRDInfo.BranchId!;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureRDInfo!.VoucherDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.MatureRDInfo!.VoucherDate);
+                    int nextVrNo = _vrLease.VoucherNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureRDInfo?.Narration ?? ("RD Matured") + " .";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.MatureRDInfo!.VoucherDate, DateTimeKind.Unspecified);
@@ -1061,7 +1063,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                                    ?? claimsPrincipal?.FindFirst("UserId")?.Value
                                    ?? claimsPrincipal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     int branchId = (int)dto.MatureRDInfo.BranchId!;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureRDInfo!.VoucherDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.MatureRDInfo!.VoucherDate);
+                    int nextVrNo = _vrLease.VoucherNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureRDInfo?.Narration ?? ("RD Pre-Matured") + " .";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.MatureRDInfo!.VoucherDate, DateTimeKind.Unspecified);

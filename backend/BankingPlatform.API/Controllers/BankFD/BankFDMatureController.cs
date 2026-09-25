@@ -553,7 +553,7 @@ namespace BankingPlatform.API.Controllers.BankFD
                 var matDate = CalcMaturityDate(renewStartDate, renewMonths, renewDays);
                 string newLtdNo = !string.IsNullOrWhiteSpace(renewLtdNo) ? renewLtdNo : detail.LTDNo + "R";
                 newDetail = new BankFDAccountDetail
-                {
+                {   
                     BrId = branchId,
                     AccId = accId,
                     LTDNo = newLtdNo,

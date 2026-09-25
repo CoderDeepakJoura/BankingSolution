@@ -105,7 +105,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                 if (dto.Voucher!.DebitAccountId > 0 && dto.Voucher.TotalDebit > 0)
                 {
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.Voucher.VoucherDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.Voucher.VoucherDate);
+                    int nextVrNo = _vrLease.VoucherNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     dto.Voucher = new VoucherDTO
                     {
@@ -283,7 +284,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                 if (dto.Voucher!.DebitAccountId > 0 && dto.Voucher.TotalDebit > 0)
                 {
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.Voucher.VoucherDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.Voucher.VoucherDate);
+                    int nextVrNo = _vrLease.VoucherNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     dto.Voucher = new VoucherDTO
                     {
@@ -811,7 +813,7 @@ namespace BankingPlatform.API.Service.AccountMasters
 
         public async Task<string> MatureOrRenewFDAsync(CommonAccMasterDTO dto)
         {
-
+            int _matureVrNo = 0;
             var claimsPrincipal = _httpContextAccessor.HttpContext?.User;
             var accountMaster = await _context.accountmaster.AsNoTracking()
                 .FirstOrDefaultAsync(m => m.ID == dto.MatureOrRenewFDInfo!.FDAccountId && m.BranchId == dto.MatureOrRenewFDInfo.BranchId);
@@ -843,7 +845,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                     decimal principalDrAmt = intDrAmt > 0 && intExpAccId > 0
                         ? totalDebit - intDrAmt
                         : totalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureOrRenewFDInfo!.VoucherDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.MatureOrRenewFDInfo!.VoucherDate);
+                    int nextVrNo = _vrLease.VoucherNo;
+                    _matureVrNo = nextVrNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureOrRenewFDInfo?.Narration ?? ("FD " + (dto.MatureOrRenewFDInfo!.IsRenew ? "Renewed" : "Matured") + " .");
                     DateTime voucherDate = DateTime.SpecifyKind(dto.MatureOrRenewFDInfo!.VoucherDate, DateTimeKind.Unspecified);
@@ -1001,7 +1005,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 throw;
             }
 
-            return "Success";
+            return $"OK:{_matureVrNo}";
 
 
         }
@@ -1041,7 +1045,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                     decimal principalDrAmt = intDrAmt > 0 && intExpAccId > 0
                         ? totalDebit - intDrAmt
                         : totalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.MatureOrRenewFDInfo!.VoucherDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.MatureOrRenewFDInfo!.VoucherDate);
+                    int nextVrNo = _vrLease.VoucherNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.MatureOrRenewFDInfo?.Narration ?? ("FD Pre-Matured") + " .";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.MatureOrRenewFDInfo!.VoucherDate, DateTimeKind.Unspecified);

@@ -50,6 +50,7 @@ import DashboardLayout from "../../../Common/Layout";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
+import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
 import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
 
 // Joint Account Holder Interface
@@ -83,6 +84,7 @@ const RDKistVoucher: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
+  const { printAfterSave } = useVoucherPrint();
   const sessionDate = user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, validateField, clearErrors, markFieldTouched } =
     useFormValidation();
@@ -282,9 +284,11 @@ const RDKistVoucher: React.FC = () => {
     Promise.all([
       commonservice.fetch_rd_products(user.branchid),
       commonservice.fetch_saving_products(user.branchid),
-    ]).then(([rdRes, savRes]) => {
+      commonservice.general_accmasters_info(user.branchid),
+    ]).then(([rdRes, savRes, debitRes]) => {
       if (rdRes.success) setRDProducts(rdRes.data ?? []);
       if (savRes.success) setSavingProducts(savRes.data ?? []);
+      if (debitRes.success) setDebitAccounts(debitRes.data ?? []);
     });
   }, []);
 
@@ -517,6 +521,7 @@ const RDKistVoucher: React.FC = () => {
         : await rdKistVoucherApi.addRDKistVoucher(rdKistVoucherPayload);
 
       if (response.success) {
+        if (!isEditMode && response.message) await printAfterSave(response.message, 4, 8);
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",

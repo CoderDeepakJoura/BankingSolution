@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -19,7 +19,11 @@ import {
   Receipt,
   ChevronRight,
   XCircle,
+  Printer,
+  ShieldCheck,
 } from "lucide-react";
+import { voucherPrintApi } from "../../services/voucherPrintApi";
+import settingsApi from "../../services/settings/settingsapi";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -333,6 +337,23 @@ const VouchersModule: React.FC = () => {
   const navigate      = useNavigate();
   const showBankFD    = useSelector((state: RootState) => state.user.showBankFDModule);
   const ibEnabled     = useSelector((state: RootState) => state.user.enableIBTransactions);
+  const branchId      = useSelector((state: RootState) => state.user.branchid);
+
+  const [hasPrintSettings, setHasPrintSettings] = useState(false);
+  const [autoVerification, setAutoVerification] = useState(true);
+
+  useEffect(() => {
+    if (!branchId) return;
+    voucherPrintApi.getSettings(branchId)
+      .then(rows => setHasPrintSettings(rows.some(r => r.isEnabled)))
+      .catch(() => {});
+    settingsApi.fetch_settings(branchId)
+      .then(res => {
+        const av = res?.data?.voucherSettings?.autoVerification;
+        setAutoVerification(av === true);
+      })
+      .catch(() => {});
+  }, [branchId]);
 
   const visibleCategories = categories.filter(c =>
     (!c.bankFdOnly || showBankFD) &&
@@ -386,6 +407,56 @@ const VouchersModule: React.FC = () => {
                 </div>
               </div>
             </button>
+
+            {/* ── Re-Print (shown only when at least one type is print-enabled) ── */}
+            {hasPrintSettings && (
+              <button
+                onClick={() => navigate("/voucher-reprint")}
+                className="group w-full bg-white rounded-2xl shadow-sm border-2 border-violet-300 hover:border-violet-500 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer"
+              >
+                <div className="flex items-center gap-6 px-8 py-6">
+                  <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-purple-600 group-hover:from-violet-600 group-hover:to-purple-700 rounded-2xl flex items-center justify-center shadow-md transition-colors flex-shrink-0">
+                    <Printer size={26} className="text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-lg font-bold text-gray-800 group-hover:text-violet-700 transition-colors">
+                      Re-Print Voucher
+                    </p>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Search vouchers by date range and re-download their PDFs
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 group-hover:bg-violet-700 text-white text-sm font-semibold rounded-xl shadow transition-colors flex-shrink-0">
+                    Open <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </div>
+              </button>
+            )}
+
+            {/* ── Verify Vouchers (only when auto-verification is OFF) ──── */}
+            {!autoVerification && (
+              <button
+                onClick={() => navigate("/voucher-verify")}
+                className="group w-full bg-white rounded-2xl shadow-sm border-2 border-green-300 hover:border-green-500 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer"
+              >
+                <div className="flex items-center gap-6 px-8 py-6">
+                  <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 group-hover:from-green-600 group-hover:to-emerald-700 rounded-2xl flex items-center justify-center shadow-md transition-colors flex-shrink-0">
+                    <ShieldCheck size={26} className="text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-lg font-bold text-gray-800 group-hover:text-green-700 transition-colors">
+                      Verify Vouchers
+                    </p>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Maker-checker: verify today's unverified vouchers added by other users
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 px-5 py-2.5 bg-green-600 group-hover:bg-green-700 text-white text-sm font-semibold rounded-xl shadow transition-colors flex-shrink-0">
+                    Open <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </div>
+              </button>
+            )}
 
             {/* ── Divider ─────────────────────────────────────────────────── */}
             <div className="flex items-center gap-4">

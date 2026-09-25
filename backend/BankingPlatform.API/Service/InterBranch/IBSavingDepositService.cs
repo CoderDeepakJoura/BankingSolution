@@ -1,4 +1,4 @@
-using BankingPlatform.API.Common;
+﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.InterBranch;
 using BankingPlatform.API.DTO.Voucher;
@@ -68,7 +68,9 @@ namespace BankingPlatform.API.Service.InterBranch
                 string narration = dto.Narration ?? $"IB Saving Deposit to A/c {dto.DestAccNo} ({dto.DestAccName})";
                 string userId    = dto.UserId ?? _commonfunctions.GetCurrentUserId() ?? "0";
 
-                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, voucherDate);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, voucherDate);
+
+                int nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                 string voucherStatus = isAutoVerification ? "V" : "A";
 
@@ -195,7 +197,9 @@ namespace BankingPlatform.API.Service.InterBranch
                     : ibRecord.Narration ?? $"IB Settlement — Br{ibRecord.FromBrId} → Br{ibRecord.DestBrId}";
                 string userId    = dto.UserId ?? _commonfunctions.GetCurrentUserId() ?? "0";
 
-                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, voucherDate);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, voucherDate);
+
+                int nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                 string voucherStatus = isAutoVerification ? "V" : "A";
 
@@ -370,7 +374,9 @@ namespace BankingPlatform.API.Service.InterBranch
                 : ibRecord.Narration ?? $"IB Saving Deposit — credit to {ibRecord.DestAccName}";
             string userId    = userIdRaw ?? _commonfunctions.GetCurrentUserId() ?? "0";
 
-            int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, voucherDate);
+            using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, voucherDate);
+
+            int nextVrNo = _vrLease.VoucherNo;
             bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
             string voucherStatus = isAutoVerification ? "V" : "A";
 
@@ -495,7 +501,9 @@ namespace BankingPlatform.API.Service.InterBranch
                 string narration = dto.Narration ?? $"IB Saving Withdrawal from A/c {dto.DestAccNo} ({dto.DestAccName})";
                 string userId    = dto.UserId ?? _commonfunctions.GetCurrentUserId() ?? "0";
 
-                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, voucherDate);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, voucherDate);
+
+                int nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                 string voucherStatus = isAutoVerification ? "V" : "A";
 
@@ -623,7 +631,9 @@ namespace BankingPlatform.API.Service.InterBranch
                     : ibRecord.Narration ?? $"IB Withdrawal Settlement — Br{ibRecord.FromBrId} ← Br{ibRecord.DestBrId}";
                 string userId    = dto.UserId ?? _commonfunctions.GetCurrentUserId() ?? "0";
 
-                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, voucherDate);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, voucherDate);
+
+                int nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                 string voucherStatus = isAutoVerification ? "V" : "A";
 
@@ -799,7 +809,9 @@ namespace BankingPlatform.API.Service.InterBranch
                 : ibRecord.Narration ?? $"IB Saving Withdrawal — debit from {ibRecord.DestAccName}";
             string userId    = userIdRaw ?? _commonfunctions.GetCurrentUserId() ?? "0";
 
-            int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, voucherDate);
+            using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, voucherDate);
+
+            int nextVrNo = _vrLease.VoucherNo;
             bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
             string voucherStatus = isAutoVerification ? "V" : "A";
 

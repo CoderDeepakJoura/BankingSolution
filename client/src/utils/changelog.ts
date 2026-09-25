@@ -15,6 +15,26 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.3",
+    date: "2026-09-25",
+    changes: [
+      { type: "new", text: "Maker-checker voucher verification: vouchers saved in 'Added' status can now be verified by a different user — dedicated 'Verify Vouchers' screen shows today's unverified vouchers with maker name and amount" },
+      { type: "new", text: "Verify action propagates status to all detail tables (vouchercreditdebitdetails, vouchersavingdetail, voucherrddetail, voucherfddetail, voucherbfddetail, voucherrecintdetail) atomically" },
+      { type: "improvement", text: "Voucher Operations hub: Re-Print card only shown when at least one print type is enabled; Verify Vouchers card only shown when auto-verification is off" },
+      { type: "new", text: "Voucher Re-Print screen added to Voucher Operations hub" },
+    ],
+  },
+  {
+    version: "1.1.2",
+    date: "2026-09-24",
+    changes: [
+      { type: "fix", text: "Voucher number race condition: concurrent requests from two tabs/users can no longer generate duplicate voucher numbers — per-branch semaphore serialises the read-MAX → save window across all 17 service paths" },
+      { type: "new", text: "Input validation: FluentValidation added for Login, Cash Voucher, Journal Voucher, Saving Voucher, and base Voucher DTOs — malformed requests are now rejected before reaching the service layer with descriptive 400 errors" },
+      { type: "improvement", text: "Pagination: Saving Ledger and Day Book endpoints now accept ?page=&pageSize= query params — large datasets no longer force a full 50,000-row response; pageSize=0 (default) retains backward-compatible behaviour" },
+      { type: "new", text: "Integration tests: 26 automated tests added covering validator correctness, pagination edge cases, and concurrent voucher-number uniqueness" },
+    ],
+  },
+  {
     version: "1.1.1",
     date: "2026-09-23",
     changes: [

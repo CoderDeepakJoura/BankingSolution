@@ -1,3 +1,4 @@
+using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.Service.Reports;
 using Microsoft.AspNetCore.Authorization;
@@ -43,7 +44,9 @@ namespace BankingPlatform.API.Controllers.Reports
         public async Task<IActionResult> GetDayBook(
             [FromQuery] int branchId,
             [FromQuery] string fromDate,
-            [FromQuery] string toDate)
+            [FromQuery] string toDate,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 0)
         {
             try
             {
@@ -57,6 +60,19 @@ namespace BankingPlatform.API.Controllers.Reports
 
                 if (!success)
                     return BadRequest(new { Success = false, Message = message });
+
+                // Pagination metadata — entries are paginated when pageSize > 0
+                if (data != null && pageSize > 0)
+                {
+                    int safePage = Math.Max(1, page);
+                    int safeSize = Math.Clamp(pageSize, 1, 500);
+                    int totalVouchers = data.TotalVoucherCount;
+                    int totalPages = (int)Math.Ceiling((double)totalVouchers / safeSize);
+                    return Ok(new { Success = true, Message = message, Data = data, Pagination = new {
+                        Page = safePage, PageSize = safeSize, TotalCount = totalVouchers,
+                        TotalPages = totalPages, HasPrevious = safePage > 1, HasNext = safePage < totalPages
+                    }});
+                }
 
                 return Ok(new { Success = true, Message = message, Data = data });
             }

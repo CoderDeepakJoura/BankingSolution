@@ -30,6 +30,7 @@ import { RootState } from "../../../redux";
 import { SavingAccounts } from "../../vouchers/saving/savingdeposit";
 import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../../services/vouchers/loan/loanRecoveryApi";
 import branchwiseruleService from "../../../services/branchwiserule/branchwiserules";
+import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -125,6 +126,7 @@ interface RenewValidationErrors {
 const MatureFDPage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
+  const { printAfterSave } = useVoucherPrint();
   const sessionDate = user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [loading, setLoading] = useState(false);
@@ -839,15 +841,19 @@ const MatureFDPage: React.FC = () => {
         CreditAccountDetails: accountCredit,
       };
 
-      await fdAccountService.matureFD(dto);
+      const response = await fdAccountService.matureFD(dto);
+      const voucherSubType = isRenewFD ? 6 : 5;
 
       await Swal.fire({
         icon: "success",
         title: "Success!",
-        text: `FD ${isRenewFD ? "renewed" : "matured"} successfully!`,
+        text: response.message || `FD ${isRenewFD ? "renewed" : "matured"} successfully!`,
         timer: 1500,
         showConfirmButton: false,
       });
+
+      await printAfterSave(response.message ?? "", 3, voucherSubType);
+
       handleReset();
       setTimeout(() => productSelectRef.current?.focus(), 100);
     } catch (error: any) {

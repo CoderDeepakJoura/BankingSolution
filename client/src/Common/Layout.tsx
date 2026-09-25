@@ -153,6 +153,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               branchGstNo: data.branchGstNo ?? "",
               branchStateId: data.branchStateId ?? 0,
               lastSeenVersion: data.lastSeenVersion ?? "0.0.0",
+              userId: data.userId ?? 0,
               enableIBTransactions: suRes?.data?.enableIBTransactions ?? true,
               allowGSTDeduction: suRes?.data?.allowGSTDeduction ?? true,
               showBankFDModule: suRes?.data?.showBankFDModule ?? false,

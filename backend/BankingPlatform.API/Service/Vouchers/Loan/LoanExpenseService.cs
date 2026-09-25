@@ -1,4 +1,4 @@
-using BankingPlatform.API.Common;
+﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Voucher.Loan;
@@ -131,7 +131,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     return ("Total tax cannot be negative.", 0);
 
                 int branchId = dto.BranchId;
-                nextVrNo = await _commonFunctions.GetLatestVoucherNo(branchId, dto.Date);
+                using var _vrLease = await _commonFunctions.ReserveVoucherNoAsync(branchId, dto.Date);
+                nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonFunctions.IsAutoVerification(branchId);
                 string voucherStatus = isAutoVerification ? "V" : "A";
                 int currentUserId = int.Parse(_commonFunctions.GetCurrentUserId()!);

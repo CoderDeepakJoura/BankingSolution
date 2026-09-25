@@ -37,6 +37,8 @@ namespace BankingPlatform.API.Service.Reports
         public decimal TotalReceipts { get; set; }
         public decimal TotalPayments { get; set; }
         public decimal ClosingBalance { get; set; }
+        // Pagination support: total number of distinct vouchers in the date range
+        public int TotalVoucherCount { get; set; }
     }
 
     public class SessionDatesDTO
@@ -176,7 +178,8 @@ namespace BankingPlatform.API.Service.Reports
                 PaymentGroups = paymentGroups,
                 TotalReceipts = totalReceipts,
                 TotalPayments = totalPayments,
-                ClosingBalance = closingBalance
+                ClosingBalance = closingBalance,
+                TotalVoucherCount = idList.Count
             });
         }
 

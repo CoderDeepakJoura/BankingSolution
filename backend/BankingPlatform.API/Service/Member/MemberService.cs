@@ -133,7 +133,8 @@ namespace BankingPlatform.API.Services
                 if (!isOpeningEntry && smAmount > 0)
                 {
                     string narration = dto.Voucher.VoucherNarration!;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(member.BranchId, member.JoiningDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(member.BranchId, member.JoiningDate);
+                    int nextVrNo = _vrLease.VoucherNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(member.BranchId);
                     int admissionFeeAccountId = dto.Voucher.admissionFeesAccountId ?? 0;
                     decimal admissionFeeAmount = dto.Voucher.admissionFeeAmount ?? 0;

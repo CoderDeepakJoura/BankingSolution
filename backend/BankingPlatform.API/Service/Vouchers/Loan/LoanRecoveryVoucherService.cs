@@ -1,4 +1,4 @@
-using BankingPlatform.API.Common;
+﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.Voucher.Loan;
 using BankingPlatform.Infrastructure.Models;
@@ -901,7 +901,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 }
 
                 // Voucher header
-                int nextVrNo   = await _cf.GetLatestVoucherNo(dto.BrId, dto.VoucherDate);
+                using var _vrLease = await _cf.ReserveVoucherNoAsync(dto.BrId, dto.VoucherDate);
+                int nextVrNo = _vrLease.VoucherNo;
                 bool autoVerify = await _cf.IsAutoVerification(dto.BrId);
                 string vrStatus = autoVerify ? "V" : "A";
                 int userId      = int.Parse(_cf.GetCurrentUserId()!);

@@ -1,4 +1,4 @@
-using BankingPlatform.API.Common;
+﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.Voucher;
 using BankingPlatform.API.DTO.Voucher.Cash;
@@ -48,7 +48,9 @@ namespace BankingPlatform.API.Service.Vouchers.Cash
                 if (netCash == 0)
                     return ("Net cash amount cannot be zero. Total credits and debits are equal.", 0);
 
-                nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.VoucherDate);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.VoucherDate);
+
+                nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                 DateTime voucherDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Unspecified);
                 DateTime valueDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Utc);

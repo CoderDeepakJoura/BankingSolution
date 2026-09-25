@@ -170,7 +170,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                 {
                     int debitAccountId = (int)dto.Voucher!.DebitAccountId;
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    int nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.Voucher.VoucherDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.Voucher.VoucherDate);
+                    int nextVrNo = _vrLease.VoucherNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.Voucher.VoucherNarration ?? "";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.Voucher.VoucherDate, DateTimeKind.Unspecified);
@@ -683,7 +684,9 @@ namespace BankingPlatform.API.Service.AccountMasters
                     return "Success";
                 }
 
-                int nextVrNo = await _commonfunctions.GetLatestVoucherNo(dto.BranchId, dto.VoucherDate);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(dto.BranchId, dto.VoucherDate);
+
+                int nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(dto.BranchId);
                 string voucherStatus = isAutoVerification ? "V" : "A";
                 string narration = !string.IsNullOrWhiteSpace(dto.Narration)

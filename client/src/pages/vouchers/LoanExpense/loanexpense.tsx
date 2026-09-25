@@ -6,6 +6,7 @@ import Swal from "sweetalert2";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { RootState } from "../../../redux";
+import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
 import commonservice from "../../../services/common/commonservice";
 import loanExpenseApi, {
   LoanExpenseDTO,
@@ -61,6 +62,7 @@ type ListRow = LoanExpenseListDTO & { _idx: number };
 const LoanExpensePage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
+  const { printAfterSave } = useVoucherPrint();
   const sessionDate = user.workingdate
     ? commonservice.splitDate(user.workingdate)
     : commonservice.getTodaysDate();
@@ -224,6 +226,7 @@ const LoanExpensePage: React.FC = () => {
         ? await loanExpenseApi.update(editId, dto)
         : await loanExpenseApi.create(dto);
       if (res.success) {
+        if (!editId && res.message) await printAfterSave(res.message, 5, 14);
         await Swal.fire({
           icon: "success",
           title: editId ? "Updated" : "Saved",

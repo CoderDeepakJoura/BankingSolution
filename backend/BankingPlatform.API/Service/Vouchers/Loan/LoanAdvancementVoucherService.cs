@@ -1,4 +1,4 @@
-using BankingPlatform.API.Common;
+﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.Voucher.Loan;
 using BankingPlatform.API.Mappers.Voucher;
@@ -49,7 +49,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     return ($"Advancement amount cannot exceed sanctioned loan amount of {kistDetail.LoanAmountPassed.Value:N2}.", 0);
 
                 int branchId = dto.BrId;
-                nextVrNo = await _commonFunctions.GetLatestVoucherNo(branchId, dto.VoucherDate);
+                using var _vrLease = await _commonFunctions.ReserveVoucherNoAsync(branchId, dto.VoucherDate);
+                nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonFunctions.IsAutoVerification(branchId);
                 string voucherStatus = isAutoVerification ? "V" : "A";
                 int currentUserId = int.Parse(_commonFunctions.GetCurrentUserId()!);

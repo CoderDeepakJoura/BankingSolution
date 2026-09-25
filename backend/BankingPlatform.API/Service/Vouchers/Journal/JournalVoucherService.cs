@@ -1,4 +1,4 @@
-using BankingPlatform.API.Common;
+﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.Voucher;
 using BankingPlatform.API.DTO.Voucher.Journal;
@@ -55,7 +55,9 @@ namespace BankingPlatform.API.Service.Vouchers.Journal
                 var balErr = await CheckPersonalAccountBalances(dto.Entries, branchId);
                 if (balErr != null) return (balErr, 0);
 
-                nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.VoucherDate);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.VoucherDate);
+
+                nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                 DateTime voucherDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Unspecified);
                 DateTime valueDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Utc);

@@ -3,6 +3,8 @@ using BankingPlatform.API.DTO;
 using BankingPlatform.API.DTO.Member;
 using BankingPlatform.API.Service;
 using BankingPlatform.API.Services;
+using BankingPlatform.API.Validators;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -18,12 +20,15 @@ namespace BankingPlatform.API.Controllers.Member
         private readonly CommonFunctions _commonfunctions;
         private readonly ImageService _imageService;
         private readonly BankingDbContext _db;
-        public MemberController(MemberService service, CommonFunctions commonfunctions, ImageService imageService, BankingDbContext db)
+        private readonly IValidator<CombinedMemberDTO> _memberValidator;
+
+        public MemberController(MemberService service, CommonFunctions commonfunctions, ImageService imageService, BankingDbContext db, IValidator<CombinedMemberDTO> memberValidator)
         {
             _service = service;
             _commonfunctions = commonfunctions;
             _imageService = imageService;
             _db = db;
+            _memberValidator = memberValidator;
         }
 
 
@@ -39,10 +44,15 @@ namespace BankingPlatform.API.Controllers.Member
                     WriteIndented = true
                 };
                 var dto = JsonSerializer.Deserialize<CombinedMemberDTO>(request.MemberData, options);
+                if (dto is null)
+                    return BadRequest(new ResponseDto { Success = false, Message = "Invalid member data." });
 
+                var validation = await _memberValidator.ValidateAsync(dto);
+                if (!validation.IsValid)
+                    return BadRequest(new ResponseDto { Success = false, Message = validation.Errors[0].ErrorMessage });
 
                 var result = await _service.CreateMemberAsync(
-                    dto!,
+                    dto,
                     request.MemberPhoto,
                     request.MemberSignature
                 );
@@ -111,10 +121,15 @@ namespace BankingPlatform.API.Controllers.Member
                     WriteIndented = true
                 };
                 var dto = JsonSerializer.Deserialize<CombinedMemberDTO>(request.MemberData, options);
+                if (dto is null)
+                    return BadRequest(new ResponseDto { Success = false, Message = "Invalid member data." });
 
+                var validation = await _memberValidator.ValidateAsync(dto);
+                if (!validation.IsValid)
+                    return BadRequest(new ResponseDto { Success = false, Message = validation.Errors[0].ErrorMessage });
 
                 var result = await _service.UpdateMemberAsync(
-                    dto!,
+                    dto,
                     request.MemberPhoto,
                     request.MemberSignature
                 );

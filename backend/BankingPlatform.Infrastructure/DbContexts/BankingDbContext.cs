@@ -92,6 +92,7 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<AccountSettings> accountsettings { get; set; }
     public virtual DbSet<TDSSettings> tdssettings { get; set; }
     public virtual DbSet<PrintingSettings> printingsettings { get; set; }
+    public virtual DbSet<VoucherPrintSettings> voucherprintsettings { get; set; }
     public virtual DbSet<SuperUserSettings> superusersettings { get; set; }
     public virtual DbSet<SavingProductBranchWiseRule> savingproductbranchwiserule { get; set; }
     public virtual DbSet<FDProductBranchWiseRule> fdproductbranchwiserule { get; set; }

@@ -7,6 +7,7 @@ using BankingPlatform.Infrastructure.Models.voucher;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using System;
+using System.Collections.Concurrent;
 using System.Security.Claims;
 
 namespace BankingPlatform.API.Common.CommonFunctions
@@ -17,6 +18,11 @@ namespace BankingPlatform.API.Common.CommonFunctions
         public const long dividendPayableHeadCode = 138101000000;
         private readonly BankingDbContext _appcontext;
         private readonly IHttpContextAccessor _httpContextAccessor;
+
+        // One semaphore per branch — serialises the read-MAX → save window so
+        // two concurrent requests for the same branch cannot both receive the
+        // same voucher number before either has committed.
+        private static readonly ConcurrentDictionary<int, SemaphoreSlim> _voucherLocks = new();
         public CommonFunctions(
             BankingDbContext context, IHttpContextAccessor httpContextAccessor)
         {
@@ -204,6 +210,29 @@ namespace BankingPlatform.API.Common.CommonFunctions
             }
 
             return (maxVoucherNo ?? 0) + 1;
+        }
+
+        /// <summary>
+        /// Acquires a per-branch semaphore and returns a VoucherNumberLease that
+        /// holds both the reserved number and the lock. Callers MUST wrap this in
+        /// a <c>using</c> block that includes the subsequent SaveChangesAsync() call
+        /// so the lock is released only after the row is safely committed.
+        /// </summary>
+        public async Task<VoucherNumberLease> ReserveVoucherNoAsync(int branchId, DateTime? voucherDate = null)
+        {
+            var sem = _voucherLocks.GetOrAdd(branchId, _ => new SemaphoreSlim(1, 1));
+            await sem.WaitAsync();
+            int voucherNo;
+            try
+            {
+                voucherNo = await GetLatestVoucherNo(branchId, voucherDate);
+            }
+            catch
+            {
+                sem.Release();
+                throw;
+            }
+            return new VoucherNumberLease(voucherNo, sem);
         }
 
         public async Task<int> GetHeadIdFromHeadCode(int branchId, long headCode) => await _appcontext.accounthead.Where(x => x.branchid == branchId && x.headcode == headCode).Select(x => x.id > 0 ? x.id : 0).FirstOrDefaultAsync();

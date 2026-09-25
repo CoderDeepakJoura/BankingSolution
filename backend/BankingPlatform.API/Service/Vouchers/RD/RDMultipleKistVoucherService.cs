@@ -1,4 +1,4 @@
-using BankingPlatform.API.Common;
+﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.Voucher;
 using BankingPlatform.API.DTO.Voucher.RD;
@@ -38,7 +38,8 @@ namespace BankingPlatform.API.Service.Vouchers.RD
             try
             {
                 int branchId = dto.BrID;
-                nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.VoucherDate);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.VoucherDate);
+                nextVrNo = _vrLease.VoucherNo;
                 bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                 string voucherStatus = isAutoVerification ? "V" : "A";
                 DateTime voucherDate = DateTime.SpecifyKind(dto.VoucherDate, DateTimeKind.Unspecified);

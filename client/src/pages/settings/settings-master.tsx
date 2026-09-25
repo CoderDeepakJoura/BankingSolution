@@ -13,6 +13,8 @@ import SettingsApiService, {
   TDSSettingsDTO,
   PrintingSettingsDTO,
 } from "../../services/settings/settingsapi";
+import { voucherPrintApi, VoucherPrintSettingDTO } from "../../services/voucherPrintApi";
+import { invalidateVoucherPrintCache } from "../../hooks/useVoucherPrint";
 import {
   Settings,
   Receipt,
@@ -47,6 +49,8 @@ const SettingsMaster = () => {
   const [showValidationSummary, setShowValidationSummary] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [loading, setLoading] = useState(false);
+  const [vpSettings, setVpSettings] = useState<VoucherPrintSettingDTO[]>([]);
+  const [vpLoading, setVpLoading] = useState(false);
 
   // ✅ Complete Settings form data
   const [settingsData, setSettingsData] = useState({
@@ -96,6 +100,9 @@ const SettingsMaster = () => {
         } else {
           throw new Error(response.message || "Failed to fetch general accounts info.");
         }
+
+        const vpRows = await voucherPrintApi.getSettings(user.branchid);
+        if (vpRows.length > 0) setVpSettings(vpRows);
 
         const settingsResponse = await SettingsApiService.fetch_settings(user.branchid);
         if (settingsResponse.success && settingsResponse.data) {
@@ -359,11 +366,12 @@ const SettingsMaster = () => {
   };
 
   const tabs = [
-    { id: "general", label: "General", icon: Settings },
-    { id: "account", label: "Account", icon: CreditCard },
-    { id: "voucher", label: "Voucher", icon: Receipt },
-    { id: "tds", label: "TDS", icon: Calculator },
-    { id: "printing", label: "Printing", icon: Printer },
+    { id: "general",      label: "General",        icon: Settings  },
+    { id: "account",      label: "Account",        icon: CreditCard },
+    { id: "voucher",      label: "Voucher",        icon: Receipt   },
+    { id: "tds",          label: "TDS",            icon: Calculator },
+    { id: "printing",     label: "Printing",       icon: Printer   },
+    { id: "voucherprint", label: "Voucher Print",  icon: FileText  },
   ];
 
   const accountOptions = generalAccounts.map((accounts) => ({
@@ -383,6 +391,152 @@ const SettingsMaster = () => {
     { value: 4, label: "Yearly" },
     { value: 5, label: "At Interest Posting" },
   ];
+
+  const VOUCHER_PRINT_CONFIGS: { voucherType: number; voucherSubType: number; label: string; category: string }[] = [
+    { voucherType: 1,  voucherSubType: 1,  label: "Share Money",          category: "Member" },
+    { voucherType: 2,  voucherSubType: 2,  label: "Saving Deposit",       category: "Saving" },
+    { voucherType: 2,  voucherSubType: 3,  label: "Saving Withdrawal",    category: "Saving" },
+    { voucherType: 2,  voucherSubType: 29, label: "Close Saving Account", category: "Saving" },
+    { voucherType: 3,  voucherSubType: 2,  label: "FD Deposit",           category: "Fixed Deposit" },
+    { voucherType: 3,  voucherSubType: 5,  label: "FD Mature",            category: "Fixed Deposit" },
+    { voucherType: 3,  voucherSubType: 6,  label: "FD Renew",             category: "Fixed Deposit" },
+    { voucherType: 3,  voucherSubType: 7,  label: "FD Pre-Mature",        category: "Fixed Deposit" },
+    { voucherType: 4,  voucherSubType: 8,  label: "RD Kist",              category: "Recurring Deposit" },
+    { voucherType: 4,  voucherSubType: 16, label: "RD Multiple Kist",     category: "Recurring Deposit" },
+    { voucherType: 5,  voucherSubType: 9,  label: "Loan Advancement",     category: "Loan" },
+    { voucherType: 5,  voucherSubType: 10, label: "Loan Recovery",        category: "Loan" },
+    { voucherType: 5,  voucherSubType: 14, label: "Loan Expense",         category: "Loan" },
+    { voucherType: 6,  voucherSubType: 11, label: "Cash Voucher",         category: "Cash / Journal" },
+    { voucherType: 7,  voucherSubType: 12, label: "Journal / Transfer",   category: "Cash / Journal" },
+  ];
+
+  const isVpEnabled = (voucherType: number, voucherSubType: number) =>
+    vpSettings.some((s) => s.voucherType === voucherType && s.voucherSubType === voucherSubType && s.isEnabled);
+
+  const getVpCopies = (voucherType: number, voucherSubType: number) =>
+    vpSettings.find((s) => s.voucherType === voucherType && s.voucherSubType === voucherSubType)?.copies ?? 1;
+
+  const toggleVp = (voucherType: number, voucherSubType: number, enabled: boolean) => {
+    setVpSettings((prev) => {
+      const existing = prev.find((s) => s.voucherType === voucherType && s.voucherSubType === voucherSubType);
+      if (existing) {
+        return prev.map((s) =>
+          s.voucherType === voucherType && s.voucherSubType === voucherSubType ? { ...s, isEnabled: enabled } : s
+        );
+      }
+      return [...prev, { voucherType, voucherSubType, isEnabled: enabled, copies: 1 }];
+    });
+  };
+
+  const setVpCopies = (voucherType: number, voucherSubType: number, copies: number) => {
+    setVpSettings((prev) => {
+      const existing = prev.find((s) => s.voucherType === voucherType && s.voucherSubType === voucherSubType);
+      if (existing) {
+        return prev.map((s) =>
+          s.voucherType === voucherType && s.voucherSubType === voucherSubType ? { ...s, copies } : s
+        );
+      }
+      return [...prev, { voucherType, voucherSubType, isEnabled: false, copies }];
+    });
+  };
+
+  const handleVpSave = async () => {
+    setVpLoading(true);
+    try {
+      const payload = VOUCHER_PRINT_CONFIGS.map((c) => ({
+        voucherType: c.voucherType,
+        voucherSubType: c.voucherSubType,
+        isEnabled: isVpEnabled(c.voucherType, c.voucherSubType),
+        copies: getVpCopies(c.voucherType, c.voucherSubType),
+      }));
+      const res = await voucherPrintApi.saveSettings(user.branchid, payload);
+      if (res.success) {
+        invalidateVoucherPrintCache(user.branchid);
+        await Swal.fire({ icon: "success", title: "Saved!", text: res.message, confirmButtonColor: "#3B82F6" });
+      } else {
+        throw new Error(res.message || "Failed to save.");
+      }
+    } catch (err: any) {
+      Swal.fire({ icon: "error", title: "Error!", text: err.message || "Failed to save voucher print settings.", confirmButtonColor: "#EF4444" });
+    } finally {
+      setVpLoading(false);
+    }
+  };
+
+  const renderVoucherPrintSettings = () => {
+    const categories = [...new Set(VOUCHER_PRINT_CONFIGS.map((c) => c.category))];
+    return (
+      <div className="space-y-6">
+        <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <p className="text-sm text-amber-800">
+            When enabled, a PDF voucher is automatically downloaded to your browser immediately after saving that voucher type.
+          </p>
+        </div>
+        {categories.map((cat) => (
+          <div key={cat} className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                {cat}
+              </h3>
+            </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {VOUCHER_PRINT_CONFIGS.filter((c) => c.category === cat).map((cfg) => {
+                const enabled = isVpEnabled(cfg.voucherType, cfg.voucherSubType);
+                const copies = getVpCopies(cfg.voucherType, cfg.voucherSubType);
+                const key = `vp-${cfg.voucherType}-${cfg.voucherSubType}`;
+                return (
+                  <div
+                    key={key}
+                    className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-150 ${
+                      enabled ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      id={key}
+                      checked={enabled}
+                      onChange={(e) => toggleVp(cfg.voucherType, cfg.voucherSubType, e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                    />
+                    <label htmlFor={key} className={`flex-1 text-sm font-medium cursor-pointer ${enabled ? "text-blue-800" : "text-gray-700"}`}>
+                      {cfg.label}
+                    </label>
+                    {enabled && (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="text-xs text-gray-500">Copies:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={copies}
+                          onChange={(e) => setVpCopies(cfg.voucherType, cfg.voucherSubType, Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                          className="w-12 text-center text-sm border border-blue-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <div className="flex justify-end">
+          <button
+            onClick={handleVpSave}
+            disabled={vpLoading}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+          >
+            {vpLoading ? (
+              <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
+            ) : (
+              <><Save className="w-4 h-4" />Save Voucher Print Settings</>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // ✅ General Settings Tab
   const renderGeneralSettings = () => (
@@ -1009,6 +1163,8 @@ const SettingsMaster = () => {
         return renderTDSSettings();
       case "printing":
         return renderPrintingSettings();
+      case "voucherprint":
+        return renderVoucherPrintSettings();
       default:
         return renderGeneralSettings();
     }

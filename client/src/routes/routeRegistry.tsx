@@ -106,6 +106,8 @@ import SavingDepositVoucher from "../pages/vouchers/saving/savingdeposit";
 import SavingWithdrawalVoucher from "../pages/vouchers/saving/savingwithdrawal";
 import VoucherModule from "../components/Vouchers/VoucherOperations";
 import VoucherSearch from "../pages/vouchers/VoucherSearch";
+import VoucherReprint from "../pages/vouchers/VoucherReprint";
+import VoucherVerify from "../pages/vouchers/VoucherVerify";
 import RDKistVoucher from "../pages/vouchers/RD/rdkist";
 import RDMultipleKistVoucher from "../pages/vouchers/RD/rdmultiplekist";
 import CashPaymentReceiptVoucher from "../pages/vouchers/Cash/cashvoucher";
@@ -383,6 +385,8 @@ export const ROUTES: RouteEntry[] = [
   // ── Vouchers ──────────────────────────────────────────────────────────────
   { path: "/voucher-operations",              element: <VoucherModule />,               label: "Voucher Operations",       category: "Vouchers" },
   { path: "/voucher-search",                  element: <VoucherSearch />,               label: "Voucher Search",           category: "Vouchers" },
+  { path: "/voucher-reprint",                 element: <VoucherReprint />,              label: "Voucher Re-Print",         category: "Vouchers" },
+  { path: "/voucher-verify",                  element: <VoucherVerify />,               label: "Verify Vouchers",           category: "Vouchers" },
   { path: "/saving-deposit-voucher",          element: <SavingDepositVoucher />,        label: "Saving Deposit Voucher",   category: "Vouchers" },
   { path: "/saving-withdrawal-voucher",       element: <SavingWithdrawalVoucher />,     label: "Saving Withdrawal Voucher", category: "Vouchers" },
   { path: "/rd-kist-voucher",                 element: <RDKistVoucher />,               label: "RD Kist Voucher",          category: "Vouchers" },

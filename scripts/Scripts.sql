@@ -323,6 +323,17 @@ CREATE TABLE IF NOT EXISTS printingsettings (
     CONSTRAINT printingsettings_pkey PRIMARY KEY (id, branchid)
 );
 
+CREATE TABLE IF NOT EXISTS voucherprintsettings (
+    id              INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    branchid        INTEGER  NOT NULL,
+    vouchertype     INTEGER  NOT NULL,
+    vouchersubtype  INTEGER  NOT NULL,
+    isenabled       BOOLEAN  NOT NULL DEFAULT FALSE,
+    copies          INTEGER  NOT NULL DEFAULT 1,
+    CONSTRAINT voucherprintsettings_pkey PRIMARY KEY (id),
+    CONSTRAINT uq_voucherprintsettings UNIQUE (branchid, vouchertype, vouchersubtype)
+);
+
 CREATE TABLE IF NOT EXISTS superusersettings (
     id                          INT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     branchid                    INTEGER   NOT NULL DEFAULT 1,
@@ -2062,6 +2073,9 @@ ALTER TABLE interbranchvoucher ADD COLUMN IF NOT EXISTS flowtype VARCHAR(20) NOT
 -- savingproduct / fdproduct: effectivetill allows marking a product as expired after a date
 ALTER TABLE savingproduct ADD COLUMN IF NOT EXISTS effectivetill TIMESTAMP(3) NULL;
 ALTER TABLE fdproduct     ADD COLUMN IF NOT EXISTS effectivetill TIMESTAMP(3) NULL;
+
+-- voucherprintsettings: number of copies to print per voucher type
+ALTER TABLE voucherprintsettings ADD COLUMN IF NOT EXISTS copies INTEGER NOT NULL DEFAULT 1;
 
 -- =============================================================================
 -- REFERENTIAL INTEGRITY: add missing FK constraints (idempotent — safe to re-run)

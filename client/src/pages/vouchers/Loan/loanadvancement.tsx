@@ -23,6 +23,7 @@ import Select from "react-select";
 import Swal from "sweetalert2";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
+import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
 import commonservice from "../../../services/common/commonservice";
 import loanAdvancementApi, {
   LoanAdvancementCreditItemDTO,
@@ -107,6 +108,7 @@ const LoanAdvancementVoucher: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
+  const { printAfterSave } = useVoucherPrint();
   const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [isEditMode, setIsEditMode] = useState(false);
@@ -465,6 +467,7 @@ const LoanAdvancementVoucher: React.FC = () => {
         : await loanAdvancementApi.addLoanAdvancement(payload);
 
       if (res.success) {
+        if (!isEditMode && res.message) await printAfterSave(res.message, 5, 9);
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",

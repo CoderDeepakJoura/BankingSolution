@@ -1,4 +1,4 @@
-using BankingPlatform.API.Common;
+﻿using BankingPlatform.API.Common;
 using BankingPlatform.API.Common.CommonFunctions;
 using BankingPlatform.API.DTO.Voucher;
 using BankingPlatform.API.Mappers.Voucher;
@@ -251,7 +251,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                 decimal totalInterest = postings.Sum(p => p.Interest);
 
                 // ONE voucher for all accounts
-                int nextVrNo = await _commonFunctions.GetLatestVoucherNo(dto.BranchId, dto.PostingDate);
+                using var _vrLease = await _commonFunctions.ReserveVoucherNoAsync(dto.BranchId, dto.PostingDate);
+                int nextVrNo = _vrLease.VoucherNo;
                 var voucherEntity = new VoucherDTO
                 {
                     ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),

@@ -151,11 +151,15 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                 var result = await _service.MatureOrRenewFDAsync(
                     dto!
                 );
-                if (result.ToLower() != "success") return BadRequest(new ResponseDto { Success = false, Message = result });
+                if (!result.StartsWith("OK:")) return BadRequest(new ResponseDto { Success = false, Message = result });
+                var vrNo = int.TryParse(result.Split(':')[1], out var n) ? n : 0;
+                var action = dto.MatureOrRenewFDInfo!.IsRenew ? "saved" : "saved";
                 return Ok(new ResponseDto
                 {
                     Success = true,
-                    Message = "FD Account" + (dto.MatureOrRenewFDInfo!.IsRenew ? "renewed" : "matured") + " successfully."
+                    Message = vrNo > 0
+                        ? $"Voucher saved successfully with voucher no. {vrNo}"
+                        : "FD " + (dto.MatureOrRenewFDInfo!.IsRenew ? "renewed" : "matured") + " successfully."
                 });
             }
             catch (Exception ex)

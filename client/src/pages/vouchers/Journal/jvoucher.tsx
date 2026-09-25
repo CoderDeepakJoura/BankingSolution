@@ -21,6 +21,7 @@ import DashboardLayout from "../../../Common/Layout";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
+import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
 import commonservice from "../../../services/common/commonservice";
 import journalVoucherApi, {
   JournalVoucherDTO,
@@ -94,6 +95,7 @@ const JournalTransferVoucher: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
+  const { printAfterSave } = useVoucherPrint();
   const sessionDate = user.workingdate
     ? commonservice.splitDate(user.workingdate)
     : commonservice.getTodaysDate();
@@ -419,6 +421,7 @@ const JournalTransferVoucher: React.FC = () => {
         : await journalVoucherApi.addJournalVoucher(dto);
 
       if (res.success) {
+        if (!isEditMode && res.message) await printAfterSave(res.message, 7, 12);
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",

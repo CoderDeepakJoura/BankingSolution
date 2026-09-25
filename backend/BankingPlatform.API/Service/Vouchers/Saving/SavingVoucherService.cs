@@ -40,7 +40,8 @@ namespace BankingPlatform.API.Service.Vouchers.Saving
                     int debitAccountId = (int)dto.Voucher!.DebitAccountId;
                     int creditAccountId = (int)dto.Voucher!.CreditAccountId!;
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
-                    nextVrNo = await _commonfunctions.GetLatestVoucherNo(branchId, dto.Voucher.VoucherDate);
+                    using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.Voucher.VoucherDate);
+                    nextVrNo = _vrLease.VoucherNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     string narration = dto.Voucher.VoucherNarration ?? "";
                     DateTime voucherDate = DateTime.SpecifyKind(dto.Voucher.VoucherDate, DateTimeKind.Unspecified);

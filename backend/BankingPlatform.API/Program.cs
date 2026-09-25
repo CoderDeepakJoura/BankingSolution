@@ -1,5 +1,7 @@
 ﻿using BankingPlatform.API.Controllers;
 using BankingPlatform.API.Controllers.Member;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using BankingPlatform.API.Mappers.Voucher;
 using BankingPlatform.API.Service;
 using BankingPlatform.API.Service.AccountMasters;
@@ -37,7 +39,13 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddTransient<BankingPlatform.API.Common.Idempotency.IdempotencyFilter>();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.AddService<BankingPlatform.API.Common.Idempotency.IdempotencyFilter>();
+});
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<BankingPlatform.API.Validators.UserLoginDtoValidator>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddLogging();
 builder.Services.AddMemoryCache();
@@ -49,6 +57,7 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Salary.SalaryComponentSer
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.SalaryCreationService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.EmployeeAttendanceService>();
 builder.Services.AddScoped<MasterUsageCheckerService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.VoucherPrint.VoucherPrintService>();
 builder.Services.AddScoped<ImageService>();
 builder.Services.AddScoped<FDProductService>();
 builder.Services.AddScoped<SavingsProductService>();

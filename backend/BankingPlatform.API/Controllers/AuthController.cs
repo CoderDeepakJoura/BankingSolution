@@ -465,7 +465,8 @@ namespace BankingPlatform.API.Controllers
                 BranchGstNo = branchGstNo,
                 BranchStateId = branchStateId,
                 LastSeenVersion = lastSeenVersion,
-                IsMainBranch = isMainBranch
+                IsMainBranch = isMainBranch,
+                UserId = int.TryParse(userId, out int parsedUid) ? parsedUid : 0
             });
         }
 
