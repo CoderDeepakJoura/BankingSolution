@@ -1111,7 +1111,7 @@ const SettingsMaster = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             name="fdReceiptSetting"
-            label="FD Receipt Setting"
+            label="Print FD Bond"
             errors={errorsByField.fdReceiptSetting || []}
             icon={<FileText className="w-4 h-4 text-blue-500" />}
           >
@@ -1124,7 +1124,7 @@ const SettingsMaster = () => {
                 className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
               />
               <label htmlFor="fdReceiptSetting" className="text-sm font-medium text-gray-700 cursor-pointer">
-                Print FD receipts when created
+                Auto-print FD Bond when account is created or renewed
               </label>
             </div>
           </FormField>

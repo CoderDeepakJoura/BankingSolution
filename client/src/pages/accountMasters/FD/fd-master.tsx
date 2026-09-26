@@ -35,6 +35,8 @@ import { SavingAccounts } from "../Saving/close-saving-account";
 import { json } from "stream/consumers";
 import { canEnterOpeningBalance } from "../../../utils/session";
 import DatePicker from "../../../components/DatePicker";
+import { fdBondApi } from "../../../services/fdBondApi";
+import settingsapi from "../../../services/settings/settingsapi";
 
 export interface FDProduct {
   id: number;
@@ -1730,6 +1732,21 @@ const FDAccountMaster = () => {
           timer: 1500,
           showConfirmButton: false,
         });
+        // Auto-print FD Bond if setting enabled (on create/add only, not edit)
+        if (!isEditMode && !showMIS) {
+          try {
+            const settingsRes = await settingsapi.fetch_settings(user.branchid);
+            if (settingsRes.data?.printingSettings?.fdReceiptSetting) {
+              const accId = response.data?.accountId ?? (addToExistingMode ? selectedExistingAccId : null);
+              const detailIds: number[] = response.data?.fdDetailIds ?? [];
+              if (detailIds.length > 0 && accId) {
+                for (const did of detailIds) {
+                  await fdBondApi.downloadBond(user.branchid, did);
+                }
+              }
+            }
+          } catch { /* bond print is optional */ }
+        }
         if (isEditMode) {
           navigate("/fd-acc-info");
           return;

@@ -118,6 +118,7 @@ import LoanInterestPostingVoucher from "../pages/vouchers/Loan/loaninterestposti
 import LoanExpensePage from "../pages/vouchers/LoanExpense/loanexpense";
 import MatureFDPage from "../pages/FixedDeposit/MatureFD/mature-fd";
 import PreMatureFDPage from "../pages/FixedDeposit/PreMatureFD/pre-mature";
+import FDBondReprint from "../pages/FixedDeposit/FDBondReprint/FDBondReprint";
 import UnpledgeFDPage from "../pages/FixedDeposit/UnpledgeFD/unpledge-fd";
 import MatureRDPage from "../pages/RecurringDeposit/mature-rd";
 import PrematureRDPage from "../pages/RecurringDeposit/premature-rd";
@@ -314,7 +315,6 @@ export const ROUTES: RouteEntry[] = [
   { path: "/mis-interest-posting",       element: <FDInterestPosting isMIS={true} />,  label: "MIS Interest Posting", category: "Account Masters" },
   { path: "/mature-fd-account",          element: <MatureFDPage />,              label: "Mature FD Account",        category: "Account Masters" },
   { path: "/premature-fd-account",       element: <PreMatureFDPage />,           label: "Pre-Mature FD Account",    category: "Account Masters" },
-
   { path: "/rd-acc-operations",          element: <RDAccOperations />,           label: "RD Account Master",        category: "Account Masters" },
   { path: "/rd-acc-master",              element: <RDAccountMaster />,           label: "New RD Account",           category: "Account Masters" },
   { path: "/rd-acc-master/:accountId",   element: <RDAccountMaster /> },
@@ -497,6 +497,7 @@ export const ROUTES: RouteEntry[] = [
   // ── FD Reports ────────────────────────────────────────────────────────────
   { path: "/fd-maturity-report",              element: <FDMaturityPage />,              label: "FD Maturity Report",       category: "FD Reports" },
   { path: "/fd-opening-report",               element: <FDOpeningPage />,               label: "FD Opening Report",        category: "FD Reports" },
+  { path: "/fd-bond-reprint",                 element: <FDBondReprint /> },
 
   // ── RD Reports ────────────────────────────────────────────────────────────
   { path: "/rd-maturity-report",              element: <RDMaturityPage />,              label: "RD Maturity Report",       category: "RD Reports" },

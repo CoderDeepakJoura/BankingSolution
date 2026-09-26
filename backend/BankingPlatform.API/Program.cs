@@ -58,6 +58,7 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Salary.SalaryCreationServ
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.EmployeeAttendanceService>();
 builder.Services.AddScoped<MasterUsageCheckerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.VoucherPrint.VoucherPrintService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.FDBond.FDBondService>();
 builder.Services.AddScoped<ImageService>();
 builder.Services.AddScoped<FDProductService>();
 builder.Services.AddScoped<SavingsProductService>();

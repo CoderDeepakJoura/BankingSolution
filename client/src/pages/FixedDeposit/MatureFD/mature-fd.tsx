@@ -31,6 +31,8 @@ import { SavingAccounts } from "../../vouchers/saving/savingdeposit";
 import loanRecoveryApi, { LoanRecoveryBalanceDTO } from "../../../services/vouchers/loan/loanRecoveryApi";
 import branchwiseruleService from "../../../services/branchwiserule/branchwiserules";
 import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
+import { fdBondApi } from "../../../services/fdBondApi";
+import settingsapi from "../../../services/settings/settingsapi";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -853,6 +855,19 @@ const MatureFDPage: React.FC = () => {
       });
 
       await printAfterSave(response.message ?? "", 3, voucherSubType);
+
+      // Auto-print FD Bond on renewal if setting enabled
+      if (isRenewFD) {
+        try {
+          const settingsRes = await settingsapi.fetch_settings(user.branchid);
+          if (settingsRes.data?.printingSettings?.fdReceiptSetting) {
+            const renewedDetailId: number = (response as any).data?.fdDetailId ?? 0;
+            if (renewedDetailId > 0) {
+              await fdBondApi.downloadBond(user.branchid, renewedDetailId);
+            }
+          }
+        } catch { /* bond print is optional */ }
+      }
 
       handleReset();
       setTimeout(() => productSelectRef.current?.focus(), 100);

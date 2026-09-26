@@ -29,11 +29,20 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                 var result = await _service.CreateNewFDAccAsync(
                     dto!
                 );
-                if (result != "Success") return BadRequest(new ResponseDto { Success = false, Message = result });
-                return Ok(new ResponseDto
+                if (!result.StartsWith("Success")) return BadRequest(new ResponseDto { Success = false, Message = result });
+                // result format: "Success:{accountId}:{fdDetailId1,fdDetailId2,...}"
+                var parts = result.Split(':');
+                int.TryParse(parts.Length > 1 ? parts[1] : "0", out var accountId);
+                var fdDetailIds = (parts.Length > 2 ? parts[2] : "")
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => int.TryParse(s, out var n) ? n : 0)
+                    .Where(n => n > 0)
+                    .ToList();
+                return Ok(new
                 {
-                    Success = true,
-                    Message = "FD Account saved successfully."
+                    success = true,
+                    message = "FD Account saved successfully.",
+                    data = new { accountId, fdDetailIds }
                 });
             }
             catch (Exception ex)
@@ -152,14 +161,17 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                     dto!
                 );
                 if (!result.StartsWith("OK:")) return BadRequest(new ResponseDto { Success = false, Message = result });
-                var vrNo = int.TryParse(result.Split(':')[1], out var n) ? n : 0;
-                var action = dto.MatureOrRenewFDInfo!.IsRenew ? "saved" : "saved";
-                return Ok(new ResponseDto
+                // result format: "OK:{voucherNo}:{renewedFdDetailId}"
+                var rparts = result.Split(':');
+                var vrNo = int.TryParse(rparts.Length > 1 ? rparts[1] : "0", out var n) ? n : 0;
+                int.TryParse(rparts.Length > 2 ? rparts[2] : "0", out var renewedFdDetailId);
+                return Ok(new
                 {
-                    Success = true,
-                    Message = vrNo > 0
+                    success = true,
+                    message = vrNo > 0
                         ? $"Voucher saved successfully with voucher no. {vrNo}"
-                        : "FD " + (dto.MatureOrRenewFDInfo!.IsRenew ? "renewed" : "matured") + " successfully."
+                        : "FD " + (dto.MatureOrRenewFDInfo!.IsRenew ? "renewed" : "matured") + " successfully.",
+                    data = dto.MatureOrRenewFDInfo!.IsRenew ? (object)new { fdDetailId = renewedFdDetailId } : null
                 });
             }
             catch (Exception ex)

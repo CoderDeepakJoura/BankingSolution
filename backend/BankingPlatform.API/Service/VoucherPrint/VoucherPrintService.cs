@@ -131,10 +131,63 @@ namespace BankingPlatform.API.Service.VoucherPrint
                 .ToListAsync();
 
             var accountIds = details.Select(d => d.AccountId).Distinct().ToList();
-            var accountMap = await _db.accountmaster.AsNoTracking()
+
+            // Extended account info: name, number, type, product
+            var accountRaw = await _db.accountmaster.AsNoTracking()
                 .Where(a => accountIds.Contains(a.ID))
-                .Select(a => new { a.ID, a.AccountName })
-                .ToDictionaryAsync(a => a.ID, a => a.AccountName ?? "");
+                .Select(a => new { a.ID, a.AccountName, a.AccountNumber, a.AccPrefix, a.AccSuffix, a.AccTypeId, a.GeneralProductId })
+                .ToListAsync();
+
+            // Fetch product names for Saving/General/ShareMoney (2,3,4)
+            var savingProductIds = accountRaw
+                .Where(a => a.AccTypeId is 2 or 3 or 4 && a.GeneralProductId.HasValue)
+                .Select(a => a.GeneralProductId!.Value).Distinct().ToList();
+            var savingProductMap = savingProductIds.Any()
+                ? (await _db.savingproduct.AsNoTracking()
+                    .Where(p => savingProductIds.Contains(p.Id) && p.BranchId == branchId)
+                    .ToListAsync()).GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First().ProductName)
+                : new Dictionary<int, string>();
+
+            // Fetch product names for FD (6)
+            var fdProductIds = accountRaw
+                .Where(a => a.AccTypeId == 6 && a.GeneralProductId.HasValue)
+                .Select(a => a.GeneralProductId!.Value).Distinct().ToList();
+            var fdProductMap = fdProductIds.Any()
+                ? (await _db.fdproduct.AsNoTracking()
+                    .Where(p => fdProductIds.Contains(p.Id) && p.BranchId == branchId)
+                    .ToListAsync()).GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First().ProductName)
+                : new Dictionary<int, string>();
+
+            // Fetch product names for RD (5)
+            var rdProductIds = accountRaw
+                .Where(a => a.AccTypeId == 5 && a.GeneralProductId.HasValue)
+                .Select(a => a.GeneralProductId!.Value).Distinct().ToList();
+            var rdProductMap = rdProductIds.Any()
+                ? (await _db.rdproduct.AsNoTracking()
+                    .Where(p => rdProductIds.Contains(p.Id) && p.BrId == branchId)
+                    .ToListAsync()).GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First().ProductName)
+                : new Dictionary<int, string>();
+
+            // Build per-account sub-line: "ProductName · AccountNo"
+            var accountSubLineMap = accountRaw.ToDictionary(a => a.ID, a =>
+            {
+                var accNo = !string.IsNullOrWhiteSpace(a.AccPrefix)
+                    ? $"{a.AccPrefix}-{a.AccSuffix}"
+                    : (string.IsNullOrWhiteSpace(a.AccountNumber) ? "" : a.AccountNumber);
+
+                string? productName = a.AccTypeId is 2 or 3 or 4
+                    ? (a.GeneralProductId.HasValue && savingProductMap.TryGetValue(a.GeneralProductId.Value, out var sp) ? sp : null)
+                    : a.AccTypeId == 6
+                        ? (a.GeneralProductId.HasValue && fdProductMap.TryGetValue(a.GeneralProductId.Value, out var fp) ? fp : null)
+                        : a.AccTypeId == 5
+                            ? (a.GeneralProductId.HasValue && rdProductMap.TryGetValue(a.GeneralProductId.Value, out var rp) ? rp : null)
+                            : null;
+
+                var parts = new[] { productName, accNo }.Where(s => !string.IsNullOrWhiteSpace(s));
+                return string.Join(" · ", parts);
+            });
+
+            var accountNameMap = accountRaw.ToDictionary(a => a.ID, a => a.AccountName ?? "");
 
             var branch = await _db.branchmaster.AsNoTracking()
                 .FirstOrDefaultAsync(b => b.id == branchId);
@@ -148,7 +201,8 @@ namespace BankingPlatform.API.Service.VoucherPrint
 
             var entries = details.Select((d, i) => new EntryRow(
                 i + 1,
-                accountMap.TryGetValue(d.AccountId, out var name) ? name : $"Account #{d.AccountId}",
+                accountNameMap.TryGetValue(d.AccountId, out var name) ? name : $"Account #{d.AccountId}",
+                accountSubLineMap.TryGetValue(d.AccountId, out var sub) ? sub : "",
                 d.VoucherEntryType,
                 d.VoucherAmount
             )).ToList();
@@ -171,28 +225,38 @@ namespace BankingPlatform.API.Service.VoucherPrint
         {
             QuestPDF.Settings.License = LicenseType.Community;
 
-            const string Primary = "#1c3e6e";   // deep navy
-            const string Accent  = "#2563eb";   // blue
-            const string LightBg = "#eef4ff";   // tinted table header
-            const string Border  = "#c5d5e8";   // soft border
-            const string RowAlt  = "#f4f8fd";   // alternating row
-            const string SubText = "#95b5d0";   // muted header sub-text
+            // Light sky-blue palette
+            const string Primary = "#1e5c9a";   // dark blue — used for text/borders only
+            const string HeaderBg= "#5b9ecf";   // sky blue header band
+            const string AccentBg= "#6caed9";   // lighter accent band
+            const string HdrDark = "#5494c4";   // table header bg
+            const string LightBg = "#eaf4fb";   // total row tint
+            const string Border  = "#b0cfe8";   // soft border
+            const string RowAlt  = "#f4f9fd";   // alternating row
+            const string SubText = "#b5d8ee";   // muted sub-text in header
+            const string SubLine = "#5a85a8";   // account sub-line text
+
+            // Compact page height: fit content, not a full A4
+            const float BaseHeightMm = 118f;  // header + meta row + footer + sigs
+            const float RowHeightMm  = 10f;
+            var heightMm = Math.Min(287f, BaseHeightMm + entries.Count * RowHeightMm);
+            const float PtPerMm = 2.8346f;
 
             var document = Document.Create(container =>
             {
                 for (int copy = 0; copy < copies; copy++)
                 container.Page(page =>
                 {
-                    page.Size(PageSizes.A4);
+                    page.Size(new PageSize(PageSizes.A4.Width, heightMm * PtPerMm));
                     page.Margin(12, Unit.Millimetre);
                     page.DefaultTextStyle(x => x.FontSize(9.5f).FontFamily(Fonts.Arial));
 
                     page.Content()
-                        .Border(1.5f).BorderColor(Primary)
+                        .Border(1.5f).BorderColor(HeaderBg)
                         .Column(outer =>
                         {
-                            // ── Navy header band ──────────────────────────
-                            outer.Item().Background(Primary).Padding(10).Column(hdr =>
+                            // ── Header band ──────────────────────────────
+                            outer.Item().Background(HeaderBg).Padding(10).Column(hdr =>
                             {
                                 hdr.Item().AlignCenter()
                                     .Text(branchName)
@@ -204,7 +268,7 @@ namespace BankingPlatform.API.Service.VoucherPrint
                             });
 
                             // ── Voucher type label ─────────────────────────
-                            outer.Item().Background(Accent)
+                            outer.Item().Background(AccentBg)
                                 .PaddingVertical(5).PaddingHorizontal(12)
                                 .AlignCenter()
                                 .Text(typeLabel)
@@ -232,16 +296,16 @@ namespace BankingPlatform.API.Service.VoucherPrint
                             {
                                 table.ColumnsDefinition(cols =>
                                 {
-                                    cols.ConstantColumn(38);
+                                    cols.ConstantColumn(34);
                                     cols.RelativeColumn();
-                                    cols.ConstantColumn(105);
-                                    cols.ConstantColumn(105);
+                                    cols.ConstantColumn(100);
+                                    cols.ConstantColumn(100);
                                 });
 
                                 table.Header(h =>
                                 {
-                                    static IContainer HCell(IContainer c) =>
-                                        c.Background("#1c3e6e").BorderBottom(1).BorderColor("#14305a")
+                                    IContainer HCell(IContainer c) =>
+                                        c.Background(HdrDark).BorderBottom(1).BorderColor("#1a4a80")
                                          .Padding(5);
 
                                     h.Cell().Element(HCell).AlignCenter()
@@ -263,8 +327,17 @@ namespace BankingPlatform.API.Service.VoucherPrint
 
                                     table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(Border)
                                         .Padding(4).AlignCenter().Text(entry.Sr.ToString()).FontSize(9);
+
+                                    // Account name + sub-line (product · accno)
                                     table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(Border)
-                                        .Padding(4).Text(entry.AccountName).FontSize(9);
+                                        .Padding(4).Column(cell =>
+                                        {
+                                            cell.Item().Text(entry.AccountName).FontSize(9);
+                                            if (!string.IsNullOrWhiteSpace(entry.SubLine))
+                                                cell.Item().PaddingTop(1)
+                                                    .Text(entry.SubLine).FontSize(7.5f).FontColor(SubLine);
+                                        });
+
                                     table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(Border)
                                         .Padding(4).AlignRight()
                                         .Text(drAmt == 0 ? "—" : FormatAmount(drAmt)).FontSize(9);
@@ -304,7 +377,7 @@ namespace BankingPlatform.API.Service.VoucherPrint
                                     });
                                 });
 
-                            // ── Signature area ────────────────────────────
+                            // ── Signature area: Customer Signature first ──
                             outer.Item().BorderTop(1).BorderColor(Border)
                                 .PaddingHorizontal(10).PaddingTop(28).PaddingBottom(12)
                                 .Row(sig =>
@@ -314,16 +387,16 @@ namespace BankingPlatform.API.Service.VoucherPrint
                                         sig.RelativeItem().AlignCenter().Column(s =>
                                         {
                                             s.Item().AlignCenter().Width(110)
-                                                .BorderBottom(1).BorderColor(Colors.Grey.Darken1)
+                                                .BorderBottom(1).BorderColor(Colors.Grey.Medium)
                                                 .Height(0.5f);
                                             s.Item().PaddingTop(4).AlignCenter()
-                                                .Text(label).FontSize(8).FontColor(Colors.Grey.Darken2);
+                                                .Text(label).FontSize(8).FontColor(Colors.Grey.Darken1);
                                         });
                                     }
 
+                                    SigBox("Customer Signature");
                                     SigBox("Prepared By");
                                     SigBox("Verified By");
-                                    SigBox("Received By");
                                 });
                         });
                 });
@@ -453,6 +526,6 @@ namespace BankingPlatform.API.Service.VoucherPrint
             return words.ToString().Trim();
         }
 
-        private record EntryRow(int Sr, string AccountName, string EntryType, decimal Amount);
+        private record EntryRow(int Sr, string AccountName, string SubLine, string EntryType, decimal Amount);
     }
 }

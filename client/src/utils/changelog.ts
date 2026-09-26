@@ -15,6 +15,15 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.4",
+    date: "2026-09-26",
+    changes: [
+      { type: "new", text: "FD Bond printing: auto-download PDF bond after FD account creation and after FD renewal (when 'Print FD Bond' setting is enabled)" },
+      { type: "new", text: "FD Bond Re-Print screen: search any FD account, view all FD details with status, and re-print individual bonds at any time" },
+      { type: "improvement", text: "Settings page: 'FD Receipt Setting' renamed to 'Print FD Bond' with updated description" },
+    ],
+  },
+  {
     version: "1.1.3",
     date: "2026-09-25",
     changes: [

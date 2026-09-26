@@ -152,6 +152,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 }
 
                 // Always save FD details (opening entry or real voucher)
+                var newFdDetailIds = new List<int>();
                 foreach (var fdDetail in dto.FDAccountDetailDTO ?? new())
                 {
                     int intCompoundingInterval = _commonfunctions.CompoundingIntervalFromString(fdDetail.CompoundingInterval);
@@ -180,6 +181,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     };
                     await _context.fdaccountdetail.AddAsync(fdAccountDetail);
                     await _context.SaveChangesAsync();
+                    newFdDetailIds.Add(fdAccountDetail.Id);
 
                     if (voucherInfo != null && voucherCreditInfo != null)
                     {
@@ -206,7 +208,8 @@ namespace BankingPlatform.API.Service.AccountMasters
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                return "Success";
+                var idsStr = newFdDetailIds.Any() ? string.Join(",", newFdDetailIds) : "0";
+                return $"Success:{accountId}:{idsStr}";
             }
             catch (Exception ex)
             {
@@ -826,6 +829,7 @@ namespace BankingPlatform.API.Service.AccountMasters
 
             if (fdDetailInfo == null) return "FD Detail not found.";
 
+            int _renewedFdDetailId = 0;
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
@@ -891,7 +895,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                             FDStatus = dto.FDAccountDetailDTOSingle!.FDStatus,
                             FDPeriodMonths = dto.FDAccountDetailDTOSingle!.FDPeriodMonths,
                             FDPeriodDays = dto.FDAccountDetailDTOSingle!.FDPeriodDays,
-                            SlabId = dto.FDAccountDetailDTOSingle!.SlabId,
+                            SlabId = dto.FDAccountDetailDTOSingle!.SlabId > 0 ? dto.FDAccountDetailDTOSingle!.SlabId : (int?)null,
                             IntRate = dto.FDAccountDetailDTOSingle!.IntRate,
                             IntCompInterval = intCompoundingInterval,
                             SerialNo = dto.FDAccountDetailDTOSingle!.SerialNo,
@@ -902,6 +906,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                         };
                         await _context.fdaccountdetail.AddAsync(fdAccountDetail);
                         await _context.SaveChangesAsync();
+                        _renewedFdDetailId = fdAccountDetail.Id;
 
                         VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.MatureOrRenewFDInfo!.FDAccountId, branchId), (int)dto.MatureOrRenewFDInfo!.FDAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "New FD Account Credited", (decimal)dto.FDAccountDetailDTOSingle!.FDAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
                         _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
@@ -1005,7 +1010,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 throw;
             }
 
-            return $"OK:{_matureVrNo}";
+            return $"OK:{_matureVrNo}:{_renewedFdDetailId}";
 
 
         }

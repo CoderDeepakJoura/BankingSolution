@@ -483,6 +483,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           subItems: [
             { label: "FD Maturity Report", path: "/fd-maturity-report" },
             { label: "FD Opening Report",  path: "/fd-opening-report" },
+            { label: "FD Bond Re-Print",   path: "/fd-bond-reprint" },
           ],
         },
         {

@@ -179,6 +179,7 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
   // ── FD Reports ────────────────────────────────────────────────────────────
   { path: "/fd-maturity-report",              label: "FD Maturity Report",              category: "FD Reports" },
   { path: "/fd-opening-report",               label: "FD Opening Report",               category: "FD Reports" },
+  { path: "/fd-bond-reprint",                 label: "FD Bond Re-Print",                category: "FD Reports" },
 
   // ── RD Reports ────────────────────────────────────────────────────────────
   { path: "/rd-maturity-report",              label: "RD Maturity Report",              category: "RD Reports" },
