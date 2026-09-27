@@ -1565,8 +1565,9 @@ const FDAccountMaster = () => {
 
     // Voucher amount must not exceed total FD amount (skip for opening entry / edit)
     if (!isOpeningEntry && !isEditMode) {
-      const totalFdAmount = (showMIS ? misDetailsList : fdDetailsList)
-        .reduce((sum, d) => sum + (parseFloat(String(d.fdAmount ?? 0)) || 0), 0);
+      const totalFdAmount = showMIS
+        ? misDetailsList.reduce((sum, d) => sum + (parseFloat(String(d.misAmount ?? 0)) || 0), 0)
+        : fdDetailsList.reduce((sum, d) => sum + (parseFloat(String(d.fdAmount ?? 0)) || 0), 0);
       const totalVoucherAmount =
         (parseFloat(voucherCashGL.amount || "0") || 0) +
         (parseFloat(voucherSaving.amount || "0") || 0);

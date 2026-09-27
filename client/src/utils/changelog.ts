@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.6",
+    date: "2026-09-27",
+    changes: [
+      { type: "fix", text: "FD MIS: voucher amount validation now correctly reads MIS amount (was always showing ₹0.00 and blocking valid entries)" },
+    ],
+  },
+  {
     version: "1.1.5",
     date: "2026-09-27",
     changes: [
