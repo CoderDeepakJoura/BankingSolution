@@ -30,7 +30,7 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                     dto!
                 );
                 if (!result.StartsWith("Success")) return BadRequest(new ResponseDto { Success = false, Message = result });
-                // result format: "Success:{accountId}:{fdDetailId1,fdDetailId2,...}"
+                // result format: "Success:{accountId}:{fdDetailId1,fdDetailId2,...}:{voucherNo}"
                 var parts = result.Split(':');
                 int.TryParse(parts.Length > 1 ? parts[1] : "0", out var accountId);
                 var fdDetailIds = (parts.Length > 2 ? parts[2] : "")
@@ -38,10 +38,14 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                     .Select(s => int.TryParse(s, out var n) ? n : 0)
                     .Where(n => n > 0)
                     .ToList();
+                int.TryParse(parts.Length > 3 ? parts[3] : "0", out var voucherNo);
+                var message = voucherNo > 0
+                    ? $"Voucher saved successfully with voucher no. {voucherNo}"
+                    : "FD Account saved successfully.";
                 return Ok(new
                 {
                     success = true,
-                    message = "FD Account saved successfully.",
+                    message,
                     data = new { accountId, fdDetailIds }
                 });
             }

@@ -46,7 +46,7 @@ namespace BankingPlatform.API.Service.FDBond
             )).ToList();
         }
 
-        public async Task<byte[]?> GenerateBondAsync(int branchId, int fdDetailId)
+        public async Task<byte[]?> GenerateBondAsync(int branchId, int fdDetailId, int? voucherNo = null)
         {
             var fdDetail = await _db.fdaccountdetail.AsNoTracking()
                 .FirstOrDefaultAsync(d => d.Id == fdDetailId && d.BranchId == branchId);
@@ -95,7 +95,8 @@ namespace BankingPlatform.API.Service.FDBond
                 fdDetail.LTDNo, fdDetail.FDDate,
                 fullName, memberNo, accountNo, nomineeName, memberAddress, customerType,
                 fdDetail.FDAmount, fdDetail.FDDate, fdDetail.IntRate, period,
-                fdDetail.FDMaturityDate, fdDetail.MaturityAmount
+                fdDetail.FDMaturityDate, fdDetail.MaturityAmount,
+                voucherNo
             );
         }
 
@@ -105,7 +106,8 @@ namespace BankingPlatform.API.Service.FDBond
             string memberName, string memberNo, string accountNo, string nominee,
             string address, string customerType,
             decimal depositAmount, DateTime depositDate, decimal intRate, string period,
-            DateTime maturityDate, decimal maturityAmount)
+            DateTime maturityDate, decimal maturityAmount,
+            int? voucherNo = null)
         {
             QuestPDF.Settings.License = LicenseType.Community;
 
@@ -152,11 +154,13 @@ namespace BankingPlatform.API.Service.FDBond
                             });
                         });
 
-                        // ── Receipt No + Date ─────────────────────────────
+                        // ── Receipt No + Voucher No + Date ───────────────
                         col.Item().Background(LabelBg).BorderBottom(0.5f).BorderColor(Border)
                             .PaddingHorizontal(14).PaddingVertical(5).Row(r =>
                         {
                             r.RelativeItem().Text($"Receipt No: {receiptNo}").FontSize(9).Bold().FontColor(Gray);
+                            if (voucherNo.HasValue)
+                                r.AutoItem().Text($"Voucher No: {voucherNo.Value}").FontSize(9).Bold().FontColor(Blue).AlignCenter();
                             r.ConstantItem(200).AlignRight().Text($"Date: {receiptDate:dd-MMM-yyyy}").FontSize(9).FontColor(Gray);
                         });
 

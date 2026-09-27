@@ -96,6 +96,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 }
                 
                 // Real voucher (non-opening-entry): create voucher header + Cr entry
+                int _createVrNo = 0;
                 Voucher? voucherInfo = null;
                 VoucherCreditDebitDetails? voucherCreditInfo = null;
                 DateTime voucherDate = DateTime.SpecifyKind(dto.Voucher!.VoucherDate, DateTimeKind.Unspecified);
@@ -107,6 +108,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     decimal totalDebit = (decimal)dto.Voucher.TotalDebit;
                     using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, dto.Voucher.VoucherDate);
                     int nextVrNo = _vrLease.VoucherNo;
+                    _createVrNo = nextVrNo;
                     bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
                     dto.Voucher = new VoucherDTO
                     {
@@ -209,7 +211,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 await transaction.CommitAsync();
 
                 var idsStr = newFdDetailIds.Any() ? string.Join(",", newFdDetailIds) : "0";
-                return $"Success:{accountId}:{idsStr}";
+                return $"Success:{accountId}:{idsStr}:{_createVrNo}";
             }
             catch (Exception ex)
             {

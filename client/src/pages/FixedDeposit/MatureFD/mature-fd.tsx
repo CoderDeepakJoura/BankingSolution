@@ -862,8 +862,10 @@ const MatureFDPage: React.FC = () => {
           const settingsRes = await settingsapi.fetch_settings(user.branchid);
           if (settingsRes.data?.printingSettings?.fdReceiptSetting) {
             const renewedDetailId: number = (response as any).data?.fdDetailId ?? 0;
+            const voucherMatch = (response as any).message?.match(/voucher no[.\s]+(\d+)/i);
+            const voucherNo = voucherMatch ? parseInt(voucherMatch[1]) : undefined;
             if (renewedDetailId > 0) {
-              await fdBondApi.downloadBond(user.branchid, renewedDetailId);
+              await fdBondApi.downloadBond(user.branchid, renewedDetailId, voucherNo);
             }
           }
         } catch { /* bond print is optional */ }

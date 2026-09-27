@@ -13,11 +13,11 @@ namespace BankingPlatform.API.Controllers.FDBond
 
         public FDBondController(FDBondService service) => _service = service;
 
-        // GET /api/FDBond/{branchId}/{fdDetailId}
+        // GET /api/FDBond/{branchId}/{fdDetailId}?voucherNo=123
         [HttpGet("{branchId}/{fdDetailId}")]
-        public async Task<IActionResult> GetBond([FromRoute] int branchId, [FromRoute] int fdDetailId)
+        public async Task<IActionResult> GetBond([FromRoute] int branchId, [FromRoute] int fdDetailId, [FromQuery] int? voucherNo = null)
         {
-            var bytes = await _service.GenerateBondAsync(branchId, fdDetailId);
+            var bytes = await _service.GenerateBondAsync(branchId, fdDetailId, voucherNo);
             if (bytes == null) return NotFound(new { success = false, message = "FD detail not found." });
             return File(bytes, "application/pdf", $"FD-Bond-{fdDetailId}.pdf");
         }

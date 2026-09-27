@@ -18,8 +18,11 @@ export interface FdBondDetailDTO {
 }
 
 export const fdBondApi = {
-  async downloadBond(branchId: number, fdDetailId: number): Promise<void> {
-    const res = await fetch(`${BASE}/${branchId}/${fdDetailId}`, {
+  async downloadBond(branchId: number, fdDetailId: number, voucherNo?: number): Promise<void> {
+    const endpoint = voucherNo
+      ? `${BASE}/${branchId}/${fdDetailId}?voucherNo=${voucherNo}`
+      : `${BASE}/${branchId}/${fdDetailId}`;
+    const res = await fetch(endpoint, {
       credentials: "include",
     });
     if (!res.ok) return;

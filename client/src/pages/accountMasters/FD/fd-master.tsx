@@ -1563,6 +1563,23 @@ const FDAccountMaster = () => {
       isEditMode
     );
 
+    // Voucher amount must not exceed total FD amount (skip for opening entry / edit)
+    if (!isOpeningEntry && !isEditMode) {
+      const totalFdAmount = (showMIS ? misDetailsList : fdDetailsList)
+        .reduce((sum, d) => sum + (parseFloat(String(d.fdAmount ?? 0)) || 0), 0);
+      const totalVoucherAmount =
+        (parseFloat(voucherCashGL.amount || "0") || 0) +
+        (parseFloat(voucherSaving.amount || "0") || 0);
+      if (totalVoucherAmount > totalFdAmount + 0.01) {
+        Swal.fire({
+          icon: "error",
+          title: "Amount Mismatch",
+          text: `Voucher amount ₹${totalVoucherAmount.toFixed(2)} cannot be greater than FD amount ₹${totalFdAmount.toFixed(2)}.`,
+        });
+        return;
+      }
+    }
+
     if (!validationResult.isValid) {
       setShowValidationSummary(true);
 
@@ -1739,9 +1756,11 @@ const FDAccountMaster = () => {
             if (settingsRes.data?.printingSettings?.fdReceiptSetting) {
               const accId = response.data?.accountId ?? (addToExistingMode ? selectedExistingAccId : null);
               const detailIds: number[] = response.data?.fdDetailIds ?? [];
+              const voucherMatch = response.message?.match(/voucher no[.\s]+(\d+)/i);
+              const voucherNo = voucherMatch ? parseInt(voucherMatch[1]) : undefined;
               if (detailIds.length > 0 && accId) {
                 for (const did of detailIds) {
-                  await fdBondApi.downloadBond(user.branchid, did);
+                  await fdBondApi.downloadBond(user.branchid, did, voucherNo);
                 }
               }
             }
