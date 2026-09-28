@@ -316,7 +316,9 @@ namespace BankingPlatform.API.Common.CommonFunctions
                         {
                             BranchId = branchId,
                             FDReceiptSetting = existingPrintingSettings.fdReceiptSetting,
-                            RDCertificateSetting = existingPrintingSettings.rdCertificateSetting
+                            RDCertificateSetting = existingPrintingSettings.rdCertificateSetting,
+                            PrintReceiptSetting = existingPrintingSettings.printReceiptSetting,
+                            StartReceiptNoFrom = existingPrintingSettings.startReceiptNoFrom
                         }
                         : new PrintingSettingsDTO { BranchId = branchId }
                 };

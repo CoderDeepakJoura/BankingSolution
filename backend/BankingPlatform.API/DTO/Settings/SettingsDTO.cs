@@ -1,4 +1,4 @@
-﻿namespace BankingPlatform.API.DTO.Settings
+namespace BankingPlatform.API.DTO.Settings
 {
     public class SettingsDTO
     {
@@ -30,11 +30,12 @@
         public int BankFDTDSLedgerAccountId { get; set; }
     }
 
-    // Printing Settings DTO
     public class PrintingSettingsDTO
     {
         public int BranchId { get; set; }
         public bool FDReceiptSetting { get; set; }
         public bool RDCertificateSetting { get; set; }
+        public bool PrintReceiptSetting { get; set; }
+        public int StartReceiptNoFrom { get; set; } = 1;
     }
 }

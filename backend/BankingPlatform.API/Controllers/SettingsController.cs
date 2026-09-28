@@ -196,6 +196,8 @@ namespace BankingPlatform.API.Controllers
                         // Update existing
                         existingPrintingSettings.fdReceiptSetting = settingsDTO.PrintingSettings.FDReceiptSetting;
                         existingPrintingSettings.rdCertificateSetting = settingsDTO.PrintingSettings.RDCertificateSetting;
+                        existingPrintingSettings.printReceiptSetting = settingsDTO.PrintingSettings.PrintReceiptSetting;
+                        existingPrintingSettings.startReceiptNoFrom = settingsDTO.PrintingSettings.StartReceiptNoFrom;
                     }
                     else
                     {
@@ -204,7 +206,9 @@ namespace BankingPlatform.API.Controllers
                         {
                             branchid = branchId,
                             fdReceiptSetting = settingsDTO.PrintingSettings.FDReceiptSetting,
-                            rdCertificateSetting = settingsDTO.PrintingSettings.RDCertificateSetting
+                            rdCertificateSetting = settingsDTO.PrintingSettings.RDCertificateSetting,
+                            printReceiptSetting = settingsDTO.PrintingSettings.PrintReceiptSetting,
+                            startReceiptNoFrom = settingsDTO.PrintingSettings.StartReceiptNoFrom
                         };
                         await _appcontext.printingsettings.AddAsync(printingSettings);
                     }

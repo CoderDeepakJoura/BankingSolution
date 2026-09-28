@@ -2077,6 +2077,21 @@ ALTER TABLE fdproduct     ADD COLUMN IF NOT EXISTS effectivetill TIMESTAMP(3) NU
 -- voucherprintsettings: number of copies to print per voucher type
 ALTER TABLE voucherprintsettings ADD COLUMN IF NOT EXISTS copies INTEGER NOT NULL DEFAULT 1;
 
+-- printingsettings: print cash receipt after Saving Deposit, Loan Recovery, and RD Kist
+ALTER TABLE printingsettings ADD COLUMN IF NOT EXISTS printreceiptsetting BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- printingsettings: starting receipt number (receipts count from this value if greater than last printed)
+ALTER TABLE printingsettings ADD COLUMN IF NOT EXISTS startreceiptno INT NOT NULL DEFAULT 1;
+
+-- receiptnotracker: tracks the last printed receipt number per branch
+CREATE TABLE IF NOT EXISTS receiptnotracker (
+    id            INT GENERATED ALWAYS AS IDENTITY,
+    brid          INT NOT NULL,
+    lastreceiptno INT NOT NULL DEFAULT 0,
+    CONSTRAINT pk_receiptnotracker PRIMARY KEY (id),
+    CONSTRAINT uq_receiptnotracker_brid UNIQUE (brid)
+);
+
 -- =============================================================================
 -- REFERENTIAL INTEGRITY: add missing FK constraints (idempotent — safe to re-run)
 -- Pattern: DO $$ BEGIN IF NOT EXISTS (pg_constraint lookup) THEN ALTER TABLE ADD CONSTRAINT; END IF; END $$;

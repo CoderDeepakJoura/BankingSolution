@@ -51,6 +51,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
+import { useReceiptPrint } from "../../../hooks/useReceiptPrint";
 import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
 
 // Joint Account Holder Interface
@@ -85,6 +86,7 @@ const RDKistVoucher: React.FC = () => {
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
   const { printAfterSave } = useVoucherPrint();
+  const { printReceiptAfterSave } = useReceiptPrint();
   const sessionDate = user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, validateField, clearErrors, markFieldTouched } =
     useFormValidation();
@@ -521,7 +523,10 @@ const RDKistVoucher: React.FC = () => {
         : await rdKistVoucherApi.addRDKistVoucher(rdKistVoucherPayload);
 
       if (response.success) {
-        if (!isEditMode && response.message) await printAfterSave(response.message, 4, 8);
+        if (!isEditMode && response.message) {
+          await printAfterSave(response.message, 4, 8);
+          await printReceiptAfterSave(response.message, 4, 8);
+        }
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",

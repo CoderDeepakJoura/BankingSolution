@@ -15,6 +15,7 @@ import SettingsApiService, {
 } from "../../services/settings/settingsapi";
 import { voucherPrintApi, VoucherPrintSettingDTO } from "../../services/voucherPrintApi";
 import { invalidateVoucherPrintCache } from "../../hooks/useVoucherPrint";
+import { invalidateReceiptCache } from "../../hooks/useReceiptPrint";
 import {
   Settings,
   Receipt,
@@ -88,6 +89,8 @@ const SettingsMaster = () => {
     // Printing Settings
     fdReceiptSetting: false,
     rdCertificateSetting: false,
+    printReceiptSetting: false,
+    startReceiptNoFrom: 1,
   });
 
   useEffect(() => {
@@ -165,6 +168,8 @@ const SettingsMaster = () => {
               ...prev,
               fdReceiptSetting: printing.fdReceiptSetting,
               rdCertificateSetting: printing.rdCertificateSetting,
+              printReceiptSetting: printing.printReceiptSetting,
+              startReceiptNoFrom: printing.startReceiptNoFrom ?? 1,
             }));
           }
         }
@@ -298,6 +303,8 @@ const SettingsMaster = () => {
         BranchId: user.branchid,
         FDReceiptSetting: settingsData.fdReceiptSetting,
         RDCertificateSetting: settingsData.rdCertificateSetting,
+        PrintReceiptSetting: settingsData.printReceiptSetting,
+        StartReceiptNoFrom: settingsData.startReceiptNoFrom,
       };
 
       const dto: SettingsDTO = {
@@ -452,6 +459,7 @@ const SettingsMaster = () => {
       const res = await voucherPrintApi.saveSettings(user.branchid, payload);
       if (res.success) {
         invalidateVoucherPrintCache(user.branchid);
+        invalidateReceiptCache(user.branchid);
         await Swal.fire({ icon: "success", title: "Saved!", text: res.message, confirmButtonColor: "#3B82F6" });
       } else {
         throw new Error(res.message || "Failed to save.");
@@ -1147,6 +1155,45 @@ const SettingsMaster = () => {
                 Print RD certificates when created
               </label>
             </div>
+          </FormField>
+
+          <FormField
+            name="printReceiptSetting"
+            label="Print Receipt"
+            errors={errorsByField.printReceiptSetting || []}
+            icon={<FileText className="w-4 h-4 text-green-500" />}
+          >
+            <div className="flex items-center space-x-3 mt-2">
+              <input
+                type="checkbox"
+                id="printReceiptSetting"
+                checked={settingsData.printReceiptSetting}
+                onChange={(e) => handleInputChange("printReceiptSetting", e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+              />
+              <label htmlFor="printReceiptSetting" className="text-sm font-medium text-gray-700 cursor-pointer">
+                Auto-print receipt after Saving Deposit, Loan Recovery, and RD Kist
+              </label>
+            </div>
+          </FormField>
+
+          <FormField
+            name="startReceiptNoFrom"
+            label="Start Receipt No From"
+            errors={errorsByField.startReceiptNoFrom || []}
+            icon={<Receipt className="w-4 h-4 text-purple-500" />}
+          >
+            <input
+              type="text"
+              inputMode="numeric"
+              value={settingsData.startReceiptNoFrom}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, "");
+                handleInputChange("startReceiptNoFrom", val === "" ? 1 : parseInt(val));
+              }}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="1"
+            />
           </FormField>
         </div>
       </div>

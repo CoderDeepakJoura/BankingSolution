@@ -59,6 +59,7 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Salary.EmployeeAttendance
 builder.Services.AddScoped<MasterUsageCheckerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.VoucherPrint.VoucherPrintService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.FDBond.FDBondService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Receipt.ReceiptService>();
 builder.Services.AddScoped<ImageService>();
 builder.Services.AddScoped<FDProductService>();
 builder.Services.AddScoped<SavingsProductService>();
@@ -172,7 +173,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials();
+              .AllowCredentials()
+              .WithExposedHeaders("X-Receipt-No");
     });
 });
 

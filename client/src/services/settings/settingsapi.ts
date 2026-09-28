@@ -56,6 +56,8 @@ export interface PrintingSettingsDTO {
   BranchId: number;
   FDReceiptSetting: boolean;
   RDCertificateSetting: boolean;
+  PrintReceiptSetting: boolean;
+  StartReceiptNoFrom: number;
 }
 
 // ============= Response DTO for Fetch =============

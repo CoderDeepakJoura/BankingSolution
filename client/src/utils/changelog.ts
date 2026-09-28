@@ -15,6 +15,27 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.8",
+    date: "2026-09-28",
+    changes: [
+      { type: "new", text: "Receipt printing: auto-print a receipt PDF after Saving Deposit, Loan Recovery, and RD Kist when 'Print Receipt' setting is enabled" },
+      { type: "new", text: "Receipt PDF shows branch name, member name with account number, amount in words, and transaction type on a single styled receipt" },
+      { type: "new", text: "Settings › Printing: 'Print Receipt' toggle and 'Start Receipt No From' to control receipt numbering starting point" },
+      { type: "new", text: "Sequential receipt numbering per branch — receipt number always increments from the greater of the last printed number or the configured start value" },
+      { type: "improvement", text: "Receipt PDF downloaded with the actual receipt number in the filename (e.g. Receipt-42.pdf)" },
+      { type: "fix", text: "Settings page 'Failed to load required data' error caused by EF Core column name mismatch for startreceiptno" },
+    ],
+  },
+  {
+    version: "1.1.7",
+    date: "2026-09-28",
+    changes: [
+      { type: "new", text: "Receipt printing: auto-print a receipt PDF after Saving Deposit, Loan Recovery, and RD Kist when 'Print Receipt' setting is enabled" },
+      { type: "new", text: "Receipt PDF shows branch name, receipt number (voucher no), member name, amount in words, and transaction type" },
+      { type: "new", text: "Settings › Printing: new 'Print Receipt' toggle to enable/disable auto-receipt printing" },
+    ],
+  },
+  {
     version: "1.1.6",
     date: "2026-09-27",
     changes: [

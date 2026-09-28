@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,5 +18,10 @@ namespace BankingPlatform.Infrastructure.Models.Settings
         public bool fdReceiptSetting { get; set; }
 
         public bool rdCertificateSetting { get; set; }
+
+        public bool printReceiptSetting { get; set; }
+
+        [Column("startreceiptno")]
+        public int startReceiptNoFrom { get; set; } = 1;
     }
 }

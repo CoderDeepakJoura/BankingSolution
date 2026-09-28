@@ -41,6 +41,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
+import { useReceiptPrint } from "../../../hooks/useReceiptPrint";
 import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
 import savingLedgerApi, { SavingLedger } from "../../../services/reports/savingLedgerApi";
 
@@ -76,6 +77,7 @@ const SavingDepositVoucher: React.FC = () => {
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
   const { printAfterSave } = useVoucherPrint();
+  const { printReceiptAfterSave } = useReceiptPrint();
   const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
   const { errors, validateForm, validateField, clearErrors, markFieldTouched } =
     useFormValidation();
@@ -536,7 +538,10 @@ const SavingDepositVoucher: React.FC = () => {
       }
 
       if (response.success) {
-        if (!isEditMode && response.message) await printAfterSave(response.message, 2, 2);
+        if (!isEditMode && response.message) {
+          await printAfterSave(response.message, 2, 2);
+          await printReceiptAfterSave(response.message, 2, 2);
+        }
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
