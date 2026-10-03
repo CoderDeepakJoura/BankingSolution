@@ -25,5 +25,22 @@ namespace BankingPlatform.Infrastructure.Models.Salary
         public string? remarks { get; set; }
         public string? emailid { get; set; }
         public int currentbranchid { get; set; } = 0;
+
+        // Step 1 — personal
+        public string? relativename { get; set; }
+        public string? relation { get; set; }
+        public string? station { get; set; }
+        public int maritalstatus { get; set; } = 1;
+        public bool isleave { get; set; } = false;
+        public DateTime? leavedate { get; set; }
+        public string? hoacno { get; set; }
+
+        // Step 2 — payroll
+        public string? pfaccountno { get; set; }
+        public string? uanno { get; set; }
+        public string? esicaccountno { get; set; }
+        public DateTime? lastincrementdate { get; set; }
+        public int savingaccountid { get; set; } = 0;
+        public string? educationqual { get; set; }
     }
 }

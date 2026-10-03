@@ -194,7 +194,9 @@ import MemberIntCertPage from "../pages/reports/MemberIntCert";
 import SeleniumAutomation from "../pages/seleniumautomation/automation";
 import SuperUserSettings from "../pages/superuser/SuperUserSettings";
 import EmployeeDesignationData from "../pages/Salary/employee-designation-data";
-import EmployeeMasterPage from "../pages/Salary/employee-master";
+import EmployeeMasterOperations from "../pages/Salary/employee-master-operations";
+import EmployeeMasterForm from "../pages/Salary/employee-master";
+import EmployeeMasterData from "../pages/Salary/employee-master-data";
 import SalaryComponentData from "../pages/Salary/salary-component-data";
 import SalaryCreation from "../pages/Salary/salary-creation";
 import EmployeeAttendancePage from "../pages/Salary/employee-attendance";
@@ -512,8 +514,11 @@ export const ROUTES: RouteEntry[] = [
   { path: "/member-int-cert",                 element: <MemberIntCertPage />,           label: "Interest Certificate",     category: "Member Reports" },
 
   // ── Salary — Master ───────────────────────────────────────────────────────
-  { path: "/employee-designation-data",  element: <EmployeeDesignationData />,                          label: "Employee Designation",              category: "Payroll" },
-  { path: "/employee-master",            element: <EmployeeMasterPage />,                               label: "Employee Master",                   category: "Payroll" },
+  { path: "/employee-designation-data",  element: <EmployeeDesignationData />,    label: "Employee Designation",  category: "Payroll" },
+  { path: "/employee-master",            element: <EmployeeMasterOperations />,   label: "Employee Master",       category: "Payroll" },
+  { path: "/employee-master/add",        element: <EmployeeMasterForm /> },
+  { path: "/employee-master/edit/:id",   element: <EmployeeMasterForm /> },
+  { path: "/employee-master-data",       element: <EmployeeMasterData /> },
   { path: "/salary-component-data",      element: <SalaryComponentData />,                              label: "Employee Wise Salary Component",     category: "Payroll" },
   { path: "/employee-grade-data",        element: <InProgress title="Employee Grade" />,                label: "Employee Grade",                    category: "Payroll" },
   { path: "/employee-attendance",        element: <EmployeeAttendancePage />,                          label: "Employee Attendance",               category: "Payroll" },

@@ -149,7 +149,7 @@ const LoanRecovery: React.FC = () => {
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
   const { printAfterSave } = useVoucherPrint();
-  const { printReceiptAfterSave } = useReceiptPrint();
+  const { printLoanReceiptAfterSave } = useReceiptPrint();
   const sessionDate = user.workingdate ? commonservice.splitDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [isEditMode, setIsEditMode] = useState(false);
@@ -528,7 +528,12 @@ const LoanRecovery: React.FC = () => {
       if (res.success) {
         if (!isEditMode && res.message) {
           await printAfterSave(res.message, 5, 10);
-          await printReceiptAfterSave(res.message, 5, 10);
+          // Stand loans: pass principal + interest breakdown; Add in Balance: no breakdown
+          if (isStandLoan && intTotal > 0) {
+            await printLoanReceiptAfterSave(res.message, principalRec, intTotal);
+          } else {
+            await printLoanReceiptAfterSave(res.message);
+          }
         }
         await Swal.fire({
           icon: "success",

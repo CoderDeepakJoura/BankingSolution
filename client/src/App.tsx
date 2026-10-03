@@ -7,8 +7,13 @@ import { Login } from "./pages";
 import SessionExpired from "./pages/session-expired";
 import { ROUTES } from "./routes/routeRegistry";
 import { Monitor } from "lucide-react";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsOfService from "./pages/legal/TermsOfService";
+import SecurityPolicy from "./pages/legal/SecurityPolicy";
+import HelpCenter from "./pages/legal/HelpCenter";
+import ContactSupport from "./pages/legal/ContactSupport";
 
-const PUBLIC_PATHS = new Set(["/", "/session-expired"]);
+const PUBLIC_PATHS = new Set(["/", "/session-expired", "/privacy-policy", "/terms-of-service", "/security", "/help-center", "/contact-support"]);
 
 function RouterGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -84,6 +89,11 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/session-expired" element={<SessionExpired />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/security" element={<SecurityPolicy />} />
+          <Route path="/help-center" element={<HelpCenter />} />
+          <Route path="/contact-support" element={<ContactSupport />} />
           {ROUTES.map((r) => (
             <Route
               key={r.path}

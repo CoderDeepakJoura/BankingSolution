@@ -222,9 +222,9 @@ namespace BankingPlatform.API.Service.FDBond
                             {
                                 r.RelativeItem().Column(c =>
                                 {
-                                    c.Item().Text("MATURITY VALUE").FontSize(8).Bold().FontColor(LtGray);
-                                    c.Item().Text(matStr).FontSize(20).Bold().FontColor(Blue);
-                                    c.Item().Text(matWords).FontSize(8).Italic().FontColor(LtGray);
+                                    c.Item().Text("MATURITY VALUE").FontSize(7.5f).Bold().FontColor(LtGray);
+                                    c.Item().Text(matStr).FontSize(11).Bold().FontColor(Blue);
+                                    c.Item().Text(matWords).FontSize(7.5f).Italic().FontColor(LtGray);
                                 });
                             });
 

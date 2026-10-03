@@ -27,6 +27,7 @@ import { getFirstSessionFromDate } from "../../../utils/session";
 import { VoucherPreview } from "../../../services/vouchers/voucherOperationsApi";
 import { Pencil, X } from "lucide-react";
 import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
+import { useReceiptPrint } from "../../../hooks/useReceiptPrint";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ const CashPaymentReceiptVoucher: React.FC = () => {
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user);
   const { printAfterSave } = useVoucherPrint();
+  const { printReceiptsForAccounts } = useReceiptPrint();
   const sessionDate = user.workingdate
     ? commonservice.splitDate(user.workingdate)
     : commonservice.getTodaysDate();
@@ -429,6 +431,13 @@ const CashPaymentReceiptVoucher: React.FC = () => {
 
       if (res.success) {
         if (!isEditMode && res.message) await printAfterSave(res.message, 6, 11);
+        // Print one receipt per non-General Cr entry (Saving, RD, Share Money, Loan, etc.)
+        const memberCrAccountIds = entries
+          .filter((e) => e.entryType === "Cr" && e.accountType !== 3 && e.accountId > 0)
+          .map((e) => e.accountId);
+        if (!isEditMode && memberCrAccountIds.length > 0 && res.message) {
+          try { await printReceiptsForAccounts(res.message, 6, 11, memberCrAccountIds); } catch { /* optional */ }
+        }
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",

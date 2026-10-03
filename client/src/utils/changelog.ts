@@ -15,6 +15,18 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.9",
+    date: "2026-10-03",
+    changes: [
+      { type: "new", text: "Receipt printing for FD account creation, FD renewal, and new member registration (Share Money voucher)" },
+      { type: "new", text: "Cash voucher: prints one receipt per non-General Cr entry — e.g. three Saving/RD/Share Money credits produce three separate receipts" },
+      { type: "new", text: "Loan recovery Stand type: receipt now shows Principal / Interest / Total breakdown instead of a single amount" },
+      { type: "improvement", text: "Loan recovery receipt shows the loan account name (Cr side) instead of the cash account" },
+      { type: "improvement", text: "FD Bond maturity amount font reduced for a more compact, professional layout" },
+      { type: "improvement", text: "Receipt amount box condensed to a single line" },
+    ],
+  },
+  {
     version: "1.1.8",
     date: "2026-09-28",
     changes: [

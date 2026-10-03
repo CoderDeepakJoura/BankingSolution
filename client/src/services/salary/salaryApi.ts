@@ -8,23 +8,48 @@ export interface EmployeeDesignation {
   empGradeId: number;
 }
 
+export interface EmployeeLeaveAllotment {
+  id: number;
+  employeeId: number;
+  branchId: number;
+  leaveType: string;
+  noOfDays: number;
+  allotmentDate: string;
+}
+
 export interface EmployeeMaster {
   id: number;
   branchId: number;
   code: string;
   firstName: string;
   lastName?: string;
+  relativeName?: string;
+  relation?: string;
+  station?: string;
+  genderId: number;
+  maritalStatus: number;
+  phone?: string;
+  address?: string;
+  hoAcNo?: string;
   designationId: number;
   designationName?: string;
   empType: number;
-  genderId: number;
-  dob?: string;
-  phone?: string;
-  address?: string;
   joiningDate: string;
-  status: number;
+  dob?: string;
   emailId?: string;
+  isLeave: boolean;
+  leaveDate?: string;
+  status: number;
   remarks?: string;
+  // payroll
+  pfAccountNo?: string;
+  uanNo?: string;
+  esicAccountNo?: string;
+  lastIncrementDate?: string;
+  savingAccountId: number;
+  savingAccountName?: string;
+  educationQual: string[];
+  leaveAllotments: EmployeeLeaveAllotment[];
 }
 
 export interface SalaryComponent {
@@ -140,6 +165,13 @@ class SalaryApiService extends ApiService {
     );
   }
 
+  getEmployeeById(id: number, branchId: number) {
+    return this.makeRequest<{ success: boolean; data: EmployeeMaster }>(
+      `/EmployeeMaster/${id}/${branchId}`,
+      { method: 'GET' }
+    );
+  }
+
   getEmployeeDropdown(branchId: number) {
     return this.makeRequest<{ success: boolean; items: EmployeeMaster[] }>(
       `/EmployeeMaster/dropdown/${branchId}`,
@@ -148,8 +180,15 @@ class SalaryApiService extends ApiService {
   }
 
   createEmployee(data: Partial<EmployeeMaster>) {
-    return this.makeRequest<{ success: boolean; message: string }>(
+    return this.makeRequest<{ success: boolean; message: string; empId: number }>(
       `/EmployeeMaster`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+  }
+
+  saveEmployeePayroll(data: Partial<EmployeeMaster>) {
+    return this.makeRequest<{ success: boolean; message: string }>(
+      `/EmployeeMaster/save-payroll`,
       { method: 'POST', body: JSON.stringify(data) }
     );
   }

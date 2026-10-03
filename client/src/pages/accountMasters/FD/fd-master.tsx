@@ -37,6 +37,7 @@ import { canEnterOpeningBalance } from "../../../utils/session";
 import DatePicker from "../../../components/DatePicker";
 import { fdBondApi } from "../../../services/fdBondApi";
 import settingsapi from "../../../services/settings/settingsapi";
+import { useReceiptPrint } from "../../../hooks/useReceiptPrint";
 
 export interface FDProduct {
   id: number;
@@ -80,6 +81,7 @@ interface FDDetailItem {
 }
 
 const FDAccountMaster = () => {
+  const { printReceiptAfterSave } = useReceiptPrint();
   const navigate = useNavigate();
   const { accountId: encryptedId } = useParams<{ accountId?: string }>();
   const accountId = encryptedId ? decryptId(encryptedId) : null;
@@ -1741,6 +1743,12 @@ const FDAccountMaster = () => {
       if (response.success) {
         clearErrors();
         setShowValidationSummary(false);
+        // Auto-print receipt before Swal (consistent with saving deposit pattern)
+        if (!isEditMode && !isOpeningEntry && response.message) {
+          try {
+            await printReceiptAfterSave(response.message, 3, 2);
+          } catch { /* receipt print is optional */ }
+        }
         await Swal.fire({
           icon: "success",
           title: "Success!",

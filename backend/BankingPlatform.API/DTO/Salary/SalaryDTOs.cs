@@ -17,22 +17,53 @@ namespace BankingPlatform.API.DTO.Salary
     {
         public int Id { get; set; }
         public int BranchId { get; set; }
+
+        // Step 1 — employee identity
         [Required, MaxLength(50)]
         public string Code { get; set; } = "";
         [Required, MaxLength(80)]
         public string FirstName { get; set; } = "";
         public string? LastName { get; set; }
+        public string? RelativeName { get; set; }
+        public string? Relation { get; set; }
+        public string? Station { get; set; }
+        public int GenderId { get; set; } = 1;
+        public int MaritalStatus { get; set; } = 1;
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public string? HoAcNo { get; set; }
+
+        // Step 1 — employee detail
         public int DesignationId { get; set; }
         public string? DesignationName { get; set; }
         public int EmpType { get; set; } = 1;
-        public int GenderId { get; set; } = 1;
-        public string? Dob { get; set; }
-        public string? Phone { get; set; }
-        public string? Address { get; set; }
         public string JoiningDate { get; set; } = "";
-        public int Status { get; set; } = 1;
+        public string? Dob { get; set; }
         public string? EmailId { get; set; }
+        public bool IsLeave { get; set; } = false;
+        public string? LeaveDate { get; set; }
+        public int Status { get; set; } = 1;
         public string? Remarks { get; set; }
+
+        // Step 2 — payroll
+        public string? PfAccountNo { get; set; }
+        public string? UanNo { get; set; }
+        public string? EsicAccountNo { get; set; }
+        public string? LastIncrementDate { get; set; }
+        public int SavingAccountId { get; set; } = 0;
+        public string? SavingAccountName { get; set; }
+        public List<string> EducationQual { get; set; } = new();
+        public List<EmployeeLeaveAllotmentDTO> LeaveAllotments { get; set; } = new();
+    }
+
+    public class EmployeeLeaveAllotmentDTO
+    {
+        public int Id { get; set; }
+        public int EmployeeId { get; set; }
+        public int BranchId { get; set; }
+        public string LeaveType { get; set; } = "";
+        public int NoOfDays { get; set; }
+        public string AllotmentDate { get; set; } = "";
     }
 
     public class SalaryComponentDTO

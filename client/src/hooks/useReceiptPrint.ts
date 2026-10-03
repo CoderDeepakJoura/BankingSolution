@@ -56,5 +56,48 @@ export function useReceiptPrint() {
     await receiptApi.downloadReceipt(branchId, voucherType, voucherSubType, voucherNo);
   }
 
-  return { printReceiptAfterSave };
+  // Print one receipt per accountId — used for cash vouchers with multiple Cr entries
+  async function printReceiptsForAccounts(
+    successMessage: string,
+    voucherType: number,
+    voucherSubType: number,
+    accountIds: number[]
+  ): Promise<void> {
+    if (!branchId || accountIds.length === 0) return;
+
+    if (!_cache.has(branchId)) {
+      await loadSetting(branchId);
+    }
+
+    if (!_cache.get(branchId)) return;
+
+    const voucherNo = parseVoucherNo(successMessage);
+    if (!voucherNo) return;
+
+    for (const accountId of accountIds) {
+      await receiptApi.downloadReceiptForAccount(branchId, voucherType, voucherSubType, voucherNo, accountId);
+    }
+  }
+
+  // Loan recovery receipt: Add in Balance → no breakdown; Stand → pass principal + interest
+  async function printLoanReceiptAfterSave(
+    successMessage: string,
+    principalAmount?: number,
+    intAmount?: number
+  ): Promise<void> {
+    if (!branchId) return;
+
+    if (!_cache.has(branchId)) {
+      await loadSetting(branchId);
+    }
+
+    if (!_cache.get(branchId)) return;
+
+    const voucherNo = parseVoucherNo(successMessage);
+    if (!voucherNo) return;
+
+    await receiptApi.downloadLoanReceipt(branchId, voucherNo, principalAmount, intAmount);
+  }
+
+  return { printReceiptAfterSave, printReceiptsForAccounts, printLoanReceiptAfterSave };
 }

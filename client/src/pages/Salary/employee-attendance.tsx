@@ -2,40 +2,91 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import Swal from "sweetalert2";
+import { Calendar, Save, X, ArrowLeft } from "lucide-react";
 import { RootState } from "../../redux";
 import salaryApi, { AttendanceRow } from "../../services/salary/salaryApi";
 import commonservice from "../../services/common/commonservice";
 import DashboardLayout from "../../Common/Layout";
 
+// ── Leave type options ────────────────────────────────────────────────────────
+type LeaveKey = "EL" | "CL" | "MLSL" | "LWP" | "";
+
+const LEAVE_OPTIONS: { value: LeaveKey; label: string }[] = [
+  { value: "",     label: "==Please Select==" },
+  { value: "EL",   label: "EL (Earned Leave)" },
+  { value: "CL",   label: "CL (Casual Leave)" },
+  { value: "MLSL", label: "ML or SL (Medical or Sick Leave)" },
+  { value: "LWP",  label: "LWP (Leave Without Pay)" },
+];
+
+// ── Editable row ──────────────────────────────────────────────────────────────
 interface EditableRow extends AttendanceRow {
+  leaveType: LeaveKey;
+  leaveCount: number;
   changed: boolean;
 }
 
-const NUM_COLS = ["el", "cl", "mlsl", "lwp"] as const;
-type LeaveCol = typeof NUM_COLS[number];
+// ── Derive leaveType + leaveCount from separate el/cl/mlsl/lwp ───────────────
+function toEditable(r: AttendanceRow): EditableRow {
+  let leaveType: LeaveKey = "";
+  let leaveCount = 0;
+  if (r.el > 0)   { leaveType = "EL";   leaveCount = r.el; }
+  else if (r.cl > 0)   { leaveType = "CL";   leaveCount = r.cl; }
+  else if (r.mlsl > 0) { leaveType = "MLSL"; leaveCount = r.mlsl; }
+  else if (r.lwp > 0)  { leaveType = "LWP";  leaveCount = r.lwp; }
+  return { ...r, leaveType, leaveCount, changed: false };
+}
 
+// ── Map back to el/cl/mlsl/lwp ────────────────────────────────────────────────
+function toSaveRow(r: EditableRow) {
+  return {
+    empId: r.empId,
+    el:    r.leaveType === "EL"   ? r.leaveCount : 0,
+    cl:    r.leaveType === "CL"   ? r.leaveCount : 0,
+    mlsl:  r.leaveType === "MLSL" ? r.leaveCount : 0,
+    lwp:   r.leaveType === "LWP"  ? r.leaveCount : 0,
+    remarks: r.remarks,
+  };
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+const inp = "border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-colors";
+const sel = inp + " cursor-pointer";
+
+// ─────────────────────────────────────────────────────────────────────────────
 export default function EmployeeAttendancePage() {
   const navigate = useNavigate();
-  const user = useSelector((s: RootState) => s.user);
+  const user     = useSelector((s: RootState) => s.user);
   const branchId = user.branchid;
 
-  const workingDate = commonservice.parseWorkingDate(user.workingdate);
-  const defaultMonth = workingDate.slice(0, 7);
+  const workingDate   = commonservice.parseWorkingDate(user.workingdate);
+  const defaultDate   = workingDate;           // YYYY-MM-DD
+  const defaultMonth  = workingDate.slice(0, 7); // YYYY-MM
 
-  const [attMonth, setAttMonth] = useState(defaultMonth);
-  const [attType, setAttType] = useState<1 | 2>(2); // 1=Daily, 2=Monthly
-  const [rows, setRows] = useState<EditableRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [fetched, setFetched] = useState(false);
+  const [attType, setAttType]   = useState<1 | 2>(1);   // 1=Daily, 2=Monthly
+  const [date, setDate]         = useState(defaultDate);
+  const [month, setMonth]       = useState(defaultMonth);
+  const [rows, setRows]         = useState<EditableRow[]>([]);
+  const [loading, setLoading]   = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [fetched, setFetched]   = useState(false);
 
+  // ── Show ──────────────────────────────────────────────────────────────────
   const handleShow = async () => {
-    if (!attMonth) { Swal.fire("Required", "Please select a month.", "warning"); return; }
+    const attMonth = attType === 1
+      ? date.slice(0, 7) + "-01"      // daily → use selected date's month
+      : month + "-01";                 // monthly
+
+    if (!attMonth || attMonth === "-01") {
+      Swal.fire("Required", "Please select a date.", "warning");
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await salaryApi.getAttendance(branchId, attMonth);
+      const res = await salaryApi.getAttendance(branchId, attMonth.slice(0, 7));
       if (!res.success) throw new Error("Failed to fetch attendance data.");
-      setRows((res.items ?? []).map(r => ({ ...r, changed: false })));
+      setRows((res.items ?? []).map(toEditable));
       setFetched(true);
     } catch (err: any) {
       Swal.fire("Error", err.message ?? "Could not load attendance.", "error");
@@ -44,12 +95,13 @@ export default function EmployeeAttendancePage() {
     }
   };
 
-  const updateRow = (idx: number, field: LeaveCol | "remarks", value: string | number) => {
+  // ── Row update ────────────────────────────────────────────────────────────
+  const updateRow = (idx: number, field: "leaveType" | "leaveCount" | "remarks", value: any) =>
     setRows(prev => prev.map((r, i) =>
       i === idx ? { ...r, [field]: value, changed: true } : r
     ));
-  };
 
+  // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     const changed = rows.filter(r => r.changed);
     if (changed.length === 0) {
@@ -57,31 +109,25 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
-    // Validate: leave counts must be non-negative
+    // Validate: if leaveType selected, count must be > 0
     for (const r of changed) {
-      if (r.el < 0 || r.cl < 0 || r.mlsl < 0 || r.lwp < 0) {
-        Swal.fire("Validation Error", `Negative leave values are not allowed for ${r.empName}.`, "warning");
+      if (r.leaveType !== "" && r.leaveCount <= 0) {
+        Swal.fire("Validation", `Leave count must be greater than 0 for ${r.empName}.`, "warning");
         return;
       }
     }
 
+    const attMonth = attType === 1 ? date.slice(0, 7) + "-01" : month + "-01";
     setSaving(true);
     try {
       const res = await salaryApi.saveAttendance({
         branchId,
-        attMonth: `${attMonth}-01`,
+        attMonth,
         attType,
-        rows: changed.map(r => ({
-          empId: r.empId,
-          el: r.el,
-          cl: r.cl,
-          mlsl: r.mlsl,
-          lwp: r.lwp,
-          remarks: r.remarks,
-        })),
+        rows: changed.map(toSaveRow),
       });
       if (!res.success) throw new Error(res.message);
-      await Swal.fire("Saved", res.message || "Attendance saved successfully.", "success");
+      await Swal.fire({ icon: "success", title: "Saved!", text: res.message || "Attendance saved successfully.", confirmButtonColor: "#7c3aed", timer: 2000, showConfirmButton: false });
       setRows(prev => prev.map(r => ({ ...r, changed: false })));
     } catch (err: any) {
       Swal.fire("Error", err.message ?? "Could not save attendance.", "error");
@@ -90,70 +136,89 @@ export default function EmployeeAttendancePage() {
     }
   };
 
-  const monthLabel = attMonth
-    ? new Date(`${attMonth}-01`).toLocaleString("en-IN", { month: "long", year: "numeric" })
-    : "";
+  const hasChanges = rows.some(r => r.changed);
 
   return (
     <DashboardLayout enableScroll={true} mainContent={
-      <div className="w-full min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-sky-100">
-        {/* Header */}
-        <div className="w-full bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 px-6 py-4 flex items-center gap-4 shadow-lg">
+      <div className="w-full min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-50 p-6 space-y-5">
+
+        {/* ── Title card ── */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-md">
+              <Calendar size={22} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">Employee Attendance</h1>
+              <p className="text-sm text-gray-400 mt-0.5">Fields marked with <span className="text-red-500">*</span> are mandatory</p>
+            </div>
+          </div>
           <button
             onClick={() => navigate("/dashboard")}
-            className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-all">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft size={16} /> Back
           </button>
-          <div className="p-2 rounded-xl bg-white/20">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-white">Employee Attendance</h1>
-            <p className="text-sm text-white/80">Record monthly leave and attendance for employees</p>
-          </div>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Controls */}
-          <div className="bg-white rounded-2xl shadow-md p-5">
-            <h2 className="text-base font-bold text-slate-700 mb-4">Select Month</h2>
-            <div className="flex flex-wrap gap-5 items-end">
+        {/* ── Filter card ── */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-5">
+            <div className="flex flex-wrap items-end gap-8">
+
               {/* Attendance Type */}
               <div>
-                <label className="block text-sm font-semibold text-slate-600 mb-2">Attendance Type</label>
-                <div className="flex gap-4">
-                  {([{ label: "Monthly", val: 2 }, { label: "Daily", val: 1 }] as const).map(opt => (
-                    <label key={opt.val} className="flex items-center gap-2 cursor-pointer select-none">
+                <label className="block text-sm font-semibold text-gray-600 mb-2">
+                  Attendance Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-6">
+                  {([{ val: 1, label: "Daily" }, { val: 2, label: "Monthly" }] as const).map(opt => (
+                    <label key={opt.val} className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-gray-700">
                       <input
                         type="radio"
                         name="attType"
                         value={opt.val}
                         checked={attType === opt.val}
                         onChange={() => { setAttType(opt.val); setFetched(false); setRows([]); }}
-                        className="accent-teal-600 w-4 h-4"
+                        className="w-4 h-4 accent-purple-600"
                       />
-                      <span className="text-sm font-medium text-slate-700">{opt.label}</span>
+                      {opt.label}
                     </label>
                   ))}
                 </div>
               </div>
 
-              {/* Month picker */}
+              {/* Date / Month */}
               <div>
-                <label className="block text-sm font-semibold text-slate-600 mb-1">
-                  Month <span className="text-red-500">*</span>
+                <label className="block text-sm font-semibold text-gray-600 mb-2">
+                  {attType === 1 ? "Date" : "Month"} <span className="text-red-500">*</span>
                 </label>
+                {attType === 1 ? (
+                  <input
+                    type="date"
+                    value={date}
+                    max={workingDate}
+                    onChange={e => { setDate(e.target.value); setFetched(false); setRows([]); }}
+                    className={inp + " w-44"}
+                  />
+                ) : (
+                  <input
+                    type="month"
+                    value={month}
+                    max={defaultMonth}
+                    onChange={e => { setMonth(e.target.value); setFetched(false); setRows([]); }}
+                    className={inp + " w-44"}
+                  />
+                )}
+              </div>
+
+              {/* Branch Code (read-only) */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Branch Code</label>
                 <input
-                  type="month"
-                  value={attMonth}
-                  max={workingDate.slice(0, 7)}
-                  onChange={e => { setAttMonth(e.target.value); setFetched(false); setRows([]); }}
-                  className="px-3 py-2 border-2 border-slate-200 rounded-xl outline-none focus:border-teal-400 text-sm bg-white"
+                  readOnly
+                  value={user.branchCode ?? ""}
+                  className={inp + " w-32 bg-gray-50 text-gray-500 cursor-default"}
                 />
               </div>
 
@@ -161,139 +226,146 @@ export default function EmployeeAttendancePage() {
               <button
                 onClick={handleShow}
                 disabled={loading}
-                className="px-6 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-cyan-600 disabled:opacity-50 transition-all shadow-md text-sm">
+                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 transition-all shadow-md"
+              >
                 {loading ? "Loading..." : "Show"}
               </button>
             </div>
           </div>
-
-          {/* Attendance Table */}
-          {fetched && (
-            <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-cyan-50 flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-slate-700">
-                    Attendance — {monthLabel}
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {rows.length} employee{rows.length !== 1 ? "s" : ""} · enter leave days for each
-                  </p>
-                </div>
-                {rows.some(r => r.changed) && (
-                  <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
-                    Unsaved changes
-                  </span>
-                )}
-              </div>
-
-              {rows.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                  <svg className="w-12 h-12 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
-                  </svg>
-                  <p className="font-semibold">No employees found for this branch.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                      <tr>
-                        <th className="px-3 py-3 text-left font-semibold text-slate-600 w-10">#</th>
-                        <th className="px-3 py-3 text-left font-semibold text-slate-600">Emp Code</th>
-                        <th className="px-3 py-3 text-left font-semibold text-slate-600">Name</th>
-                        <th className="px-3 py-3 text-left font-semibold text-slate-600">Designation</th>
-                        <th className="px-3 py-3 text-center font-semibold text-slate-600 w-24">
-                          <span className="text-green-600">EL</span>
-                        </th>
-                        <th className="px-3 py-3 text-center font-semibold text-slate-600 w-24">
-                          <span className="text-blue-600">CL</span>
-                        </th>
-                        <th className="px-3 py-3 text-center font-semibold text-slate-600 w-24">
-                          <span className="text-purple-600">ML/SL</span>
-                        </th>
-                        <th className="px-3 py-3 text-center font-semibold text-slate-600 w-24">
-                          <span className="text-red-600">LWP</span>
-                        </th>
-                        <th className="px-3 py-3 text-left font-semibold text-slate-600">Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((row, i) => (
-                        <tr
-                          key={row.empId}
-                          className={`border-b border-slate-100 transition-colors ${row.changed ? "bg-amber-50/40" : "hover:bg-teal-50/30"}`}>
-                          <td className="px-3 py-2 text-slate-400 font-medium">{i + 1}</td>
-                          <td className="px-3 py-2 font-mono text-slate-600 text-xs">{row.empCode}</td>
-                          <td className="px-3 py-2 font-semibold text-slate-800">{row.empName}</td>
-                          <td className="px-3 py-2 text-slate-500 text-xs">{row.designationName || "—"}</td>
-                          {NUM_COLS.map(col => {
-                            const colorMap: Record<LeaveCol, string> = {
-                              el: "focus:border-green-400",
-                              cl: "focus:border-blue-400",
-                              mlsl: "focus:border-purple-400",
-                              lwp: "focus:border-red-400",
-                            };
-                            return (
-                              <td key={col} className="px-3 py-2">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.5"
-                                  value={row[col]}
-                                  onChange={e => updateRow(i, col, parseFloat(e.target.value) || 0)}
-                                  className={`w-full px-2 py-1.5 border-2 border-slate-200 rounded-lg outline-none ${colorMap[col]} text-center text-sm`}
-                                />
-                              </td>
-                            );
-                          })}
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={row.remarks}
-                              maxLength={100}
-                              onChange={e => updateRow(i, "remarks", e.target.value)}
-                              placeholder="Optional"
-                              className="w-full px-2 py-1.5 border-2 border-slate-200 rounded-lg outline-none focus:border-teal-400 text-sm"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Legend + Save */}
-              <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex gap-4 text-xs text-slate-500 font-medium">
-                  <span><span className="text-green-600 font-semibold">EL</span> = Earned Leave</span>
-                  <span><span className="text-blue-600 font-semibold">CL</span> = Casual Leave</span>
-                  <span><span className="text-purple-600 font-semibold">ML/SL</span> = Medical / Sick Leave</span>
-                  <span><span className="text-red-600 font-semibold">LWP</span> = Leave Without Pay</span>
-                </div>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !rows.some(r => r.changed)}
-                  className="px-8 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold rounded-xl hover:from-teal-600 hover:to-cyan-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md text-sm">
-                  {saving ? "Saving..." : "Save Attendance"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Empty state before first Show */}
-          {!fetched && !loading && (
-            <div className="flex flex-col items-center justify-center py-24 text-slate-400">
-              <svg className="w-16 h-16 mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <p className="text-lg font-semibold">Select a month and click Show</p>
-              <p className="text-sm mt-1">Employees will load with their existing leave records</p>
-            </div>
-          )}
         </div>
+
+        {/* ── Attendance Table ── */}
+        {fetched && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+
+            {/* Table header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div>
+                <h2 className="text-base font-bold text-gray-700">Attendance Records</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {rows.length} employee{rows.length !== 1 ? "s" : ""} &nbsp;·&nbsp;
+                  {attType === 1
+                    ? new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
+                    : new Date(month + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+                </p>
+              </div>
+              {hasChanges && (
+                <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
+                  Unsaved changes
+                </span>
+              )}
+            </div>
+
+            {rows.length === 0 ? (
+              <div className="py-16 text-center text-gray-400">
+                <Calendar size={40} className="mx-auto mb-3 text-gray-200" />
+                <p className="font-semibold">No employees found for this branch.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      {["Sr.No.", "Branch Code", "Employee Code", "Employee Name", "Designation", "Leave Type", "Leave Count", "Remarks"].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {rows.map((row, i) => (
+                      <tr key={row.empId} className={`transition-colors ${row.changed ? "bg-amber-50/40" : "hover:bg-purple-50/20"}`}>
+                        <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>
+                        <td className="px-4 py-3 text-gray-600">{user.branchCode ?? ""}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">{row.empCode}</span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">{row.empName}</td>
+                        <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{row.designationName || "—"}</td>
+
+                        {/* Leave Type dropdown */}
+                        <td className="px-4 py-3">
+                          <select
+                            value={row.leaveType}
+                            onChange={e => updateRow(i, "leaveType", e.target.value as LeaveKey)}
+                            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer min-w-[200px]"
+                          >
+                            {LEAVE_OPTIONS.map(o => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                        </td>
+
+                        {/* Leave Count */}
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            min="0"
+                            max="31"
+                            step="0.5"
+                            value={row.leaveCount || ""}
+                            disabled={row.leaveType === ""}
+                            onChange={e => updateRow(i, "leaveCount", parseFloat(e.target.value) || 0)}
+                            placeholder="0"
+                            className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed"
+                          />
+                        </td>
+
+                        {/* Remarks */}
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={row.remarks}
+                            maxLength={100}
+                            onChange={e => updateRow(i, "remarks", e.target.value)}
+                            placeholder="Optional"
+                            className="w-full min-w-[140px] border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Footer: Save + Close */}
+            {rows.length > 0 && (
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between gap-4">
+                <p className="text-xs text-gray-400">
+                  <span className="font-semibold text-gray-500">{rows.filter(r => r.changed).length}</span> record(s) modified
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setRows([]); setFetched(false); }}
+                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+                  >
+                    <X size={15} /> Close
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || !hasChanges}
+                    className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md"
+                  >
+                    <Save size={15} />
+                    {saving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Empty state ── */}
+        {!fetched && !loading && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 py-20 flex flex-col items-center text-gray-400">
+            <Calendar size={48} className="mb-4 text-gray-200" />
+            <p className="text-base font-semibold text-gray-500">Select attendance type and date, then click Show</p>
+            <p className="text-sm mt-1">Employee list will load with existing leave records</p>
+          </div>
+        )}
+
       </div>
     } />
   );

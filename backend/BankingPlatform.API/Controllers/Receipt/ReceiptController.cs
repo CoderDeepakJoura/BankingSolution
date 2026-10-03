@@ -16,9 +16,14 @@ namespace BankingPlatform.API.Controllers.Receipt
             [FromRoute] int branchId,
             [FromRoute] int voucherType,
             [FromRoute] int voucherSubType,
-            [FromRoute] int voucherNo)
+            [FromRoute] int voucherNo,
+            [FromQuery] int? accountId = null,
+            [FromQuery] decimal? principalAmount = null,
+            [FromQuery] decimal? intAmount = null)
         {
-            var result = await _service.GenerateReceiptAsync(branchId, voucherType, voucherSubType, voucherNo);
+            var result = await _service.GenerateReceiptAsync(
+                branchId, voucherType, voucherSubType, voucherNo,
+                accountId, principalAmount, intAmount);
             if (result == null) return NotFound(new { success = false, message = "Voucher not found." });
             Response.Headers.Append("X-Receipt-No", result.Value.ReceiptNo.ToString());
             return File(result.Value.Pdf, "application/pdf", $"Receipt-{result.Value.ReceiptNo}.pdf");

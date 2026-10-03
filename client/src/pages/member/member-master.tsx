@@ -50,6 +50,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import DashboardLayout from "../../Common/Layout";
 import ZoneApiService from "../../services/location/zone/zoneapi";
 import DatePicker from "../../components/DatePicker";
+import { useReceiptPrint } from "../../hooks/useReceiptPrint";
 
 interface ZoneInfo {
   zoneId: number;
@@ -234,6 +235,7 @@ interface OccupationInfo {
 }
 
 const MemberMaster = () => {
+  const { printReceiptAfterSave } = useReceiptPrint();
   const navigate = useNavigate();
   const { memberId: encryptedId } = useParams<{ memberId?: string }>();
   const memberId = encryptedId ? decryptId(encryptedId) : null;
@@ -1175,6 +1177,12 @@ const isOpeningEntry = !!(
           );
 
       if (response.success) {
+        // Auto-print receipt before Swal (consistent with saving deposit pattern)
+        if (!isEditMode && !isOpeningEntry && response.message) {
+          try {
+            await printReceiptAfterSave(response.message, 1, 1);
+          } catch { /* receipt print is optional */ }
+        }
         await Swal.fire({
           icon: "success",
           title: "Success!",

@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { APP_VERSION, APP_VERSION_DATE } from "../constants/config";
 
 interface FooterProps {
@@ -22,9 +23,11 @@ const Footer: React.FC<FooterProps> = ({ onWhatsNewClick }) => {
               <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full text-[10px] font-semibold">v{APP_VERSION}</span>
             </button>
             <span className="text-gray-400">{APP_VERSION_DATE}</span>
-            <a href="#" className="hover:text-blue-600 transition">Privacy Policy</a>
-            <a href="#" className="hover:text-blue-600 transition">Terms of Service</a>
-            <a href="#" className="hover:text-blue-600 transition">Security</a>
+            <Link to="/help-center" className="hover:text-blue-600 transition">Help Center</Link>
+            <Link to="/contact-support" className="hover:text-blue-600 transition">Contact Support</Link>
+            <Link to="/privacy-policy" className="hover:text-blue-600 transition">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="hover:text-blue-600 transition">Terms of Service</Link>
+            <Link to="/security" className="hover:text-blue-600 transition">Security</Link>
           </div>
 
           {/* Right: Security Info */}

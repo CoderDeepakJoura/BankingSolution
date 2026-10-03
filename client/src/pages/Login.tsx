@@ -341,7 +341,7 @@ const Login = () => {
           <div className="mt-8 text-center space-y-4">
             <div className="flex items-center justify-center space-x-6 text-sm text-gray-600">
               <a
-                href="#"
+                href="/help-center"
                 className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
               >
                 <svg
@@ -361,7 +361,7 @@ const Login = () => {
               </a>
               <span className="text-gray-400">|</span>
               <a
-                href="#"
+                href="/contact-support"
                 className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
               >
                 <svg

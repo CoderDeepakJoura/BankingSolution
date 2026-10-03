@@ -1,5 +1,6 @@
 using BankingPlatform.Infrastructure.DbContexts;
 using BankingPlatform.Infrastructure.Models.Settings;
+using BankingPlatform.Infrastructure.Models.voucher;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -17,7 +18,16 @@ namespace BankingPlatform.API.Service.Receipt
         //   5/10 = Loan Recovery
         //   4/8  = RD Kist
         //   4/16 = RD Multiple Kist
-        public async Task<(byte[] Pdf, int ReceiptNo)?> GenerateReceiptAsync(int branchId, int voucherType, int voucherSubType, int voucherNo)
+        //   3/2  = FD Deposit
+        //   3/6  = FD Renewal
+        //   1/1  = Share Money (new member)
+        //   6/11 = Cash Receipt (Cr entry to non-General account)
+        // forAccountId: when set, generates one receipt for that specific Cr entry (its amount only).
+        // principalAmount + intAmount: when both set, the PDF shows a principal/interest breakdown (Stand loans).
+        public async Task<(byte[] Pdf, int ReceiptNo)?> GenerateReceiptAsync(
+            int branchId, int voucherType, int voucherSubType, int voucherNo,
+            int? forAccountId = null,
+            decimal? principalAmount = null, decimal? intAmount = null)
         {
             // OrderByDescending so that if multiple sessions share the same voucherNo, we get the latest
             var voucher = await _db.voucher.AsNoTracking()
@@ -43,13 +53,30 @@ namespace BankingPlatform.API.Service.Receipt
             var branch = await _db.branchmaster.AsNoTracking()
                 .FirstOrDefaultAsync(b => b.id == branchId);
 
-            // For loan recovery the customer account is on the Dr side; for all others it's Cr
-            bool isLoanRecovery = voucherType == 5 && voucherSubType == 10;
-            string customerSide = isLoanRecovery ? "Dr" : "Cr";
+            // Resolve customer entry and amount
+            VoucherCreditDebitDetails? customerEntry;
+            decimal amount;
 
-            var customerEntry = await _db.vouchercreditdebitdetails.AsNoTracking()
-                .Where(d => d.VoucherID == voucher.Id && d.BrId == branchId && d.VoucherEntryType == customerSide)
-                .FirstOrDefaultAsync();
+            if (forAccountId.HasValue)
+            {
+                // Per-entry mode: specific Cr account, its amount only
+                customerEntry = await _db.vouchercreditdebitdetails.AsNoTracking()
+                    .FirstOrDefaultAsync(d => d.VoucherID == voucher.Id && d.BrId == branchId
+                        && d.AccountId == forAccountId.Value && d.VoucherEntryType == "Cr");
+                amount = customerEntry?.VoucherAmount ?? 0m;
+            }
+            else
+            {
+                // Auto-detect: customer is always on Cr side; sum all Cr for total amount
+                customerEntry = await _db.vouchercreditdebitdetails.AsNoTracking()
+                    .Where(d => d.VoucherID == voucher.Id && d.BrId == branchId && d.VoucherEntryType == "Cr")
+                    .FirstOrDefaultAsync();
+
+                var allEntries = await _db.vouchercreditdebitdetails.AsNoTracking()
+                    .Where(d => d.VoucherID == voucher.Id && d.BrId == branchId)
+                    .ToListAsync();
+                amount = allEntries.Where(d => d.VoucherEntryType == "Cr").Sum(d => d.VoucherAmount);
+            }
 
             string memberName = "";
             string accountDisplay = "";
@@ -59,13 +86,9 @@ namespace BankingPlatform.API.Service.Receipt
                     .FirstOrDefaultAsync(a => a.ID == customerEntry.AccountId && a.BranchId == branchId);
                 if (account != null)
                 {
-                    // Loan recovery: show account number; others: show prefix/suffix
-                    if (isLoanRecovery)
-                        accountDisplay = account.AccountNumber ?? "";
-                    else
-                        accountDisplay = !string.IsNullOrWhiteSpace(account.AccPrefix)
-                            ? $"{account.AccPrefix}/{account.AccSuffix}"
-                            : account.AccountNumber ?? "";
+                    accountDisplay = !string.IsNullOrWhiteSpace(account.AccPrefix)
+                        ? $"{account.AccPrefix}/{account.AccSuffix}"
+                        : account.AccountNumber ?? "";
 
                     if (account.MemberId.HasValue)
                     {
@@ -80,21 +103,16 @@ namespace BankingPlatform.API.Service.Receipt
                 }
             }
 
-            // Sum all credit amounts as the receipt amount
-            var entries = await _db.vouchercreditdebitdetails.AsNoTracking()
-                .Where(d => d.VoucherID == voucher.Id && d.BrId == branchId)
-                .ToListAsync();
-
-            decimal amount = entries
-                .Where(d => d.VoucherEntryType == "Cr")
-                .Sum(d => d.VoucherAmount);
-
             string onAccountOf = (voucherType, voucherSubType) switch
             {
                 (2, 2)   => "SAVING DEPOSIT",
                 (5, 10)  => "LOAN RECOVERY",
                 (4, 8)   => "RD KIST",
                 (4, 16)  => "RD MULTIPLE KIST",
+                (3, 2)   => "FIXED DEPOSIT",
+                (3, 6)   => "FD RENEWAL",
+                (1, 1)   => "SHARE MONEY",
+                (6, 11)  => "CASH RECEIPT",
                 _        => "TRANSACTION"
             };
 
@@ -102,7 +120,7 @@ namespace BankingPlatform.API.Service.Receipt
             string branchAddress = branch?.branchmaster_addressline ?? "";
 
             var pdf = BuildPdf(branchName, branchAddress, nextReceiptNo, voucher.VoucherDate,
-                memberName, accountDisplay, amount, onAccountOf);
+                memberName, accountDisplay, amount, onAccountOf, principalAmount, intAmount);
             return (pdf, nextReceiptNo);
         }
 
@@ -110,7 +128,8 @@ namespace BankingPlatform.API.Service.Receipt
             string branchName, string branchAddress,
             int receiptNo, DateTime receiptDate,
             string memberName, string accountDisplay,
-            decimal amount, string onAccountOf)
+            decimal amount, string onAccountOf,
+            decimal? principalAmount = null, decimal? intAmount = null)
         {
             QuestPDF.Settings.License = LicenseType.Community;
 
@@ -184,12 +203,35 @@ namespace BankingPlatform.API.Service.Receipt
                             // Amount box + Signature row
                             body.Item().Row(r =>
                             {
-                                r.ConstantItem(130).Border(1).BorderColor(Border)
-                                    .PaddingHorizontal(10).PaddingVertical(10).Column(box =>
+                                if (principalAmount.HasValue && intAmount.HasValue)
                                 {
-                                    box.Item().Text("Rs.").FontSize(8).FontColor(Gray);
-                                    box.Item().PaddingTop(4).Text($"Rs. {amountStr}").FontSize(13).Bold().FontColor(Dark);
-                                });
+                                    // Stand loan: show principal / interest / total breakdown
+                                    r.ConstantItem(160).Border(1).BorderColor(Border)
+                                        .PaddingHorizontal(8).PaddingVertical(6).Column(box =>
+                                    {
+                                        box.Item().Text(t =>
+                                        {
+                                            t.Span("Principal : ").FontSize(8).FontColor(Gray);
+                                            t.Span($"Rs. {principalAmount.Value:N2}").FontSize(8.5f).Bold().FontColor(Dark);
+                                        });
+                                        box.Item().PaddingTop(2).Text(t =>
+                                        {
+                                            t.Span("Interest  : ").FontSize(8).FontColor(Gray);
+                                            t.Span($"Rs. {intAmount.Value:N2}").FontSize(8.5f).Bold().FontColor(Dark);
+                                        });
+                                        box.Item().PaddingTop(3).BorderTop(0.5f).BorderColor(Border).PaddingTop(3).Text(t =>
+                                        {
+                                            t.Span("Total     : ").FontSize(8).FontColor(Gray);
+                                            t.Span($"Rs. {amountStr}").FontSize(9).Bold().FontColor(Dark);
+                                        });
+                                    });
+                                }
+                                else
+                                {
+                                    r.ConstantItem(110).Border(1).BorderColor(Border)
+                                        .PaddingHorizontal(8).PaddingVertical(6).AlignMiddle()
+                                        .Text($"Rs. {amountStr}").FontSize(9).Bold().FontColor(Dark);
+                                }
 
                                 r.RelativeItem();
 

@@ -56,10 +56,14 @@ namespace BankingPlatform.API.Controllers.Member
                     request.MemberPhoto,
                     request.MemberSignature
                 );
+                int? voucherNo = result.Voucher?.VoucherNo;
+                string message = voucherNo.HasValue && voucherNo.Value > 0
+                    ? $"Voucher saved successfully with voucher no. {voucherNo.Value}"
+                    : "Member saved successfully";
                 return Ok(new ResponseDto
                 {
                     Success = true,
-                    Message = "Member saved successfully"
+                    Message = message
                 });
             }
             catch(Exception ex)

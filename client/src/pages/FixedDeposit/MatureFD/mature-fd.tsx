@@ -33,6 +33,7 @@ import branchwiseruleService from "../../../services/branchwiserule/branchwiseru
 import { useVoucherPrint } from "../../../hooks/useVoucherPrint";
 import { fdBondApi } from "../../../services/fdBondApi";
 import settingsapi from "../../../services/settings/settingsapi";
+import { useReceiptPrint } from "../../../hooks/useReceiptPrint";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -129,6 +130,7 @@ const MatureFDPage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user);
   const { printAfterSave } = useVoucherPrint();
+  const { printReceiptAfterSave } = useReceiptPrint();
   const sessionDate = user.workingdate ? commonservice.parseWorkingDate(user.workingdate) : commonservice.getTodaysDate();
 
   const [loading, setLoading] = useState(false);
@@ -845,6 +847,13 @@ const MatureFDPage: React.FC = () => {
 
       const response = await fdAccountService.matureFD(dto);
       const voucherSubType = isRenewFD ? 6 : 5;
+
+      // Auto-print receipt before Swal (renew only, consistent with saving deposit pattern)
+      if (voucherSubType === 6 && response.message) {
+        try {
+          await printReceiptAfterSave(response.message, 3, 6);
+        } catch { /* receipt print is optional */ }
+      }
 
       await Swal.fire({
         icon: "success",

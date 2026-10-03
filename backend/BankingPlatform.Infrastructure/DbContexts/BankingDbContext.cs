@@ -171,6 +171,7 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<BankFDAccountOpeningTDS> bankfdaccountopeningtds { get; set; }
     public virtual DbSet<EmployeeDesignation> employeedesignation { get; set; }
     public virtual DbSet<EmployeeMaster> employeemaster { get; set; }
+    public virtual DbSet<EmployeeLeaveAllotment> employeeleaveallotment { get; set; }
     public virtual DbSet<SalaryComponent> salarycomponent { get; set; }
     public virtual DbSet<SalaryCompEmpWise> salarycompempwise { get; set; }
     public virtual DbSet<MonthlySalary> monthlysalary { get; set; }

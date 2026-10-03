@@ -2274,3 +2274,29 @@ ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS operation         VARCHAR(
 ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS valuedate         TIMESTAMP(3) NOT NULL DEFAULT now();
 ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS voucherdate       TIMESTAMP(3) NOT NULL DEFAULT now();
 ALTER TABLE voucherbfddetail ADD COLUMN IF NOT EXISTS vouchermainstatus VARCHAR(2) NULL;
+
+-- employeemaster incremental columns (Step 1 & Step 2 fields)
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS relativename      VARCHAR(100) NULL;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS relation          VARCHAR(50)  NULL;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS station           VARCHAR(100) NULL;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS maritalstatus     INTEGER      NOT NULL DEFAULT 1;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS isleave           BOOLEAN      NOT NULL DEFAULT FALSE;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS leavedate         DATE         NULL;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS hoacno            VARCHAR(50)  NULL;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS pfaccountno       VARCHAR(50)  NULL;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS uanno             VARCHAR(50)  NULL;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS esicaccountno     VARCHAR(50)  NULL;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS lastincrementdate DATE         NULL;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS savingaccountid   INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE employeemaster ADD COLUMN IF NOT EXISTS educationqual     TEXT         NULL;
+
+-- employee leave allotment
+CREATE TABLE IF NOT EXISTS employeeleaveallotment (
+    id              SERIAL,
+    employeeid      INTEGER      NOT NULL,
+    branchid        INTEGER      NOT NULL,
+    leavetype       VARCHAR(100) NOT NULL,
+    noofdays        INTEGER      NOT NULL DEFAULT 0,
+    allotmentdate   DATE         NOT NULL,
+    CONSTRAINT pk_employeeleaveallotment PRIMARY KEY (id)
+);
