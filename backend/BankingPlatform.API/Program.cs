@@ -162,6 +162,7 @@ builder.Services.AddScoped<FDSlabService>();
 builder.Services.AddScoped<RDAccountService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.OtherBranchAccountService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.IBSavingDepositService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.MemberPortal.MemberPortalService>();
 
 // Configure CORS with dynamic origins
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()

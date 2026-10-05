@@ -1,0 +1,28 @@
+name: banking_member
+description: AHD Society — Member Self-Service App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.1.0
+  http: ^1.2.0
+  shared_preferences: ^2.3.2
+  intl: ^0.19.0
+  flutter_animate: ^4.3.0
+  pdf: ^3.11.0
+  printing: ^5.13.1
+  path_provider: ^2.1.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

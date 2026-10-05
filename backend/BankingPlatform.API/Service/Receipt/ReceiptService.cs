@@ -151,7 +151,7 @@ namespace BankingPlatform.API.Service.Receipt
             {
                 container.Page(page =>
                 {
-                    page.ContinuousSize(PageSizes.A5.Width * 1.2f);
+                    page.Size(PageSizes.A5.Landscape());
                     page.Margin(0);
                     page.Background(White);
 

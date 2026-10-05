@@ -15,6 +15,14 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.11",
+    date: "2026-10-05",
+    changes: [
+      { type: "new", text: "Member Portal: new Flutter mobile/web app for members to view accounts, balances, and transaction ledgers" },
+      { type: "improvement", text: "Receipt printing now generates in landscape (A5) format by default" },
+    ],
+  },
+  {
     version: "1.1.10",
     date: "2026-10-03",
     changes: [

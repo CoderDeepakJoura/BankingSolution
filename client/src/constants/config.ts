@@ -3,5 +3,5 @@ export const API_CONFIG = {
   REACT_APP_ENCRYPTION_KEY: "R8x+Kz9W/tA3qCq2dJf0HwEw5yLdZbYnXkXfTjM6pG0="
 };
 
-export const APP_VERSION = "1.1.10";
-export const APP_VERSION_DATE = "03-October-2026";
+export const APP_VERSION = "1.1.11";
+export const APP_VERSION_DATE = "05-October-2026";
