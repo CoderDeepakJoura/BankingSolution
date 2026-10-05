@@ -1,9 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/societies.dart';
 
-// Use HTTP in dev to avoid untrusted self-signed cert on localhost
-const String kBaseUrl = 'http://localhost:5009/api';
+const String kSocietyUrlKey = 'society_base_url';
+
+/// Returns the base URL saved at login, falling back to the first society.
+Future<String> getBaseUrl() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getString(kSocietyUrlKey) ?? kSocieties.first.baseUrl;
+}
 
 class ApiService {
   static Future<String?> _getToken() async {
@@ -18,9 +24,10 @@ class ApiService {
 
   // ── Auth ─────────────────────────────────────────────────────────────────
 
-  static Future<Map<String, dynamic>> login(String phoneNo, String dob) async {
+  static Future<Map<String, dynamic>> login(
+      String phoneNo, String dob, String baseUrl) async {
     final res = await http.post(
-      Uri.parse('$kBaseUrl/MemberPortal/login'),
+      Uri.parse('$baseUrl/MemberPortal/login'),
       headers: _headers(),
       body: jsonEncode({'phoneNo': phoneNo, 'dateOfBirth': dob}),
     );
@@ -30,9 +37,10 @@ class ApiService {
   // ── Profile ───────────────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> getProfile() async {
+    final base = await getBaseUrl();
     final token = await _getToken();
     final res = await http.get(
-      Uri.parse('$kBaseUrl/MemberPortal/profile'),
+      Uri.parse('$base/MemberPortal/profile'),
       headers: _headers(token: token),
     );
     return _decode(res);
@@ -47,6 +55,7 @@ class ApiService {
     required String toDate,
     int? fdDetailId,
   }) async {
+    final base = await getBaseUrl();
     final token = await _getToken();
     final params = {
       'accountId': accountId.toString(),
@@ -55,7 +64,7 @@ class ApiService {
       'toDate': toDate,
       if (fdDetailId != null) 'fdDetailId': fdDetailId.toString(),
     };
-    final uri = Uri.parse('$kBaseUrl/MemberPortal/ledger').replace(queryParameters: params);
+    final uri = Uri.parse('$base/MemberPortal/ledger').replace(queryParameters: params);
     final res = await http.get(uri, headers: _headers(token: token));
     return _decode(res);
   }

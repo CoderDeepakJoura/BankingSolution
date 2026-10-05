@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/societies.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 
@@ -20,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   DateTime? _selectedDob;
   bool _loading = false;
   String? _error;
+  Society _selectedSociety = kSocieties.first;
 
   @override
   void dispose() {
@@ -59,10 +61,12 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final dob = DateFormat('yyyy-MM-dd').format(_selectedDob!);
-      final res = await ApiService.login(_phoneCtrl.text.trim(), dob);
+      final res = await ApiService.login(_phoneCtrl.text.trim(), dob, _selectedSociety.baseUrl);
       if (res['success'] == true) {
         final data = res['data'] as Map<String, dynamic>;
         final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(kSocietyUrlKey, _selectedSociety.baseUrl);
+        await prefs.setString('society_name', _selectedSociety.name);
         await prefs.setString('member_token', data['token'] as String);
         await prefs.setString('member_name', data['memberName'] as String);
         await prefs.setInt('member_id', data['memberId'] as int);
@@ -289,6 +293,34 @@ class _LoginScreenState extends State<LoginScreen> {
           style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade500, height: 1.5)),
 
         const SizedBox(height: 32),
+
+        // Society selector
+        _fieldLabel('Select Society'),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<Society>(
+              value: _selectedSociety,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500,
+                  color: const Color(0xFF0F172A)),
+              items: kSocieties.map((s) => DropdownMenuItem(
+                value: s,
+                child: Text(s.name, style: GoogleFonts.inter(fontSize: 14)),
+              )).toList(),
+              onChanged: (s) { if (s != null) setState(() => _selectedSociety = s); },
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
 
         // Mobile field
         _fieldLabel('Mobile Number'),
