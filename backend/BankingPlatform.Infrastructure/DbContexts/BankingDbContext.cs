@@ -178,6 +178,9 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<MonthlySalaryEmpDetail> monthlysalaryempdetail { get; set; }
     public virtual DbSet<MonthlySalaryCompDetail> monthlysalarycompdetail { get; set; }
     public virtual DbSet<EmployeeAttendance> employeeattendance { get; set; }
+    public virtual DbSet<EmpGrade> empgrade { get; set; }
+    public virtual DbSet<PayrollSettings> payrollsettings { get; set; }
+    public virtual DbSet<PayrollSettingsLoanComp> payrollsettingsloancomp { get; set; }
     public virtual DbSet<VoucherBFDDetail> voucherbfddetail { get; set; }
     public virtual DbSet<OtherBranchAccount> otherbranchaccounts { get; set; }
     public virtual DbSet<InterBranchVoucher> interbranchvoucher { get; set; }

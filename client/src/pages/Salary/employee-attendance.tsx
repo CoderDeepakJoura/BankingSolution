@@ -2,11 +2,15 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import Swal from "sweetalert2";
+import Select from "react-select";
 import { Calendar, Save, X, ArrowLeft } from "lucide-react";
 import { RootState } from "../../redux";
 import salaryApi, { AttendanceRow } from "../../services/salary/salaryApi";
 import commonservice from "../../services/common/commonservice";
+import { getSessionMonthOptions } from "../../utils/sessionUtils";
 import DashboardLayout from "../../Common/Layout";
+
+interface MonthOpt { value: string; label: string }
 
 // ── Leave type options ────────────────────────────────────────────────────────
 type LeaveKey = "EL" | "CL" | "MLSL" | "LWP" | "";
@@ -59,23 +63,28 @@ export default function EmployeeAttendancePage() {
   const user     = useSelector((s: RootState) => s.user);
   const branchId = user.branchid;
 
-  const workingDate   = commonservice.parseWorkingDate(user.workingdate);
-  const defaultDate   = workingDate;           // YYYY-MM-DD
-  const defaultMonth  = workingDate.slice(0, 7); // YYYY-MM
+  const workingDate        = commonservice.parseWorkingDate(user.workingdate);
+  const defaultDate        = workingDate;
+  const sessionMonthOpts   = getSessionMonthOptions(user.sessionInfo, workingDate);
 
-  const [attType, setAttType]   = useState<1 | 2>(1);   // 1=Daily, 2=Monthly
-  const [date, setDate]         = useState(defaultDate);
-  const [month, setMonth]       = useState(defaultMonth);
-  const [rows, setRows]         = useState<EditableRow[]>([]);
-  const [loading, setLoading]   = useState(false);
-  const [saving, setSaving]     = useState(false);
-  const [fetched, setFetched]   = useState(false);
+  const [attType,      setAttType]      = useState<1 | 2>(1);
+  const [date,         setDate]         = useState(defaultDate);
+  const [monthOpt,     setMonthOpt]     = useState<MonthOpt | null>(null);
+  const [rows,         setRows]         = useState<EditableRow[]>([]);
+  const [loading,      setLoading]      = useState(false);
+  const [saving,       setSaving]       = useState(false);
+  const [fetched,      setFetched]      = useState(false);
+
+  const numericWithDecimal = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!/[0-9.]/.test(e.key) && !["ArrowLeft","ArrowRight","Delete","Backspace","Tab"].includes(e.key) && !e.ctrlKey && !e.metaKey)
+      e.preventDefault();
+  };
 
   // ── Show ──────────────────────────────────────────────────────────────────
   const handleShow = async () => {
     const attMonth = attType === 1
-      ? date.slice(0, 7) + "-01"      // daily → use selected date's month
-      : month + "-01";                 // monthly
+      ? date.slice(0, 7) + "-01"
+      : monthOpt?.value ?? "";
 
     if (!attMonth || attMonth === "-01") {
       Swal.fire("Required", "Please select a date.", "warning");
@@ -117,7 +126,7 @@ export default function EmployeeAttendancePage() {
       }
     }
 
-    const attMonth = attType === 1 ? date.slice(0, 7) + "-01" : month + "-01";
+    const attMonth = attType === 1 ? date.slice(0, 7) + "-01" : (monthOpt?.value ?? "");
     setSaving(true);
     try {
       const res = await salaryApi.saveAttendance({
@@ -202,13 +211,16 @@ export default function EmployeeAttendancePage() {
                     className={inp + " w-44"}
                   />
                 ) : (
-                  <input
-                    type="month"
-                    value={month}
-                    max={defaultMonth}
-                    onChange={e => { setMonth(e.target.value); setFetched(false); setRows([]); }}
-                    className={inp + " w-44"}
-                  />
+                  <div className="w-52">
+                    <Select
+                      options={sessionMonthOpts}
+                      value={monthOpt}
+                      onChange={opt => { setMonthOpt(opt as MonthOpt | null); setFetched(false); setRows([]); }}
+                      placeholder="Select month..."
+                      isClearable
+                      styles={{ control: (b: any) => ({ ...b, borderRadius: "0.5rem", borderColor: "#e5e7eb", minHeight: "38px", fontSize: "0.875rem", cursor: "pointer" }) }}
+                    />
+                  </div>
                 )}
               </div>
 
@@ -246,7 +258,7 @@ export default function EmployeeAttendancePage() {
                   {rows.length} employee{rows.length !== 1 ? "s" : ""} &nbsp;·&nbsp;
                   {attType === 1
                     ? new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
-                    : new Date(month + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+                    : (monthOpt ? new Date(monthOpt.value).toLocaleDateString("en-IN", { month: "long", year: "numeric" }) : "")}
                 </p>
               </div>
               {hasChanges && (
@@ -300,12 +312,10 @@ export default function EmployeeAttendancePage() {
                         {/* Leave Count */}
                         <td className="px-4 py-3">
                           <input
-                            type="number"
-                            min="0"
-                            max="31"
-                            step="0.5"
+                            type="text" inputMode="decimal" maxLength={5}
                             value={row.leaveCount || ""}
                             disabled={row.leaveType === ""}
+                            onKeyDown={numericWithDecimal}
                             onChange={e => updateRow(i, "leaveCount", parseFloat(e.target.value) || 0)}
                             placeholder="0"
                             className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed"

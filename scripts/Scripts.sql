@@ -2008,6 +2008,44 @@ CREATE TABLE IF NOT EXISTS employeeattendance (
 CREATE UNIQUE INDEX IF NOT EXISTS "IX_employeeattendance_emp_month"
     ON employeeattendance (branchid, empid, attmonth);
 
+-- Employee grade / pay band master
+CREATE TABLE IF NOT EXISTS empgrade (
+    id          SERIAL,
+    branchid    INTEGER      NOT NULL,
+    code        VARCHAR(20)  NOT NULL,
+    description VARCHAR(150) NOT NULL,
+    CONSTRAINT pk_empgrade PRIMARY KEY (id, branchid)
+);
+
+-- Branch-level payroll configuration (one row per branch)
+CREATE TABLE IF NOT EXISTS payrollsettings (
+    id                  SERIAL,
+    branchid            INTEGER        NOT NULL,
+    salaryaccid         INTEGER        NOT NULL DEFAULT 0,
+    salaryaccname       VARCHAR(200)   NOT NULL DEFAULT '',
+    startdayofmonth     INTEGER        NOT NULL DEFAULT 1,
+    daysinmonth         INTEGER        NOT NULL DEFAULT 26,
+    cpfheadcode         VARCHAR(50)    NOT NULL DEFAULT '',
+    rdheadcode          VARCHAR(50)    NOT NULL DEFAULT '',
+    maxsalaryforpf      NUMERIC(18,2)  NOT NULL DEFAULT 15000,
+    extraemployeepf     BOOLEAN        NOT NULL DEFAULT FALSE,
+    extraemployerpf     BOOLEAN        NOT NULL DEFAULT FALSE,
+    maxfpf              NUMERIC(18,2)  NOT NULL DEFAULT 1800,
+    employeresicperc    NUMERIC(6,2)   NOT NULL DEFAULT 0.75,
+    esiclimit           NUMERIC(18,2)  NOT NULL DEFAULT 21000,
+    CONSTRAINT pk_payrollsettings PRIMARY KEY (id, branchid),
+    CONSTRAINT uq_payrollsettings_branch UNIQUE (branchid)
+);
+
+-- Loan product IDs included in salary deductions (per branch)
+CREATE TABLE IF NOT EXISTS payrollsettingsloancomp (
+    id                SERIAL PRIMARY KEY,
+    branchid          INTEGER NOT NULL,
+    payrollsettingsid INTEGER NOT NULL DEFAULT 0,
+    loanproductid     INTEGER NOT NULL,
+    CONSTRAINT uq_payrollsettingsloancomp UNIQUE (branchid, loanproductid)
+);
+
 -- =============================================================================
 -- SECTION 13 : INCREMENTAL COLUMN ADDITIONS
 -- =============================================================================
@@ -2091,6 +2129,27 @@ CREATE TABLE IF NOT EXISTS receiptnotracker (
     CONSTRAINT pk_receiptnotracker PRIMARY KEY (id),
     CONSTRAINT uq_receiptnotracker_brid UNIQUE (brid)
 );
+
+-- empgrade / payrollsettings / payrollsettingsloancomp: salary module master tables
+-- (Tables created above in Section 15; incremental entries listed here per convention.)
+-- If tables already exist from an older partial migration, these are no-ops.
+-- branchid is listed first because older DB schemas may have been created without it.
+ALTER TABLE empgrade                ADD COLUMN IF NOT EXISTS branchid         INTEGER       NOT NULL DEFAULT 0;
+ALTER TABLE empgrade                ADD COLUMN IF NOT EXISTS code             VARCHAR(20)   NOT NULL DEFAULT '';
+ALTER TABLE empgrade                ADD COLUMN IF NOT EXISTS description      VARCHAR(150)  NOT NULL DEFAULT '';
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS branchid         INTEGER       NOT NULL DEFAULT 0;
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS salaryaccid      INTEGER       NOT NULL DEFAULT 0;
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS startdayofmonth  INTEGER       NOT NULL DEFAULT 1;
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS daysinmonth      INTEGER       NOT NULL DEFAULT 26;
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS maxsalaryforpf   NUMERIC(18,2) NOT NULL DEFAULT 15000;
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS extraemployeepf  BOOLEAN       NOT NULL DEFAULT FALSE;
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS extraemployerpf  BOOLEAN       NOT NULL DEFAULT FALSE;
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS maxfpf           NUMERIC(18,2) NOT NULL DEFAULT 1800;
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS employeresicperc NUMERIC(6,2)  NOT NULL DEFAULT 0.75;
+ALTER TABLE payrollsettings         ADD COLUMN IF NOT EXISTS esiclimit        NUMERIC(18,2) NOT NULL DEFAULT 21000;
+ALTER TABLE payrollsettingsloancomp ADD COLUMN IF NOT EXISTS branchid         INTEGER       NOT NULL DEFAULT 0;
+ALTER TABLE payrollsettingsloancomp ADD COLUMN IF NOT EXISTS payrollsettingsid INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE payrollsettingsloancomp ADD COLUMN IF NOT EXISTS loanproductid    INTEGER       NOT NULL DEFAULT 0;
 
 -- =============================================================================
 -- REFERENTIAL INTEGRITY: add missing FK constraints (idempotent — safe to re-run)

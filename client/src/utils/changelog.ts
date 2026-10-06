@@ -15,6 +15,17 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.15",
+    date: "2026-10-06",
+    changes: [
+      { type: "new",         text: "Payroll module: full salary management — employee grades, salary components, creation, attendance, PF/ESIC statements, register, challan, arrear report, bonus report, salary challan, delete salary with hierarchy enforcement" },
+      { type: "new",         text: "Day Book report: day-wise L/R format with account-head filtering and session date range" },
+      { type: "improvement", text: "Month dropdowns in payroll screens now bounded to the current fiscal session (Apr–Mar); already-posted months hidden from salary creation" },
+      { type: "improvement", text: "All numeric inputs in payroll screens converted to text with keyboard-level validation — no browser spinners, proper maxLength enforced" },
+      { type: "fix",         text: "Salary delete now enforces hierarchy — must delete newer months before older ones" },
+    ],
+  },
+  {
     version: "1.1.14",
     date: "2026-10-05",
     changes: [

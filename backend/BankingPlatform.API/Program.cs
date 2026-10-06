@@ -56,6 +56,10 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Salary.EmployeeMasterServ
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.SalaryComponentService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.SalaryCreationService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.EmployeeAttendanceService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Salary.BonusReportService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Salary.EmpGradeService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Salary.PayrollSettingsService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Salary.SalaryReportsService>();
 builder.Services.AddScoped<MasterUsageCheckerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.VoucherPrint.VoucherPrintService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.FDBond.FDBondService>();

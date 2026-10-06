@@ -188,6 +188,7 @@ import FDOpeningPage from "../pages/reports/FDOpening";
 import RDMaturityPage from "../pages/reports/RDMaturity";
 import RDKistReceivePage from "../pages/reports/RDKistReceive";
 import RDFinancialReportPage from "../pages/reports/RDFinancialReport";
+import BonusReportPage from "../pages/reports/BonusReport";
 import MemberReportPage from "../pages/reports/MemberReport";
 import MemberAccountsPage from "../pages/reports/MemberAccounts";
 import MemberIntCertPage from "../pages/reports/MemberIntCert";
@@ -200,6 +201,21 @@ import EmployeeMasterData from "../pages/Salary/employee-master-data";
 import SalaryComponentData from "../pages/Salary/salary-component-data";
 import SalaryCreation from "../pages/Salary/salary-creation";
 import EmployeeAttendancePage from "../pages/Salary/employee-attendance";
+import EmployeeGradeData from "../pages/Salary/employee-grade-data";
+import PayrollSettings from "../pages/Salary/payroll-settings";
+import DeleteSalary from "../pages/Salary/DeleteSalary";
+import PFStatementPage from "../pages/reports/PFStatement";
+import ESICStatementPage from "../pages/reports/ESICStatement";
+import SalaryRegisterPage from "../pages/reports/SalaryRegister";
+import EmpSalaryStatementPage from "../pages/reports/EmpSalaryStatement";
+import ArrearReportPage from "../pages/reports/ArrearReport";
+import SalaryChallanPage from "../pages/reports/SalaryChallan";
+import LoanRecoveryDetailPage from "../pages/reports/LoanRecoveryDetailReport";
+import SalaryVoucherList from "../pages/Salary/SalaryVoucherList";
+import SalaryComponentAccount from "../pages/Salary/SalaryComponentAccount";
+import EmployeeTransfer from "../pages/Salary/EmployeeTransfer";
+import PayrollOtherSettings from "../pages/Salary/PayrollOtherSettings";
+import PayrollOtherBranchAccount from "../pages/Salary/PayrollOtherBranchAccount";
 import InProgress from "../pages/Salary/InProgress";
 
 export interface RouteEntry {
@@ -520,27 +536,27 @@ export const ROUTES: RouteEntry[] = [
   { path: "/employee-master/edit/:id",   element: <EmployeeMasterForm /> },
   { path: "/employee-master-data",       element: <EmployeeMasterData /> },
   { path: "/salary-component-data",      element: <SalaryComponentData />,                              label: "Employee Wise Salary Component",     category: "Payroll" },
-  { path: "/employee-grade-data",        element: <InProgress title="Employee Grade" />,                label: "Employee Grade",                    category: "Payroll" },
+  { path: "/employee-grade-data",        element: <EmployeeGradeData />,                                label: "Employee Grade",                    category: "Payroll" },
   { path: "/employee-attendance",        element: <EmployeeAttendancePage />,                          label: "Employee Attendance",               category: "Payroll" },
-  { path: "/employee-transfer",          element: <InProgress title="Employee Transfer" />,             label: "Employee Transfer",                 category: "Payroll" },
+  { path: "/employee-transfer",          element: <EmployeeTransfer />,                                 label: "Employee Transfer",                 category: "Payroll" },
   // ── Salary — Transaction ──────────────────────────────────────────────────
   { path: "/salary-creation",            element: <SalaryCreation />,                                   label: "Employee Salary Creation",          category: "Payroll" },
-  { path: "/salary-voucher",             element: <InProgress title="Salary Voucher" />,                label: "Salary Voucher",                    category: "Payroll" },
-  { path: "/delete-employee-salary",     element: <InProgress title="Delete Employee Salary Detail" />, label: "Delete Employee Salary Detail",     category: "Payroll" },
+  { path: "/salary-voucher",             element: <SalaryVoucherList />,                                label: "Salary Voucher",                    category: "Payroll" },
+  { path: "/delete-employee-salary",     element: <DeleteSalary />,                                     label: "Delete Employee Salary Detail",     category: "Payroll" },
   // ── Salary — Reports ──────────────────────────────────────────────────────
-  { path: "/salary-bonus-report",        element: <InProgress title="Bonus Report" />,                  label: "Bonus Report",                      category: "Payroll" },
-  { path: "/salary-arrear-report",       element: <InProgress title="Arrear Report" />,                 label: "Arrear Report",                     category: "Payroll" },
-  { path: "/salary-challan-report",      element: <InProgress title="Salary Challan Report" />,         label: "Salary Challan Report",             category: "Payroll" },
-  { path: "/salary-pf-report",           element: <InProgress title="PF Statement Report" />,           label: "PF Statement Report",               category: "Payroll" },
-  { path: "/salary-esic-report",         element: <InProgress title="ESIC Statement Report" />,         label: "ESIC Statement Report",             category: "Payroll" },
-  { path: "/salary-report",              element: <InProgress title="Salary Report" />,                 label: "Salary Report",                     category: "Payroll" },
-  { path: "/salary-statement-report",    element: <InProgress title="Employee Salary Statement" />,     label: "Employee Salary Statement",         category: "Payroll" },
-  { path: "/salary-loan-recovery-report",element: <InProgress title="Loan Recovery Detail Report" />,  label: "Loan Recovery Detail Report",       category: "Payroll" },
+  { path: "/salary-bonus-report",        element: <BonusReportPage />,                                  label: "Bonus Report",                      category: "Payroll" },
+  { path: "/salary-arrear-report",       element: <ArrearReportPage />,                                 label: "Arrear Report",                     category: "Payroll" },
+  { path: "/salary-challan-report",      element: <SalaryChallanPage />,                                label: "Salary Challan Report",             category: "Payroll" },
+  { path: "/salary-pf-report",           element: <PFStatementPage />,                                  label: "PF Statement Report",               category: "Payroll" },
+  { path: "/salary-esic-report",         element: <ESICStatementPage />,                                label: "ESIC Statement Report",             category: "Payroll" },
+  { path: "/salary-report",              element: <SalaryRegisterPage />,                               label: "Salary Report",                     category: "Payroll" },
+  { path: "/salary-statement-report",    element: <EmpSalaryStatementPage />,                           label: "Employee Salary Statement",         category: "Payroll" },
+  { path: "/salary-loan-recovery-report",element: <LoanRecoveryDetailPage />,                          label: "Loan Recovery Detail Report",       category: "Payroll" },
   // ── Salary — Settings ─────────────────────────────────────────────────────
-  { path: "/payroll-settings",           element: <InProgress title="Payroll Settings" />,              label: "Payroll Settings",                  category: "Payroll" },
-  { path: "/payroll-other-branch-account",element: <InProgress title="Other Branch Account" />,         label: "Payroll Other Branch Account",      category: "Payroll" },
-  { path: "/salary-component-account",   element: <InProgress title="Salary Component Account" />,      label: "Salary Component Account",          category: "Payroll" },
-  { path: "/payroll-other-settings",     element: <InProgress title="Employee Salary Other Setting" />, label: "Employee Salary Other Setting",     category: "Payroll" },
+  { path: "/payroll-settings",           element: <PayrollSettings />,                                  label: "Payroll Settings",                  category: "Payroll" },
+  { path: "/payroll-other-branch-account",element: <PayrollOtherBranchAccount />,                      label: "Payroll Other Branch Account",      category: "Payroll" },
+  { path: "/salary-component-account",   element: <SalaryComponentAccount />,                          label: "Salary Component Account",          category: "Payroll" },
+  { path: "/payroll-other-settings",     element: <PayrollOtherSettings />,                            label: "Employee Salary Other Setting",     category: "Payroll" },
 
   // ── Super User ────────────────────────────────────────────────────────────
   { path: "/su-settings",                     element: <SuperUserSettings />,           label: "Super User Settings",      category: "Super User",    suOnly: true },

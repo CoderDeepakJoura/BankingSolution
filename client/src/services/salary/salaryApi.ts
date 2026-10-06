@@ -118,6 +118,135 @@ export interface SaveAttendanceDto {
   }>;
 }
 
+export interface BonusReportRequestDTO {
+  branchId: number;
+  fromDate: string;
+  toDate: string;
+  days: number;
+}
+
+export interface BonusReportRow {
+  srNo: number;
+  empId: number;
+  empName: string;
+  designation: string;
+  leaveCount: number;
+  bonusDays: number;
+  basicSalary: number;
+  bonus: number;
+}
+
+export interface BonusReportResponse {
+  branchName: string;
+  branchAddress: string;
+  fromDate: string;
+  toDate: string;
+  days: number;
+  totalBonus: number;
+  rows: BonusReportRow[];
+}
+
+// ── EmpGrade ──────────────────────────────────────────────────────────────────
+export interface EmpGrade {
+  id: number; branchId: number; code: string; description: string;
+}
+
+// ── PayrollSettings ───────────────────────────────────────────────────────────
+export interface PayrollSettingsDTO {
+  id: number; branchId: number;
+  salaryAccId: number; salaryAccName: string;
+  startDayOfMonth: number; daysInMonth: number;
+  cpfHeadCode: string; rdHeadCode: string;
+  maxSalaryForPf: number; extraEmployeePf: boolean; extraEmployerPf: boolean;
+  maxFpf: number; employeresicPerc: number; esicLimit: number;
+  loanProductIds: number[];
+}
+
+// ── Salary Voucher Dropdown ───────────────────────────────────────────────────
+export interface SalaryVoucherDropdown {
+  id: number; label: string; salaryMonth: string;
+}
+
+// ── Component Amount ──────────────────────────────────────────────────────────
+export interface ComponentAmount {
+  compId: number; compName: string; compAlias: string; amount: number;
+}
+
+// ── PF Statement ──────────────────────────────────────────────────────────────
+export interface PFStatementRow {
+  srNo: number; pfAccount: string; uanNo: string; empName: string;
+  salary: number; share: number; epf: number; fpf: number;
+}
+export interface PFStatementResponse {
+  branchName: string; branchAddress: string; salaryMonth: string;
+  rows: PFStatementRow[];
+  totalSalary: number; totalShare: number; totalEpf: number; totalFpf: number;
+}
+
+// ── ESIC Statement ────────────────────────────────────────────────────────────
+export interface ESICStatementRow {
+  srNo: number; esicAccount: string; empName: string; salary: number;
+  employeeShare: number; employerShare: number; totalEsic: number;
+}
+export interface ESICStatementResponse {
+  branchName: string; branchAddress: string; salaryMonth: string; esicLimit: number;
+  rows: ESICStatementRow[];
+  totalSalary: number; totalEmployeeShare: number; totalEmployerShare: number; totalEsic: number;
+}
+
+// ── Salary Register ───────────────────────────────────────────────────────────
+export interface SalaryRegisterRow {
+  srNo: number; empId: number; empName: string; designation: string;
+  days: number; el: number; cl: number; sl: number; lwp: number;
+  totalGross: number; totalDeduction: number; netPay: number;
+  earnings: ComponentAmount[]; deductions: ComponentAmount[];
+}
+export interface SalaryRegisterResponse {
+  branchName: string; branchAddress: string; salaryMonth: string;
+  earningComponents: ComponentAmount[]; deductionComponents: ComponentAmount[];
+  rows: SalaryRegisterRow[];
+  totalGross: number; totalDeduction: number; totalNetPay: number;
+  epfPerc: number; fpfPerc: number; admnPerc: number; edliPerc: number; ac22Perc: number;
+  epfAmount: number; fpfAmount: number; admnAmount: number; edliAmount: number; ac22Amount: number;
+  sanctionedTotal: number;
+}
+
+// ── Employee Salary Statement ─────────────────────────────────────────────────
+export interface EmpSalaryStatementRow {
+  salaryMonth: string; totalGross: number; totalDeduction: number; netPay: number;
+  components: ComponentAmount[];
+}
+export interface EmpSalaryStatementResponse {
+  empName: string; empCode: string; designation: string;
+  branchName: string; branchAddress: string;
+  allComponents: ComponentAmount[];
+  rows: EmpSalaryStatementRow[];
+}
+
+// ── Arrear Report ─────────────────────────────────────────────────────────────
+export interface ArrearRow {
+  srNo: number; empName: string; salaryMonth: string; compName: string;
+  due: number; drawn: number; arrear: number;
+}
+export interface ArrearReportResponse {
+  branchName: string; fromMonth: string; toMonth: string;
+  rows: ArrearRow[];
+  totalDue: number; totalDrawn: number; totalArrear: number;
+}
+
+// ── Salary Challan ────────────────────────────────────────────────────────────
+export interface SalaryChallanRow {
+  srNo: number; empName: string; designation: string; accountNo: string;
+  totalGross: number; totalDeduction: number; netPay: number;
+  earnings: ComponentAmount[]; deductions: ComponentAmount[];
+}
+export interface SalaryChallanResponse {
+  branchName: string; branchAddress: string; salaryMonth: string;
+  earningComponents: ComponentAmount[]; deductionComponents: ComponentAmount[];
+  rows: SalaryChallanRow[];
+  totalGross: number; totalDeduction: number; totalNetPay: number;
+}
+
 class SalaryApiService extends ApiService {
   constructor() { super(); }
 
@@ -281,6 +410,138 @@ class SalaryApiService extends ApiService {
       { method: 'POST', body: JSON.stringify(dto) }
     );
   }
+
+  getBonusReport(dto: BonusReportRequestDTO) {
+    return this.makeRequest<BonusReportResponse>(
+      `/SalaryReport/bonus-report`,
+      { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+
+  // ── EmpGrade ──────────────────────────────────────────────────────────────
+  getEmpGrades(branchId: number, filter: SalaryFilter) {
+    return this.makeRequest<{ success: boolean; items: EmpGrade[]; totalCount: number }>(
+      `/EmpGrade/get-all/${branchId}`,
+      { method: 'POST', body: JSON.stringify(filter) }
+    );
+  }
+  getEmpGradeDropdown(branchId: number) {
+    return this.makeRequest<{ success: boolean; items: EmpGrade[] }>(
+      `/EmpGrade/dropdown/${branchId}`, { method: 'GET' }
+    );
+  }
+  createEmpGrade(data: Partial<EmpGrade>) {
+    return this.makeRequest<{ success: boolean; message: string }>(
+      `/EmpGrade`, { method: 'POST', body: JSON.stringify(data) }
+    );
+  }
+  updateEmpGrade(data: Partial<EmpGrade>) {
+    return this.makeRequest<{ success: boolean; message: string }>(
+      `/EmpGrade`, { method: 'PUT', body: JSON.stringify(data) }
+    );
+  }
+  deleteEmpGrade(id: number, branchId: number) {
+    return this.makeRequest<{ success: boolean; message: string }>(
+      `/EmpGrade/${id}/${branchId}`, { method: 'DELETE' }
+    );
+  }
+
+  // ── Payroll Settings ───────────────────────────────────────────────────────
+  getPayrollSettings(branchId: number) {
+    return this.makeRequest<PayrollSettingsDTO>(
+      `/PayrollSettings/${branchId}`, { method: 'GET' }
+    );
+  }
+  savePayrollSettings(dto: PayrollSettingsDTO) {
+    return this.makeRequest<{ success: boolean; message: string }>(
+      `/PayrollSettings`, { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+
+  // ── Salary Reports ─────────────────────────────────────────────────────────
+  getSalaryVouchers(branchId: number, month: string) {
+    return this.makeRequest<{ success: boolean; items: SalaryVoucherDropdown[] }>(
+      `/SalaryReport/salary-vouchers/${branchId}?month=${month}`, { method: 'GET' }
+    );
+  }
+  getPFStatement(dto: { branchId: number; salaryVoucherId: number }) {
+    return this.makeRequest<PFStatementResponse>(
+      `/SalaryReport/pf-statement`, { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+  getESICStatement(dto: { branchId: number; salaryVoucherId: number }) {
+    return this.makeRequest<ESICStatementResponse>(
+      `/SalaryReport/esic-statement`, { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+  getSalaryRegister(dto: { branchId: number; salaryVoucherId: number }) {
+    return this.makeRequest<SalaryRegisterResponse>(
+      `/SalaryReport/salary-register`, { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+  getEmpSalaryStatement(dto: { branchId: number; empId: number }) {
+    return this.makeRequest<EmpSalaryStatementResponse>(
+      `/SalaryReport/emp-salary-statement`, { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+  getArrearReport(dto: { branchId: number; fromMonth: string; toMonth: string; empId?: number; compIds: number[] }) {
+    return this.makeRequest<ArrearReportResponse>(
+      `/SalaryReport/arrear-report`, { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+  getSalaryChallan(dto: { branchId: number; salaryVoucherId: number }) {
+    return this.makeRequest<SalaryChallanResponse>(
+      `/SalaryReport/salary-challan`, { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+  deleteSalaryVoucher(dto: { branchId: number; salaryVoucherId: number }) {
+    return this.makeRequest<{ success: boolean; message: string }>(
+      `/SalaryReport/delete-salary`, { method: 'DELETE', body: JSON.stringify(dto) }
+    );
+  }
+  getLoanRecoveryDetail(dto: { branchId: number; salaryVoucherId: number }) {
+    return this.makeRequest<LoanRecoveryDetailResponse>(
+      `/SalaryReport/loan-recovery-detail`, { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+  getSalaryVoucherList(branchId: number) {
+    return this.makeRequest<SalaryVoucherListResponse>(
+      `/SalaryReport/salary-voucher-list/${branchId}`, { method: 'GET' }
+    );
+  }
+  getPostedSalaryMonths(branchId: number) {
+    return this.makeRequest<{ success: boolean; months: string[] }>(
+      `/SalaryReport/posted-months/${branchId}`, { method: 'GET' }
+    );
+  }
+  transferEmployee(dto: { empId: number; fromBranchId: number; toBranchId: number; transferDate: string; remarks: string }) {
+    return this.makeRequest<{ success: boolean; message: string }>(
+      `/EmployeeTransfer`, { method: 'POST', body: JSON.stringify(dto) }
+    );
+  }
+}
+
+// ── Loan Recovery Detail Report ───────────────────────────────────────────────
+export interface LoanRecoveryDetailRow {
+  srNo: number; empName: string; designation: string;
+  deductions: { compId: number; compName: string; compAlias: string; amount: number }[];
+  totalDeduction: number;
+}
+export interface LoanRecoveryDetailResponse {
+  branchName: string; branchAddress: string; salaryMonth: string;
+  deductionComponents: { compId: number; compAlias: string }[];
+  rows: LoanRecoveryDetailRow[];
+  totalDeduction: number;
+}
+
+// ── Salary Voucher List ───────────────────────────────────────────────────────
+export interface SalaryVoucherListRow {
+  srNo: number; voucherId: number; salaryMonth: string; processDate: string;
+  employeeCount: number; totalGross: number; totalDeduction: number; totalNetPay: number;
+}
+export interface SalaryVoucherListResponse {
+  branchName: string;
+  rows: SalaryVoucherListRow[];
 }
 
 export default new SalaryApiService();

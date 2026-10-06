@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -140,18 +140,180 @@ const LRCombinedScreen: React.FC<{
   );
 };
 
+// ── Screen: Day-wise L/R table (both date and head modes) ────────────────────
+const LRDayWiseTable: React.FC<{ data: DayBook; longNar: boolean; filterMode: "date" | "head" }> = ({ data, longNar, filterMode }) => {
+  const isHead = filterMode === "head";
+  const colsPerSide = isHead ? 5 : 4;
+  const totalCols = colsPerSide * 2 + 1;
+
+  const allReceipts = data.receiptGroups.flatMap(g => g.entries);
+  const allPayments = data.paymentGroups.flatMap(g => g.entries);
+
+  const allDates = [...new Set([
+    ...allReceipts.map(e => fmtDateKey(e.voucherDate)),
+    ...allPayments.map(e => fmtDateKey(e.voucherDate)),
+  ])].sort();
+
+  let lSno = 0, rSno = 0;
+  let runningBalance = data.openingBalance;
+
+  const buildHeadRows = (entries: DayBookEntry[], snoRef: { v: number }): LRRow[] => {
+    const headMap = new Map<number, { name: string; total: number; items: DayBookEntry[] }>();
+    for (const e of entries) {
+      if (!headMap.has(e.accHeadCode)) headMap.set(e.accHeadCode, { name: e.accHeadName || "Unknown", total: 0, items: [] });
+      const h = headMap.get(e.accHeadCode)!;
+      h.total += e.amount; h.items.push(e);
+    }
+    const rows: LRRow[] = [];
+    Array.from(headMap.entries()).sort(([a], [b]) => a - b).forEach(([, { name, total, items }]) => {
+      rows.push({ type: "header", cells: ["", "", name, "", fmt(total)] });
+      items.sort((a, b) => a.voucherNo - b.voucherNo).forEach(e => {
+        snoRef.v++;
+        rows.push({ type: "data", cells: [String(snoRef.v), fmtShort(e.voucherDate), particulars(e, longNar), fmt(e.amount), "0.00"] });
+      });
+    });
+    return rows;
+  };
+
+  const headers = isHead
+    ? ["SNo", "Date", "Particulars", "Amount", "Head Amt."]
+    : ["SNo", "Particulars", "Amount", "Total"];
+  const colAlign = isHead
+    ? ["text-center", "text-center", "text-left", "text-right", "text-right"]
+    : ["text-center", "text-left", "text-right", "text-right"];
+
+  const cellCls = "border border-gray-400 px-2 py-1 text-xs";
+  const divCell = <td className="w-1 p-0 border-0" style={{ backgroundColor: "#999" }} />;
+  const emptyRow: LRRow = { type: "empty", cells: Array(colsPerSide).fill("") };
+
+  const styledCells = (row: LRRow, prefix: string) => {
+    const s = LR_STYLES[row.type] ?? LR_STYLES.data;
+    const st: React.CSSProperties = {
+      backgroundColor: `rgb(${s.fillColor.join(",")})`,
+      color: `rgb(${s.textColor.join(",")})`,
+      fontWeight: s.fontStyle === "bold" ? "bold" : undefined,
+    };
+    return row.cells.map((cell, ci) => (
+      <td key={`${prefix}${ci}`} className={`${cellCls} ${colAlign[ci] ?? ""}`} style={st}>{cell}</td>
+    ));
+  };
+
+  const mkRow = (type: LRRow["type"], ...cells: string[]): LRRow => ({ type, cells });
+
+  const obRow  = (amount: string): LRRow => mkRow("ob",    ...(isHead ? ["","","Opening Cash Balance",amount,""] : ["","Opening Cash Balance",amount,""]));
+  const trRow  = (amount: string): LRRow => mkRow("total", ...(isHead ? ["","","Total Receipt",amount,amount]    : ["","Total Receipt",amount,amount]));
+  const tpRow  = (amount: string): LRRow => mkRow("total", ...(isHead ? ["","","Total Payment",amount,amount]    : ["","Total Payment",amount,amount]));
+  const cbRow  = (amount: string): LRRow => mkRow("cb",    ...(isHead ? ["","","Closing Cash",amount,""]         : ["","Closing Cash",amount,""]));
+  const gtRow  = (amount: string): LRRow => mkRow("total", ...(isHead ? ["","","Grand Total",amount,amount]      : ["","Grand Total",amount,amount]));
+
+  return (
+    <table className="w-full border-collapse text-xs">
+      <thead>
+        <tr>
+          {headers.map(h => <TH key={`lh-${h}`} className={h === "Particulars" ? "text-left" : h === "SNo" ? "text-center" : "text-right"}>{h}</TH>)}
+          <th className="w-1 p-0 bg-gray-500 border-0" />
+          {headers.map(h => <TH key={`rh-${h}`} className={h === "Particulars" ? "text-left" : h === "SNo" ? "text-center" : "text-right"}>{h}</TH>)}
+        </tr>
+      </thead>
+      <tbody>
+        {allDates.map((date, di) => {
+          const dayOpen = runningBalance;
+          const leftAll  = allReceipts.filter(e => fmtDateKey(e.voucherDate) === date).sort((a, b) => a.voucherNo - b.voucherNo);
+          const rightAll = allPayments.filter(e => fmtDateKey(e.voucherDate) === date).sort((a, b) => a.voucherNo - b.voucherNo);
+          const dayReceipts = leftAll.reduce((s, e) => s + e.amount, 0);
+          const dayPayments = rightAll.reduce((s, e) => s + e.amount, 0);
+          const dayClose = dayOpen + dayReceipts - dayPayments;
+          runningBalance = dayClose;
+
+          let leftRows: LRRow[], rightRows: LRRow[];
+          if (isHead) {
+            const lRef = { v: lSno }; const rRef = { v: rSno };
+            leftRows  = buildHeadRows(leftAll,  lRef);
+            rightRows = buildHeadRows(rightAll, rRef);
+            lSno = lRef.v; rSno = rRef.v;
+          } else {
+            leftRows  = leftAll.map(e  => { lSno++; return { type: "data" as const, cells: [String(lSno), particulars(e, longNar), fmt(e.amount), "—"] }; });
+            rightRows = rightAll.map(e => { rSno++; return { type: "data" as const, cells: [String(rSno), particulars(e, longNar), fmt(e.amount), "—"] }; });
+          }
+          const maxLen = Math.max(leftRows.length, rightRows.length);
+
+          return (
+            <React.Fragment key={date}>
+              {/* Full-width date header */}
+              <tr style={{ backgroundColor: "rgb(254,252,232)", color: "rgb(133,77,14)", fontWeight: "bold" }}>
+                <td colSpan={totalCols} className={`${cellCls} text-center`}>{fmtDate(date)}</td>
+              </tr>
+
+              {/* Opening Cash Balance (left only) */}
+              <tr>
+                {styledCells(obRow(fmt(dayOpen)), `ob${di}-l-`)}
+                {divCell}
+                {styledCells(emptyRow, `ob${di}-r-`)}
+              </tr>
+
+              {/* Zipped entry rows */}
+              {Array.from({ length: maxLen }, (_, i) => (
+                <tr key={i}>
+                  {styledCells(leftRows[i]  ?? emptyRow, `l${di}-${i}-`)}
+                  {divCell}
+                  {styledCells(rightRows[i] ?? emptyRow, `r${di}-${i}-`)}
+                </tr>
+              ))}
+
+              {/* Total Receipt | Total Payment */}
+              <tr>
+                {styledCells(trRow(fmt(dayReceipts)), `tr${di}-`)}
+                {divCell}
+                {styledCells(tpRow(fmt(dayPayments)), `tp${di}-`)}
+              </tr>
+
+              {/* empty | Closing Cash */}
+              <tr>
+                {styledCells(emptyRow, `cbl${di}-`)}
+                {divCell}
+                {styledCells(cbRow(fmt(dayClose)), `cbr${di}-`)}
+              </tr>
+
+              {/* Grand Total | Grand Total */}
+              <tr>
+                {styledCells(gtRow(fmt(dayOpen + dayReceipts)), `gtl${di}-`)}
+                {divCell}
+                {styledCells(gtRow(fmt(dayPayments + dayClose)), `gtr${di}-`)}
+              </tr>
+
+              {/* Gap between days */}
+              {di < allDates.length - 1 && (
+                <tr><td colSpan={totalCols} style={{ height: 8, padding: 0, border: "none", backgroundColor: "rgb(243,244,246)" }} /></tr>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+};
+
 // ── Screen: Simple format ─────────────────────────────────────────────────────
 const SimpleTable: React.FC<{ data: DayBook; longNar: boolean }> = ({ data, longNar }) => {
-  const rows: { entry: DayBookEntry; side: "Dr" | "Cr" }[] = [];
-  data.paymentGroups.forEach((g) => g.entries.forEach((e) => rows.push({ entry: e, side: "Dr" })));
-  data.receiptGroups.forEach((g) => g.entries.forEach((e) => rows.push({ entry: e, side: "Cr" })));
-  rows.sort((a, b) => {
+  const allRows: { entry: DayBookEntry; side: "Dr" | "Cr" }[] = [];
+  data.paymentGroups.forEach(g => g.entries.forEach(e => allRows.push({ entry: e, side: "Dr" })));
+  data.receiptGroups.forEach(g => g.entries.forEach(e => allRows.push({ entry: e, side: "Cr" })));
+  allRows.sort((a, b) => {
     const dateDiff = fmtDateKey(a.entry.voucherDate).localeCompare(fmtDateKey(b.entry.voucherDate));
     return dateDiff !== 0 ? dateDiff : a.entry.voucherNo - b.entry.voucherNo;
   });
 
+  // Group into date blocks
+  const dateGroups: Array<{ date: string; rows: typeof allRows }> = [];
+  for (const row of allRows) {
+    const date = fmtDateKey(row.entry.voucherDate);
+    const last = dateGroups[dateGroups.length - 1];
+    if (!last || last.date !== date) dateGroups.push({ date, rows: [row] });
+    else last.rows.push(row);
+  }
+
+  const multiDay = dateGroups.length > 1;
   let sno = 0;
-  let lastDate = "";
 
   return (
     <table className="w-full border-collapse text-xs">
@@ -165,30 +327,52 @@ const SimpleTable: React.FC<{ data: DayBook; longNar: boolean }> = ({ data, long
         </tr>
       </thead>
       <tbody>
-        {rows.map(({ entry, side }, i) => {
-          const dateKey = fmtDateKey(entry.voucherDate);
-          const showDateRow = dateKey !== lastDate;
-          if (showDateRow) lastDate = dateKey;
-          sno++;
+        {dateGroups.map(({ date, rows }, gi) => {
+          const dayDr = rows.filter(r => r.side === "Dr").reduce((s, r) => s + r.entry.amount, 0);
+          const dayCr = rows.filter(r => r.side === "Cr").reduce((s, r) => s + r.entry.amount, 0);
           return (
-            <React.Fragment key={i}>
-              {showDateRow && (
-                <tr className="bg-yellow-50">
-                  <TD colSpan={5} className="text-center font-semibold text-yellow-800 py-0.5">
-                    {fmtDate(entry.voucherDate)}
-                  </TD>
+            <React.Fragment key={date}>
+              {/* Date header */}
+              <tr className="bg-yellow-50">
+                <TD colSpan={5} className="text-center font-semibold text-yellow-800 py-0.5">
+                  {fmtDate(date)}
+                </TD>
+              </tr>
+
+              {/* Entries for this day */}
+              {rows.map(({ entry, side }, i) => {
+                sno++;
+                return (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <TD className="text-center">{sno}</TD>
+                    <TD className="text-center">{entry.voucherNo}</TD>
+                    <TD>{particulars(entry, longNar)}</TD>
+                    <TD className="text-right text-red-700">{side === "Dr" ? fmt(entry.amount) : ""}</TD>
+                    <TD className="text-right text-green-700">{side === "Cr" ? fmt(entry.amount) : ""}</TD>
+                  </tr>
+                );
+              })}
+
+              {/* Day total (only when spanning multiple days) */}
+              {multiDay && (
+                <tr style={{ backgroundColor: "rgb(219,234,254)", fontWeight: "bold", color: "rgb(30,64,175)" }}>
+                  <TD colSpan={3} className="text-right">Day Total</TD>
+                  <TD className="text-right">{dayDr ? fmt(dayDr) : "—"}</TD>
+                  <TD className="text-right">{dayCr ? fmt(dayCr) : "—"}</TD>
                 </tr>
               )}
-              <tr className="hover:bg-gray-50">
-                <TD className="text-center">{sno}</TD>
-                <TD className="text-center">{entry.voucherNo}</TD>
-                <TD>{particulars(entry, longNar)}</TD>
-                <TD className="text-right text-red-700">{side === "Dr" ? fmt(entry.amount) : ""}</TD>
-                <TD className="text-right text-green-700">{side === "Cr" ? fmt(entry.amount) : ""}</TD>
-              </tr>
+
+              {/* Gap between days */}
+              {multiDay && gi < dateGroups.length - 1 && (
+                <tr>
+                  <td colSpan={5} style={{ height: 8, padding: 0, border: "none", backgroundColor: "rgb(243,244,246)" }} />
+                </tr>
+              )}
             </React.Fragment>
           );
         })}
+
+        {/* Grand total */}
         <tr className="bg-gray-200 border-t-2 border-gray-500 font-bold">
           <TD colSpan={3} className="text-right font-bold">Total</TD>
           <TD className="text-right font-bold text-red-700">{fmt(data.totalPayments)}</TD>
@@ -287,6 +471,97 @@ const LR_STYLES: Record<string, { fillColor: [number,number,number]; textColor: 
   empty:  { fillColor: [255,255,255], textColor: [200,200,200], fontStyle: "normal" },
 };
 
+// Build day-wise zipped rows for PDF (both date and head modes)
+const buildDayWisePDFRows = (data: DayBook, longNar: boolean, filterMode: "date" | "head"): [LRRow, LRRow][] => {
+  const isHead = filterMode === "head";
+  const empty: LRRow = { type: "empty", cells: isHead ? ["", "", "", "", ""] : ["", "", "", ""] };
+  const allReceipts = data.receiptGroups.flatMap(g => g.entries);
+  const allPayments = data.paymentGroups.flatMap(g => g.entries);
+  const allDates = [...new Set([
+    ...allReceipts.map(e => fmtDateKey(e.voucherDate)),
+    ...allPayments.map(e => fmtDateKey(e.voucherDate)),
+  ])].sort();
+  const result: [LRRow, LRRow][] = [];
+  let lSno = 0, rSno = 0;
+
+  const buildHeadRowsPDF = (entries: DayBookEntry[], snoRef: { v: number }): LRRow[] => {
+    const headMap = new Map<number, { name: string; total: number; items: DayBookEntry[] }>();
+    for (const e of entries) {
+      if (!headMap.has(e.accHeadCode)) headMap.set(e.accHeadCode, { name: e.accHeadName || "Unknown", total: 0, items: [] });
+      const h = headMap.get(e.accHeadCode)!;
+      h.total += e.amount; h.items.push(e);
+    }
+    const rows: LRRow[] = [];
+    Array.from(headMap.entries()).sort(([a], [b]) => a - b).forEach(([, { name, total, items }]) => {
+      rows.push({ type: "header", cells: ["", "", name, "", fmt(total)] });
+      items.sort((a, b) => a.voucherNo - b.voucherNo).forEach(e => {
+        snoRef.v++;
+        rows.push({ type: "data", cells: [String(snoRef.v), fmtShort(e.voucherDate), particulars(e, longNar), fmt(e.amount), "0.00"] });
+      });
+    });
+    return rows;
+  };
+
+  const mk = (type: LRRow["type"], ...cells: string[]): LRRow => ({ type, cells });
+
+  let runningBalance = data.openingBalance;
+
+  allDates.forEach((date, di) => {
+    const dayOpen = runningBalance;
+    const leftAll  = allReceipts.filter(e => fmtDateKey(e.voucherDate) === date).sort((a, b) => a.voucherNo - b.voucherNo);
+    const rightAll = allPayments.filter(e => fmtDateKey(e.voucherDate) === date).sort((a, b) => a.voucherNo - b.voucherNo);
+    const dayReceipts = leftAll.reduce((s, e) => s + e.amount, 0);
+    const dayPayments = rightAll.reduce((s, e) => s + e.amount, 0);
+    const dayClose = dayOpen + dayReceipts - dayPayments;
+    runningBalance = dayClose;
+
+    let leftRows: LRRow[], rightRows: LRRow[];
+    if (isHead) {
+      const lRef = { v: lSno }, rRef = { v: rSno };
+      leftRows  = buildHeadRowsPDF(leftAll,  lRef);
+      rightRows = buildHeadRowsPDF(rightAll, rRef);
+      lSno = lRef.v; rSno = rRef.v;
+    } else {
+      leftRows  = leftAll.map(e  => { lSno++; return mk("data", String(lSno), particulars(e, longNar), fmt(e.amount), "—"); });
+      rightRows = rightAll.map(e => { rSno++; return mk("data", String(rSno), particulars(e, longNar), fmt(e.amount), "—"); });
+    }
+
+    const dateCells = isHead ? ["", "", fmtDate(date), "", ""] : ["", fmtDate(date), "", ""];
+    result.push([mk("date", ...dateCells), mk("date", ...dateCells)]);
+
+    // Opening Cash Balance (left only)
+    result.push([
+      mk("ob", ...(isHead ? ["","","Opening Cash Balance",fmt(dayOpen),""] : ["","Opening Cash Balance",fmt(dayOpen),""]) ),
+      empty,
+    ]);
+
+    const maxLen = Math.max(leftRows.length, rightRows.length);
+    for (let i = 0; i < maxLen; i++) result.push([leftRows[i] ?? empty, rightRows[i] ?? empty]);
+
+    // Total Receipt | Total Payment
+    result.push([
+      mk("total", ...(isHead ? ["","","Total Receipt",fmt(dayReceipts),fmt(dayReceipts)] : ["","Total Receipt",fmt(dayReceipts),fmt(dayReceipts)])),
+      mk("total", ...(isHead ? ["","","Total Payment",fmt(dayPayments),fmt(dayPayments)] : ["","Total Payment",fmt(dayPayments),fmt(dayPayments)])),
+    ]);
+    // empty | Closing Cash
+    result.push([
+      empty,
+      mk("cb",    ...(isHead ? ["","","Closing Cash",fmt(dayClose),""]    : ["","Closing Cash",fmt(dayClose),""])),
+    ]);
+    // Grand Total | Grand Total
+    const lG = fmt(dayOpen + dayReceipts);
+    const rG = fmt(dayPayments + dayClose);
+    result.push([
+      mk("total", ...(isHead ? ["","","Grand Total",lG,lG] : ["","Grand Total",lG,lG])),
+      mk("total", ...(isHead ? ["","","Grand Total",rG,rG] : ["","Grand Total",rG,rG])),
+    ]);
+
+    if (di < allDates.length - 1) result.push([empty, empty]);
+  });
+
+  return result;
+};
+
 const exportDayBookLRPdf = (data: DayBook, longNar: boolean, filterMode: "date" | "head") => {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth(); // 297
@@ -328,20 +603,8 @@ const exportDayBookLRPdf = (data: DayBook, longNar: boolean, filterMode: "date" 
   doc.text("PAYMENTS", margin + sideW + divW + sideW / 2, y + 4.2, { align: "center" });
   doc.setTextColor(0,0,0); y += 7;
 
-  // Build & zip rows — keep Total pinned to the last row on both sides
-  const leftRows  = buildSideRows(data.receiptGroups, "receipts", data, longNar, filterMode);
-  const rightRows = buildSideRows(data.paymentGroups, "payments", data, longNar, filterMode);
-  const empty: LRRow = { type: "empty", cells: Array<string>(colsPerSide).fill("") };
-  // Separate the final "total" row from the body rows on each side
-  const leftTotal  = leftRows[leftRows.length - 1];
-  const rightTotal = rightRows[rightRows.length - 1];
-  const leftBody   = leftRows.slice(0, -1);
-  const rightBody  = rightRows.slice(0, -1);
-  const maxBodyLen = Math.max(leftBody.length, rightBody.length);
-  const zipped: [LRRow, LRRow][] = [
-    ...Array.from({ length: maxBodyLen }, (_, i): [LRRow, LRRow] => [leftBody[i] ?? empty, rightBody[i] ?? empty]),
-    [leftTotal, rightTotal],  // both Totals always on the same last row
-  ];
+  // Build day-wise zipped rows for both date and head modes
+  const zipped = buildDayWisePDFRows(data, longNar, filterMode);
 
   // Column widths — total must equal usable (277mm)
   // Date-wise:  9+82+24+22.5 | 2 | 9+82+24+22.5  = 277
@@ -489,141 +752,140 @@ const buildPrintHTML = (
     return longNar && e.narration ? `${base}- ${e.narration}` : base;
   };
 
-  const buildLRTable = (groups: DayBookGroup[], side: "receipts" | "payments"): string => {
-    const total =
-      side === "receipts"
-        ? data.openingBalance + data.totalReceipts
-        : data.totalPayments + data.closingBalance;
-
-    let sno = 0;
-    let rows = "";
+  // Single combined L/R table — same day-wise structure as the PDF
+  const buildCombinedLRTable = (): string => {
     const isHead = filterMode === "head";
-    // date mode = 4 cols, head mode = 5 cols (adds Date column)
-    const spanAll = isHead ? 5 : 4;
+    const colsPerSide = isHead ? 5 : 4;
+    const totalCols = colsPerSide * 2 + 1;
 
-    if (side === "receipts") {
-      rows += isHead
-        ? `<tr class="ob-row">
-            <td class="sno"></td><td></td>
-            <td>Opening Balance on ${fmtDate(data.fromDate)}</td>
-            <td class="amt">${fmt(data.openingBalance)}</td><td class="amt"></td>
-           </tr>`
-        : `<tr class="ob-row">
-            <td class="sno"></td>
-            <td>Opening Balance on ${fmtDate(data.fromDate)}</td>
-            <td class="amt">${fmt(data.openingBalance)}</td><td class="amt"></td>
-           </tr>`;
-    }
+    const allReceipts = data.receiptGroups.flatMap(g => g.entries);
+    const allPayments = data.paymentGroups.flatMap(g => g.entries);
+    const allDates = [...new Set([
+      ...allReceipts.map(e => fmtDateKey(e.voucherDate)),
+      ...allPayments.map(e => fmtDateKey(e.voucherDate)),
+    ])].sort();
 
-    if (!isHead) {
-      // Date-wise: flatten + sort, one date header then entries
-      const all = groups.flatMap((g) => g.entries);
-      all.sort((a, b) => {
-        const dd = fmtDateKey(a.voucherDate).localeCompare(fmtDateKey(b.voucherDate));
-        return dd !== 0 ? dd : a.voucherNo - b.voucherNo;
-      });
-      groupByDate(all).forEach(({ date, items }) => {
-        const dateTotal = items.reduce((s, e) => s + e.amount, 0);
-        rows += `<tr class="date-row">
-          <td class="sno"></td>
-          <td>${fmtDate(date)}</td>
-          <td class="amt">${fmt(dateTotal)}</td>
-          <td class="amt">${fmt(dateTotal)}</td>
-        </tr>`;
-        items.forEach((e) => {
-          sno++;
-          rows += `<tr>
-            <td class="sno">${sno}</td>
-            <td>${par(e)}</td>
-            <td class="amt">${fmt(e.amount)}</td>
-            <td class="amt">—</td>
-          </tr>`;
-        });
-      });
-    } else {
-      // Head-wise: flatten + group by accHeadCode, sort by headcode order
-      const allEntries = groups.flatMap((g) => g.entries);
-      const headMap = new Map<number, { name: string; entries: typeof allEntries }>();
-      for (const e of allEntries) {
-        if (!headMap.has(e.accHeadCode))
-          headMap.set(e.accHeadCode, { name: e.accHeadName || "Unknown", entries: [] });
-        headMap.get(e.accHeadCode)!.entries.push(e);
+    type PrintRow =
+      | { type: "header"; name: string; headTotal: number }
+      | { type: "data"; sno: number; entry: DayBookEntry };
+
+    let lSno = 0, rSno = 0;
+
+    const buildDayRows = (entries: DayBookEntry[], snoRef: { v: number }): PrintRow[] => {
+      if (!isHead) {
+        return entries.map(e => { snoRef.v++; return { type: "data" as const, sno: snoRef.v, entry: e }; });
       }
-      const headGroups = Array.from(headMap.entries())
-        .sort(([a], [b]) => a - b)
-        .map(([, { name, entries }]) => ({
-          name,
-          total: entries.reduce((s, e) => s + e.amount, 0),
-          entries: [...entries].sort((a, b) => {
-            const dd = fmtDateKey(a.voucherDate).localeCompare(fmtDateKey(b.voucherDate));
-            return dd !== 0 ? dd : a.voucherNo - b.voucherNo;
-          }),
-        }));
-
-      headGroups.forEach(({ name, total, entries }) => {
-        rows += `<tr class="group-row">
-          <td colspan="4" style="font-weight:bold">${name}</td>
-          <td class="amt">${fmt(total)}</td>
-        </tr>`;
-        entries.forEach((e) => {
-          sno++;
-          rows += `<tr>
-            <td class="sno">${sno}</td>
-            <td style="text-align:center;white-space:nowrap">${fmtShort(e.voucherDate)}</td>
-            <td>${par(e)}</td>
-            <td class="amt">${fmt(e.amount)}</td>
-            <td class="amt">0.00</td>
-          </tr>`;
+      const headMap = new Map<number, { name: string; total: number; items: DayBookEntry[] }>();
+      for (const e of entries) {
+        if (!headMap.has(e.accHeadCode)) headMap.set(e.accHeadCode, { name: e.accHeadName || "Unknown", total: 0, items: [] });
+        const h = headMap.get(e.accHeadCode)!;
+        h.total += e.amount; h.items.push(e);
+      }
+      const rows: PrintRow[] = [];
+      Array.from(headMap.entries()).sort(([a], [b]) => a - b).forEach(([, { name, total, items }]) => {
+        rows.push({ type: "header", name, headTotal: total });
+        items.sort((a, b) => a.voucherNo - b.voucherNo).forEach(e => {
+          snoRef.v++;
+          rows.push({ type: "data", sno: snoRef.v, entry: e });
         });
       });
-    }
+      return rows;
+    };
 
-    if (side === "payments") {
-      rows += isHead
-        ? `<tr class="cb-row">
-            <td class="sno"></td><td></td>
-            <td>Closing Balance</td>
-            <td class="amt">${fmt(data.closingBalance)}</td><td class="amt"></td>
-           </tr>`
-        : `<tr class="cb-row">
-            <td class="sno"></td>
-            <td>Closing Balance</td>
-            <td class="amt">${fmt(data.closingBalance)}</td><td class="amt"></td>
-           </tr>`;
-    }
+    const sideCells = (row: PrintRow | undefined): string => {
+      if (!row) return isHead
+        ? `<td class="sno"></td><td></td><td></td><td class="amt"></td><td class="amt"></td>`
+        : `<td class="sno"></td><td></td><td class="amt"></td><td class="amt"></td>`;
+      if (row.type === "header") {
+        const hStyle = 'style="background:#dbeafe;color:#1e3a8a;font-weight:bold"';
+        return isHead
+          ? `<td class="sno" ${hStyle}></td><td ${hStyle}></td><td ${hStyle}>${row.name}</td><td class="amt" ${hStyle}></td><td class="amt" ${hStyle}>${fmt(row.headTotal)}</td>`
+          : `<td class="sno" ${hStyle}></td><td ${hStyle}>${row.name}</td><td class="amt" ${hStyle}></td><td class="amt" ${hStyle}>${fmt(row.headTotal)}</td>`;
+      }
+      return isHead
+        ? `<td class="sno">${row.sno}</td><td style="text-align:center;white-space:nowrap">${fmtShort(row.entry.voucherDate)}</td><td>${par(row.entry)}</td><td class="amt">${fmt(row.entry.amount)}</td><td class="amt">0.00</td>`
+        : `<td class="sno">${row.sno}</td><td>${par(row.entry)}</td><td class="amt">${fmt(row.entry.amount)}</td><td class="amt">—</td>`;
+    };
 
-    rows += isHead
-      ? `<tr class="total-row">
-          <td class="sno"></td><td></td>
-          <td>Total</td>
-          <td class="amt">${fmt(total)}</td>
-          <td class="amt">${fmt(total)}</td>
-         </tr>`
-      : `<tr class="total-row">
-          <td class="sno"></td>
-          <td>Total</td>
-          <td class="amt">${fmt(total)}</td>
-          <td class="amt">${fmt(total)}</td>
-         </tr>`;
+    const dtCells = (total: number): string => {
+      const a = total ? fmt(total) : "—";
+      const s = 'style="background:#dbeafe;color:#1e40af;font-weight:bold"';
+      return isHead
+        ? `<td class="sno" ${s}></td><td ${s}></td><td ${s}>Day Total</td><td class="amt" ${s}>${a}</td><td class="amt" ${s}>${a}</td>`
+        : `<td class="sno" ${s}></td><td ${s}>Day Total</td><td class="amt" ${s}>${a}</td><td class="amt" ${s}>${a}</td>`;
+    };
 
-    const thead = isHead
-      ? `<tr>
-          <th style="width:28px">SNo</th>
-          <th style="width:70px">Date</th>
-          <th style="text-align:left">Particulars</th>
-          <th style="width:90px">Amount</th>
-          <th style="width:90px">Head Amt.</th>
-         </tr>`
-      : `<tr>
-          <th style="width:28px">SNo</th>
-          <th style="text-align:left">Particulars</th>
-          <th style="width:90px">Amount</th>
-          <th style="width:90px">Date Total</th>
-         </tr>`;
+    let tbody = "";
+    let runningBalance = data.openingBalance;
 
-    return `<table>
-      <thead>${thead}</thead>
-      <tbody>${rows}</tbody>
+    allDates.forEach((date, di) => {
+      const dayOpen = runningBalance;
+      const leftAll  = allReceipts.filter(e => fmtDateKey(e.voucherDate) === date).sort((a, b) => a.voucherNo - b.voucherNo);
+      const rightAll = allPayments.filter(e => fmtDateKey(e.voucherDate) === date).sort((a, b) => a.voucherNo - b.voucherNo);
+      const dayReceipts = leftAll.reduce((s, e) => s + e.amount, 0);
+      const dayPayments = rightAll.reduce((s, e) => s + e.amount, 0);
+      const dayClose = dayOpen + dayReceipts - dayPayments;
+      runningBalance = dayClose;
+
+      const lRef = { v: lSno }, rRef = { v: rSno };
+      const leftRows  = buildDayRows(leftAll,  lRef);
+      const rightRows = buildDayRows(rightAll, rRef);
+      lSno = lRef.v; rSno = rRef.v;
+
+      // Date header (full-width)
+      tbody += `<tr class="date-row"><td colspan="${totalCols}">${fmtDate(date)}</td></tr>`;
+
+      // Opening Cash Balance (left only)
+      const obS = 'style="background:#fef2f2;color:#b91c1c;font-weight:bold"';
+      tbody += isHead
+        ? `<tr><td class="sno" ${obS}></td><td ${obS}></td><td ${obS}>Opening Cash Balance</td><td class="amt" ${obS}>${fmt(dayOpen)}</td><td ${obS}></td><td class="div-col"></td><td colspan="${colsPerSide}"></td></tr>`
+        : `<tr><td class="sno" ${obS}></td><td ${obS}>Opening Cash Balance</td><td class="amt" ${obS}>${fmt(dayOpen)}</td><td ${obS}></td><td class="div-col"></td><td colspan="${colsPerSide}"></td></tr>`;
+
+      // Entry rows (zipped)
+      const maxLen = Math.max(leftRows.length, rightRows.length);
+      for (let i = 0; i < maxLen; i++) {
+        tbody += `<tr>${sideCells(leftRows[i])}<td class="div-col"></td>${sideCells(rightRows[i])}</tr>`;
+      }
+
+      // Total Receipt | Total Payment
+      const tS = 'style="background:#e5e7eb;font-weight:bold"';
+      tbody += isHead
+        ? `<tr><td class="sno" ${tS}></td><td ${tS}></td><td ${tS}>Total Receipt</td><td class="amt" ${tS}>${fmt(dayReceipts)}</td><td class="amt" ${tS}>${fmt(dayReceipts)}</td><td class="div-col"></td><td class="sno" ${tS}></td><td ${tS}></td><td ${tS}>Total Payment</td><td class="amt" ${tS}>${fmt(dayPayments)}</td><td class="amt" ${tS}>${fmt(dayPayments)}</td></tr>`
+        : `<tr><td class="sno" ${tS}></td><td ${tS}>Total Receipt</td><td class="amt" ${tS}>${fmt(dayReceipts)}</td><td class="amt" ${tS}>${fmt(dayReceipts)}</td><td class="div-col"></td><td class="sno" ${tS}></td><td ${tS}>Total Payment</td><td class="amt" ${tS}>${fmt(dayPayments)}</td><td class="amt" ${tS}>${fmt(dayPayments)}</td></tr>`;
+
+      // empty left | Closing Cash right
+      const cbS = 'style="background:#f0fdf4;color:#166534;font-weight:bold"';
+      tbody += isHead
+        ? `<tr><td colspan="${colsPerSide}"></td><td class="div-col"></td><td class="sno" ${cbS}></td><td ${cbS}></td><td ${cbS}>Closing Cash</td><td class="amt" ${cbS}>${fmt(dayClose)}</td><td ${cbS}></td></tr>`
+        : `<tr><td colspan="${colsPerSide}"></td><td class="div-col"></td><td class="sno" ${cbS}></td><td ${cbS}>Closing Cash</td><td class="amt" ${cbS}>${fmt(dayClose)}</td><td ${cbS}></td></tr>`;
+
+      // Grand Total | Grand Total
+      const lG = fmt(dayOpen + dayReceipts);
+      const rG = fmt(dayPayments + dayClose);
+      const gtS = 'style="background:#e5e7eb;font-weight:bold;border-top:2px solid #555"';
+      tbody += isHead
+        ? `<tr><td class="sno" ${gtS}></td><td ${gtS}></td><td ${gtS}>Grand Total</td><td class="amt" ${gtS}>${lG}</td><td class="amt" ${gtS}>${lG}</td><td class="div-col"></td><td class="sno" ${gtS}></td><td ${gtS}></td><td ${gtS}>Grand Total</td><td class="amt" ${gtS}>${rG}</td><td class="amt" ${gtS}>${rG}</td></tr>`
+        : `<tr><td class="sno" ${gtS}></td><td ${gtS}>Grand Total</td><td class="amt" ${gtS}>${lG}</td><td class="amt" ${gtS}>${lG}</td><td class="div-col"></td><td class="sno" ${gtS}></td><td ${gtS}>Grand Total</td><td class="amt" ${gtS}>${rG}</td><td class="amt" ${gtS}>${rG}</td></tr>`;
+
+      if (di < allDates.length - 1) {
+        tbody += `<tr><td colspan="${totalCols}" style="height:8px;border:none;background:#f3f4f6;padding:0"></td></tr>`;
+      }
+    });
+
+    const thDate = `<th style="width:28px">SNo</th><th style="text-align:left">Particulars</th><th style="width:90px">Amount</th><th style="width:90px">Day Total</th>`;
+    const thHead = `<th style="width:28px">SNo</th><th style="width:60px">Date</th><th style="text-align:left">Particulars</th><th style="width:85px">Amount</th><th style="width:85px">Head Amt.</th>`;
+    const th = isHead ? thHead : thDate;
+
+    return `<table class="lr-combined">
+      <thead>
+        <tr>
+          <th colspan="${colsPerSide}" class="receipts-hdr">RECEIPTS</th>
+          <th class="div-col"></th>
+          <th colspan="${colsPerSide}" class="payments-hdr">PAYMENTS</th>
+        </tr>
+        <tr>${th}<th class="div-col"></th>${th}</tr>
+      </thead>
+      <tbody>${tbody}</tbody>
     </table>`;
   };
 
@@ -674,21 +936,7 @@ const buildPrintHTML = (
     </table>`;
   };
 
-  const bodyContent = withLeftRight
-    ? `<table class="lr-outer">
-        <tr>
-          <td class="lr-cell">
-            <div class="col-hdr receipts-hdr">Receipts</div>
-            ${buildLRTable(data.receiptGroups, "receipts")}
-          </td>
-          <td class="lr-divider-cell"></td>
-          <td class="lr-cell">
-            <div class="col-hdr payments-hdr">Payments</div>
-            ${buildLRTable(data.paymentGroups, "payments")}
-          </td>
-        </tr>
-       </table>`
-    : buildSimpleTable();
+  const bodyContent = withLeftRight ? buildCombinedLRTable() : buildSimpleTable();
 
   return `<!DOCTYPE html>
 <html>
@@ -707,25 +955,21 @@ const buildPrintHTML = (
     .day-label { text-align:center; border:1px solid #aaa; background:#f5f5f5;
                  padding:3px; font-weight:bold; margin-bottom:6px; }
 
-    .lr-outer        { width:100%; border-collapse:collapse; table-layout:fixed; }
-    .lr-cell         { width:49.5%; vertical-align:top; padding:0; }
-    .lr-divider-cell { width:1%; background:#888; padding:0; }
-
-    .col-hdr { text-align:center; font-weight:bold; padding:4px;
-               font-size:12px; border:1px solid #555; }
-    .receipts-hdr { background:#1e40af; color:#fff; }
-    .payments-hdr { background:#9f1239; color:#fff; }
-
     table { width:100%; border-collapse:collapse; }
+    .lr-combined { table-layout:fixed; }
+    .div-col { width:3px; background:#888; border:none; padding:0; }
+    .receipts-hdr { background:#1e40af; color:#fff; text-align:center; }
+    .payments-hdr { background:#9f1239; color:#fff; text-align:center; }
     th { border:1px solid #666; padding:3px 4px; background:#d0d8f0;
          text-align:center; font-weight:bold; }
     td { border:1px solid #aaa; padding:2px 4px; vertical-align:top; }
 
-    .date-row td  { background:#fefce8; color:#854d0e; font-weight:bold; text-align:center; font-size:10px; }
-    .group-row td { background:#dbeafe; font-weight:bold; }
-    .ob-row td    { background:#fef2f2; color:#b91c1c; font-weight:bold; }
-    .cb-row td    { background:#f0fdf4; color:#166534; font-weight:bold; }
-    .total-row td { background:#e5e7eb; font-weight:bold; border-top:2px solid #555; }
+    .date-row td      { background:#fefce8; color:#854d0e; font-weight:bold; text-align:center; font-size:10px; }
+    .group-row td     { background:#dbeafe; font-weight:bold; }
+    .ob-row td        { background:#fef2f2; color:#b91c1c; font-weight:bold; }
+    .cb-row td        { background:#f0fdf4; color:#166534; font-weight:bold; }
+    .total-row td     { background:#e5e7eb; font-weight:bold; border-top:2px solid #555; }
+    .day-total-row td { background:#dbeafe; color:#1e40af; font-weight:bold; }
     .amt          { text-align:right; }
     .sno          { text-align:center; width:28px; }
 
@@ -773,8 +1017,9 @@ const DayBookPage: React.FC = () => {
     ? commonservice.parseWorkingDate(user.workingdate)
     : new Date().toISOString().split("T")[0];
 
-  const [sessionMinDate, setSessionMinDate] = useState("");
-  const [sessionMaxDate, setSessionMaxDate] = useState(workingDate);
+  const sessionMinDate = getSessionFromDate(user.sessionInfo, workingDate);
+  const sessionMaxDate = workingDate;
+
   const [fromDate, setFromDate] = useState(workingDate);
   const [toDate, setToDate] = useState(workingDate);
   const [withLongNarration, setWithLongNarration] = useState(false);
@@ -782,24 +1027,6 @@ const DayBookPage: React.FC = () => {
   const [lrFilter, setLrFilter] = useState<"date" | "head">("date");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<DayBook | null>(null);
-
-  // Fetch session dates on mount to constrain date pickers
-  useEffect(() => {
-    if (!user.branchid) return;
-    dayBookApi.getSessionDates(user.branchid).then((res) => {
-      if (res.success && res.data) {
-        const minD = toInputDate(res.data.fromDate);
-        const maxD = workingDate < toInputDate(res.data.toDate)
-          ? workingDate
-          : toInputDate(res.data.toDate);
-        setSessionMinDate(minD);
-        setSessionMaxDate(maxD);
-        // Clamp current dates within session
-        if (fromDate < minD) setFromDate(minD);
-        if (toDate < minD) setToDate(minD);
-      }
-    }).catch(() => {/* silently ignore — date pickers still work without bounds */});
-  }, [user.branchid]);
 
   const handleShow = async () => {
     if (!fromDate || !toDate) {
@@ -1035,11 +1262,7 @@ const DayBookPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="overflow-y-auto max-h-[65vh] overflow-x-auto">
-                        <LRCombinedScreen
-                          data={data}
-                          longNar={withLongNarration}
-                          filterMode={lrFilter}
-                        />
+                        <LRDayWiseTable data={data} longNar={withLongNarration} filterMode={lrFilter} />
                       </div>
                     </div>
                   ) : (

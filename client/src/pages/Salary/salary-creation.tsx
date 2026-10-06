@@ -2,11 +2,14 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import Swal from "sweetalert2";
+import Select from "react-select";
 import { RootState } from "../../redux";
 import salaryApi, { EmployeeMaster, SalaryComponentLine, SalaryCreationData } from "../../services/salary/salaryApi";
 import commonservice from "../../services/common/commonservice";
-import { getSessionFromDate } from "../../utils/sessionUtils";
+import { getSessionMonthOptions } from "../../utils/sessionUtils";
 import DashboardLayout from "../../Common/Layout";
+
+interface MonthOpt { value: string; label: string }
 
 interface ComponentRow extends SalaryComponentLine {
   editedAmount: number;
@@ -18,35 +21,44 @@ export default function SalaryCreation() {
   const user = useSelector((s: RootState) => s.user);
   const branchId = user.branchid;
 
-  const workingDate = commonservice.parseWorkingDate(user.workingdate);
-  const sessionStart = getSessionFromDate(user.sessionInfo, workingDate);
+  const workingDate  = commonservice.parseWorkingDate(user.workingdate);
+  const sessionMonthOpts = getSessionMonthOptions(user.sessionInfo, workingDate);
 
-  // derive default salary month as YYYY-MM (current working month)
-  const defaultMonth = workingDate.slice(0, 7);
+  const [employees,      setEmployees]      = useState<EmployeeMaster[]>([]);
+  const [selectedEmpId,  setSelectedEmpId]  = useState<number>(0);
+  const [selectedMonth,  setSelectedMonth]  = useState<MonthOpt | null>(null);
+  const [postedMonths,   setPostedMonths]   = useState<string[]>([]);
+  const [salaryData,     setSalaryData]     = useState<SalaryCreationData | null>(null);
+  const [rows,           setRows]           = useState<ComponentRow[]>([]);
+  const [loading,        setLoading]        = useState(false);
+  const [saving,         setSaving]         = useState(false);
+  const [fetched,        setFetched]        = useState(false);
 
-  const [employees, setEmployees] = useState<EmployeeMaster[]>([]);
-  const [selectedEmpId, setSelectedEmpId] = useState<number>(0);
-  const [salaryMonth, setSalaryMonth] = useState(defaultMonth);
-  const [salaryData, setSalaryData] = useState<SalaryCreationData | null>(null);
-  const [rows, setRows] = useState<ComponentRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [fetched, setFetched] = useState(false);
+  const availableMonthOpts = sessionMonthOpts.filter(o => !postedMonths.includes(o.value));
+
+  const refreshPostedMonths = () =>
+    salaryApi.getPostedSalaryMonths(branchId).then(r => setPostedMonths((r as any).months ?? [])).catch(() => {});
 
   useEffect(() => {
     salaryApi.getEmployeeDropdown(branchId).then(r => setEmployees(r.items ?? []));
+    refreshPostedMonths();
   }, [branchId]);
+
+  const numericWithDecimal = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!/[0-9.]/.test(e.key) && !["ArrowLeft","ArrowRight","Delete","Backspace","Tab"].includes(e.key) && !e.ctrlKey && !e.metaKey)
+      e.preventDefault();
+  };
 
   const handleFetch = async () => {
     if (!selectedEmpId) { Swal.fire("Required", "Please select an employee.", "warning"); return; }
-    if (!salaryMonth) { Swal.fire("Required", "Please select a salary month.", "warning"); return; }
+    if (!selectedMonth) { Swal.fire("Required", "Please select a salary month.", "warning"); return; }
 
     // Derive date range for selected month
-    const [yr, mo] = salaryMonth.split("-").map(Number);
-    const dateFrom = `${salaryMonth}-01`;
-    const lastDay = new Date(yr, mo, 0).getDate();
-    const dateTo = `${salaryMonth}-${String(lastDay).padStart(2, "0")}`;
-    // salaryDate = last day of the month
+    const monthStr = selectedMonth.value.slice(0, 7); // "YYYY-MM"
+    const [yr, mo] = monthStr.split("-").map(Number);
+    const dateFrom = selectedMonth.value; // "YYYY-MM-01"
+    const lastDay  = new Date(yr, mo, 0).getDate();
+    const dateTo   = `${monthStr}-${String(lastDay).padStart(2, "0")}`;
     const salaryDate = dateTo;
 
     setLoading(true);
@@ -72,6 +84,7 @@ export default function SalaryCreation() {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, editedAmount: n } : r));
   };
 
+
   const handleActiveToggle = (idx: number) => {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, active: !r.active, editedAmount: !r.active ? r.amount : 0 } : r));
   };
@@ -90,7 +103,7 @@ export default function SalaryCreation() {
         branchId,
         sessionId: user.sessionId ?? 0,
         processedBy: 0,
-        salaryMonth: `${salaryMonth}-01`,
+        salaryMonth: selectedMonth!.value,
         employees: [{
           empId: selectedEmpId,
           totalGross, totalDeduction, netPay,
@@ -101,7 +114,8 @@ export default function SalaryCreation() {
       });
       if (!res.success) throw new Error(res.message);
       await Swal.fire("Saved", res.message, "success");
-      setFetched(false); setSalaryData(null); setRows([]); setSelectedEmpId(0);
+      setFetched(false); setSalaryData(null); setRows([]); setSelectedEmpId(0); setSelectedMonth(null);
+      refreshPostedMonths();
     } catch (err: any) {
       Swal.fire("Error", err.message ?? "Could not save salary.", "error");
     } finally { setSaving(false); }
@@ -140,11 +154,17 @@ export default function SalaryCreation() {
                 {employees.map(e => <option key={e.id} value={e.id}>{e.code} — {e.firstName} {e.lastName ?? ""}</option>)}
               </select>
             </div>
-            <div className="min-w-[180px]">
+            <div className="min-w-[210px]">
               <label className="block text-sm font-semibold text-slate-600 mb-1">Salary Month <span className="text-red-500">*</span></label>
-              <input type="month" value={salaryMonth} onChange={e => { setSalaryMonth(e.target.value); setFetched(false); setSalaryData(null); setRows([]); }}
-                max={workingDate.slice(0, 7)}
-                className="w-full px-3 py-2 border-2 border-slate-200 rounded-xl outline-none focus:border-orange-400 text-sm bg-white"/>
+              <Select
+                options={availableMonthOpts}
+                value={selectedMonth}
+                onChange={opt => { setSelectedMonth(opt as MonthOpt | null); setFetched(false); setSalaryData(null); setRows([]); }}
+                placeholder="Select month..."
+                isClearable
+                styles={{ control: (b: any) => ({ ...b, borderRadius: "0.75rem", borderColor: "#e2e8f0", borderWidth: "2px", minHeight: "38px", fontSize: "0.875rem", cursor: "pointer" }) }}
+              />
+              {availableMonthOpts.length === 0 && <p className="text-xs text-slate-400 mt-1">All months in session already posted.</p>}
             </div>
             <button onClick={handleFetch} disabled={loading}
               className="px-6 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 transition-all shadow-md text-sm">
@@ -169,7 +189,7 @@ export default function SalaryCreation() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Salary Month</p>
-                  <p className="text-base font-semibold text-slate-700 mt-0.5">{salaryMonth}</p>
+                  <p className="text-base font-semibold text-slate-700 mt-0.5">{selectedMonth?.label ?? ""}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Days in Month</p>
@@ -213,8 +233,9 @@ export default function SalaryCreation() {
                         </td>
                         <td className="px-4 py-3">
                           <input
-                            type="number" min="0" step="0.01"
+                            type="text" inputMode="numeric" maxLength={12}
                             value={row.editedAmount}
+                            onKeyDown={numericWithDecimal}
                             onChange={e => handleAmountChange(i, e.target.value)}
                             disabled={!row.active}
                             className="w-full px-3 py-1.5 border-2 border-slate-200 rounded-lg outline-none focus:border-orange-400 text-right text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
