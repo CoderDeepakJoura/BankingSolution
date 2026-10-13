@@ -126,13 +126,44 @@ Defined in `Enums.VoucherType` and `Enums.VoucherSubType`.
 | 27 | IB Saving Wdl — HO Settlement (BranchToBranch, Dr Dest-Ref Cr Source-Ref) |
 | 28 | IB Saving Wdl — Dest Branch Debit (BranchToBranch final, Dr Customer Cr HO-Ref) |
 | 29 | Close Account — single combined closure voucher (Saving, RD, FD etc.) |
+| 30 | Bank FD Deposit — account creation deposit voucher |
+| 31 | IB Loan Adv — HO Step 1 (HOToBranch, Dr=IB-Ref, Cr=Cash) |
+| 32 | IB Loan Adv — Dest Branch Step 3 (HOToBranch, Dr=LoanAcc, Cr=HO-Ref) |
+| 33 | IB Loan Adv — Source Branch Step 1 (BranchToBranch, Dr=IB-Ref, Cr=Cash) |
+| 34 | IB Loan Adv — HO Settlement Step 2 (BranchToBranch, Dr=Dest-Ref, Cr=Source-Ref) |
+| 35 | IB Loan Adv — Dest Branch Step 3 (BranchToBranch, Dr=LoanAcc, Cr=HO-Ref) |
+| 36 | IB Loan Exp — HO Step 1 (HOToBranch, Dr=IB-Ref, Cr=CrAcc) |
+| 37 | IB Loan Exp — Dest Branch Step 3 (HOToBranch, Dr=LoanAcc, Cr=HO-Ref) |
+| 38 | IB Loan Exp — Source Branch Step 1 (BranchToBranch, Dr=IB-Ref, Cr=CrAcc) |
+| 39 | IB Loan Exp — HO Settlement Step 2 |
+| 40 | IB Loan Exp — Dest Branch Step 3 (BranchToBranch) |
+| 41 | IB Pre-Mature — HO Step 1 (HOToBranch, Dr=FD/RD Acc, Cr=IB-Ref) |
+| 42 | IB Pre-Mature — Dest Branch Step 3 (HOToBranch, Dr=HO-Ref, Cr=Customer Saving) |
+| 43 | IB Pre-Mature — Source Branch Step 1 (BranchToBranch) |
+| 44 | IB Pre-Mature — HO Settlement Step 2 |
+| 45 | IB Pre-Mature — Dest Branch Step 3 (BranchToBranch) |
+| 46 | IB Mature — HO Step 1 (HOToBranch, Dr=FD/RD Acc, Cr=IB-Ref) |
+| 47 | IB Mature — Dest Branch Step 3 (HOToBranch, Dr=HO-Ref, Cr=Customer Saving) |
+| 48 | IB Mature — Source Branch Step 1 (BranchToBranch) |
+| 49 | IB Mature — HO Settlement Step 2 |
+| 50 | IB Mature — Dest Branch Step 3 (BranchToBranch) |
+| 51 | IB RD Kist — HO Step 1 (HOToBranch, Dr=Cash, Cr=IB-Ref) |
+| 52 | IB RD Kist — Dest Branch Step 3 (HOToBranch, Dr=HO-Ref, Cr=RD Acc + voucherrddetail) |
+| 53 | IB RD Kist — Source Branch Step 1 (BranchToBranch) |
+| 54 | IB RD Kist — HO Settlement Step 2 |
+| 55 | IB RD Kist — Dest Branch Step 3 (BranchToBranch) |
+| 56 | IB Loan Rec — HO Step 1 (HOToBranch, Dr=Cash/Saving multi, Cr=IB-Ref) |
+| 57 | IB Loan Rec — Dest Branch Step 3 (HOToBranch, Dr=HO-Ref, Cr=LoanAcc + interest) |
+| 58 | IB Loan Rec — Source Branch Step 1 (BranchToBranch) |
+| 59 | IB Loan Rec — HO Settlement Step 2 |
+| 60 | IB Loan Rec — Dest Branch Step 3 (BranchToBranch) |
 
 ---
 
 ## Inter-Branch (IB) Voucher System
 
 ### Overview
-Enables saving deposits and withdrawals across branches. Two flow types:
+Enables transactions across branches for 7 voucher types: Saving Deposit, Saving Withdrawal, Loan Advancement, Loan Recovery, Loan Expense, Pre-Mature FD/RD, Mature FD/RD, RD Kist. Two flow types:
 
 | FlowType | Steps | Description |
 |---|---|---|
@@ -190,6 +221,19 @@ Table `{brid, otherbrid, accid}` — defines which account a branch uses to repr
 | BranchToBranch | Step 2 | 27 | HO branch | Dest-Ref → Source-Ref |
 | BranchToBranch | Step 3 | 28 | Dest branch | Customer → HO-Ref |
 
+### IB VoucherType strings (stored in `interbranchvoucher.vouchertype`)
+
+| VoucherType string | Transaction | Service file |
+|---|---|---|
+| `"IBSavingDeposit"` | Saving Deposit | `IBSavingDepositService.cs` |
+| `"IBSavingWithdrawal"` | Saving Withdrawal | `IBSavingDepositService.cs` |
+| `"IBLoanAdvancement"` | Loan Advancement | `IBLoanAdvancementService.cs` |
+| `"IBLoanExpense"` | Loan Expense | `IBLoanExpenseService.cs` |
+| `"IBPreMature"` | Pre-Mature FD/RD | `IBPreMatureService.cs` |
+| `"IBMature"` | Mature FD/RD | `IBMatureService.cs` |
+| `"IBRDKist"` | RD Kist | `IBRDKistService.cs` |
+| `"IBLoanRecovery"` | Loan Recovery | `IBLoanRecoveryService.cs` |
+
 ### Service: `IBSavingDepositService.cs`
 Key methods:
 - `GetIncomingForBranchAsync(brId)` — returns vouchers for dest branch to approve (Step 3). Does NOT wait for Step 2; shows vouchers from the moment Step 1 exists. Falls back to `otherbranchaccounts` lookup for HO branch ref account when Step 2 hasn't happened yet.
@@ -208,10 +252,20 @@ Auto-filled default: `"HO settlement for IB deposit of ₹{amount} from {fromBrC
 User can edit before confirming. Passed as `dto.Narration` override.
 
 ### Frontend Pages
-- `IBPendingVouchers.tsx` — HO branch approves Step 2. Shows pre-resolved Dr/Cr account names. Has editable narration textarea with auto-fill. Handles both deposit and withdrawal — labels swap based on `voucherType`.
-- `IBIncomingVouchers.tsx` — Dest branch approves Step 3 (or Step 2 for HOToBranch). Handles both deposit and withdrawal — "credit/debit" labels, button text, and Dr/Cr annotations all flip based on `voucherType`. For pending withdrawal, `step3DrAccName` holds the pre-resolved HO-ref (Cr side), and `destAccName` is used for the Dr (customer) display.
-- `savingwithdrawal.tsx` — Now supports IB mode. Adds "Destination Branch" selector; when set, routes submit to `ibVoucherApi.createSavingWithdrawalStep1` with `drAccId=ibDrAccId` (IB-ref), `crAccId=creditAccount` (cash). Shows "IB Ref Debit Account" label below the branch selector.
+- `IBPendingVouchers.tsx` — HO branch approves Step 2 for ALL IB voucher types. Shows pre-resolved Dr/Cr account names. Has editable narration textarea with auto-fill. Dispatches to the correct `confirmXxxStep2` API method based on `voucherType`.
+- `IBIncomingVouchers.tsx` — Dest branch approves Step 3 for Saving Deposit/Withdrawal, Loan Advancement, Loan Expense, Pre-Mature, Mature, RD Kist. Handles type-specific labels, button text, Dr/Cr annotations based on `voucherType`.
+- `IBIncomingLoanRecovery.tsx` — Dedicated dest branch page for IB Loan Recovery Step 3. Shows loan outstanding balance, interest breakdown (Cat 3/Cat 4 for Stand loans) with editable `intAmount`, and interest posting ledger. Calls `completeLoanRecoveryStep3`.
+- `IBLoanAdvancement.tsx` — Dedicated dest branch page for IB Loan Advancement Step 3.
+- `IBLoanExpense.tsx` — Dedicated dest branch page for IB Loan Expense Step 3.
+- `savingwithdrawal.tsx` — IB mode: "Destination Branch" selector routes submit to `createSavingWithdrawalStep1`.
+- `loanadvancement.tsx` — IB mode: "Destination Branch" selector routes submit to `createLoanAdvancementStep1`.
+- `loanrecovery.tsx` — IB mode: "Destination Branch" selector, multiple Dr entries allowed, routes submit to `createLoanRecoveryStep1`. `destBrId > 0` gates IB path.
+- `loanexpense.tsx` — IB mode: "Destination Branch" selector routes submit to `createLoanExpenseStep1`.
+- `rdkist.tsx` — IB mode: "Destination Branch" selector routes submit to `createRDKistStep1`.
+- `mature-fd.tsx`, `mature-rd.tsx` — IB mode: "Destination Branch" selector, payout goes to destination branch saving account.
+- `pre-mature.tsx`, `premature-rd.tsx` — IB mode: same pattern as mature.
 - Status badge colors: `"Pending"` → yellow, `"HOConfirmed"` → blue, `"BranchCompleted"` → violet, `"Completed"` → green
+- Notification bell routes `IBLoanRecovery` incoming items to `/ib-incoming-loan-recovery`; all other types to `/ib-incoming-vouchers`
 
 ### IB Voucher Deletion Protection (`VoucherOperationsService.DeleteVoucherAsync`)
 - **Delete Step 1**: blocked if Step 2 OR Step 3 exists. User must delete later steps first.
@@ -226,7 +280,7 @@ User can edit before confirming. Passed as `dto.Narration` override.
 - `NotificationBell` component fetches `/IBVoucher/notifications/{brId}` on mount and every 60s
 - Uses `createPortal` for the dropdown to avoid overflow clipping
 - Two refs: `bellRef` (button) + `dropdownRef` (portal div) — both checked in mousedown outside-click handler to prevent race condition
-- Navigates to `/ib-incoming-vouchers` (incoming) or `/ib-pending-vouchers` (pendingHO) on click
+- Navigates to `/ib-incoming-loan-recovery` for `IBLoanRecovery` incoming items, `/ib-incoming-vouchers` for all others, `/ib-pending-vouchers` for pendingHO
 - Red badge shows total count
 
 ---
@@ -247,7 +301,7 @@ User can edit before confirming. Passed as `dto.Narration` override.
 Delete-and-recreate pattern: cleans up `voucherrecintdetail`, removes old voucher, then calls `AddLoanRecoveryVoucherAsync`. Edit mode in `loanrecovery.tsx` reads `location.state?.editVoucher` from Voucher Search navigate state.
 
 ### VoucherType / SubType Names (`VoucherOperationsService.cs`)
-`GetVoucherTypeName` and `GetVoucherSubTypeName` — used for display in Voucher Search. IB subtypes 19–23 are registered here.
+`GetVoucherTypeName` and `GetVoucherSubTypeName` — used for display in Voucher Search. IB subtypes 19–60 are registered here.
 
 ---
 
@@ -461,6 +515,58 @@ File: `.github/workflows/deploy.yml`
 
 ---
 
+## Agent Module
+
+### Purpose
+Tracks which field agent is responsible for collecting instalments from accounts (RD/Loan). Agents have a level hierarchy and can be transferred between accounts over time.
+
+### Models
+- `AgentLevel` — `{id, branchid, code, name, isactive}` — agent grades/tiers
+- `AgentMaster` — `{id, branchid, code, name, agentlevelid, phone, address, isactive}`
+- `AccountAgent` — `{id, branchid, accountid, acctype, agentid, fromdate, todate}` — history table; `todate = null` means current assignment
+
+### Frontend Pages
+- `/agent-level-operations` → CRUD via `AgentLevelService`
+- `/agent-master-operations` → CRUD via `AgentMasterService`
+- `/update-agent-accounts` — two-tab page: **Transfer** (select From-Agent, To-Agent, tick accounts, apply) and **History** (select agent, view accounts, drill per-account to see all past assignments)
+
+### Backend
+- `AccountAgentService.cs` — `GetByAgent`, `Transfer(fromAgentId, toAgentId, accountIds, effectiveDate)`: closes `todate` on old records, inserts new ones
+- Toggle visibility via `SuperUserSettings.enableAgentModule` — sidebar group only shows when enabled
+
+---
+
+## Auto Debit
+
+### Purpose
+Automatically posts RD Kist and Loan Recovery vouchers daily for enrolled accounts, without operator action.
+
+### Models
+- `AutoDebitAccount` — `{id, branchid, accountid, accounttype, isactive, savingaccountid, notes, createdAt}` — per-account mandate. `accounttype` = `"RDKist"` or `"LoanRecovery"`. `savingaccountid` = optional saving account to debit (for loan recovery).
+- `AutoDebitRun` — `{id, branchid, rundate, startedAt, completedAt, totalAccounts, successCount, failCount, logJson}` — one row per daily run per branch.
+
+### Background Service (`AutoDebitBackgroundService.cs`)
+- Runs as `IHostedService` via `AddHostedService<AutoDebitBackgroundService>()`
+- Waits until start of the next minute, then fires a `PeriodicTimer` every 60 seconds
+- Calls `AutoDebitService.RunDueBranchesAsync(DateTime.Now)` each tick
+- Finds branches where `superusersettings.enableAutoDebit = true` AND `autoDebitRunHour + autoDebitRunMinute` matches current server time
+- Skips if a run already completed today for that branch (checks `autodebitrun` table)
+- After processing, sends a Telegram notification via `ITelegramService` with success/fail counts
+
+### Frontend Pages
+- `/auto-debit-mandates` — list of enrolled accounts with enable/disable toggle and manual "Run Now" button; account type badge (blue=RD Kist, orange=Loan Recovery)
+- `/auto-debit-history` — list of `AutoDebitRun` records with success/fail counts and expandable log
+
+### Super User Settings
+- `enableAutoDebit` (bool) — master switch; sidebar group hidden when false
+- `autoDebitRunHour` + `autoDebitRunMinute` — time of day for the daily run
+- Configurable per branch via `SuperUserSettings.tsx`
+
+### IB Non-Destructive Rule
+IB vouchers must never alter existing non-IB functionality. All IB entry points are gated behind `destBrId > 0`. Normal (non-IB) save paths run untouched. Backend IB services are separate files; existing voucher service methods are not modified for IB logic.
+
+---
+
 ## EF Core Migrations
 
 Migrations live in `BankingPlatform.Infrastructure/Migrations/`. Recent ones:
@@ -471,6 +577,12 @@ Migrations live in `BankingPlatform.Infrastructure/Migrations/`. Recent ones:
 | `20260531130000_MakeFDDetailSlabIdNullable` | Makes `fdaccountdetail.slabid` nullable, re-adds FK |
 | `20260613100000_AddVoucherIdToLoanAccountBalanceDetail` | Adds `voucherid` to `loanaccountbalancedetail` |
 | `20260614100000_AddLastSeenVersionToUser` | Adds `lastseenversion` to `user` table for What's New feature |
+| `20261008131935_AddAgentModule` | Creates `agentlevel`, `agentmaster`, `accountagent` tables |
+| `20261012042659_AddIBVoucherExpenseDetail` | Adds `ibvoucherexpensedetail` table for IB Loan Expense detail |
+| `20261012110000_AddAutoDebit` | Creates `autodebitaccount`, `autodebitrun` tables; adds auto-debit settings columns to `superusersettings` |
+| `20261012113306_AddPenaltyAmountToInterBranchVoucher` | Adds `penaltyamount` column to `interbranchvoucher` (for RD Kist penalty) |
+| `20261012120000_AddTelegramChatIdToMember` | Adds `telegramchatid` to `member` for Telegram notifications |
+| `20261013100000_AddSavingAccountIdToAutoDebitAccount` | Adds `savingaccountid` to `autodebitaccount` (debit source for loan recovery mandates) |
 
 ---
 
