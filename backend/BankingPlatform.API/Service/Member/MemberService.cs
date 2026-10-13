@@ -777,6 +777,7 @@ namespace BankingPlatform.API.Services
             entity.MemberStatusDate = dto.MemberStatusDate;
             entity.Email1 = dto.Email1;
             entity.Email2 = dto.Email2;
+            entity.TelegramChatId = dto.TelegramChatId;
 
             return entity;
         }
@@ -821,7 +822,8 @@ namespace BankingPlatform.API.Services
             MemberStatus = entity.MemberStatus,
             MemberStatusDate = entity.MemberStatusDate,
             Email1 = entity.Email1,
-            Email2 = entity.Email2
+            Email2 = entity.Email2,
+            TelegramChatId = entity.TelegramChatId
 
         };
 

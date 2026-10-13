@@ -10,7 +10,14 @@ export interface SuperUserSettingsDTO {
   allowGSTDeduction: boolean;
   showBankFDModule: boolean;
   showPayrollModule: boolean;
+  showAgentModule: boolean;
   enforceSingleSession: boolean;
+  telegramChatId?: string;
+  enableAutoDebit?: boolean;
+  autoDebitRunHour?: number;
+  autoDebitRunMinute?: number;
+  autoDebitProcessRdKist?: boolean;
+  autoDebitProcessLoanRecovery?: boolean;
 }
 
 /** @deprecated Use SuperUserSettingsDTO */

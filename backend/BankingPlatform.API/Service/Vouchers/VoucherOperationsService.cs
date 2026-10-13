@@ -482,6 +482,21 @@ namespace BankingPlatform.API.Service.Vouchers
             28 => "IB Saving Wdl — Dest Branch Debit",
             29 => "Close Account",
             30 => "Bank FD Deposit",
+            41 => "IB Pre-Mature — HO Step 1",
+            42 => "IB Pre-Mature — Dest Branch Credit (HO→Br)",
+            43 => "IB Pre-Mature — Source Branch Step 1",
+            44 => "IB Pre-Mature — HO Settlement",
+            45 => "IB Pre-Mature — Dest Branch Credit",
+            46 => "IB Mature — HO Step 1",
+            47 => "IB Mature — Dest Branch Credit (HO→Br)",
+            48 => "IB Mature — Source Branch Step 1",
+            49 => "IB Mature — HO Settlement",
+            50 => "IB Mature — Dest Branch Credit",
+            51 => "IB RD Kist — HO Step 1",
+            52 => "IB RD Kist — Dest Branch Kist (HO→Br)",
+            53 => "IB RD Kist — Source Branch Step 1",
+            54 => "IB RD Kist — HO Settlement",
+            55 => "IB RD Kist — Dest Branch Kist",
             _ => "Unknown"
         };
     }

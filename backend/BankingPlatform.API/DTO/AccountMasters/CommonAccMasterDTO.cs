@@ -27,7 +27,8 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public int? AccountType { get; set; }
         public string? SavingAccountName { get; set; }
         public decimal? PreMaturityAmount { get; set; }
-        
+        public IBPreMatureInfo? IBPreMatureInfo { get; set; }
+        public IBPreMatureInfo? IBMatureInfo { get; set; }
 
     }
     public class CreateAccountCreationRequest
@@ -128,6 +129,20 @@ namespace BankingPlatform.API.DTO.AccountMasters
         public int MemberBrId { get; set; }
         public int JointWithAccountId { get; set; }
         public string? JointAccHolderAccountNumber { get; set; }
+    }
+
+    public class IBPreMatureInfo
+    {
+        public string FlowType { get; set; } = "HOToBranch"; // "HOToBranch" or "BranchToBranch"
+        public int DestBrId { get; set; }
+        public int DestAccId { get; set; }          // customer saving account at dest branch
+        public string DestAccName { get; set; } = "";
+        public string DestAccNo { get; set; } = "";
+        public string DestBrCode { get; set; } = "";
+        public string DestBrName { get; set; } = "";
+        public int IBRefAccId { get; set; }          // IB-Ref account (from otherbranchaccounts)
+        public decimal IBSavingAmount { get; set; }  // saving portion routed via IB
+        public string? Narration { get; set; }
     }
 
     public class JointAccountWithdrawalInfoDTO

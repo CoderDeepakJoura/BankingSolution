@@ -15,6 +15,17 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.16",
+    date: "2026-10-13",
+    changes: [
+      { type: "new",         text: "Agent module: Agent Level Master, Agent Master (with level hierarchy, phone, address, active flag), toggle via Super User Settings" },
+      { type: "new",         text: "Update Agent of Accounts: transfer accounts between agents with full from/to date history stored per account" },
+      { type: "new",         text: "Agent history viewer: select any agent, view current accounts, drill into full agent history per account showing all past and present assignments" },
+      { type: "new",         text: "Auto Debit: per-account mandates for RD Kist and Loan Recovery — a background service fires at a configurable branch time daily and posts vouchers automatically; mandate list with enable/disable toggle, run history, and optional saving account as debit source" },
+      { type: "new",         text: "Inter-Branch vouchers extended to 7 transaction types: Loan Advancement, Loan Recovery (with full interest allocation for Stand loans), Pre-Mature FD, Pre-Mature RD, Mature FD, Mature RD, and Loan Expense — all support 2-step HOToBranch and 3-step BranchToBranch flows" },
+    ],
+  },
+  {
     version: "1.1.15",
     date: "2026-10-06",
     changes: [

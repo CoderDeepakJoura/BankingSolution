@@ -20,6 +20,7 @@ import {
 import DashboardLayout from "../../../Common/Layout";
 import commonservice from "../../../services/common/commonservice";
 import fdAccountService from "../../../services/accountMasters/fdaccount/fdaccountapi";
+import ibVoucherApi from "../../../services/interbranch/ibVoucherApi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux";
 import { SavingAccounts } from "../../vouchers/saving/savingdeposit";
@@ -146,6 +147,22 @@ const PrePreMatureFDPage: React.FC = () => {
   });
   const [intExpAccId, setIntExpAccId] = useState<number>(0);
 
+  // IB pre-mature state
+  const [ibRefAccounts, setIbRefAccounts] = useState<Array<{id: number; otherBrId: number; accId: number; otherBranchCode: string; otherBranchName: string; accountName: string}>>([]);
+  const [allBranches, setAllBranches] = useState<{ value: number; label: string; brCode: string; brName: string }[]>([]);
+  const [ibDestBrId, setIbDestBrId] = useState<number>(0);
+  const [ibDestBrCode, setIbDestBrCode] = useState<string>("");
+  const [ibDestBrName, setIbDestBrName] = useState<string>("");
+  const [ibRefAccId, setIbRefAccId] = useState<number>(0);
+  const [ibRefAccName, setIbRefAccName] = useState<string>("");
+  const [ibDestSavingAccounts, setIbDestSavingAccounts] = useState<Array<{accId: number; accountName: string; accountNumber: string}>>([]);
+  const [ibDestSavingAccId, setIbDestSavingAccId] = useState<number>(0);
+  const [ibDestSavingAccNo, setIbDestSavingAccNo] = useState<string>("");
+  const [ibDestSavingAccName, setIbDestSavingAccName] = useState<string>("");
+  const [ibNarration, setIbNarration] = useState<string>("");
+  const [savAccIbHold, setSavAccIbHold] = useState(0);
+  const [savAccIbHoldCount, setSavAccIbHoldCount] = useState(0);
+
   const calculatePendingAmount = () => {
     const totalCredited =
       parseFloat(accountCredit.generalAmount || "0") +
@@ -255,6 +272,66 @@ const PrePreMatureFDPage: React.FC = () => {
     };
     if (user.branchid) fetchAccountDropdowns();
   }, [user.branchid]);
+
+  // Load IB-ref accounts for this branch
+  useEffect(() => {
+    if (!user.branchid || !user.enableIBTransactions) return;
+    ibVoucherApi.getOtherBranchAccounts(user.branchid).then((res: any) => {
+      if (res.success && Array.isArray(res.data)) setIbRefAccounts(res.data);
+    }).catch(() => {});
+  }, [user.branchid, user.enableIBTransactions]);
+
+  // For non-HO branches: load all branches so user can pick any dest branch
+  useEffect(() => {
+    if (!user.isMainBranch && user.enableIBTransactions) {
+      import("../../../services/branch/branchapi").then(({ default: BranchApiService }) => {
+        (BranchApiService.fetchBranches({ searchTerm: "", pageNumber: 1, pageSize: 1000 }, 1) as any).then((res: any) => {
+          if (res.success) {
+            setAllBranches(
+              (res.branches ?? [])
+                .filter((b: any) => b.id !== user.branchid && !b.isMainBranch)
+                .map((b: any) => ({ value: b.id, label: `${b.code} — ${b.name}`, brCode: b.code || "", brName: b.name || "" }))
+            );
+          }
+        });
+      });
+    }
+  }, [user.branchid, user.isMainBranch, user.enableIBTransactions]);
+
+  const handleIBDestBranchChange = async (brId: number, brCode: string, brName: string, accId: number, accName: string) => {
+    setIbDestBrId(brId);
+    setIbDestBrCode(brCode);
+    setIbDestBrName(brName);
+    // HO: ref account is per-dest-branch mapping; non-HO: always their one HO ref account
+    if (user.isMainBranch) {
+      setIbRefAccId(accId);
+      setIbRefAccName(accName);
+    } else {
+      setIbRefAccId(ibRefAccounts[0]?.accId ?? 0);
+      setIbRefAccName(ibRefAccounts[0]?.accountName ?? "");
+    }
+    setIbDestSavingAccId(0);
+    setIbDestSavingAccNo("");
+    setIbDestSavingAccName("");
+    setIbDestSavingAccounts([]);
+    setAccountCredit((c) => ({ ...c, savingAccountId: 0, savingAmount: "0.00" }));
+    if (brId > 0) {
+      try {
+        const res = await commonservice.fetch_Saving_Accounts(brId, preMatureFDDetail.date);
+        if (res.success && Array.isArray(res.data)) setIbDestSavingAccounts(res.data.map((a: any) => ({ accId: a.accId, accountName: a.accountName, accountNumber: a.accountNumber || "" })));
+      } catch { /* silently ignore */ }
+    }
+  };
+
+  const clearIBMode = () => {
+    setIbDestBrId(0); setIbDestBrCode(""); setIbDestBrName("");
+    setIbRefAccId(0); setIbRefAccName("");
+    setIbDestSavingAccId(0); setIbDestSavingAccNo(""); setIbDestSavingAccName("");
+    setIbDestSavingAccounts([]);
+    setIbNarration("");
+    setSavAccIbHold(0); setSavAccIbHoldCount(0);
+    setAccountCredit((c) => ({ ...c, savingAccountId: 0, savingAmount: "0.00" }));
+  };
 
   const fetchFDAccounts = async (productId: number) => {
     if (!productId) { setFdAccounts([]); return; }
@@ -447,6 +524,7 @@ const PrePreMatureFDPage: React.FC = () => {
     setSelectedLoanProductId(null);
     setLoanAccounts([]);
     setLoanBalance(null);
+    clearIBMode();
   };
 
   const handleSubmit = async () => {
@@ -510,9 +588,25 @@ const PrePreMatureFDPage: React.FC = () => {
         closingCharges: accountCredit.closingCharges,
         tdsAmount: accountCredit.tdsAmount
       }
+      const ibPreMatureInfo = ibDestBrId > 0 && ibRefAccId > 0 && ibDestSavingAccId > 0
+        ? {
+            flowType: "BranchToBranch",  // source branch always uses BranchToBranch; HO would need separate logic
+            destBrId: ibDestBrId,
+            destAccId: ibDestSavingAccId,
+            destAccNo: ibDestSavingAccNo,
+            destAccName: ibDestSavingAccName,
+            destBrCode: ibDestBrCode,
+            destBrName: ibDestBrName,
+            ibRefAccId,
+            ibSavingAmount: Number(accountCredit.savingAmount),
+            narration: ibNarration || `IB Pre-Mature FD credit to ${ibDestBrName} for ${ibDestSavingAccName}`,
+          }
+        : null;
+
       const dto = {
         MatureOrRenewFDInfo: preMatureFdDto,
         CreditAccountDetails: creditData,
+        IBPreMatureInfo: ibPreMatureInfo,
       };
       await fdAccountService.preMatureFD(dto);
       await Swal.fire({
@@ -915,21 +1009,97 @@ const PrePreMatureFDPage: React.FC = () => {
 
                     {/* Saving Tab */}
                     {activeTab === "saving" && (
-                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200">
+                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200 space-y-4">
+                        {/* IB Destination Branch — shown when IB transactions enabled */}
+                        {user.enableIBTransactions && (
+                          <div className="border border-blue-200 bg-blue-50 rounded-lg p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-semibold text-blue-700">Inter-Branch Credit (optional)</p>
+                              {ibDestBrId > 0 && (
+                                <button onClick={clearIBMode} className="text-xs text-red-500 hover:text-red-700 underline">Clear IB</button>
+                              )}
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="text-sm font-semibold text-gray-700 mb-1">Destination Branch</label>
+                              <Select
+                                options={user.isMainBranch
+                                  ? ibRefAccounts.map((r) => ({ value: r.otherBrId, label: `${r.otherBranchCode} — ${r.otherBranchName}`, accId: r.accId, accName: r.accountName, brCode: r.otherBranchCode, brName: r.otherBranchName }))
+                                  : allBranches}
+                                value={ibDestBrId > 0 ? { value: ibDestBrId, label: `${ibDestBrCode} — ${ibDestBrName}` } as any : null}
+                                onChange={(option: any) => {
+                                  if (option) handleIBDestBranchChange(option.value, option.brCode || "", option.brName || option.label, option.accId ?? 0, option.accName ?? "");
+                                  else clearIBMode();
+                                }}
+                                placeholder="Select dest branch for IB credit…"
+                                isClearable
+                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                              />
+                            </div>
+                            {ibRefAccId > 0 && (
+                              <p className="text-xs text-blue-600">IB Ref (Cr): <span className="font-semibold">{ibRefAccName}</span></p>
+                            )}
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="flex flex-col">
                             <label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                               <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
-                              Saving Account
+                              {ibDestBrId > 0 ? `Saving Account (${ibDestBrName})` : "Saving Account"}
                             </label>
-                            <Select
-                              options={savingAccountOptions}
-                              value={savingAccountOptions.find((opt) => opt.value === accountCredit.savingAccountId) || null}
-                              onChange={(option) => setAccountCredit({ ...accountCredit, savingAccountId: option?.value || 0 })}
-                              placeholder="Select Saving Account"
-                              isClearable
-                              styles={customSelectStyles}
-                            />
+                            {ibDestBrId > 0 ? (
+                              <Select
+                                options={ibDestSavingAccounts.map((a) => ({ value: a.accId, label: a.accountName, accNo: a.accountNumber }))}
+                                value={ibDestSavingAccId > 0 ? { value: ibDestSavingAccId, label: ibDestSavingAccName } as any : null}
+                                onChange={(option: any) => {
+                                  if (option) {
+                                    setIbDestSavingAccId(option.value);
+                                    setIbDestSavingAccName(option.label);
+                                    setIbDestSavingAccNo(option.accNo || "");
+                                    setAccountCredit((c) => ({ ...c, savingAccountId: option.value }));
+                                    setSavAccIbHold(0); setSavAccIbHoldCount(0);
+                                    commonservice.get_account_balance(ibDestBrId, option.value).then((res: any) => {
+                                      setSavAccIbHold(res?.ibHold ?? 0);
+                                      setSavAccIbHoldCount(res?.ibHoldCount ?? 0);
+                                    }).catch(() => {});
+                                  } else {
+                                    setIbDestSavingAccId(0); setIbDestSavingAccNo(""); setIbDestSavingAccName("");
+                                    setAccountCredit((c) => ({ ...c, savingAccountId: 0 }));
+                                    setSavAccIbHold(0); setSavAccIbHoldCount(0);
+                                  }
+                                }}
+                                placeholder="Select dest branch saving account"
+                                isClearable
+                                styles={customSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                              />
+                            ) : (
+                              <Select
+                                options={savingAccountOptions}
+                                value={savingAccountOptions.find((opt) => opt.value === accountCredit.savingAccountId) || null}
+                                onChange={(option) => {
+                                  setAccountCredit({ ...accountCredit, savingAccountId: option?.value || 0 });
+                                  setSavAccIbHold(0); setSavAccIbHoldCount(0);
+                                  if (option?.value) {
+                                    commonservice.get_account_balance(user.branchid, option.value).then((res: any) => {
+                                      setSavAccIbHold(res?.ibHold ?? 0);
+                                      setSavAccIbHoldCount(res?.ibHoldCount ?? 0);
+                                    }).catch(() => {});
+                                  }
+                                }}
+                                placeholder="Select Saving Account"
+                                isClearable
+                                styles={customSelectStyles}
+                              />
+                            )}
+                            {savAccIbHold > 0 && (
+                              <p className="text-xs text-amber-600 font-medium mt-1">
+                                ⚠ ₹{savAccIbHold.toFixed(2)} IB hold on this account ({savAccIbHoldCount} pending)
+                              </p>
+                            )}
                           </div>
                           <div className="flex flex-col">
                             <label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
@@ -949,6 +1119,18 @@ const PrePreMatureFDPage: React.FC = () => {
                             />
                           </div>
                         </div>
+                        {ibDestBrId > 0 && (
+                          <div className="flex flex-col">
+                            <label className="text-sm font-semibold text-gray-700 mb-1">IB Narration (optional)</label>
+                            <input
+                              type="text"
+                              value={ibNarration}
+                              onChange={(e) => setIbNarration(e.target.value)}
+                              className="px-3 py-2 border border-blue-300 rounded-lg outline-none text-gray-700 bg-white text-sm"
+                              placeholder={`IB Pre-Mature FD credit to ${ibDestBrName}…`}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
 

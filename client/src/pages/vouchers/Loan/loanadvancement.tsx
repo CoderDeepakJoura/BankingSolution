@@ -126,6 +126,20 @@ const LoanAdvancementVoucher: React.FC = () => {
   const [creditItems, setCreditItems] = useState<CreditRow[]>([]);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
 
+  // IB state
+  const [ibRefAccounts, setIbRefAccounts] = useState<Array<{id: number; otherBrId: number; accId: number; otherBranchCode: string; otherBranchName: string; accountName: string}>>([]);
+  const [allBranches, setAllBranches] = useState<{ value: number; label: string; brCode: string; brName: string }[]>([]);
+  const [ibDestBrId, setIbDestBrId] = useState(0);
+  const [ibDestBrCode, setIbDestBrCode] = useState("");
+  const [ibDestBrName, setIbDestBrName] = useState("");
+  const [ibRefAccId, setIbRefAccId] = useState(0);
+  const [ibRefAccName, setIbRefAccName] = useState("");
+  const [ibCrAccId, setIbCrAccId] = useState(0);
+  const [ibCrAccName, setIbCrAccName] = useState("");
+  const [ibCrAccounts, setIbCrAccounts] = useState<{ accId: number; accountName: string }[]>([]);
+  const [loanAccIbHold, setLoanAccIbHold] = useState(0);
+  const [loanAccIbHoldCount, setLoanAccIbHoldCount] = useState(0);
+
   const [formData, setFormData] = useState({
     voucherDate: "",
     loanProductId: 0,
@@ -152,7 +166,7 @@ const LoanAdvancementVoucher: React.FC = () => {
 
   // Shared: load loan account details + guarantors for any account ID
   const loadAccountDetails = async (accountId: number) => {
-    const res = await loanAccountApi.getLoanAccountById(accountId, user.branchid);
+    const res = await loanAccountApi.getLoanAccountById(accountId, ibDestBrId || user.branchid);
     if (!res.success) return null;
     const data = res.data as CombinedLoanAccountDTO;
     setLoanAccountData(data);
@@ -245,10 +259,35 @@ const LoanAdvancementVoucher: React.FC = () => {
 
   useEffect(() => {
     if (isEditMode || !formData.voucherDate) return;
-    commonservice.fetch_loan_products(user.branchid, formData.voucherDate).then((res) => {
+    commonservice.fetch_loan_products(ibDestBrId || user.branchid, formData.voucherDate).then((res) => {
       if (res.success) setLoanProducts(res.data ?? []);
     });
-  }, [formData.voucherDate]);
+  }, [formData.voucherDate, ibDestBrId]);
+
+  useEffect(() => {
+    if (!user.branchid || !user.enableIBTransactions) return;
+    import("../../../services/interbranch/ibVoucherApi").then(({ default: ibApi }) => {
+      ibApi.getOtherBranchAccounts(user.branchid).then((res: any) => {
+        if (res.success && Array.isArray(res.data)) setIbRefAccounts(res.data);
+      }).catch(() => {});
+    });
+  }, [user.branchid, user.enableIBTransactions]);
+
+  useEffect(() => {
+    if (!user.isMainBranch && user.enableIBTransactions) {
+      import("../../../services/branch/branchapi").then(({ default: BranchApiService }) => {
+        (BranchApiService.fetchBranches({ searchTerm: "", pageNumber: 1, pageSize: 1000 }, 1) as any).then((res: any) => {
+          if (res.success) {
+            setAllBranches(
+              (res.branches ?? [])
+                .filter((b: any) => b.id !== user.branchid && !b.isMainBranch)
+                .map((b: any) => ({ value: b.id, label: `${b.code} — ${b.name}`, brCode: b.code || "", brName: b.name || "" }))
+            );
+          }
+        });
+      });
+    }
+  }, [user.branchid, user.isMainBranch, user.enableIBTransactions]);
 
   const clearError = (key: string) =>
     setErrors((p) => { const n = { ...p }; delete n[key]; return n; });
@@ -265,7 +304,7 @@ const LoanAdvancementVoucher: React.FC = () => {
     setCreditAccountsForRow([]);
     clearError("loanProductId");
     if (id && formData.voucherDate) {
-      const res = await commonservice.fetch_loan_accounts_by_product(user.branchid, id, formData.voucherDate);
+      const res = await commonservice.fetch_loan_accounts_by_product(ibDestBrId || user.branchid, id, formData.voucherDate);
       if (res.success) setLoanAccounts(res.data ?? []);
     }
   };
@@ -293,14 +332,37 @@ const LoanAdvancementVoucher: React.FC = () => {
     setEditingRowId(null);
     setRowForm({ accountType: null, accountId: null, amount: "", narration: "" });
     setCreditAccountsForRow([]);
+    setLoanAccIbHold(0);
+    setLoanAccIbHoldCount(0);
     clearError("loanAccountId");
+
+    // Max disbursements check
+    try {
+      const disbRes = await commonservice.get_loan_disbursement_info(ibDestBrId || user.branchid, sel.value);
+      if (disbRes.success && disbRes.data && !disbRes.data.canDisburse) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Disbursement Limit Reached",
+          text: disbRes.data.message,
+          confirmButtonColor: "#6366f1",
+        });
+        setFormData((p) => ({ ...p, loanAccountId: 0, loanAmountPassed: 0, totalAmount: "" }));
+        setLoanAccountData(null);
+        return;
+      }
+    } catch { /* non-critical — proceed */ }
+
     await loadAccountDetails(sel.value);
-    loanRecoveryApi.getBalance(sel.value, user.branchid).then((res) => {
+    loanRecoveryApi.getBalance(sel.value, ibDestBrId || user.branchid).then((res) => {
       if (res.success && res.data) setLoanBalance(res.data);
     });
-    loanRecoveryApi.getLedger(sel.value, user.branchid).then((res) => {
+    loanRecoveryApi.getLedger(sel.value, ibDestBrId || user.branchid).then((res) => {
       if (res.success && res.data) setLoanLedger(res.data);
     });
+    commonservice.get_account_balance(ibDestBrId || user.branchid, sel.value).then((res: any) => {
+      setLoanAccIbHold(res?.ibHold ?? 0);
+      setLoanAccIbHoldCount(res?.ibHoldCount ?? 0);
+    }).catch(() => { setLoanAccIbHold(0); setLoanAccIbHoldCount(0); });
   };
 
   const resetRowGst = () => {
@@ -408,6 +470,41 @@ const LoanAdvancementVoucher: React.FC = () => {
     ["rowType", "rowAccount", "rowAmount", "creditItems"].forEach(clearError);
   };
 
+  const clearIBMode = () => {
+    setIbDestBrId(0); setIbDestBrCode(""); setIbDestBrName("");
+    setIbRefAccId(0); setIbRefAccName("");
+    setIbCrAccId(0); setIbCrAccName(""); setIbCrAccounts([]);
+    setLoanAccIbHold(0); setLoanAccIbHoldCount(0);
+  };
+
+  const handleIBDestBrChange = async (brId: number, brCode: string, brName: string, accId: number, accName: string) => {
+    setIbDestBrId(brId); setIbDestBrCode(brCode); setIbDestBrName(brName);
+    if (user.isMainBranch) {
+      setIbRefAccId(accId); setIbRefAccName(accName);
+    } else {
+      setIbRefAccId(ibRefAccounts[0]?.accId ?? 0);
+      setIbRefAccName(ibRefAccounts[0]?.accountName ?? "");
+    }
+    setIbCrAccId(0); setIbCrAccName(""); setIbCrAccounts([]);
+    // Reset loan product/account since they come from the new dest branch
+    setFormData((p) => ({ ...p, loanProductId: 0, loanAccountId: 0, loanAmountPassed: 0, totalAmount: "" }));
+    setLoanAccounts([]); setLoanAccountData(null); setLoanBalance(null);
+    setCreditItems([]); setEditingRowId(null);
+    // Load IB credit accounts (General/Saving at current branch) for the Cr side
+    if (brId > 0) {
+      try {
+        const [generals, savings] = await Promise.all([
+          commonservice.general_accmasters_info(user.branchid),
+          commonservice.fetch_Saving_Accounts(user.branchid, formData.voucherDate),
+        ]);
+        const accs: { accId: number; accountName: string }[] = [];
+        if (generals.success) accs.push(...(generals.data ?? []).map((a: any) => ({ accId: a.accId, accountName: a.accountName })));
+        if (savings.success) accs.push(...(savings.data ?? []).map((a: any) => ({ accId: a.accId, accountName: a.accountName })));
+        setIbCrAccounts(accs);
+      } catch { /* silently ignore */ }
+    }
+  };
+
   const handleReset = () => {
     setFormData({
       voucherDate: sessionDate,
@@ -428,6 +525,7 @@ const LoanAdvancementVoucher: React.FC = () => {
     resetRowGst();
     setErrors({});
     setActiveTab("account-info");
+    clearIBMode();
   };
 
   const handleSave = async () => {
@@ -438,36 +536,62 @@ const LoanAdvancementVoucher: React.FC = () => {
       errs.totalAmount = "Enter a valid amount";
     else if (formData.loanAmountPassed > 0 && Number(formData.totalAmount) > formData.loanAmountPassed)
       errs.totalAmount = `Cannot exceed sanctioned amount (${formData.loanAmountPassed.toFixed(2)})`;
-    if (creditItems.length === 0)
-      errs.creditItems = "Add at least one credit account";
-    else if (Math.abs(totalCredited - Number(formData.totalAmount)) > 0.01)
-      errs.creditItems = `Credit total ${totalCredited.toFixed(2)} must equal advancement amount`;
+    // IB mode: validate IB ref + credit account; non-IB: validate credit rows
+    if (!isEditMode && ibDestBrId > 0) {
+      if (!ibRefAccId) errs.ibRef = "IB reference account not configured for this branch pair";
+      if (!ibCrAccId) errs.ibCr = "Select a credit account for IB disbursement";
+    } else {
+      if (creditItems.length === 0)
+        errs.creditItems = "Add at least one credit account";
+      else if (Math.abs(totalCredited - Number(formData.totalAmount)) > 0.01)
+        errs.creditItems = `Credit total ${totalCredited.toFixed(2)} must equal advancement amount`;
+    }
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
-    const payload = {
-      brId: user.branchid,
-      voucherDate: formData.voucherDate,
-      loanAccountId: formData.loanAccountId,
-      totalAmount: Number(formData.totalAmount),
-      narration: formData.narration || undefined,
-      creditItems: creditItems.map((r) => ({
-        accountId: r.accountId,
-        accountType: r.accountType,
-        amount: r.amount,
-        narration: r.narration || undefined,
-        gstDetail: r.gstDetail || undefined,
-      })),
-    };
-
     setLoading(true);
     try {
-      const res = isEditMode && editVoucherId
-        ? await loanAdvancementApi.updateLoanAdvancement(editVoucherId, payload)
-        : await loanAdvancementApi.addLoanAdvancement(payload);
+      let res: any;
+      if (!isEditMode && ibDestBrId > 0) {
+        // IB Loan Advancement Step 1
+        const { default: ibApi } = await import("../../../services/interbranch/ibVoucherApi");
+        const ibPayload = {
+          brId: user.branchid,
+          destBrId: ibDestBrId,
+          destAccId: formData.loanAccountId,
+          destAccNo: loanAccountData?.accountMasterDTO?.accountNumber ?? String(formData.loanAccountId),
+          destAccName: loanAccountData?.accountMasterDTO?.accountName ?? "",
+          drAccId: ibRefAccId,
+          crAccId: ibCrAccId,
+          amount: Number(formData.totalAmount),
+          narration: formData.narration || undefined,
+          voucherDate: formData.voucherDate,
+          workingDate: user.workingdate ?? formData.voucherDate,
+          flowType: user.isMainBranch ? "HOToBranch" : "BranchToBranch",
+        };
+        res = await ibApi.createLoanAdvancementStep1(ibPayload);
+      } else {
+        const payload = {
+          brId: user.branchid,
+          voucherDate: formData.voucherDate,
+          loanAccountId: formData.loanAccountId,
+          totalAmount: Number(formData.totalAmount),
+          narration: formData.narration || undefined,
+          creditItems: creditItems.map((r) => ({
+            accountId: r.accountId,
+            accountType: r.accountType,
+            amount: r.amount,
+            narration: r.narration || undefined,
+            gstDetail: r.gstDetail || undefined,
+          })),
+        };
+        res = isEditMode && editVoucherId
+          ? await loanAdvancementApi.updateLoanAdvancement(editVoucherId, payload)
+          : await loanAdvancementApi.addLoanAdvancement(payload);
+      }
 
       if (res.success) {
-        if (!isEditMode && res.message) await printAfterSave(res.message, 5, 9);
+        if (!isEditMode && ibDestBrId === 0 && res.message) await printAfterSave(res.message, 5, 9);
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
@@ -559,7 +683,14 @@ const LoanAdvancementVoucher: React.FC = () => {
             <InfoCard icon={CreditCard} color="bg-green-50 text-green-600" label="Account No (Khata No)" value={acc?.accountNumber} />
             <InfoCard icon={FileText} color="bg-orange-50 text-orange-600" label="Loan No" value={kist?.loanNo} />
             <InfoCard icon={DollarSign} color="bg-emerald-50 text-emerald-600" label="Loan Amount Passed" value={kist?.loanAmountPassed != null ? `₹${Number(kist.loanAmountPassed).toFixed(2)}` : undefined} />
-            <InfoCard icon={DollarSign} color="bg-rose-50 text-rose-600" label="Principal Outstanding" value={loanBalance ? `₹${loanBalance.principalBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "Loading..."} />
+            <div className="flex flex-col gap-1">
+              <InfoCard icon={DollarSign} color="bg-rose-50 text-rose-600" label="Principal Outstanding" value={loanBalance ? `₹${loanBalance.principalBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "Loading..."} />
+              {loanAccIbHold > 0 && (
+                <p className="text-xs text-amber-600 font-medium px-1">
+                  ⚠ ₹{loanAccIbHold.toFixed(2)} IB hold ({loanAccIbHoldCount} pending approval)
+                </p>
+              )}
+            </div>
             <InfoCard icon={Calendar} color="bg-indigo-50 text-indigo-600" label="Loan Date" value={kist?.loanDate ? formatDate(kist.loanDate) : undefined} />
             <InfoCard icon={Phone} color="bg-pink-50 text-pink-600" label="Phone No" value={acc?.phoneNo1} />
             <InfoCard icon={DollarSign} color="bg-yellow-50 text-yellow-600" label="Kist Amount" value={kist?.kistAmount != null ? `₹${Number(kist.kistAmount).toFixed(2)}` : undefined} />
@@ -766,6 +897,44 @@ const LoanAdvancementVoucher: React.FC = () => {
                   </div>
 
                   <div className="p-5 space-y-5">
+                    {/* IB Dest Branch selector */}
+                    {!isEditMode && user.enableIBTransactions && (
+                      <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-blue-700">Inter-Branch Loan Advancement (optional)</p>
+                          {ibDestBrId > 0 && (
+                            <button onClick={clearIBMode} className="text-xs text-red-500 hover:text-red-700 underline">Clear IB</button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-semibold text-gray-600 mb-1 block">Destination Branch (loan account is there)</label>
+                            <Select
+                              options={[{ value: 0, label: "— Same Branch —" }, ...(user.isMainBranch
+                                ? ibRefAccounts.map((x) => ({ value: x.otherBrId, label: `${x.otherBranchCode} — ${x.otherBranchName}`, accId: x.accId, accName: x.accountName, brCode: x.otherBranchCode, brName: x.otherBranchName }))
+                                : allBranches)]}
+                              value={ibDestBrId > 0 ? { value: ibDestBrId, label: `${ibDestBrCode} — ${ibDestBrName}` } : { value: 0, label: "— Same Branch —" }}
+                              onChange={(o: any) => {
+                                if (!o || o.value === 0) clearIBMode();
+                                else handleIBDestBrChange(o.value, o.brCode || "", o.brName || o.label, o.accId ?? 0, o.accName ?? "");
+                              }}
+                              styles={selectStyles()}
+                              menuPortalTarget={document.body}
+                              menuPosition="fixed"
+                            />
+                          </div>
+                          {ibDestBrId > 0 && ibRefAccId > 0 && (
+                            <div className="flex items-end">
+                              <p className="text-xs text-blue-700 bg-blue-100 border border-blue-200 rounded px-3 py-2 w-full">
+                                IB Ref (Dr): <span className="font-semibold">{ibRefAccName}</span>
+                              </p>
+                            </div>
+                          )}
+                          {errors.ibRef && <p className="text-xs text-red-600 col-span-2">{errors.ibRef}</p>}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                       <div>
                         <Label>Voucher Date</Label>
@@ -778,7 +947,7 @@ const LoanAdvancementVoucher: React.FC = () => {
                       </div>
 
                       <div>
-                        <Label required={!isEditMode}>Loan Product</Label>
+                        <Label required={!isEditMode}>{ibDestBrId > 0 ? `Loan Product (${ibDestBrName})` : "Loan Product"}</Label>
                         <Select
                           options={loanProductOptions}
                           value={loanProductOptions.find((o) => o.value === formData.loanProductId) ?? null}
@@ -867,7 +1036,34 @@ const LoanAdvancementVoucher: React.FC = () => {
                   </div>
 
                   <div className="p-5">
-                    {/* Add / Edit row form */}
+                    {/* IB Mode: single credit account */}
+                    {!isEditMode && ibDestBrId > 0 && (
+                      <div className="mb-4 border border-blue-200 bg-blue-50 rounded-lg p-4">
+                        <p className="text-xs text-blue-700 mb-3">
+                          <span className="font-semibold">IB Mode:</span> select one disbursement account at <span className="font-semibold">{user.branchCode || "current"}</span> branch where the member receives the loan amount.
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-semibold text-gray-600 mb-1 block">IB Disbursement Account (Cr) <span className="text-red-500">*</span></label>
+                            <Select
+                              options={ibCrAccounts.map((a) => ({ value: a.accId, label: a.accountName }))}
+                              value={ibCrAccId > 0 ? { value: ibCrAccId, label: ibCrAccName } : null}
+                              onChange={(o: any) => { setIbCrAccId(o ? o.value : 0); setIbCrAccName(o ? o.label : ""); }}
+                              placeholder="Select disbursement account…"
+                              isClearable
+                              styles={selectStyles(!!errors.ibCr)}
+                              menuPortalTarget={document.body}
+                              menuPosition="fixed"
+                              noOptionsMessage={() => !formData.loanAccountId ? "Select loan account first" : "No accounts"}
+                            />
+                            {errors.ibCr && <p className="mt-1 text-xs text-red-600">{errors.ibCr}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Normal multi-row credit form (non-IB mode) */}
+                    {(isEditMode || ibDestBrId === 0) && (<>
                     <div className={`bg-white border rounded-lg p-4 mb-3 ${editingRowId !== null ? "border-amber-300 ring-1 ring-amber-200" : "border-green-200"}`}>
                       {editingRowId !== null && (
                         <p className="text-xs font-semibold text-amber-600 mb-3 flex items-center gap-1">
@@ -1125,6 +1321,7 @@ const LoanAdvancementVoucher: React.FC = () => {
                         </tbody>
                       </table>
                     </div>
+                    </>)}
                   </div>
                 </div>
 

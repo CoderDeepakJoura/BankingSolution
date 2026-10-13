@@ -103,6 +103,8 @@ const SavingDepositVoucher: React.FC = () => {
   const [signatureFile, setSignatureFile] = useState<any>(null);
   const [accountBalance, setAccountBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [ibHold, setIbHold]               = useState<number>(0);
+  const [ibHoldCount, setIbHoldCount]     = useState<number>(0);
   const [ledgerData, setLedgerData] = useState<SavingLedger | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
 
@@ -339,6 +341,7 @@ const SavingDepositVoucher: React.FC = () => {
     setPictureFile(null);
     setSignatureFile(null);
     setAccountBalance(null);
+    setIbHold(0); setIbHoldCount(0);
     // Reload saving products for the selected branch (or back to login branch if cleared)
     const effectiveBrId = brId || user.branchid;
     const productsRes = await commonservice.fetch_saving_products(effectiveBrId, voucherData.voucherDate || undefined);
@@ -368,6 +371,7 @@ const SavingDepositVoucher: React.FC = () => {
     setPictureFile(null);
     setSignatureFile(null);
     setAccountBalance(null);
+    setIbHold(0); setIbHoldCount(0);
 
     // Clear error on change
     if (selected) {
@@ -593,6 +597,7 @@ const SavingDepositVoucher: React.FC = () => {
     setJointHolders([]);
     setSavingProductAccounts([]);
     setAccountBalance(null);
+    setIbHold(0); setIbHoldCount(0);
     setLedgerData(null);
     setActiveTab("account-info");
     clearErrors();
@@ -804,8 +809,12 @@ const SavingDepositVoucher: React.FC = () => {
                   setBalanceLoading(true);
                   setAccountBalance(null);
                   commonservice.get_account_balance(effectiveBrId, accountId)
-                    .then(res => setAccountBalance(res?.data ?? null))
-                    .catch(() => setAccountBalance(null))
+                    .then(res => {
+                      setAccountBalance(res?.data ?? null);
+                      setIbHold((res as any)?.ibHold ?? 0);
+                      setIbHoldCount((res as any)?.ibHoldCount ?? 0);
+                    })
+                    .catch(() => { setAccountBalance(null); setIbHold(0); setIbHoldCount(0); })
                     .finally(() => setBalanceLoading(false));
                 } else {
                   setAccountBalance(null);
@@ -950,9 +959,16 @@ const SavingDepositVoucher: React.FC = () => {
             {balanceLoading ? (
               <p className="text-xs text-gray-400 mt-1">Fetching balance...</p>
             ) : accountBalance !== null ? (
-              <p className="text-xs mt-1 font-semibold text-blue-600">
-                Current Balance: ₹{accountBalance.toFixed(2)}
-              </p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xs font-semibold text-blue-600">
+                  Current Balance: ₹{accountBalance.toFixed(2)}
+                </p>
+                {ibHold > 0 && (
+                  <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                    ⚠ ₹{ibHold.toFixed(2)} held for {ibHoldCount} pending IB voucher{ibHoldCount !== 1 ? "s" : ""}
+                  </p>
+                )}
+              </div>
             ) : null}
           </div>
 
@@ -1219,6 +1235,11 @@ const SavingDepositVoucher: React.FC = () => {
                   ? `₹${accountBalance.toFixed(2)}`
                   : "N/A"}
               </p>
+              {!balanceLoading && ibHold > 0 && (
+                <p className="text-xs text-amber-600 font-medium mt-0.5">
+                  ⚠ ₹{ibHold.toFixed(2)} IB hold ({ibHoldCount} pending)
+                </p>
+              )}
             </div>
           </div>
         </div>

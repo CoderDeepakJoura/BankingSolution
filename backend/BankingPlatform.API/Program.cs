@@ -39,6 +39,10 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<BankingPlatform.API.Service.Notifications.ITelegramService, BankingPlatform.API.Service.Notifications.TelegramService>();
+builder.Services.AddSingleton<BankingPlatform.API.Service.AutoDebit.AutoDebitService>();
+builder.Services.AddHostedService<BankingPlatform.API.Service.AutoDebit.AutoDebitBackgroundService>();
 builder.Services.AddTransient<BankingPlatform.API.Common.Idempotency.IdempotencyFilter>();
 builder.Services.AddControllers(options =>
 {
@@ -60,6 +64,9 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Salary.BonusReportService
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.EmpGradeService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.PayrollSettingsService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Salary.SalaryReportsService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AgentLevelService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AgentMasterService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AccountAgentService>();
 builder.Services.AddScoped<MasterUsageCheckerService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.VoucherPrint.VoucherPrintService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.FDBond.FDBondService>();
@@ -166,6 +173,12 @@ builder.Services.AddScoped<FDSlabService>();
 builder.Services.AddScoped<RDAccountService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.OtherBranchAccountService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.IBSavingDepositService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.IBLoanAdvancementService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.IBLoanExpenseService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.IBPreMatureService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.IBMatureService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.IBRDKistService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.InterBranch.IBLoanRecoveryService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.MemberPortal.MemberPortalService>();
 
 // Configure CORS with dynamic origins

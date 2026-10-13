@@ -15,6 +15,7 @@ namespace BankingPlatform.Infrastructure.Models.Miscalleneous
         [Column("vouchertype")]   [MaxLength(20)]  public string VoucherType { get; set; } = "";
         [Column("flowtype")]      [MaxLength(20)]  public string FlowType    { get; set; } = "BranchToBranch"; // "HOToBranch" | "BranchToBranch"
         [Column("amount", TypeName = "numeric(18,2)")] public decimal Amount { get; set; }
+        [Column("penaltyamount", TypeName = "numeric(18,2)")] public decimal PenaltyAmount { get; set; }
         [Column("narration")]     [MaxLength(300)] public string? Narration { get; set; }
         [Column("entrydate")]                      public DateTime EntryDate { get; set; }
         [Column("status")]        [MaxLength(20)]  public string Status { get; set; } = "Pending";

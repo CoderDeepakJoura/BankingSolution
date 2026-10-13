@@ -29,6 +29,7 @@ import {
   getFirstSessionFromDate,
 } from "../../../utils/session";
 import DatePicker from "../../../components/DatePicker";
+import autoDebitApi from "../../../services/autoDebit/autoDebitApi";
 
 // ─── Loan type constants ──────────────────────────────────────────────────────
 const LOAN_TYPE_INSTALLMENT = [1, 2, 3]; // Installment, Overdraft, Demand Loan
@@ -177,6 +178,11 @@ const LoanAccountMaster: React.FC = () => {
   const [manualLimitIntRate, setManualLimitIntRate] = useState(false);
 
   const [isNomineeRequired, setIsNomineeRequired] = useState(false);
+
+  // ── Auto-Debit
+  const [enableAutoDebit,      setEnableAutoDebit]      = useState(false);
+  const [autoDebitSavingAccId, setAutoDebitSavingAccId] = useState(0);
+  const [memberSavingAccounts, setMemberSavingAccounts] = useState<{ accId: number; accountName: string; accountNo: string }[]>([]);
 
   // ── Derived flags ────────────────────────────────────────────────────────────
   const isInstallment  = productInfo ? LOAN_TYPE_INSTALLMENT.includes(productInfo.typeId) : true;
@@ -892,6 +898,21 @@ const LoanAccountMaster: React.FC = () => {
   };
 
   // ── Submit ───────────────────────────────────────────────────────────────────
+  const handleAutoDebitCheckbox = async (checked: boolean) => {
+    setEnableAutoDebit(checked);
+    setAutoDebitSavingAccId(0);
+    if (checked && memberDetails?.memberId) {
+      try {
+        const res: any = await commonservice.fetch_member_saving_accounts(
+          user.branchid, memberDetails.memberId, memberDetails.memberBranchId ?? user.branchid
+        );
+        setMemberSavingAccounts(res?.data ?? []);
+      } catch { setMemberSavingAccounts([]); }
+    } else {
+      setMemberSavingAccounts([]);
+    }
+  };
+
   const handleSubmit = async () => {
     if (submittingRef.current) return;
     if (!formData.selectedProductId) { Swal.fire("Validation", "Please select a Loan Product.", "warning"); return; }
@@ -1009,6 +1030,21 @@ const LoanAccountMaster: React.FC = () => {
         : await loanAccountApi.createLoanAccount(dto);
 
       if (res.success) {
+        // Create auto-debit mandate if enabled
+        if (enableAutoDebit && autoDebitSavingAccId) {
+          const savedAccId = isEditMode ? Number(accountId!) : (res as any).data?.accId;
+          if (savedAccId) {
+            try {
+              await autoDebitApi.addMandate({
+                branchId: user.branchid,
+                accountId: savedAccId,
+                accountType: "LoanRecovery",
+                savingAccountId: autoDebitSavingAccId,
+                notes: "Set from Loan Account Master",
+              });
+            } catch { /* non-critical */ }
+          }
+        }
         await Swal.fire({ icon: "success", title: "Success!", text: res.message, showConfirmButton: false, timer: 2000 });
         if (isEditMode) {
           navigate("/loan-acc-info");
@@ -1972,6 +2008,39 @@ const LoanAccountMaster: React.FC = () => {
               )}
 
             </div>
+
+            {/* Auto-Debit Mandate */}
+            {memberDetails?.memberId && (
+              <div className="bg-violet-50 border border-violet-200 rounded-xl p-5 mx-5 mb-4">
+                <label className="flex items-center gap-3 cursor-pointer select-none mb-3">
+                  <input
+                    type="checkbox"
+                    checked={enableAutoDebit}
+                    onChange={(e) => handleAutoDebitCheckbox(e.target.checked)}
+                    className="w-4 h-4 accent-violet-600 cursor-pointer"
+                  />
+                  <span className="text-sm font-semibold text-violet-800">Enable Auto-Debit for this loan account</span>
+                </label>
+                {enableAutoDebit && (
+                  <div>
+                    <label className="block text-xs font-semibold text-violet-700 mb-1">Debit from Saving Account</label>
+                    {memberSavingAccounts.length === 0 ? (
+                      <p className="text-xs text-red-500 italic">No saving accounts found for this member.</p>
+                    ) : (
+                      <select
+                        value={autoDebitSavingAccId}
+                        onChange={(e) => setAutoDebitSavingAccId(parseInt(e.target.value))}
+                        className="w-full px-3 py-2 text-sm border border-violet-300 rounded-lg focus:border-violet-500 outline-none cursor-pointer bg-white">
+                        <option value={0}>— Select Saving Account —</option>
+                        {memberSavingAccounts.map(a => (
+                          <option key={a.accId} value={a.accId}>{a.accountNo} — {a.accountName}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Action buttons */}
             <div className="border-t border-gray-200 p-5 bg-gray-50 flex justify-between items-center gap-3">

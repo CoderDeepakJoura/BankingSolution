@@ -492,6 +492,35 @@ namespace BankingPlatform.API.Service.InterBranch
             if (crAcc == null)
                 return (false, "Cash (credit) account not found at originating branch.", 0);
 
+            // Balance check at dest branch — mirrors GetAccountBalance logic to prevent over-withdrawal
+            {
+                decimal crTotal = await _context.vouchercreditdebitdetails
+                    .Where(x => x.BrId == dto.DestBrId && x.AccountId == dto.DestAccId
+                             && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                             && x.VoucherEntryType == "Cr")
+                    .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+                decimal drTotal = await _context.vouchercreditdebitdetails
+                    .Where(x => x.BrId == dto.DestBrId && x.AccountId == dto.DestAccId
+                             && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                             && x.VoucherEntryType == "Dr")
+                    .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+                var ob = await _context.accopeningbalance
+                    .FirstOrDefaultAsync(x => x.BranchId == dto.DestBrId && x.AccountId == dto.DestAccId);
+                decimal openingBal = ob != null
+                    ? (ob.EntryType?.ToUpper() == "CR" ? ob.OpeningAmount : -ob.OpeningAmount)
+                    : 0;
+                decimal pendingHold = await _context.interbranchvoucher
+                    .Where(x => x.DestAccId == dto.DestAccId && x.DestBrId == dto.DestBrId
+                             && (x.VoucherType == "IBSavingWithdrawal"
+                              || x.VoucherType == "IBLoanAdvancement"
+                              || x.VoucherType == "IBLoanExpense")
+                             && x.Step3VoucherId == null && x.Status != "Completed")
+                    .SumAsync(x => (decimal?)x.Amount) ?? 0;
+                decimal available = crTotal - drTotal + openingBal - pendingHold;
+                if (dto.Amount > available)
+                    return (false, $"Insufficient balance at destination branch. Available: ₹{available:F2} (₹{pendingHold:F2} on IB hold).", 0);
+            }
+
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
@@ -802,6 +831,38 @@ namespace BankingPlatform.API.Service.InterBranch
             Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction,
             string? narrationOverride = null)
         {
+            // Re-verify balance at Step 3 — guards against concurrent approvals and balance
+            // changes between Step 1 and Step 3. Excludes this IB record from the hold sum
+            // since it is about to be consumed.
+            {
+                decimal crTotal = await _context.vouchercreditdebitdetails
+                    .Where(x => x.BrId == branchId && x.AccountId == drAccId
+                             && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                             && x.VoucherEntryType == "Cr")
+                    .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+                decimal drTotal = await _context.vouchercreditdebitdetails
+                    .Where(x => x.BrId == branchId && x.AccountId == drAccId
+                             && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
+                             && x.VoucherEntryType == "Dr")
+                    .SumAsync(x => (decimal?)x.VoucherAmount) ?? 0;
+                var ob = await _context.accopeningbalance
+                    .FirstOrDefaultAsync(x => x.BranchId == branchId && x.AccountId == drAccId);
+                decimal openingBal = ob != null
+                    ? (ob.EntryType?.ToUpper() == "CR" ? ob.OpeningAmount : -ob.OpeningAmount)
+                    : 0;
+                decimal otherHolds = await _context.interbranchvoucher
+                    .Where(x => x.Id != ibRecord.Id
+                             && x.DestAccId == drAccId && x.DestBrId == branchId
+                             && (x.VoucherType == "IBSavingWithdrawal"
+                              || x.VoucherType == "IBLoanAdvancement"
+                              || x.VoucherType == "IBLoanExpense")
+                             && x.Step3VoucherId == null && x.Status != "Completed")
+                    .SumAsync(x => (decimal?)x.Amount) ?? 0;
+                decimal available = crTotal - drTotal + openingBal - otherHolds;
+                if (ibRecord.Amount > available)
+                    return (false, $"Insufficient balance to complete withdrawal. Available: ₹{available:F2}");
+            }
+
             DateTime voucherDate = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified);
             DateTime valueDate   = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc);
             string narration = !string.IsNullOrWhiteSpace(narrationOverride)

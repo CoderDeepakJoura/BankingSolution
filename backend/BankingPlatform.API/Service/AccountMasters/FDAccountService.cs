@@ -5,6 +5,7 @@ using BankingPlatform.API.DTO.Voucher;
 using BankingPlatform.API.Mappers.Voucher;
 using BankingPlatform.API.Services;
 using BankingPlatform.Infrastructure.Models.AccMasters;
+using BankingPlatform.Infrastructure.Models.Miscalleneous;
 using BankingPlatform.Infrastructure.Models.voucher;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -940,9 +941,61 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                     if (dto.CreditAccountDetails!.SavingAccountId > 0 && dto.CreditAccountDetails!.SavingAmount > 0)
                     {
-                        VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.SavingAccountId, branchId), (int)dto.CreditAccountDetails!.SavingAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "Saving Account Credited", (decimal)dto.CreditAccountDetails!.SavingAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
-                        _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
-                        row++;
+                        if (dto.IBMatureInfo != null && !dto.MatureOrRenewFDInfo!.IsRenew)
+                        {
+                            // IB mode: credit IB-Ref at source branch; destination saving credited at Step 3
+                            int ibRefAccId = dto.IBMatureInfo.IBRefAccId;
+                            decimal ibAmt = dto.IBMatureInfo.IBSavingAmount > 0
+                                ? dto.IBMatureInfo.IBSavingAmount
+                                : (decimal)dto.CreditAccountDetails!.SavingAmount;
+                            long ibRefHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(ibRefAccId, branchId);
+                            string ibNarration = dto.IBMatureInfo.Narration
+                                ?? $"IB Mature FD credit to {dto.IBMatureInfo.DestBrName}";
+
+                            VoucherCreditDebitDetails ibCrInfo = _memberService.voucherCreditDebitDetails(
+                                ibRefHeadCode, ibRefAccId, branchId,
+                                Enums.VoucherStatus.Cr.ToString(), ibNarration,
+                                ibAmt, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                            _context.vouchercreditdebitdetails.Add(ibCrInfo);
+                            row++;
+
+                            string flowType = dto.IBMatureInfo.FlowType == "HOToBranch" ? "HOToBranch" : "BranchToBranch";
+                            var ibRefAccMaster = await _context.accountmaster.AsNoTracking()
+                                .FirstOrDefaultAsync(x => x.ID == ibRefAccId && x.BranchId == branchId);
+                            long fdDrHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId);
+
+                            await _context.interbranchvoucher.AddAsync(new InterBranchVoucher
+                            {
+                                VoucherType      = "IBMatureFD",
+                                FlowType         = flowType,
+                                Amount           = ibAmt,
+                                Narration        = ibNarration,
+                                EntryDate        = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                                Status           = "Pending",
+                                FromBrId         = branchId,
+                                DestBrId         = dto.IBMatureInfo.DestBrId,
+                                DestAccId        = dto.IBMatureInfo.DestAccId,
+                                DestAccNo        = dto.IBMatureInfo.DestAccNo,
+                                DestAccName      = dto.IBMatureInfo.DestAccName,
+                                Step1VoucherId   = voucherInfo.Id,
+                                Step1BrId        = branchId,
+                                Step1DrAccId     = accountId,
+                                Step1DrAccName   = accountMaster.AccountName,
+                                Step1DrHeadCode  = fdDrHeadCode,
+                                Step1CrAccId     = ibRefAccId,
+                                Step1CrAccName   = ibRefAccMaster?.AccountName,
+                                Step1CrHeadCode  = ibRefHeadCode,
+                                Step1Date        = voucherDate,
+                                Step1WorkingDate = voucherDate,
+                                Step1UserId      = userIdClaim,
+                            });
+                        }
+                        else
+                        {
+                            VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.SavingAccountId, branchId), (int)dto.CreditAccountDetails!.SavingAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "Saving Account Credited", (decimal)dto.CreditAccountDetails!.SavingAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                            _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                            row++;
+                        }
                     }
                     if (dto.CreditAccountDetails!.GeneralAccountId > 0 && dto.CreditAccountDetails!.GeneralAmount > 0)
                     {
@@ -1101,9 +1154,67 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                     if (dto.CreditAccountDetails!.SavingAccountId > 0 && dto.CreditAccountDetails!.SavingAmount > 0)
                     {
-                        VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.SavingAccountId, branchId), (int)dto.CreditAccountDetails!.SavingAccountId, branchId, Enums.VoucherStatus.Cr.ToString(), "Saving Account Credited", (decimal)dto.CreditAccountDetails!.SavingAmount, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
-                        _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
-                        row++;
+                        if (dto.IBPreMatureInfo != null)
+                        {
+                            // IB mode: credit IB-Ref at source branch; destination saving credited at Step 3
+                            int ibRefAccId = dto.IBPreMatureInfo.IBRefAccId;
+                            decimal ibAmt = dto.IBPreMatureInfo.IBSavingAmount > 0
+                                ? dto.IBPreMatureInfo.IBSavingAmount
+                                : (decimal)dto.CreditAccountDetails!.SavingAmount;
+                            long ibRefHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(ibRefAccId, branchId);
+                            string ibNarration = dto.IBPreMatureInfo.Narration
+                                ?? $"IB Pre-Mature FD credit to {dto.IBPreMatureInfo.DestBrName}";
+
+                            VoucherCreditDebitDetails ibCrInfo = _memberService.voucherCreditDebitDetails(
+                                ibRefHeadCode, ibRefAccId, branchId,
+                                Enums.VoucherStatus.Cr.ToString(), ibNarration,
+                                ibAmt, dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                            _context.vouchercreditdebitdetails.Add(ibCrInfo);
+                            row++;
+
+                            string flowType = dto.IBPreMatureInfo.FlowType == "HOToBranch"
+                                ? "HOToBranch" : "BranchToBranch";
+                            var ibRefAccMaster = await _context.accountmaster.AsNoTracking()
+                                .FirstOrDefaultAsync(x => x.ID == ibRefAccId && x.BranchId == branchId);
+                            long fdDrHeadCode = await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId);
+
+                            await _context.interbranchvoucher.AddAsync(new InterBranchVoucher
+                            {
+                                VoucherType      = "IBPreMatureFD",
+                                FlowType         = flowType,
+                                Amount           = ibAmt,
+                                Narration        = ibNarration,
+                                EntryDate        = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                                Status           = "Pending",
+                                FromBrId         = branchId,
+                                DestBrId         = dto.IBPreMatureInfo.DestBrId,
+                                DestAccId        = dto.IBPreMatureInfo.DestAccId,
+                                DestAccNo        = dto.IBPreMatureInfo.DestAccNo,
+                                DestAccName      = dto.IBPreMatureInfo.DestAccName,
+                                Step1VoucherId   = voucherInfo.Id,
+                                Step1BrId        = branchId,
+                                Step1DrAccId     = accountId,
+                                Step1DrAccName   = accountMaster.AccountName,
+                                Step1DrHeadCode  = fdDrHeadCode,
+                                Step1CrAccId     = ibRefAccId,
+                                Step1CrAccName   = ibRefAccMaster?.AccountName,
+                                Step1CrHeadCode  = ibRefHeadCode,
+                                Step1Date        = voucherDate,
+                                Step1WorkingDate = voucherDate,
+                                Step1UserId      = userIdClaim,
+                            });
+                        }
+                        else
+                        {
+                            VoucherCreditDebitDetails voucherCreditInfo = _memberService.voucherCreditDebitDetails(
+                                await _commonfunctions.GetAccountHeadCodeFromAccId((int)dto.CreditAccountDetails!.SavingAccountId, branchId),
+                                (int)dto.CreditAccountDetails!.SavingAccountId, branchId,
+                                Enums.VoucherStatus.Cr.ToString(), "Saving Account Credited",
+                                (decimal)dto.CreditAccountDetails!.SavingAmount,
+                                dto.Voucher.VoucherStatus, valueDate, "Cr", voucherInfo.Id, row);
+                            _context.vouchercreditdebitdetails.Add(voucherCreditInfo);
+                            row++;
+                        }
                     }
                     if (dto.CreditAccountDetails!.GeneralAccountId > 0 && dto.CreditAccountDetails!.GeneralAmount > 0)
                     {

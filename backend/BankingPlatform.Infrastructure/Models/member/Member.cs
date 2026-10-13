@@ -92,5 +92,8 @@ namespace BankingPlatform.Infrastructure.Models.member
         public string? Email1 { get; set; } = ""!;
         public string? Email2 { get; set; } = ""!;
 
+        [StringLength(50)]
+        public string? TelegramChatId { get; set; }
+
     }
 }

@@ -7,6 +7,8 @@ import Select from "react-select";
 import rdKistVoucherApi, {
   RDKistVoucherDTO,
 } from "../../../services/vouchers/rd/rdKistVoucherApi";
+import otherBranchAccountApi from "../../../services/interbranch/otherBranchAccountApi";
+import ibVoucherApi, { IBRDKistStep1Payload } from "../../../services/interbranch/ibVoucherApi";
 import commonservice, {
   AccountInformation,
 } from "../../../services/common/commonservice";
@@ -113,6 +115,13 @@ const RDKistVoucher: React.FC = () => {
   const [rdDetails, setRDDetails] = useState<any>(null);
   const [ledgerData, setLedgerData] = useState<RDLedger | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
+
+  // Inter-Branch state
+  const [ibMappings, setIbMappings]     = useState<any[]>([]);
+  const [destBrId, setDestBrId]         = useState<number>(0);
+  const [ibCrAccId, setIbCrAccId]       = useState<number>(0);
+  const [ibCrAccName, setIbCrAccName]   = useState<string>("");
+  const [allBranches, setAllBranches]   = useState<{ value: number; label: string }[]>([]);
 
   // RD Kist Voucher Data State
   const [voucherData, setVoucherData] = useState({
@@ -222,6 +231,30 @@ const RDKistVoucher: React.FC = () => {
     }
   }, []);
 
+  // Load IB mappings for this branch
+  useEffect(() => {
+    otherBranchAccountApi.getAll(user.branchid).then((res) => {
+      if (res.success && res.data) setIbMappings(res.data);
+    });
+  }, [user.branchid]);
+
+  // Load all branches for non-HO branch IB dest selector
+  useEffect(() => {
+    if (!user.isMainBranch) {
+      import("../../../services/branch/branchapi").then(({ default: BranchApiService }) => {
+        (BranchApiService.fetchBranches({ searchTerm: "", pageNumber: 1, pageSize: 1000 }, 1) as any).then((res: any) => {
+          if (res.success) {
+            setAllBranches(
+              (res.branches ?? [])
+                .filter((b: any) => b.id !== user.branchid && !b.isMainBranch)
+                .map((b: any) => ({ value: b.id, label: `${b.code} — ${b.name}` }))
+            );
+          }
+        });
+      });
+    }
+  }, [user.branchid, user.isMainBranch]);
+
   useEffect(() => {
     if (!voucherData.accountId) {
       setLedgerData(null);
@@ -230,11 +263,11 @@ const RDKistVoucher: React.FC = () => {
     const fromDate = getSessionFromDate(user.sessionInfo, sessionDate);
     const toDate = commonservice.parseWorkingDate(user.workingdate ?? sessionDate);
     setLedgerLoading(true);
-    rdLedgerApi.getRDLedger(user.branchid, voucherData.accountId, fromDate, toDate)
+    rdLedgerApi.getRDLedger(destBrId || user.branchid, voucherData.accountId, fromDate, toDate)
       .then(res => setLedgerData(res?.data ?? null))
       .catch(() => setLedgerData(null))
       .finally(() => setLedgerLoading(false));
-  }, [voucherData.accountId]);
+  }, [voucherData.accountId, destBrId]);
 
   useEffect(() => {
     const editVoucher = (location.state as any)?.editVoucher as VoucherPreview | undefined;
@@ -315,6 +348,41 @@ const RDKistVoucher: React.FC = () => {
     if (voucherData.voucherDate) fetchData();
   }, [user.branchid, voucherData.voucherDate]);
 
+  // HO: Cr = ref account mapped to the specific dest branch; Non-HO: Cr = ibMappings[0] (their HO ref)
+  const destBrOptions = user.isMainBranch
+    ? ibMappings.map((m: any) => ({
+        value: m.otherBrId,
+        label: `${m.otherBranchCode ? m.otherBranchCode + " - " : ""}${m.otherBranchName ?? m.otherBrId}`,
+        accId: m.accId,
+        accountName: m.accountName,
+      }))
+    : ([] as { value: number; label: string; accId: number; accountName: string }[]);
+
+  const effectiveDestBrOptions = user.isMainBranch ? destBrOptions : allBranches;
+
+  const handleIBDestBrChange = async (selected: any) => {
+    const brId = selected ? selected.value : 0;
+    setDestBrId(brId);
+    if (user.isMainBranch) {
+      setIbCrAccId(selected ? selected.accId : 0);
+      setIbCrAccName(selected ? (selected.accountName ?? "") : "");
+    } else {
+      const hoRef = ibMappings[0];
+      setIbCrAccId(hoRef?.accId ?? 0);
+      setIbCrAccName(hoRef?.accountName ?? "");
+    }
+    setVoucherData((prev) => ({ ...prev, rdProduct: "", accountId: 0, debitAccount: "" }));
+    setRDProductAccounts([]);
+    setAccountData(null);
+    setJointHolders([]);
+    setRDDetails(null);
+    setPictureFile(null);
+    setSignatureFile(null);
+    const effectiveBrId = brId || user.branchid;
+    const productsRes = await commonservice.fetch_rd_products(effectiveBrId, voucherData.voucherDate || undefined);
+    setRDProducts(productsRes.data || []);
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setVoucherData((prev) => ({ ...prev, [field]: value }));
   };
@@ -349,8 +417,9 @@ const RDKistVoucher: React.FC = () => {
     // Fetch accounts if product is selected
     if (productId && productId.trim() !== "") {
       try {
+        const effectiveBrId = destBrId || user.branchid;
         const response = await commonservice.fetch_RD_Open_Accounts_For_Premature(
-          user.branchid,
+          effectiveBrId,
           Number(productId),
           voucherData.voucherDate // RD account type
         );
@@ -497,41 +566,63 @@ const RDKistVoucher: React.FC = () => {
 
     setLoading(true);
     try {
-      const totalAmount = (
-        parseFloat(voucherData.kistAmount || 0) +
-        parseFloat(voucherData.penaltyAmount || 0)
-      ).toFixed(2);
-      const rdKistVoucherPayload: RDKistVoucherDTO = {
-        brID: user.branchid,
-        voucherDate: voucherData.voucherDate,
-        voucherNarration:
-          voucherData.narration ||
-          "RD Kist Voucher - Kist Amount:" + voucherData.kistAmount,
-        rdAccountId: voucherData.accountId,
-        kistAmount: parseFloat(voucherData.kistAmount),
-        penaltyAmount: parseFloat(voucherData.penaltyAmount || "0") || 0,
-        totalAmount: parseFloat(totalAmount),
-        savingProductId: voucherData.savingProduct ? Number(voucherData.savingProduct) : null,
-        savingAccountId: voucherData.savingAccount ? Number(voucherData.savingAccount) : null,
-        fromSavingAmount: fromSavingAmt,
-        debitAccountId: voucherData.debitAccount ? Number(voucherData.debitAccount) : null,
-        agent: voucherData.agent,
-      };
+      const penaltyAmt = parseFloat(voucherData.penaltyAmount || "0") || 0;
+      const kistAmt   = parseFloat(voucherData.kistAmount || "0") || 0;
+      const totalAmount = (kistAmt + penaltyAmt).toFixed(2);
 
-      const response = isEditMode && editVoucherId
-        ? await rdKistVoucherApi.updateRDKistVoucher(editVoucherId, rdKistVoucherPayload)
-        : await rdKistVoucherApi.addRDKistVoucher(rdKistVoucherPayload);
+      let response: any;
+
+      if (!isEditMode && destBrId > 0) {
+        // IB RD Kist — Step 1
+        if (!ibCrAccId) throw new Error("Reference account not configured for this branch pair.");
+        const payload: IBRDKistStep1Payload = {
+          brId: user.branchid,
+          destBrId,
+          destAccId: voucherData.accountId,
+          destAccNo: String(voucherData.accountId),
+          destAccName: accountData?.memberName ?? "",
+          destMemberId: accountData ? Number(accountData.memberId) : undefined,
+          drAccId: Number(voucherData.debitAccount),
+          crAccId: ibCrAccId,
+          amount: parseFloat(totalAmount),
+          penaltyAmount: penaltyAmt,
+          narration: voucherData.narration || undefined,
+          voucherDate: voucherData.voucherDate,
+          workingDate: user.workingdate ?? voucherData.voucherDate,
+          flowType: user.isMainBranch ? "HOToBranch" : "BranchToBranch",
+        };
+        response = await ibVoucherApi.createRDKistStep1(payload);
+      } else {
+        const rdKistVoucherPayload: RDKistVoucherDTO = {
+          brID: user.branchid,
+          voucherDate: voucherData.voucherDate,
+          voucherNarration:
+            voucherData.narration ||
+            "RD Kist Voucher - Kist Amount:" + voucherData.kistAmount,
+          rdAccountId: voucherData.accountId,
+          kistAmount: kistAmt,
+          penaltyAmount: penaltyAmt,
+          totalAmount: parseFloat(totalAmount),
+          savingProductId: voucherData.savingProduct ? Number(voucherData.savingProduct) : null,
+          savingAccountId: voucherData.savingAccount ? Number(voucherData.savingAccount) : null,
+          fromSavingAmount: fromSavingAmt,
+          debitAccountId: voucherData.debitAccount ? Number(voucherData.debitAccount) : null,
+          agent: voucherData.agent,
+        };
+        response = isEditMode && editVoucherId
+          ? await rdKistVoucherApi.updateRDKistVoucher(editVoucherId, rdKistVoucherPayload)
+          : await rdKistVoucherApi.addRDKistVoucher(rdKistVoucherPayload);
+      }
 
       if (response.success) {
-        if (!isEditMode && response.message) {
+        if (!isEditMode && destBrId === 0 && response.message) {
           await printAfterSave(response.message, 4, 8);
           await printReceiptAfterSave(response.message, 4, 8);
         }
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
-          text:
-            response.message || (isEditMode ? "Voucher updated successfully." : "Voucher saved successfully."),
+          text: response.message || (isEditMode ? "Voucher updated successfully." : "Voucher saved successfully."),
           confirmButtonColor: "#3B82F6",
         });
 
@@ -599,6 +690,9 @@ const RDKistVoucher: React.FC = () => {
     setPictureFile(null);
     setSignatureFile(null);
     setFieldErrors([]);
+    setDestBrId(0);
+    setIbCrAccId(0);
+    setIbCrAccName("");
   };
 
   // Use fieldErrors state instead of errors from hook
@@ -669,6 +763,39 @@ const RDKistVoucher: React.FC = () => {
       </div>
 
       <div className="p-6">
+        {/* IB Branch Row */}
+        {!isEditMode && user.enableIBTransactions && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Destination Branch <span className="text-gray-400 font-normal">(leave blank for local kist)</span>
+          </label>
+          <Select
+            options={effectiveDestBrOptions}
+            value={effectiveDestBrOptions.find((o) => o.value === destBrId) || null}
+            onChange={handleIBDestBrChange}
+            placeholder="Select branch for inter-branch RD kist..."
+            isClearable
+            styles={{
+              control: (base, state) => ({
+                ...base,
+                minHeight: "48px",
+                borderWidth: "2px",
+                borderColor: destBrId > 0 ? "#6366f1" : state.isFocused ? "#059669" : "#e5e7eb",
+                borderRadius: "0.5rem",
+                boxShadow: state.isFocused ? "0 0 0 2px rgba(99,102,241,0.2)" : "none",
+                cursor: "pointer",
+                "&:hover": { borderColor: "#6366f1" },
+              }),
+            }}
+          />
+          {destBrId > 0 && ibCrAccName && (
+            <p className="text-xs text-indigo-600 mt-1 font-medium">
+              IB Ref Credit Account: {ibCrAccName}
+            </p>
+          )}
+        </div>
+        )}
+
         {/* First Row - 4 columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           {/* Voucher Date */}
@@ -764,9 +891,10 @@ const RDKistVoucher: React.FC = () => {
                 if (accountId !== 0) {
                   try {
                     // Fetch account details
+                    const effectiveBrId = destBrId || user.branchid;
                     const response =
                       await commonservice.fetch_deposit_account_info_from_accountId(
-                        user.branchid,
+                        effectiveBrId,
                         accountId,
                         5
                       );
@@ -792,9 +920,10 @@ const RDKistVoucher: React.FC = () => {
 
                       // Fetch joint account holders
                       try {
+                        const effectiveBrIdJoint = destBrId || user.branchid;
                         const jointAccountResponse =
                           await commonservice.fetch_joint_acc_info(
-                            user.branchid,
+                            effectiveBrIdJoint,
                             accountId
                           );
 

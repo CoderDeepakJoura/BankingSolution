@@ -27,6 +27,7 @@ interface UserState {
   allowGSTDeduction: boolean;
   showBankFDModule: boolean;
   showPayrollModule: boolean;
+  showAgentModule: boolean;
 }
 
 const initialState: UserState = {
@@ -49,6 +50,7 @@ const initialState: UserState = {
   allowGSTDeduction: true,
   showBankFDModule: false,
   showPayrollModule: false,
+  showAgentModule: false,
 };
 
 const userSlice = createSlice({
@@ -86,6 +88,7 @@ const userSlice = createSlice({
       state.allowGSTDeduction = true;
       state.showBankFDModule = false;
       state.showPayrollModule = false;
+      state.showAgentModule = false;
     },
   },
 });

@@ -37,7 +37,14 @@ namespace BankingPlatform.API.Controllers
                     allowGSTDeduction         = s?.allowGSTDeduction         ?? true,
                     showBankFDModule          = s?.showBankFDModule          ?? false,
                     showPayrollModule         = s?.showPayrollModule         ?? false,
+                    showAgentModule           = s?.showAgentModule           ?? false,
                     enforceSingleSession      = s?.enforceSingleSession      ?? false,
+                    telegramChatId                = s?.telegramchatid            ?? "",
+                    enableAutoDebit               = s?.enableAutoDebit            ?? false,
+                    autoDebitRunHour              = s?.autoDebitRunHour           ?? 2,
+                    autoDebitRunMinute            = s?.autoDebitRunMinute         ?? 0,
+                    autoDebitProcessRdKist        = s?.autoDebitProcessRdKist     ?? true,
+                    autoDebitProcessLoanRecovery  = s?.autoDebitProcessLoanRecovery ?? true,
                 }
             });
         }
@@ -62,22 +69,36 @@ namespace BankingPlatform.API.Controllers
                 existing.allowGSTDeduction         = dto.AllowGSTDeduction;
                 existing.showBankFDModule          = dto.ShowBankFDModule;
                 existing.showPayrollModule         = dto.ShowPayrollModule;
+                existing.showAgentModule           = dto.ShowAgentModule;
                 existing.enforceSingleSession      = dto.EnforceSingleSession;
+                existing.telegramchatid              = dto.TelegramChatId;
+                existing.enableAutoDebit             = dto.EnableAutoDebit;
+                existing.autoDebitRunHour            = dto.AutoDebitRunHour;
+                existing.autoDebitRunMinute          = dto.AutoDebitRunMinute;
+                existing.autoDebitProcessRdKist      = dto.AutoDebitProcessRdKist;
+                existing.autoDebitProcessLoanRecovery = dto.AutoDebitProcessLoanRecovery;
             }
             else
             {
                 await _db.superusersettings.AddAsync(new SuperUserSettings
                 {
-                    branchid                   = dto.BranchId,
-                    allowSavingInterestChange   = dto.AllowSavingInterestChange,
-                    allowFDInterestChange       = dto.AllowFDInterestChange,
-                    allowRDInterestChange       = dto.AllowRDInterestChange,
-                    allowLoanInterestChange     = dto.AllowLoanInterestChange,
-                    enableIBTransactions        = dto.EnableIBTransactions,
-                    allowGSTDeduction           = dto.AllowGSTDeduction,
-                    showBankFDModule            = dto.ShowBankFDModule,
-                    showPayrollModule           = dto.ShowPayrollModule,
-                    enforceSingleSession        = dto.EnforceSingleSession,
+                    branchid                      = dto.BranchId,
+                    allowSavingInterestChange      = dto.AllowSavingInterestChange,
+                    allowFDInterestChange          = dto.AllowFDInterestChange,
+                    allowRDInterestChange          = dto.AllowRDInterestChange,
+                    allowLoanInterestChange        = dto.AllowLoanInterestChange,
+                    enableIBTransactions           = dto.EnableIBTransactions,
+                    allowGSTDeduction              = dto.AllowGSTDeduction,
+                    showBankFDModule               = dto.ShowBankFDModule,
+                    showPayrollModule              = dto.ShowPayrollModule,
+                    showAgentModule               = dto.ShowAgentModule,
+                    enforceSingleSession           = dto.EnforceSingleSession,
+                    telegramchatid                 = dto.TelegramChatId,
+                    enableAutoDebit                = dto.EnableAutoDebit,
+                    autoDebitRunHour               = dto.AutoDebitRunHour,
+                    autoDebitRunMinute             = dto.AutoDebitRunMinute,
+                    autoDebitProcessRdKist         = dto.AutoDebitProcessRdKist,
+                    autoDebitProcessLoanRecovery   = dto.AutoDebitProcessLoanRecovery,
                 });
             }
 
@@ -97,6 +118,13 @@ namespace BankingPlatform.API.Controllers
         public bool AllowGSTDeduction { get; set; }
         public bool ShowBankFDModule { get; set; } = false;
         public bool ShowPayrollModule { get; set; } = false;
+        public bool ShowAgentModule { get; set; } = false;
         public bool EnforceSingleSession { get; set; } = false;
+        public string? TelegramChatId { get; set; }
+        public bool EnableAutoDebit { get; set; } = false;
+        public int AutoDebitRunHour { get; set; } = 2;
+        public int AutoDebitRunMinute { get; set; } = 0;
+        public bool AutoDebitProcessRdKist { get; set; } = true;
+        public bool AutoDebitProcessLoanRecovery { get; set; } = true;
     }
 }

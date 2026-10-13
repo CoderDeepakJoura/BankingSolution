@@ -907,7 +907,85 @@ namespace BankingPlatform.API.Controllers
                     openingBal = ob.EntryType?.ToUpper() == "CR" ? ob.OpeningAmount : -ob.OpeningAmount;
             }
 
-            return Ok(new { Success = true, data = crTotal - drTotal + openingBal });
+            // Deduct any pending IB amounts — reserved at source but final entry not yet posted
+            // at the dest branch, preventing double-spend before Step 3 completes.
+            decimal ibWithdrawalHold = await _context.interbranchvoucher
+                .Where(x => x.DestAccId == accountId
+                         && (x.VoucherType == "IBSavingWithdrawal"
+                          || x.VoucherType == "IBLoanAdvancement"
+                          || x.VoucherType == "IBLoanExpense")
+                         && x.Step3VoucherId == null
+                         && x.Status != "Completed")
+                .SumAsync(x => (decimal?)x.Amount) ?? 0;
+
+            return Ok(new {
+                Success = true,
+                data = crTotal - drTotal + openingBal - ibWithdrawalHold,
+                ibHold = ibWithdrawalHold,
+                ibHoldCount = ibWithdrawalHold > 0
+                    ? await _context.interbranchvoucher
+                        .Where(x => x.DestAccId == accountId
+                                 && (x.VoucherType == "IBSavingWithdrawal"
+                                  || x.VoucherType == "IBLoanAdvancement"
+                                  || x.VoucherType == "IBLoanExpense")
+                                 && x.Step3VoucherId == null
+                                 && x.Status != "Completed")
+                        .CountAsync()
+                    : 0
+            });
+        }
+
+        /// <summary>Returns disbursement count and max for a loan account.</summary>
+        [HttpGet("loan-disbursement-info/{branchId}/{accountId}")]
+        public async Task<IActionResult> GetLoanDisbursementInfo([FromRoute] int branchId, int accountId)
+        {
+            if (branchId <= 0 || accountId <= 0)
+                return BadRequest(new ResponseDto { Success = false, Message = "Invalid parameters." });
+
+            int disbCount = await _context.vouchercreditdebitdetails
+                .Where(x => x.AccountId == accountId && x.BrId == branchId
+                         && x.EntryStatus == "LA"
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
+                .CountAsync();
+
+            // Pending IB Loan Advancements and Loan Expenses not yet at Step 3 — no LA entry posted yet
+            int pendingIBCount = await _context.interbranchvoucher
+                .Where(x => x.DestAccId == accountId && x.DestBrId == branchId
+                         && (x.VoucherType == "IBLoanAdvancement" || x.VoucherType == "IBLoanExpense")
+                         && x.Step3VoucherId == null
+                         && x.Status != "Completed")
+                .CountAsync();
+
+            int totalDisbCount = disbCount + pendingIBCount;
+
+            int? productId = await _context.accountmaster
+                .Where(x => x.ID == accountId && x.BranchId == branchId)
+                .Select(x => x.GeneralProductId)
+                .FirstOrDefaultAsync();
+
+            int maxDisb = 0;
+            if (productId.HasValue && productId.Value > 0)
+            {
+                maxDisb = await _context.loanproductadvancement
+                    .Where(x => x.ProductId == productId.Value && x.BrId == branchId)
+                    .Select(x => x.MaxNoofDisbursments)
+                    .FirstOrDefaultAsync();
+            }
+
+            bool canDisburse = maxDisb <= 0 || totalDisbCount < maxDisb;
+            return Ok(new
+            {
+                Success = true,
+                data = new
+                {
+                    disbursementCount = totalDisbCount,
+                    maxDisbursements = maxDisb,
+                    canDisburse,
+                    message = canDisburse
+                        ? ""
+                        : $"Maximum disbursements ({maxDisb}) already reached for this loan account."
+                }
+            });
         }
 
         [HttpGet("joint-acc-info/{accountId}/{branchId}")]
@@ -1130,6 +1208,26 @@ namespace BankingPlatform.API.Controllers
                 data = savingAccounts
             }
             );
+        }
+
+        [HttpGet("member-saving-accounts/{branchId}/{memberId}/{memberBrId}")]
+        public async Task<IActionResult> MemberSavingAccounts([FromRoute] int branchId, int memberId, int memberBrId)
+        {
+            int savingType = (int)Enums.AccountTypes.Saving;
+            var accounts = await _context.accountmaster
+                .Where(x => x.BranchId == branchId
+                         && x.AccTypeId == savingType
+                         && x.MemberId == memberId
+                         && x.MemberBranchID == memberBrId
+                         && x.IsAccClosed != true)
+                .Select(x => new
+                {
+                    AccId       = x.ID,
+                    AccountName = x.AccountName,
+                    AccountNo   = !string.IsNullOrEmpty(x.AccountNumber) ? x.AccountNumber : x.AccPrefix + "-" + x.AccSuffix,
+                })
+                .ToListAsync();
+            return Ok(new { success = true, data = accounts });
         }
 
         [HttpGet("fd-accounts-for-premature/{branchId}/{fdProductId}/{currentDate}")]
@@ -1476,7 +1574,9 @@ namespace BankingPlatform.API.Controllers
                     AccId = x.ID,
                     AccountName = (x.AccTypeId == generalType || x.AccTypeId == loanType || x.AccTypeId == shareMoneyType)
                         ? x.AccountNumber + "-" + x.AccountName
-                        : x.AccPrefix + "-" + x.AccSuffix + "-" + x.AccountName
+                        : x.AccPrefix + "-" + x.AccSuffix + "-" + x.AccountName,
+                    MemberId  = x.MemberId,
+                    MemberBrId = x.MemberBranchID ?? branchId,
                 })
                 .ToListAsync();
             return Ok(new { Success = true, data = accounts });

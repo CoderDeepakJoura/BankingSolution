@@ -1076,6 +1076,22 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
         // ── Helpers ───────────────────────────────────────────────────────────────
 
+        // Public entry point used by IBLoanRecoveryService for the same allocation logic.
+        // intAmount=null → full auto allocation; intAmount>=0 → override just the interest portion.
+        public static (decimal Principal, Dictionary<int, decimal> Interest) AllocatePublic(
+            decimal total, LoanRecoveryBalanceDTO bal, decimal? intAmountOverride = null)
+        {
+            if (intAmountOverride.HasValue && intAmountOverride.Value >= 0)
+            {
+                decimal totalIntOutstanding = bal.StdRecoverableOutstanding + bal.OverdueRecoverableOutstanding;
+                decimal intOverride = Math.Min(Math.Round(intAmountOverride.Value, 2), totalIntOutstanding);
+                var intRec2 = AllocateInt(intOverride, bal);
+                decimal principalRec2 = Math.Max(0, total - intRec2.Values.Sum());
+                return (principalRec2, intRec2);
+            }
+            return Allocate(total, bal);
+        }
+
         // Allocates recovery amount to interest categories (per recovery sequence), then to principal.
         private static (decimal Principal, Dictionary<int, decimal> Interest) Allocate(
             decimal total, LoanRecoveryBalanceDTO bal)

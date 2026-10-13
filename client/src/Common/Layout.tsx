@@ -100,6 +100,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const ibEnabled       = useSelector((state: RootState) => state.user.enableIBTransactions);
   const showBankFD      = useSelector((state: RootState) => state.user.showBankFDModule);
   const showPayroll     = useSelector((state: RootState) => state.user.showPayrollModule);
+  const showAgent       = useSelector((state: RootState) => state.user.showAgentModule);
   useBrowserNavigationControl(true);
 
   // Heartbeat: validates session every 15 s — displaced sessions are caught promptly
@@ -158,6 +159,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               allowGSTDeduction: suRes?.data?.allowGSTDeduction ?? true,
               showBankFDModule: suRes?.data?.showBankFDModule ?? false,
               showPayrollModule: suRes?.data?.showPayrollModule ?? false,
+              showAgentModule: suRes?.data?.showAgentModule ?? false,
             }),
           );
         } else {
@@ -350,6 +352,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Other Branch Accounts", path: "/other-branch-accounts" },
             { label: "IB Pending Vouchers", path: "/ib-pending-vouchers", mainBranchOnly: true },
             { label: "IB Incoming Vouchers", path: "/ib-incoming-vouchers" },
+            { label: "IB Loan Expense", path: "/ib-loan-expense" },
+            { label: "IB Incoming Loan Recovery", path: "/ib-incoming-loan-recovery" },
           ],
         },
       ],
@@ -409,6 +413,29 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             { label: "Other Branch Account",        path: "/payroll-other-branch-account" },
             { label: "Salary Component Account",    path: "/salary-component-account" },
             { label: "Employee Salary Other Setting", path: "/payroll-other-settings" },
+          ],
+        },
+      ],
+    },
+    {
+      icon: <Wallet size={18} />,
+      label: "Agent",
+      hasSubItems: true,
+      agentOnly: true,
+      subItems: [
+        {
+          label: "Master",
+          path: "",
+          subItems: [
+            { label: "Agent Level Master", path: "/agent-level" },
+            { label: "Agent Master",       path: "/agent-master" },
+          ],
+        },
+        {
+          label: "Operations",
+          path: "",
+          subItems: [
+            { label: "Update Agent of Accounts", path: "/update-agent-accounts" },
           ],
         },
       ],
@@ -516,6 +543,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: "/su-settings",
           suOnly: true,
         },
+        {
+          label: "Auto-Debit Mandates",
+          path: "/auto-debit-mandates",
+          suOnly: true,
+        },
+        {
+          label: "Auto-Debit History",
+          path: "/auto-debit-history",
+          suOnly: true,
+        },
       ],
     },
   ];
@@ -530,7 +567,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         (!item.mainBranchOnly || isMainBranch) &&
         (!item.ibOnly       || ibEnabled)    &&
         (!item.bankFdOnly   || showBankFD)   &&
-        (!item.payrollOnly  || showPayroll)
+        (!item.payrollOnly  || showPayroll)  &&
+        (!item.agentOnly    || showAgent)
       )
       .map((item) => ({
         ...item,

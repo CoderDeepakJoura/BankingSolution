@@ -163,6 +163,9 @@ import CRUDDashboard from "../components/Location/CRUDDashboard";
 import OtherBranchAccounts from "../pages/interbranch/OtherBranchAccounts";
 import IBPendingVouchers from "../pages/interbranch/IBPendingVouchers";
 import IBIncomingVouchers from "../pages/interbranch/IBIncomingVouchers";
+import IBLoanAdvancement from "../pages/interbranch/IBLoanAdvancement";
+import IBLoanExpense from "../pages/interbranch/IBLoanExpense";
+import IBIncomingLoanRecovery from "../pages/interbranch/IBIncomingLoanRecovery";
 import DayBookPage from "../pages/reports/DayBook";
 import CashBookPage from "../pages/reports/CashBook";
 import SavingLedgerPage from "../pages/reports/SavingLedger";
@@ -194,6 +197,8 @@ import MemberAccountsPage from "../pages/reports/MemberAccounts";
 import MemberIntCertPage from "../pages/reports/MemberIntCert";
 import SeleniumAutomation from "../pages/seleniumautomation/automation";
 import SuperUserSettings from "../pages/superuser/SuperUserSettings";
+import AutoDebitMandates from "../pages/autoDebit/AutoDebitMandates";
+import AutoDebitHistory from "../pages/autoDebit/AutoDebitHistory";
 import EmployeeDesignationData from "../pages/Salary/employee-designation-data";
 import EmployeeMasterOperations from "../pages/Salary/employee-master-operations";
 import EmployeeMasterForm from "../pages/Salary/employee-master";
@@ -217,6 +222,11 @@ import EmployeeTransfer from "../pages/Salary/EmployeeTransfer";
 import PayrollOtherSettings from "../pages/Salary/PayrollOtherSettings";
 import PayrollOtherBranchAccount from "../pages/Salary/PayrollOtherBranchAccount";
 import InProgress from "../pages/Salary/InProgress";
+import AgentLevelOperations from "../pages/Agent/agent-level-operations";
+import AgentLevelData from "../pages/Agent/agent-level-data";
+import AgentMasterOperations from "../pages/Agent/agent-master-operations";
+import AgentMasterData from "../pages/Agent/agent-master-data";
+import UpdateAgentAccounts from "../pages/Agent/update-agent-accounts";
 
 export interface RouteEntry {
   path: string;
@@ -482,6 +492,9 @@ export const ROUTES: RouteEntry[] = [
   { path: "/other-branch-accounts",           element: <OtherBranchAccounts />,         label: "Other Branch Accounts",    category: "Inter Branch" },
   { path: "/ib-pending-vouchers",             element: <IBPendingVouchers />,           label: "IB Pending Vouchers",      category: "Inter Branch" },
   { path: "/ib-incoming-vouchers",            element: <IBIncomingVouchers />,          label: "IB Incoming Vouchers",     category: "Inter Branch" },
+  { path: "/ib-loan-advancement",             element: <IBLoanAdvancement />,           label: "IB Loan Advancement",      category: "Inter Branch" },
+  { path: "/ib-loan-expense",                element: <IBLoanExpense /> },
+  { path: "/ib-incoming-loan-recovery",      element: <IBIncomingLoanRecovery />,      label: "IB Incoming Loan Recovery", category: "Inter Branch" },
 
   // ── Daily Reports ─────────────────────────────────────────────────────────
   { path: "/day-book",                        element: <DayBookPage />,                 label: "Day Book",                 category: "Daily Reports" },
@@ -558,8 +571,19 @@ export const ROUTES: RouteEntry[] = [
   { path: "/salary-component-account",   element: <SalaryComponentAccount />,                          label: "Salary Component Account",          category: "Payroll" },
   { path: "/payroll-other-settings",     element: <PayrollOtherSettings />,                            label: "Employee Salary Other Setting",     category: "Payroll" },
 
+  // ── Agent ─────────────────────────────────────────────────────────────────
+  { path: "/agent-level",                    element: <AgentLevelOperations />,        label: "Agent Level Master",       category: "Agent" },
+  { path: "/agent-level-data",               element: <AgentLevelData /> },
+  { path: "/agent-master",                   element: <AgentMasterOperations />,       label: "Agent Master",             category: "Agent" },
+  { path: "/agent-master-data",              element: <AgentMasterData /> },
+  { path: "/update-agent-accounts",          element: <UpdateAgentAccounts />,         label: "Update Agent of Accounts", category: "Agent" },
+
   // ── Super User ────────────────────────────────────────────────────────────
   { path: "/su-settings",                     element: <SuperUserSettings />,           label: "Super User Settings",      category: "Super User",    suOnly: true },
+
+  // ── Auto-Debit ────────────────────────────────────────────────────────────
+  { path: "/auto-debit-mandates",             element: <AutoDebitMandates />,           label: "Auto-Debit Mandates",      category: "Auto-Debit" },
+  { path: "/auto-debit-history",              element: <AutoDebitHistory />,            label: "Auto-Debit History",       category: "Auto-Debit" },
 ];
 
 /** All searchable screens for the header search bar. Imported from screenList to avoid circular deps. */

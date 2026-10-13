@@ -146,6 +146,7 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
   { path: "/other-branch-accounts",           label: "Other Branch Accounts",           category: "Inter Branch", ibOnly: true },
   { path: "/ib-pending-vouchers",             label: "IB Pending Vouchers",             category: "Inter Branch", ibOnly: true },
   { path: "/ib-incoming-vouchers",            label: "IB Incoming Vouchers",            category: "Inter Branch", ibOnly: true },
+  { path: "/ib-loan-expense",                 label: "IB Loan Expense",                 category: "Inter Branch", ibOnly: true },
 
   // ── Daily Reports ─────────────────────────────────────────────────────────
   { path: "/day-book",                        label: "Day Book",                        category: "Daily Reports" },
@@ -219,6 +220,10 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
   { path: "/payroll-other-branch-account",    label: "Payroll Other Branch Account",    category: "Payroll",         payrollOnly: true },
   { path: "/salary-component-account",        label: "Salary Component Account",        category: "Payroll",         payrollOnly: true },
   { path: "/payroll-other-settings",          label: "Employee Salary Other Setting",   category: "Payroll",         payrollOnly: true },
+
+  // ── Auto-Debit ────────────────────────────────────────────────────────────
+  { path: "/auto-debit-mandates",             label: "Auto-Debit Mandates",             category: "Auto-Debit" },
+  { path: "/auto-debit-history",              label: "Auto-Debit History",              category: "Auto-Debit" },
 
   // ── Super User ────────────────────────────────────────────────────────────
   { path: "/su-settings",                     label: "Super User Settings",             category: "Super User",       suOnly: true },

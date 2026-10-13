@@ -685,6 +685,10 @@ class commonService extends ApiService {
       }
     );
   }
+  async fetch_member_saving_accounts(branchId: number, memberId: number, memberBrId: number): Promise<ApiResponse<{ accId: number; accountName: string; accountNo: string }[]>> {
+    return this.makeRequest(`/fetchdata/member-saving-accounts/${branchId}/${memberId}/${memberBrId}`, { method: "GET" });
+  }
+
   async fetch_FD_Open_Accounts_For_Premature(branchId: Number, productId: Number, currentDate: string): Promise<ApiResponse<any>> {
     return this.makeRequest<AuthResponse>(
       `/fetchdata/fd-accounts-for-premature/${branchId}/${productId}/${currentDate}`,
@@ -786,9 +790,21 @@ class commonService extends ApiService {
     );
   }
 
-  async get_account_balance(branchId: number, accountId: number): Promise<ApiResponse<number>> {
+  async get_account_balance(branchId: number, accountId: number): Promise<ApiResponse<number> & { ibHold?: number; ibHoldCount?: number }> {
     return this.makeRequest<number>(
       `/fetchdata/account-balance/${branchId}/${accountId}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  async get_loan_disbursement_info(branchId: number, accountId: number): Promise<ApiResponse<{
+    disbursementCount: number;
+    maxDisbursements: number;
+    canDisburse: boolean;
+    message: string;
+  }>> {
+    return this.makeRequest(
+      `/fetchdata/loan-disbursement-info/${branchId}/${accountId}`,
       { method: "GET", headers: { "Content-Type": "application/json" } }
     );
   }

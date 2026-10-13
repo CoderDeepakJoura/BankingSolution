@@ -1830,6 +1830,7 @@ CREATE TABLE IF NOT EXISTS interbranchvoucher (
     vouchertype      VARCHAR(20)     NOT NULL,          -- 'IBSavingDeposit', …
     flowtype         VARCHAR(20)     NOT NULL DEFAULT 'BranchToBranch',  -- 'HOToBranch' | 'BranchToBranch'
     amount           NUMERIC(18,2)   NOT NULL,
+    penaltyamount    NUMERIC(18,2)   NOT NULL DEFAULT 0,          -- penalty portion (RD Kist IB only)
     narration        VARCHAR(300)    NULL,
     entrydate        DATE            NOT NULL,
     status           VARCHAR(20)     NOT NULL DEFAULT 'Pending',  -- Pending / HOConfirmed / Completed
@@ -1884,6 +1885,19 @@ CREATE TABLE IF NOT EXISTS interbranchvoucher (
     step3userid      VARCHAR(100)    NULL,
 
     CONSTRAINT pk_interbranchvoucher PRIMARY KEY (id)
+);
+
+-- Stores expense metadata for IB Loan Expense vouchers (created at Step 1, read at final step)
+CREATE TABLE IF NOT EXISTS ibvoucherexpensedetail (
+    id                  SERIAL PRIMARY KEY,
+    ibvoucherid         INTEGER NOT NULL,
+    loanproductid       INTEGER NOT NULL DEFAULT 0,
+    expensecategoryid   INTEGER NOT NULL DEFAULT 0,
+    expenseamount       NUMERIC(18,2) NOT NULL DEFAULT 0,
+    totaltax            NUMERIC(18,2) NOT NULL DEFAULT 0,
+    netamount           NUMERIC(18,2) NOT NULL DEFAULT 0,
+    remarks             VARCHAR(300),
+    craccounttypeid     INTEGER NOT NULL DEFAULT 0
 );
 
 -- =============================================================================
@@ -2104,9 +2118,62 @@ ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS lockoutuntil TIMESTAMP NULL;
 ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS showbankfdmodule       BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS showpayrollmodule      BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS enforcesinglesession   BOOLEAN NOT NULL DEFAULT FALSE;
+-- member: Telegram chat ID for per-member auto-debit transaction notifications
+ALTER TABLE member ADD COLUMN IF NOT EXISTS telegramchatid VARCHAR(50) NULL;
+
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS telegramchatid              VARCHAR(50);
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS enableautodebit             BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS autodebitrunhour            INTEGER NOT NULL DEFAULT 2;
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS autodebitrunminute          INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS autodebitprocessrdkist      BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS autodebitprocessloanrecovery BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Auto-debit tables
+CREATE TABLE IF NOT EXISTS autodebitaccount (
+    id               SERIAL PRIMARY KEY,
+    branchid         INTEGER NOT NULL,
+    accountid        INTEGER NOT NULL,
+    accounttype      VARCHAR(30) NOT NULL,
+    isactive         BOOLEAN NOT NULL DEFAULT TRUE,
+    createdat        TIMESTAMP NOT NULL DEFAULT NOW(),
+    notes            VARCHAR(200),
+    savingaccountid  INTEGER NULL,
+    UNIQUE (branchid, accountid, accounttype)
+);
+
+CREATE TABLE IF NOT EXISTS autodebitrun (
+    id            SERIAL PRIMARY KEY,
+    branchid      INTEGER NOT NULL,
+    rundate       DATE NOT NULL,
+    starttime     TIMESTAMP NOT NULL DEFAULT NOW(),
+    endtime       TIMESTAMP,
+    totalaccounts INTEGER NOT NULL DEFAULT 0,
+    successcount  INTEGER NOT NULL DEFAULT 0,
+    failcount     INTEGER NOT NULL DEFAULT 0,
+    status        VARCHAR(20) NOT NULL DEFAULT 'Running',
+    telegramsent  VARCHAR(5)
+);
+
+CREATE TABLE IF NOT EXISTS autodebitrundetail (
+    id           SERIAL PRIMARY KEY,
+    runid        INTEGER NOT NULL REFERENCES autodebitrun(id) ON DELETE CASCADE,
+    branchid     INTEGER NOT NULL,
+    accountid    INTEGER NOT NULL,
+    accounttype  VARCHAR(30) NOT NULL DEFAULT '',
+    accountno    VARCHAR(30) NOT NULL DEFAULT '',
+    accountname  VARCHAR(200) NOT NULL DEFAULT '',
+    amount       NUMERIC(18,2) NOT NULL DEFAULT 0,
+    status       VARCHAR(20) NOT NULL DEFAULT '',
+    errormessage VARCHAR(500),
+    voucherid    INTEGER
+);
+CREATE INDEX IF NOT EXISTS ix_autodebitrundetail_runid ON autodebitrundetail(runid);
 
 -- interbranchvoucher: distinguishes 2-step HO-to-Branch from 3-step Branch-to-Branch flows
 ALTER TABLE interbranchvoucher ADD COLUMN IF NOT EXISTS flowtype VARCHAR(20) NOT NULL DEFAULT 'BranchToBranch';
+
+-- interbranchvoucher: penalty amount for IB RD Kist vouchers (0 for all other types)
+ALTER TABLE interbranchvoucher ADD COLUMN IF NOT EXISTS penaltyamount NUMERIC(18,2) NOT NULL DEFAULT 0;
 
 -- savingproduct / fdproduct: effectivetill allows marking a product as expired after a date
 ALTER TABLE savingproduct ADD COLUMN IF NOT EXISTS effectivetill TIMESTAMP(3) NULL;
@@ -2359,3 +2426,75 @@ CREATE TABLE IF NOT EXISTS employeeleaveallotment (
     allotmentdate   DATE         NOT NULL,
     CONSTRAINT pk_employeeleaveallotment PRIMARY KEY (id)
 );
+
+-- superusersettings: agent module visibility flag
+ALTER TABLE superusersettings ADD COLUMN IF NOT EXISTS showagentmodule BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Agent module tables
+CREATE TABLE IF NOT EXISTS agentlevel (
+    id              SERIAL,
+    branchid        INTEGER       NOT NULL DEFAULT 0,
+    code            VARCHAR(20)   NOT NULL DEFAULT '',
+    description     VARCHAR(150)  NOT NULL DEFAULT '',
+    parentlevelid   INTEGER       NULL,
+    CONSTRAINT pk_agentlevel PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS agentmaster (
+    id              SERIAL,
+    branchid        INTEGER       NOT NULL DEFAULT 0,
+    code            VARCHAR(20)   NOT NULL DEFAULT '',
+    name            VARCHAR(150)  NOT NULL DEFAULT '',
+    agentlevelid    INTEGER       NULL,
+    phone           VARCHAR(20)   NOT NULL DEFAULT '',
+    address         VARCHAR(200)  NOT NULL DEFAULT '',
+    isactive        BOOLEAN       NOT NULL DEFAULT TRUE,
+    CONSTRAINT pk_agentmaster PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS accountagent (
+    id              SERIAL,
+    branchid        INTEGER       NOT NULL DEFAULT 0,
+    accountid       INTEGER       NOT NULL DEFAULT 0,
+    acctype         INTEGER       NOT NULL DEFAULT 0,
+    agentid         INTEGER       NOT NULL DEFAULT 0,
+    fromdate        DATE          NOT NULL,
+    todate          DATE          NULL,
+    CONSTRAINT pk_accountagent PRIMARY KEY (id)
+);
+
+-- agentlevel incremental columns
+ALTER TABLE agentlevel ADD COLUMN IF NOT EXISTS branchid        INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE agentlevel ADD COLUMN IF NOT EXISTS code            VARCHAR(20)  NOT NULL DEFAULT '';
+ALTER TABLE agentlevel ADD COLUMN IF NOT EXISTS description     VARCHAR(150) NOT NULL DEFAULT '';
+ALTER TABLE agentlevel ADD COLUMN IF NOT EXISTS parentlevelid   INTEGER      NULL;
+
+-- agentmaster incremental columns
+ALTER TABLE agentmaster ADD COLUMN IF NOT EXISTS branchid       INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE agentmaster ADD COLUMN IF NOT EXISTS code           VARCHAR(20)  NOT NULL DEFAULT '';
+ALTER TABLE agentmaster ADD COLUMN IF NOT EXISTS name           VARCHAR(150) NOT NULL DEFAULT '';
+ALTER TABLE agentmaster ADD COLUMN IF NOT EXISTS agentlevelid   INTEGER      NULL;
+ALTER TABLE agentmaster ADD COLUMN IF NOT EXISTS phone          VARCHAR(20)  NOT NULL DEFAULT '';
+ALTER TABLE agentmaster ADD COLUMN IF NOT EXISTS address        VARCHAR(200) NOT NULL DEFAULT '';
+ALTER TABLE agentmaster ADD COLUMN IF NOT EXISTS isactive       BOOLEAN      NOT NULL DEFAULT TRUE;
+
+-- accountagent incremental columns
+ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS branchid      INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS accountid     INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS acctype       INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS agentid       INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS fromdate      DATE         NOT NULL DEFAULT CURRENT_DATE;
+ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS todate        DATE         NULL;
+
+-- ibvoucherexpensedetail incremental columns (added for IB Loan Expense feature)
+ALTER TABLE ibvoucherexpensedetail ADD COLUMN IF NOT EXISTS ibvoucherid       INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE ibvoucherexpensedetail ADD COLUMN IF NOT EXISTS loanproductid     INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE ibvoucherexpensedetail ADD COLUMN IF NOT EXISTS expensecategoryid INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE ibvoucherexpensedetail ADD COLUMN IF NOT EXISTS expenseamount     NUMERIC(18,2) NOT NULL DEFAULT 0;
+ALTER TABLE ibvoucherexpensedetail ADD COLUMN IF NOT EXISTS totaltax          NUMERIC(18,2) NOT NULL DEFAULT 0;
+ALTER TABLE ibvoucherexpensedetail ADD COLUMN IF NOT EXISTS netamount         NUMERIC(18,2) NOT NULL DEFAULT 0;
+ALTER TABLE ibvoucherexpensedetail ADD COLUMN IF NOT EXISTS remarks           VARCHAR(300);
+ALTER TABLE ibvoucherexpensedetail ADD COLUMN IF NOT EXISTS craccounttypeid   INTEGER      NOT NULL DEFAULT 0;
+
+-- autodebitaccount incremental columns
+ALTER TABLE autodebitaccount ADD COLUMN IF NOT EXISTS savingaccountid INTEGER NULL;

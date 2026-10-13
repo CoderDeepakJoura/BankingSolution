@@ -30,7 +30,9 @@ using BankingPlatform.Infrastructure.Models.Services;
 using BankingPlatform.Infrastructure.Models.BankFD;
 using BankingPlatform.Infrastructure.Models.Salary;
 using BankingPlatform.Infrastructure.Configurations.Salary;
+using BankingPlatform.Infrastructure.Models.Agent;
 using BankingPlatform.Infrastructure.Interfaces;
+using BankingPlatform.Infrastructure.Models.AutoDebit;
 namespace BankingPlatform.Infrastructure.Models;
 
 public partial class BankingDbContext : DbContext
@@ -95,6 +97,9 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<ReceiptNoTracker> receiptnotracker { get; set; }
     public virtual DbSet<VoucherPrintSettings> voucherprintsettings { get; set; }
     public virtual DbSet<SuperUserSettings> superusersettings { get; set; }
+    public virtual DbSet<AutoDebitAccount> autodebitaccount { get; set; }
+    public virtual DbSet<AutoDebitRun> autodebitrun { get; set; }
+    public virtual DbSet<AutoDebitRunDetail> autodebitrundetail { get; set; }
     public virtual DbSet<SavingProductBranchWiseRule> savingproductbranchwiserule { get; set; }
     public virtual DbSet<FDProductBranchWiseRule> fdproductbranchwiserule { get; set; }
     public virtual DbSet<SavingInterestSlab> savinginterestslab { get; set; }
@@ -184,7 +189,11 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<VoucherBFDDetail> voucherbfddetail { get; set; }
     public virtual DbSet<OtherBranchAccount> otherbranchaccounts { get; set; }
     public virtual DbSet<InterBranchVoucher> interbranchvoucher { get; set; }
+    public virtual DbSet<IBVoucherExpenseDetail> ibvoucherexpensedetail { get; set; }
     public virtual DbSet<UserFavourite> userfavourites { get; set; }
+    public virtual DbSet<AgentLevel> agentlevel { get; set; }
+    public virtual DbSet<AgentMaster> agentmaster { get; set; }
+    public virtual DbSet<AccountAgent> accountagent { get; set; }
 
     // ── Audit logging ────────────────────────────────────────────────────────────
 

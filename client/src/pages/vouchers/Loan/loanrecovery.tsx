@@ -23,6 +23,8 @@ import {
   loanAccountApi,
   CombinedLoanAccountDTO,
 } from "../../../services/accountMasters/loanaccount/loanaccountapi";
+import otherBranchAccountApi from "../../../services/interbranch/otherBranchAccountApi";
+import ibVoucherApi from "../../../services/interbranch/ibVoucherApi";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -169,6 +171,13 @@ const LoanRecovery: React.FC = () => {
   const [debitAccountsForRow, setDebitAccountsForRow] = useState<{ accId: number; accountName: string }[]>([]);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
 
+  // IB state
+  const [ibMappings, setIbMappings] = useState<any[]>([]);
+  const [destBrId, setDestBrId] = useState(0);
+  const [destBrName, setDestBrName] = useState("");
+  const [ibRefAccId, setIbRefAccId] = useState(0);
+  const [ibRefAccName, setIbRefAccName] = useState("");
+
   const [formData, setFormData] = useState({
     voucherDate: sessionDate,
     loanProductId: 0,
@@ -195,6 +204,11 @@ const LoanRecovery: React.FC = () => {
     commonservice.fetch_loan_products(user.branchid, formData.voucherDate).then((res) => {
       if (res.success) setLoanProducts(res.data ?? []);
     });
+    if (user.enableIBTransactions) {
+      otherBranchAccountApi.getAll(user.branchid).then((res: any) => {
+        if (res.success) setIbMappings(res.data ?? []);
+      });
+    }
   }, [formData.voucherDate]);
 
   // ── Edit mode: load from voucher-search state ─────────────────────────────────
@@ -320,9 +334,24 @@ const LoanRecovery: React.FC = () => {
     resetAccountState();
     clearError("loanProductId");
     if (id) {
-      const res = await commonservice.fetch_loan_accounts_by_product(user.branchid, id, formData.voucherDate);
+      const brId = destBrId > 0 ? destBrId : user.branchid;
+      const res = await commonservice.fetch_loan_accounts_by_product(brId, id, formData.voucherDate);
       if (res.success) setLoanAccounts(res.data ?? []);
     }
+  };
+
+  const handleDestBrChange = async (selected: any) => {
+    const brId = selected ? selected.value : 0;
+    setDestBrId(brId);
+    setDestBrName(selected ? selected.label : "");
+    setIbRefAccId(selected ? selected.accId : 0);
+    setIbRefAccName(selected ? (selected.accountName ?? "") : "");
+    setFormData((p) => ({ ...p, loanProductId: 0, loanAccountId: 0, totalAmount: "" }));
+    setLoanAccounts([]);
+    resetAccountState();
+    const targetBrId = brId > 0 ? brId : user.branchid;
+    const prodRes = await commonservice.fetch_loan_products(targetBrId, formData.voucherDate);
+    if (prodRes.success) setLoanProducts(prodRes.data ?? []);
   };
 
   // ── Account change ────────────────────────────────────────────────────────────
@@ -333,8 +362,10 @@ const LoanRecovery: React.FC = () => {
     if (!sel) return;
     clearError("loanAccountId");
 
+    const loanBrId = destBrId > 0 ? destBrId : user.branchid;
+
     // Full account details + kist schedule (all in one call)
-    const detRes = await loanAccountApi.getLoanAccountById(sel.value, user.branchid);
+    const detRes = await loanAccountApi.getLoanAccountById(sel.value, loanBrId);
     if (detRes.success && detRes.data) {
       const data = detRes.data as CombinedLoanAccountDTO;
       setLoanAccountData(data);
@@ -360,11 +391,11 @@ const LoanRecovery: React.FC = () => {
     }
 
     // Balance (for outstanding + interest allocation)
-    const balRes = await loanRecoveryApi.getBalance(sel.value, user.branchid);
+    const balRes = await loanRecoveryApi.getBalance(sel.value, loanBrId);
     if (balRes.success && balRes.data) setLoanBalance(balRes.data);
 
     // Ledger
-    loanRecoveryApi.getLedger(sel.value, user.branchid).then((res) => {
+    loanRecoveryApi.getLedger(sel.value, loanBrId).then((res) => {
       if (res.success && res.data) setLoanLedger(res.data);
     });
   };
@@ -480,6 +511,13 @@ const LoanRecovery: React.FC = () => {
     resetAccountState();
     setErrors({});
     setActiveTab("account-info");
+    setDestBrId(0);
+    setDestBrName("");
+    setIbRefAccId(0);
+    setIbRefAccName("");
+    commonservice.fetch_loan_products(user.branchid, sessionDate).then((res) => {
+      if (res.success) setLoanProducts(res.data ?? []);
+    });
   };
 
   // ── Save ──────────────────────────────────────────────────────────────────────
@@ -507,34 +545,63 @@ const LoanRecovery: React.FC = () => {
 
     setLoading(true);
     try {
-      const dto = {
-        brId: user.branchid,
-        voucherDate: formData.voucherDate,
-        loanAccountId: formData.loanAccountId,
-        totalAmount: totalAmt,
-        narration: formData.narration || undefined,
-        debitItems: debitRows.map((r) => ({
-          accountId: r.accountId,
-          accountType: r.accountType,
-          amount: r.amount,
-          narration: r.narration || undefined,
-        })),
-        intAmount: isStandLoan && intAmtParsed > 0 ? intAmtParsed : undefined,
-      };
-      const res = isEditMode && editVoucherId
-        ? await loanRecoveryApi.updateRecovery(editVoucherId, dto)
-        : await loanRecoveryApi.addRecovery(dto);
+      let res: any;
 
-      if (res.success) {
-        if (!isEditMode && res.message) {
+      if (destBrId > 0) {
+        // IB mode — create Step 1 voucher at source branch
+        const loanAcc = loanAccounts.find((a) => a.accId === formData.loanAccountId);
+        const flowType = user.isMainBranch ? "HOToBranch" : "BranchToBranch";
+        res = await ibVoucherApi.createLoanRecoveryStep1({
+          brId: user.branchid,
+          destBrId,
+          destAccId: formData.loanAccountId,
+          destAccNo: loanAcc ? String(loanAcc.accId) : "",
+          destAccName: loanAcc?.accountName ?? "",
+          crAccId: ibRefAccId,
+          totalAmount: totalAmt,
+          debitItems: debitRows.map((r) => ({
+            accountId: r.accountId,
+            accountType: r.accountType,
+            amount: r.amount,
+            narration: r.narration || undefined,
+          })),
+          loanProductId: formData.loanProductId,
+          narration: formData.narration || undefined,
+          voucherDate: formData.voucherDate,
+          workingDate: formData.voucherDate,
+          userId: user.userId?.toString(),
+          flowType,
+        });
+      } else {
+        const dto = {
+          brId: user.branchid,
+          voucherDate: formData.voucherDate,
+          loanAccountId: formData.loanAccountId,
+          totalAmount: totalAmt,
+          narration: formData.narration || undefined,
+          debitItems: debitRows.map((r) => ({
+            accountId: r.accountId,
+            accountType: r.accountType,
+            amount: r.amount,
+            narration: r.narration || undefined,
+          })),
+          intAmount: isStandLoan && intAmtParsed > 0 ? intAmtParsed : undefined,
+        };
+        res = isEditMode && editVoucherId
+          ? await loanRecoveryApi.updateRecovery(editVoucherId, dto)
+          : await loanRecoveryApi.addRecovery(dto);
+
+        if (res.success && !isEditMode && res.message) {
           await printAfterSave(res.message, 5, 10);
-          // Stand loans: pass principal + interest breakdown; Add in Balance: no breakdown
           if (isStandLoan && intTotal > 0) {
             await printLoanReceiptAfterSave(res.message, principalRec, intTotal);
           } else {
             await printLoanReceiptAfterSave(res.message);
           }
         }
+      }
+
+      if (res.success) {
         await Swal.fire({
           icon: "success",
           title: isEditMode ? "Updated!" : "Success!",
@@ -561,6 +628,12 @@ const LoanRecovery: React.FC = () => {
   const loanProductOptions = loanProducts.map((p) => ({ value: p.id, label: p.productName }));
   const loanAccountOptions = loanAccounts.map((a) => ({ value: a.accId, label: a.accountName }));
   const debitAccOptions = debitAccountsForRow.map((a) => ({ value: a.accId, label: a.accountName }));
+  const ibBranchOptions = ibMappings.map((m: any) => ({
+    value: m.otherBrId,
+    label: `${m.otherBranchCode ? m.otherBranchCode + " - " : ""}${m.otherBranchName ?? m.otherBrId}`,
+    accId: m.accId,
+    accountName: m.accountName ?? "",
+  }));
 
   // ── Tabs ──────────────────────────────────────────────────────────────────────
 
@@ -1054,6 +1127,42 @@ const LoanRecovery: React.FC = () => {
                   </div>
 
                   <div className="p-5 space-y-5">
+                    {/* Destination Branch — IB mode */}
+                    {user.enableIBTransactions && !isEditMode && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Destination Branch <span className="text-xs text-gray-400">(leave empty for regular recovery)</span>
+                        </label>
+                        <Select
+                          options={ibBranchOptions}
+                          value={destBrId > 0 ? { value: destBrId, label: destBrName, accId: ibRefAccId, accountName: ibRefAccName } : null}
+                          onChange={handleDestBrChange}
+                          placeholder="Select branch for inter-branch loan recovery..."
+                          isClearable
+                          styles={{
+                            control: (base: any, state: any) => ({
+                              ...base,
+                              minHeight: "48px",
+                              borderWidth: "2px",
+                              borderColor: destBrId > 0 ? "#6366f1" : state.isFocused ? "#3b82f6" : "#e5e7eb",
+                              borderRadius: "0.5rem",
+                              boxShadow: state.isFocused ? "0 0 0 2px rgba(99,102,241,0.2)" : "none",
+                              "&:hover": { borderColor: "#6366f1" },
+                              cursor: "pointer",
+                            }),
+                            option: (base: any) => ({ ...base, cursor: "pointer" }),
+                            menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+                          }}
+                          menuPortalTarget={document.body}
+                        />
+                        {destBrId > 0 && ibRefAccName && (
+                          <p className="text-xs text-indigo-600 mt-1 font-medium">
+                            IB Ref Credit Account: {ibRefAccName}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                       {/* Date */}
                       <div>
@@ -1084,7 +1193,7 @@ const LoanRecovery: React.FC = () => {
 
                       {/* Account */}
                       <div>
-                        <Label required>Loan Account</Label>
+                        <Label required>{destBrId > 0 ? `Loan Account (${destBrName})` : "Loan Account"}</Label>
                         <Select
                           options={loanAccountOptions}
                           value={loanAccountOptions.find((o) => o.value === formData.loanAccountId) ?? null}
@@ -1465,7 +1574,7 @@ const LoanRecovery: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <Save className="w-4 h-4" /> {isEditMode ? "Update Recovery" : "Save Recovery"}
+                        <Save className="w-4 h-4" /> {isEditMode ? "Update Recovery" : destBrId > 0 ? "Send IB Recovery" : "Save Recovery"}
                       </>
                     )}
                   </button>

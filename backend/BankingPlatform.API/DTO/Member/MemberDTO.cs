@@ -81,6 +81,9 @@ namespace BankingPlatform.API.DTO.Member
         public string? Email1 { get; set; }
         public string? Email2 { get; set; }
 
+        [StringLength(50)]
+        public string? TelegramChatId { get; set; }
+
         // Status (Database Field Names)
         public int MemberStatus { get; set; } = 1; // Exact database column name
 

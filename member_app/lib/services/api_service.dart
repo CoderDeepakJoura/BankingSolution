@@ -72,11 +72,25 @@ class ApiService {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   static Map<String, dynamic> _decode(http.Response res) {
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    if (res.statusCode >= 400) {
-      throw ApiException(body['message'] ?? 'Request failed (${res.statusCode})');
+    if (res.body.isEmpty) {
+      throw ApiException(
+        'Server returned an empty response (HTTP ${res.statusCode}).\n'
+        'Check that the selected society server is reachable.',
+      );
     }
-    return body;
+    try {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode >= 400) {
+        throw ApiException(body['message'] ?? 'Request failed (${res.statusCode})');
+      }
+      return body;
+    } on FormatException {
+      // Server returned non-JSON (e.g. nginx error page)
+      final preview = res.body.length > 120 ? res.body.substring(0, 120) : res.body;
+      throw ApiException(
+        'Unexpected response from server (HTTP ${res.statusCode}):\n$preview',
+      );
+    }
   }
 }
 

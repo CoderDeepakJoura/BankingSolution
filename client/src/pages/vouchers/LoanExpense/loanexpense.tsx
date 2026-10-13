@@ -14,6 +14,8 @@ import loanExpenseApi, {
   GSTDetailDTO,
 } from "../../../services/vouchers/loan/loanExpenseApi";
 import expenseCategoryApi from "../../../services/loan/expensecategoryapi";
+import otherBranchAccountApi from "../../../services/interbranch/otherBranchAccountApi";
+import ibVoucherApi from "../../../services/interbranch/ibVoucherApi";
 import GSTDetailPanel from "../../../components/GST/GSTDetailPanel";
 import GenericTable, { Column } from "../../../components/Location/GenericTable";
 
@@ -94,6 +96,13 @@ const LoanExpensePage: React.FC = () => {
   const [gstModalOpen, setGstModalOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // IB mode state
+  const [ibMappings, setIbMappings] = useState<any[]>([]);
+  const [destBrId, setDestBrId] = useState(0);
+  const [destBrName, setDestBrName] = useState("");
+  const [ibRefAccId, setIbRefAccId] = useState(0);
+  const [ibRefAccName, setIbRefAccName] = useState("");
+
   // List
   const [listData, setListData] = useState<ListRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -115,6 +124,11 @@ const LoanExpensePage: React.FC = () => {
     expenseCategoryApi.getList(user.branchid).then((res) => {
       if (res.success) setExpenseCategories((res as any).items ?? []);
     });
+    if (user.enableIBTransactions) {
+      otherBranchAccountApi.getAll(user.branchid).then((res: any) => {
+        if (res?.success && res.data) setIbMappings(res.data);
+      });
+    }
     loadList();
   }, []);
 
@@ -128,13 +142,32 @@ const LoanExpensePage: React.FC = () => {
     }
   };
 
+  const handleDestBrChange = async (selected: any) => {
+    const brId = selected ? selected.value : 0;
+    setDestBrId(brId);
+    setDestBrName(selected ? selected.label : "");
+    setIbRefAccId(selected ? selected.accId : 0);
+    setIbRefAccName(selected ? (selected.accountName ?? "") : "");
+    // Reset product + account selections since they depend on the branch
+    setForm((p) => ({ ...p, loanProductId: 0, drAccountId: 0 }));
+    setLoanAccounts([]);
+    setLoanProducts([]);
+    clearErr("loanProductId");
+    clearErr("drAccountId");
+    // Reload products from dest branch (or source branch if cleared)
+    const targetBrId = brId > 0 ? brId : user.branchid;
+    const prodRes = await commonservice.fetch_loan_products(targetBrId, form.date);
+    if (prodRes.success) setLoanProducts(prodRes.data ?? []);
+  };
+
   const handleProductChange = async (sel: any) => {
     const id = sel?.value ?? 0;
     setForm((p) => ({ ...p, loanProductId: id, drAccountId: 0 }));
     setLoanAccounts([]);
     clearErr("loanProductId");
     if (id && form.date) {
-      const res = await commonservice.fetch_loan_accounts_by_product(user.branchid, id, form.date);
+      const brId = destBrId > 0 ? destBrId : user.branchid;
+      const res = await commonservice.fetch_loan_accounts_by_product(brId, id, form.date);
       if (res.success) setLoanAccounts(res.data ?? []);
     }
   };
@@ -208,25 +241,52 @@ const LoanExpensePage: React.FC = () => {
     if (!validate()) return;
     setSaving(true);
     try {
-      const dto: LoanExpenseDTO = {
-        branchId: user.branchid,
-        date: form.date,
-        loanProductId: form.loanProductId,
-        drAccountId: form.drAccountId,
-        expenseCategoryId: form.expenseCategoryId,
-        expenseAmount,
-        totalTax,
-        netAmount,
-        remarks: form.remarks || undefined,
-        crAccountTypeId: form.crAccountTypeId,
-        crAccountId: form.crAccountId,
-        gstDetail: gstDetail ?? undefined,
-      };
-      const res = editId
-        ? await loanExpenseApi.update(editId, dto)
-        : await loanExpenseApi.create(dto);
-      if (res.success) {
-        if (!editId && res.message) await printAfterSave(res.message, 5, 14);
+      let res: any;
+      if (destBrId > 0) {
+        // IB mode — route to inter-branch API
+        const loanAcc = loanAccounts.find((a) => a.accId === form.drAccountId);
+        const loanAccName = loanAcc?.accountName ?? "";
+        const flowType = user.isMainBranch ? "HOToBranch" : "BranchToBranch";
+        res = await (ibVoucherApi as any).createLoanExpenseStep1({
+          brId:              user.branchid,
+          destBrId,
+          destAccId:         form.drAccountId,
+          destAccNo:         "",
+          destAccName:       loanAccName,
+          drAccId:           ibRefAccId,
+          crAccId:           form.crAccountId,
+          amount:            expenseAmount,
+          loanProductId:     form.loanProductId,
+          expenseCategoryId: form.expenseCategoryId,
+          expenseAmount,
+          totalTax,
+          remarks:           form.remarks || undefined,
+          crAccountTypeId:   form.crAccountTypeId,
+          voucherDate:       form.date,
+          workingDate:       form.date,
+          userId:            user.userId?.toString(),
+          flowType,
+          gstDetail:         gstDetail ?? null,
+        });
+      } else {
+        const dto: LoanExpenseDTO = {
+          branchId: user.branchid,
+          date: form.date,
+          loanProductId: form.loanProductId,
+          drAccountId: form.drAccountId,
+          expenseCategoryId: form.expenseCategoryId,
+          expenseAmount,
+          totalTax,
+          netAmount,
+          remarks: form.remarks || undefined,
+          crAccountTypeId: form.crAccountTypeId,
+          crAccountId: form.crAccountId,
+          gstDetail: gstDetail ?? undefined,
+        };
+        res = editId ? await loanExpenseApi.update(editId, dto) : await loanExpenseApi.create(dto);
+        if (res?.success && !editId && res.message) await printAfterSave(res.message, 5, 14);
+      }
+      if (res?.success) {
         await Swal.fire({
           icon: "success",
           title: editId ? "Updated" : "Saved",
@@ -237,7 +297,7 @@ const LoanExpensePage: React.FC = () => {
         handleReset();
         loadList();
       } else {
-        Swal.fire({ icon: "error", title: "Error", text: res.message ?? "Failed to save." });
+        Swal.fire({ icon: "error", title: "Error", text: res?.message ?? "Failed to save." });
       }
     } finally {
       setSaving(false);
@@ -263,6 +323,10 @@ const LoanExpensePage: React.FC = () => {
     setErrors({});
     setLoanAccounts([]);
     setCrAccounts([]);
+    setDestBrId(0);
+    setDestBrName("");
+    setIbRefAccId(0);
+    setIbRefAccName("");
   };
 
   const handleDelete = async (row: ListRow) => {
@@ -349,6 +413,49 @@ const LoanExpensePage: React.FC = () => {
               </button>
             </div>
           )}
+          {/* IB Destination Branch — shown only when IB is enabled */}
+          {user.enableIBTransactions && (
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Destination Branch <span className="text-xs text-gray-400">(leave empty for regular loan expense)</span>
+              </label>
+              <Select
+                options={ibMappings.map((m: any) => ({
+                  value: m.otherBrId,
+                  label: `${m.otherBranchCode ? m.otherBranchCode + " - " : ""}${m.otherBranchName ?? m.otherBrId}`,
+                  accId: m.accId,
+                  accountName: m.accountName ?? "",
+                }))}
+                value={destBrId > 0
+                  ? { value: destBrId, label: destBrName, accId: ibRefAccId, accountName: ibRefAccName }
+                  : null}
+                onChange={handleDestBrChange}
+                placeholder="Select branch for inter-branch loan expense..."
+                isClearable
+                isDisabled={editId > 0}
+                styles={{
+                  control: (base: any, state: any) => ({
+                    ...base,
+                    minHeight: "44px",
+                    borderWidth: "2px",
+                    borderColor: destBrId > 0 ? "#6366f1" : state.isFocused ? "#3b82f6" : "#e5e7eb",
+                    borderRadius: "0.5rem",
+                    boxShadow: state.isFocused ? "0 0 0 2px rgba(99,102,241,0.2)" : "none",
+                    "&:hover": { borderColor: "#6366f1" },
+                    cursor: "pointer",
+                  }),
+                  menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+                }}
+                menuPortalTarget={document.body}
+              />
+              {destBrId > 0 && ibRefAccName && (
+                <p className="text-xs text-indigo-600 mt-1 font-medium">
+                  IB Ref Debit Account: {ibRefAccName}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {/* Date */}
             <div>
@@ -377,7 +484,9 @@ const LoanExpensePage: React.FC = () => {
 
             {/* Loan Account */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Loan Account <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {destBrId > 0 ? `Loan Account (${destBrName})` : "Loan Account"} <span className="text-red-500">*</span>
+              </label>
               <Select
                 options={loanAccounts.map((a) => ({ value: a.accId, label: a.accountName }))}
                 value={form.drAccountId ? { value: form.drAccountId, label: loanAccounts.find((a) => a.accId === form.drAccountId)?.accountName ?? "" } : null}

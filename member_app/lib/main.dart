@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme.dart';
 import 'screens/login_screen.dart';
-import 'screens/dashboard_screen.dart';
+import 'screens/main_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +15,7 @@ void main() async {
   );
   final prefs = await SharedPreferences.getInstance();
   final token = prefs.getString('member_token');
-  runApp(BankingMemberApp(initialRoute: token != null ? '/dashboard' : '/login'));
+  runApp(BankingMemberApp(initialRoute: token != null ? '/home' : '/login'));
 }
 
 class BankingMemberApp extends StatelessWidget {
@@ -33,7 +33,7 @@ class BankingMemberApp extends StatelessWidget {
       initialRoute: initialRoute,
       routes: {
         '/login': (_) => const LoginScreen(),
-        '/dashboard': (_) => const DashboardScreen(),
+        '/home':  (_) => const MainShell(),
       },
     );
   }

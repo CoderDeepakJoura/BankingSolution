@@ -155,7 +155,11 @@ const NotificationBell: React.FC<{ branchId: number }> = ({ branchId }) => {
 
   const go = (item: IBNotificationItem) => {
     setOpen(false);
-    navigate(item.type === "incoming" ? "/ib-incoming-vouchers" : "/ib-pending-vouchers");
+    if (item.type === "incoming") {
+      navigate(item.voucherType === "IBLoanRecovery" ? "/ib-incoming-loan-recovery" : "/ib-incoming-vouchers");
+    } else {
+      navigate("/ib-pending-vouchers");
+    }
   };
 
   if (!ibEnabled) return null;

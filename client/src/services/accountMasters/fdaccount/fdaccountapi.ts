@@ -400,7 +400,6 @@ class FDAccountService extends ApiService {
   async preMatureFD(
    dto: any
   ): Promise<ApiResponse<ResponseDto>> {
-    alert(JSON.stringify(dto));
     return this.makeRequest(
       `/FDAccountMaster/premature-fd`,
       {

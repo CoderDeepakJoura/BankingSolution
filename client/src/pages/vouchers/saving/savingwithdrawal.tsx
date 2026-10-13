@@ -101,6 +101,8 @@ const SavingWithdrawalVoucher: React.FC = () => {
   const [signatureFile, setSignatureFile] = useState<any>(null);
   const [accountBalance, setAccountBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [ibHold, setIbHold]               = useState<number>(0);
+  const [ibHoldCount, setIbHoldCount]     = useState<number>(0);
   const [ledgerData, setLedgerData] = useState<SavingLedger | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
 
@@ -335,6 +337,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
     setPictureFile(null);
     setSignatureFile(null);
     setAccountBalance(null);
+    setIbHold(0); setIbHoldCount(0);
     const effectiveBrId = brId || user.branchid;
     const productsRes = await commonservice.fetch_saving_products(effectiveBrId, voucherData.voucherDate || undefined);
     setSavingProducts(productsRes.data || []);
@@ -363,6 +366,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
     setPictureFile(null);
     setSignatureFile(null);
     setAccountBalance(null);
+    setIbHold(0); setIbHoldCount(0);;
 
     // Clear error on change
     if (selected) {
@@ -600,6 +604,7 @@ const SavingWithdrawalVoucher: React.FC = () => {
     setJointHolders([]);
     setSavingProductAccounts([]);
     setAccountBalance(null);
+    setIbHold(0); setIbHoldCount(0);
     setLedgerData(null);
     setActiveTab("account-info");
     clearErrors();
@@ -810,8 +815,12 @@ const SavingWithdrawalVoucher: React.FC = () => {
                   setBalanceLoading(true);
                   setAccountBalance(null);
                   commonservice.get_account_balance(destBrId || user.branchid, accountId)
-                    .then(res => setAccountBalance(res?.data ?? null))
-                    .catch(() => setAccountBalance(null))
+                    .then(res => {
+                      setAccountBalance(res?.data ?? null);
+                      setIbHold((res as any)?.ibHold ?? 0);
+                      setIbHoldCount((res as any)?.ibHoldCount ?? 0);
+                    })
+                    .catch(() => { setAccountBalance(null); setIbHold(0); setIbHoldCount(0); })
                     .finally(() => setBalanceLoading(false));
                 } else {
                   setAccountBalance(null);
@@ -961,9 +970,16 @@ const SavingWithdrawalVoucher: React.FC = () => {
                 const amt = parseFloat(voucherData.withdrawalAmount || "0");
                 const isInsufficient = !isNaN(amt) && amt > bal;
                 return (
-                  <p className={`text-xs mt-1 font-semibold ${isInsufficient ? "text-red-600" : "text-blue-600"}`}>
-                    Available Balance: ₹{bal.toFixed(2)}{isInsufficient ? " — Insufficient" : ""}
-                  </p>
+                  <div className="mt-1 space-y-1">
+                    <p className={`text-xs font-semibold ${isInsufficient ? "text-red-600" : "text-blue-600"}`}>
+                      Available Balance: ₹{bal.toFixed(2)}{isInsufficient ? " — Insufficient" : ""}
+                    </p>
+                    {ibHold > 0 && (
+                      <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                        ⚠ ₹{ibHold.toFixed(2)} held for {ibHoldCount} pending IB voucher{ibHoldCount !== 1 ? "s" : ""} (already deducted above)
+                      </p>
+                    )}
+                  </div>
                 );
               })()
             ) : null}
@@ -1232,6 +1248,11 @@ const SavingWithdrawalVoucher: React.FC = () => {
                   ? `₹${accountBalance.toFixed(2)}`
                   : "N/A"}
               </p>
+              {!balanceLoading && ibHold > 0 && (
+                <p className="text-xs text-amber-600 font-medium mt-0.5">
+                  ⚠ ₹{ibHold.toFixed(2)} IB hold ({ibHoldCount} pending)
+                </p>
+              )}
             </div>
           </div>
         </div>

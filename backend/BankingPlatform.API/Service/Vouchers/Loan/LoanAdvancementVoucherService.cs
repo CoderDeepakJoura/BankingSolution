@@ -5,6 +5,7 @@ using BankingPlatform.API.Mappers.Voucher;
 using BankingPlatform.API.Services;
 using BankingPlatform.Infrastructure.Models.GST;
 using BankingPlatform.Infrastructure.Models.voucher;
+using Microsoft.EntityFrameworkCore;
 
 namespace BankingPlatform.API.Service.Vouchers.Loan
 {
@@ -47,6 +48,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 if (kistDetail.LoanAmountPassed.HasValue && (double)dto.TotalAmount > kistDetail.LoanAmountPassed.Value)
                     return ($"Advancement amount cannot exceed sanctioned loan amount of {kistDetail.LoanAmountPassed.Value:N2}.", 0);
+
+                // Max disbursements check
+                var disbursementCheck = await CheckMaxDisbursementsAsync(dto.LoanAccountId, dto.BrId);
+                if (!disbursementCheck.canDisburse)
+                    return (disbursementCheck.message, 0);
 
                 int branchId = dto.BrId;
                 using var _vrLease = await _commonFunctions.ReserveVoucherNoAsync(branchId, dto.VoucherDate);
@@ -223,6 +229,45 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             }
 
             return ("Success", nextVrNo);
+        }
+
+        public async Task<(bool canDisburse, string message)> CheckMaxDisbursementsAsync(int loanAccId, int branchId)
+        {
+            // Count posted LA disbursements
+            int disbCount = await _context.vouchercreditdebitdetails
+                .Where(x => x.AccountId == loanAccId && x.BrId == branchId
+                         && x.EntryStatus == "LA"
+                         && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
+                .CountAsync();
+
+            // Also count pending IB Loan Advancements and IB Loan Expenses for this account
+            // that haven't posted their final LA entry yet (Step3 not done). Without this,
+            // an in-flight IB voucher wouldn't be visible to the count check, allowing a
+            // direct advancement to slip through while the IB one is still pending.
+            int pendingIBCount = await _context.interbranchvoucher
+                .Where(x => x.DestAccId == loanAccId && x.DestBrId == branchId
+                         && (x.VoucherType == "IBLoanAdvancement" || x.VoucherType == "IBLoanExpense")
+                         && x.Step3VoucherId == null
+                         && x.Status != "Completed")
+                .CountAsync();
+
+            int? productId = await _context.accountmaster
+                .Where(x => x.ID == loanAccId && x.BranchId == branchId)
+                .Select(x => x.GeneralProductId)
+                .FirstOrDefaultAsync();
+
+            if (!productId.HasValue || productId.Value <= 0)
+                return (true, "");
+
+            int maxDisb = await _context.loanproductadvancement
+                .Where(x => x.ProductId == productId.Value && x.BrId == branchId)
+                .Select(x => x.MaxNoofDisbursments)
+                .FirstOrDefaultAsync();
+
+            if (maxDisb <= 0 || (disbCount + pendingIBCount) < maxDisb)
+                return (true, "");
+
+            return (false, $"Maximum disbursements ({maxDisb}) already reached for this loan account.");
         }
 
         public async Task<(string result, int voucherNo)> UpdateLoanAdvancementVoucherAsync(int voucherId, LoanAdvancementVoucherDTO dto)

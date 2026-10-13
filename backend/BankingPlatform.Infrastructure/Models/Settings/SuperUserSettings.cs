@@ -17,6 +17,15 @@ namespace BankingPlatform.Infrastructure.Models.Settings
         public bool allowGSTDeduction { get; set; } = true;
         public bool showBankFDModule { get; set; } = false;
         public bool showPayrollModule { get; set; } = false;
+        public bool showAgentModule { get; set; } = false;
         public bool enforceSingleSession { get; set; } = false;
+        public string? telegramchatid { get; set; }
+
+        // Auto-Debit
+        public bool enableAutoDebit { get; set; } = false;
+        public int autoDebitRunHour { get; set; } = 2;
+        public int autoDebitRunMinute { get; set; } = 0;
+        public bool autoDebitProcessRdKist { get; set; } = true;
+        public bool autoDebitProcessLoanRecovery { get; set; } = true;
     }
 }

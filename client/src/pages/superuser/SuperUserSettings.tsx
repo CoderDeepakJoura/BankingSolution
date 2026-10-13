@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ShieldCheck, ArrowLeft, Save, IndianRupee, RefreshCw, Lock } from "lucide-react";
+import { ShieldCheck, ArrowLeft, Save, IndianRupee, RefreshCw, Lock, Send, Zap } from "lucide-react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
@@ -18,7 +18,14 @@ const DEFAULT_SETTINGS: SuperUserSettingsDTO = {
   allowGSTDeduction: true,
   showBankFDModule: false,
   showPayrollModule: false,
+  showAgentModule: false,
   enforceSingleSession: false,
+  telegramChatId: "",
+  enableAutoDebit: false,
+  autoDebitRunHour: 2,
+  autoDebitRunMinute: 0,
+  autoDebitProcessRdKist: true,
+  autoDebitProcessLoanRecovery: true,
 };
 
 const SuperUserSettings = () => {
@@ -62,6 +69,7 @@ const SuperUserSettings = () => {
         dispatch(setUser({
           showBankFDModule: settings.showBankFDModule,
           showPayrollModule: settings.showPayrollModule,
+          showAgentModule: settings.showAgentModule,
           enableIBTransactions: settings.enableIBTransactions,
           allowGSTDeduction: settings.allowGSTDeduction,
         }));
@@ -88,6 +96,7 @@ const SuperUserSettings = () => {
     { key: "allowGSTDeduction"    as const, label: "GST Deduction",                  desc: "Enable GST deduction functionality in journal vouchers. Disable to hide GST-related screens and entries." },
     { key: "showBankFDModule"     as const, label: "Bank FD Module",                 desc: "Show Bank FD screens (TDS settings, slabs, accounts, interest posting, maturity). Disable to hide the entire Bank FD module." },
     { key: "showPayrollModule"    as const, label: "Payroll / Salary Module",         desc: "Show Payroll screens (employee master, salary creation, attendance, reports). Disable to hide the entire Payroll module." },
+    { key: "showAgentModule"      as const, label: "Agent Module",                    desc: "Show Agent screens (agent level master, agent master, update agent of accounts). Disable to hide the entire Agent module." },
   ];
 
   return (
@@ -234,6 +243,125 @@ const SuperUserSettings = () => {
                         />
                       </button>
                     </div>
+                  </div>
+                </div>
+
+                {/* Auto-Debit Section */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                  <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-gray-100">
+                    <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
+                      <Zap className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-base font-semibold text-gray-800">Auto-Debit</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Automatically process RD kist and loan recovery for enrolled accounts daily at the configured time.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSettings((prev) => ({ ...prev, enableAutoDebit: !prev.enableAutoDebit }))}
+                      className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none cursor-pointer flex-shrink-0 ${
+                        settings.enableAutoDebit ? "bg-emerald-600" : "bg-gray-200"
+                      }`}
+                      aria-label="Toggle Auto-Debit"
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${settings.enableAutoDebit ? "translate-x-6" : "translate-x-0"}`} />
+                    </button>
+                  </div>
+
+                  {settings.enableAutoDebit && (
+                    <div className="px-6 py-5 space-y-5">
+                      {/* Run time */}
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700 mb-2">Daily Run Time (24-hour)</p>
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block">Hour (0–23)</label>
+                            <input
+                              type="number" min={0} max={23}
+                              value={settings.autoDebitRunHour ?? 2}
+                              onChange={(e) => setSettings((prev) => ({ ...prev, autoDebitRunHour: Math.max(0, Math.min(23, parseInt(e.target.value) || 0)) }))}
+                              className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                            />
+                          </div>
+                          <span className="text-gray-400 text-lg mt-4">:</span>
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block">Minute (0–59)</label>
+                            <input
+                              type="number" min={0} max={59}
+                              value={settings.autoDebitRunMinute ?? 0}
+                              onChange={(e) => setSettings((prev) => ({ ...prev, autoDebitRunMinute: Math.max(0, Math.min(59, parseInt(e.target.value) || 0)) }))}
+                              className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                            />
+                          </div>
+                          <p className="text-xs text-gray-400 mt-4 ml-2">
+                            Runs at {String(settings.autoDebitRunHour ?? 2).padStart(2, "0")}:{String(settings.autoDebitRunMinute ?? 0).padStart(2, "0")} server time daily
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Process types */}
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700 mb-2">Process Types</p>
+                        <div className="space-y-3">
+                          {[
+                            { key: "autoDebitProcessRdKist" as const, label: "RD Kist", desc: "Auto-post monthly/daily RD instalment for enrolled accounts" },
+                            { key: "autoDebitProcessLoanRecovery" as const, label: "Loan Recovery", desc: "Auto-post EMI recovery for enrolled loan accounts" },
+                          ].map(({ key, label, desc }) => (
+                            <div key={key} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="text-sm font-medium text-gray-800">{label}</p>
+                                <p className="text-xs text-gray-400">{desc}</p>
+                              </div>
+                              <button
+                                onClick={() => setSettings((prev) => ({ ...prev, [key]: !prev[key] }))}
+                                className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none cursor-pointer flex-shrink-0 ml-4 ${
+                                  settings[key] ? "bg-emerald-500" : "bg-gray-200"
+                                }`}
+                              >
+                                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${settings[key] ? "translate-x-5" : "translate-x-0"}`} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        ⚠ Auto-debit creates vouchers silently using the server date. Enroll accounts in the
+                        Auto-Debit Mandates screen before enabling. Telegram notifications are sent if a Chat ID is configured.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Telegram Notifications Section */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                  <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-sky-50 to-cyan-50 border-b border-gray-100">
+                    <div className="w-9 h-9 bg-sky-100 rounded-lg flex items-center justify-center">
+                      <Send className="w-5 h-5 text-sky-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-gray-800">Telegram Notifications</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Receive auto-debit results, alerts, and system notifications via Telegram.
+                        Enter your Telegram Chat ID to enable. Leave blank to disable.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="px-6 py-5">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Telegram Chat ID
+                    </label>
+                    <p className="text-xs text-gray-400 mb-3">
+                      Open Telegram → message <span className="font-mono bg-gray-100 px-1 rounded">@BotFather</span> → create a bot → send a message to your bot → use <span className="font-mono bg-gray-100 px-1 rounded">getUpdates</span> to find your numeric chat ID.
+                    </p>
+                    <input
+                      type="text"
+                      value={settings.telegramChatId ?? ""}
+                      onChange={(e) => setSettings((prev) => ({ ...prev, telegramChatId: e.target.value }))}
+                      placeholder="e.g. 1228438041"
+                      className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                    />
                   </div>
                 </div>
 

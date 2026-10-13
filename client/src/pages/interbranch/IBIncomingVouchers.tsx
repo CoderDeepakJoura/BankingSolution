@@ -26,13 +26,25 @@ const IBIncomingVouchers: React.FC = () => {
   const fetchVouchers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await ibVoucherApi.getIncomingForBranch(user.branchid) as any;
-      if (res.success) {
-        setVouchers(res.data ?? []);
-        setSelected(prev =>
-          prev ? (res.data ?? []).find((v: IBVoucherListItem) => v.id === prev.id) ?? null : null
-        );
-      }
+      const [savingRes, loanAdvRes, loanExpRes, preMatureRes, matureRes, rdKistRes] = await Promise.all([
+        ibVoucherApi.getIncomingForBranch(user.branchid),
+        ibVoucherApi.getLoanAdvancementIncomingForBranch(user.branchid),
+        ibVoucherApi.getLoanExpenseIncomingForBranch(user.branchid),
+        ibVoucherApi.getPreMatureIncomingForBranch(user.branchid),
+        ibVoucherApi.getMatureIncomingForBranch(user.branchid),
+        ibVoucherApi.getRDKistIncomingForBranch(user.branchid),
+        // IBLoanRecovery handled separately at /ib-incoming-loan-recovery
+      ]) as any[];
+      const all: IBVoucherListItem[] = [
+        ...(savingRes?.success    ? (savingRes.data    ?? []) : []),
+        ...(loanAdvRes?.success   ? (loanAdvRes.data   ?? []) : []),
+        ...(loanExpRes?.success   ? (loanExpRes.data   ?? []) : []),
+        ...(preMatureRes?.success ? (preMatureRes.data ?? []) : []),
+        ...(matureRes?.success    ? (matureRes.data    ?? []) : []),
+        ...(rdKistRes?.success    ? (rdKistRes.data    ?? []) : []),
+      ];
+      setVouchers(all);
+      setSelected(prev => prev ? all.find((v: IBVoucherListItem) => v.id === prev.id) ?? null : null);
     } catch {
       Swal.fire("Error", "Failed to load incoming vouchers.", "error");
     } finally {
@@ -43,18 +55,54 @@ const IBIncomingVouchers: React.FC = () => {
   useEffect(() => { fetchVouchers(); }, [fetchVouchers]);
 
   const isWithdrawal = (v: IBVoucherListItem) => v.voucherType === "IBSavingWithdrawal";
+  const isLoanAdv    = (v: IBVoucherListItem) => v.voucherType === "IBLoanAdvancement";
+  const isLoanExp    = (v: IBVoucherListItem) => v.voucherType === "IBLoanExpense";
+  const isPreMature  = (v: IBVoucherListItem) => v.voucherType === "IBPreMatureFD" || v.voucherType === "IBPreMatureRD";
+  const isMature     = (v: IBVoucherListItem) => v.voucherType === "IBMatureFD" || v.voucherType === "IBMatureRD";
+  const isRDKist     = (v: IBVoucherListItem) => v.voucherType === "IBRDKist";
 
   const handleComplete = async () => {
     if (!selected) return;
     const isHOFlow = selected.flowType === "HOToBranch";
-    const wdl = isWithdrawal(selected);
+    const wdl      = isWithdrawal(selected);
+    const loan     = isLoanAdv(selected);
+    const exp      = isLoanExp(selected);
+    const preMat   = isPreMature(selected);
+    const mat      = isMature(selected);
+    const rdKist   = isRDKist(selected);
+    const fdRdLabel = (selected.voucherType === "IBPreMatureFD" || selected.voucherType === "IBMatureFD") ? "FD" : "RD";
+    const confirmTitle = exp
+      ? (isHOFlow ? "Post Loan Expense — Approve?" : "Complete IB Loan Expense?")
+      : loan
+        ? (isHOFlow ? "Advance Loan — Approve?" : "Complete IB Loan Advancement?")
+        : preMat
+          ? `Approve Pre-Mature ${fdRdLabel} Credit?`
+          : mat
+            ? `Approve Mature ${fdRdLabel} Credit?`
+            : rdKist
+              ? "Post RD Kist — Approve?"
+              : wdl
+                ? (isHOFlow ? "Approve HO Withdrawal?" : "Complete IB Withdrawal?")
+                : (isHOFlow ? "Approve HO Deposit?" : "Complete IB Voucher?");
+    const penalNote = (rdKist && (selected.penaltyAmount ?? 0) > 0)
+      ? `<br/><small class="text-gray-500">Includes penalty of ₹${(selected.penaltyAmount ?? 0).toFixed(2)}</small>`
+      : "";
+    const confirmHtml = exp
+      ? `Post Loan Expense of <strong>₹${selected.amount.toFixed(2)}</strong> to loan account <strong>${selected.destAccName}</strong>?<br/><small class="text-gray-500">This will debit the loan account (LA entry) and credit the HO reference account, and create a loan expense record.</small>`
+      : loan
+        ? `Post Loan Advancement of <strong>₹${selected.amount.toFixed(2)}</strong> to loan account <strong>${selected.destAccName}</strong>?<br/><small class="text-gray-500">This will debit the loan account (LA entry) and credit the HO reference account.</small>`
+        : preMat
+          ? `Credit <strong>₹${selected.amount.toFixed(2)}</strong> from Pre-Mature ${fdRdLabel} to saving A/C <strong>${selected.destAccName}</strong>?<br/><small class="text-gray-500">This will debit the HO reference account and credit the customer saving account, and record a saving deposit entry.</small>`
+          : mat
+            ? `Credit <strong>₹${selected.amount.toFixed(2)}</strong> from Mature ${fdRdLabel} to saving A/C <strong>${selected.destAccName}</strong>?<br/><small class="text-gray-500">This will debit the HO reference account and credit the customer saving account, and record a saving deposit entry.</small>`
+            : rdKist
+              ? `Post RD Kist of <strong>₹${selected.amount.toFixed(2)}</strong> to RD account <strong>${selected.destAccName}</strong>?<br/><small class="text-gray-500">This will debit the HO reference account and post a kist entry (RC) to the RD account.</small>${penalNote}`
+              : wdl
+                ? `Debit <strong>₹${selected.amount.toFixed(2)}</strong> from <strong>${selected.destAccName}</strong>?<br/><small class="text-gray-500">This will debit the customer saving account and credit the HO reference account.</small>`
+                : `Credit <strong>₹${selected.amount.toFixed(2)}</strong> to <strong>${selected.destAccName}</strong>?<br/><small class="text-gray-500">This will debit the HO reference account and credit the customer saving account.</small>`;
     const confirm = await Swal.fire({
-      title: wdl
-        ? (isHOFlow ? "Approve HO Withdrawal?" : "Complete IB Withdrawal?")
-        : (isHOFlow ? "Approve HO Deposit?" : "Complete IB Voucher?"),
-      html: wdl
-        ? `Debit <strong>₹${selected.amount.toFixed(2)}</strong> from <strong>${selected.destAccName}</strong>?<br/><small class="text-gray-500">This will debit the customer saving account and credit the HO reference account.</small>`
-        : `Credit <strong>₹${selected.amount.toFixed(2)}</strong> to <strong>${selected.destAccName}</strong>?<br/><small class="text-gray-500">This will debit the HO reference account and credit the customer saving account.</small>`,
+      title: confirmTitle,
+      html: confirmHtml,
       icon: "question",
       showCancelButton: true,
       confirmButtonColor: "#8b5cf6",
@@ -65,12 +113,18 @@ const IBIncomingVouchers: React.FC = () => {
 
     setCompleting(true);
     try {
-      // Both flows: dest branch always calls step3 — service dispatches by flowType internally
-      const res = await ibVoucherApi.completeStep3(selected.id, {
-        destBrId: user.branchid,
-        workingDate: sessionDate,
-        narration: narration.trim() || undefined,
-      }) as any;
+      const payload = { destBrId: user.branchid, workingDate: sessionDate, narration: narration.trim() || undefined };
+      const res = exp
+        ? await ibVoucherApi.completeLoanExpenseStep3(selected.id, payload) as any
+        : loan
+          ? await ibVoucherApi.completeLoanAdvancementStep3(selected.id, payload) as any
+          : preMat
+            ? await ibVoucherApi.completePreMatureStep3(selected.id, payload) as any
+            : mat
+              ? await ibVoucherApi.completeMatureStep3(selected.id, payload) as any
+              : rdKist
+                ? await ibVoucherApi.completeRDKistStep3(selected.id, payload) as any
+                : await ibVoucherApi.completeStep3(selected.id, { ...payload, userId: undefined }) as any;
       if (res.success) {
         await Swal.fire({ icon: "success", title: "Completed!", text: res.message, confirmButtonColor: "#8b5cf6" });
         setSelected(null);
@@ -192,9 +246,23 @@ const IBIncomingVouchers: React.FC = () => {
                             setSelected(v);
                             const fromBr = `${v.fromBrCode ? v.fromBrCode + '-' : ''}${v.fromBrName}`;
                             const destBr = `${v.destBrCode ? v.destBrCode + '-' : ''}${v.destBrName}`;
-                            setNarration(isWithdrawal(v)
-                              ? `Saving A/C ${v.destAccNo} (${v.destAccName}) at ${destBr} debited ₹${v.amount.toFixed(2)} via IB withdrawal to ${fromBr}`
-                              : `Saving A/C ${v.destAccNo} (${v.destAccName}) at ${destBr} credited ₹${v.amount.toFixed(2)} via IB deposit from ${fromBr}`);
+                            const isPM = v.voucherType === "IBPreMatureFD" || v.voucherType === "IBPreMatureRD";
+                            const isM  = v.voucherType === "IBMatureFD" || v.voucherType === "IBMatureRD";
+                            const pmLabel = v.voucherType === "IBPreMatureFD" ? "FD" : "RD";
+                            const mLabel  = v.voucherType === "IBMatureFD" ? "FD" : "RD";
+                            setNarration(isLoanExp(v)
+                              ? `Loan expense ₹${v.amount.toFixed(2)} posted to loan A/C ${v.destAccNo} (${v.destAccName}) at ${destBr} via IB from ${fromBr}`
+                              : isLoanAdv(v)
+                                ? `Loan A/C ${v.destAccNo} (${v.destAccName}) at ${destBr} advanced ₹${v.amount.toFixed(2)} via IB loan advancement from ${fromBr}`
+                                : isPM
+                                  ? `Pre-Mature ${pmLabel} ₹${v.amount.toFixed(2)} credited to saving A/C ${v.destAccNo} (${v.destAccName}) at ${destBr} from ${fromBr}`
+                                  : isM
+                                    ? `Mature ${mLabel} ₹${v.amount.toFixed(2)} credited to saving A/C ${v.destAccNo} (${v.destAccName}) at ${destBr} from ${fromBr}`
+                                    : isRDKist(v)
+                                      ? `RD Kist ₹${v.amount.toFixed(2)} for A/C ${v.destAccNo} (${v.destAccName}) at ${destBr} from ${fromBr}`
+                                      : isWithdrawal(v)
+                                        ? `Saving A/C ${v.destAccNo} (${v.destAccName}) at ${destBr} debited ₹${v.amount.toFixed(2)} via IB withdrawal to ${fromBr}`
+                                        : `Saving A/C ${v.destAccNo} (${v.destAccName}) at ${destBr} credited ₹${v.amount.toFixed(2)} via IB deposit from ${fromBr}`);
                           }}
                           className={`w-full text-left px-5 py-4 hover:bg-purple-50 transition-colors flex items-start justify-between gap-3 ${
                             selected?.id === v.id ? "bg-purple-50 border-l-4 border-purple-500" : ""
@@ -253,7 +321,20 @@ const IBIncomingVouchers: React.FC = () => {
                             </span>
                           </div>
                           <h2 className="text-lg font-bold text-gray-800">
-                            {isWithdrawal(selected) ? "IB Saving Withdrawal" : "IB Saving Deposit"} — ₹{selected.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            {isLoanExp(selected)
+                              ? "IB Loan Expense"
+                              : isLoanAdv(selected)
+                                ? "IB Loan Advancement"
+                                : isPreMature(selected)
+                                  ? `IB Pre-Mature ${selected.voucherType === "IBPreMatureFD" ? "FD" : "RD"}`
+                                  : isMature(selected)
+                                    ? `IB Mature ${selected.voucherType === "IBMatureFD" ? "FD" : "RD"}`
+                                    : isRDKist(selected)
+                                      ? "IB RD Kist"
+                                      : isWithdrawal(selected)
+                                        ? "IB Saving Withdrawal"
+                                        : "IB Saving Deposit"
+                            } — ₹{selected.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                           </h2>
                         </div>
                         <button
@@ -264,9 +345,19 @@ const IBIncomingVouchers: React.FC = () => {
                           {completing ? (
                             <><Loader2 className="w-4 h-4 animate-spin" />{selected.flowType === "HOToBranch" ? "Approving..." : "Completing..."}</>
                           ) : (
-                            <><CheckCircle className="w-4 h-4" />{isWithdrawal(selected)
-                              ? (selected.flowType === "HOToBranch" ? "Approve & Debit Account" : "Complete & Debit Account")
-                              : (selected.flowType === "HOToBranch" ? "Approve & Credit Account" : "Complete & Credit Account")
+                            <><CheckCircle className="w-4 h-4" />{isLoanExp(selected)
+                              ? (selected.flowType === "HOToBranch" ? "Approve & Post Expense" : "Complete & Post Expense")
+                              : isLoanAdv(selected)
+                                ? (selected.flowType === "HOToBranch" ? "Approve & Post Loan" : "Complete & Post Loan")
+                                : isPreMature(selected)
+                                  ? `Approve & Credit ${selected.voucherType === "IBPreMatureFD" ? "FD" : "RD"} Payout`
+                                  : isMature(selected)
+                                    ? `Approve & Credit ${selected.voucherType === "IBMatureFD" ? "FD" : "RD"} Payout`
+                                    : isRDKist(selected)
+                                      ? (selected.flowType === "HOToBranch" ? "Approve & Post Kist" : "Complete & Post Kist")
+                                      : isWithdrawal(selected)
+                                        ? (selected.flowType === "HOToBranch" ? "Approve & Debit Account" : "Complete & Debit Account")
+                                        : (selected.flowType === "HOToBranch" ? "Approve & Credit Account" : "Complete & Credit Account")
                             }</>
                           )}
                         </button>
@@ -303,7 +394,17 @@ const IBIncomingVouchers: React.FC = () => {
                       {/* Destination account */}
                       <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
                         <h3 className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-3 flex items-center gap-2">
-                          <User className="w-4 h-4" /> Destination Account ({isWithdrawal(selected) ? "will be debited" : "will be credited"})
+                          <User className="w-4 h-4" />
+                          {isLoanExp(selected) || isLoanAdv(selected)
+                            ? "Loan Account (will receive LA entry)"
+                            : isPreMature(selected)
+                              ? `Dest Saving Account (will be credited — Pre-Mature ${selected.voucherType === "IBPreMatureFD" ? "FD" : "RD"} payout)`
+                              : isMature(selected)
+                                ? `Dest Saving Account (will be credited — Mature ${selected.voucherType === "IBMatureFD" ? "FD" : "RD"} payout)`
+                                : isRDKist(selected)
+                                  ? "RD Account (will receive kist posting)"
+                                  : `Destination Account (${isWithdrawal(selected) ? "will be debited" : "will be credited"})`
+                          }
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
                           <InfoRow label="Account No" value={selected.destAccNo} />
@@ -318,10 +419,29 @@ const IBIncomingVouchers: React.FC = () => {
                           Step 1 — {selected.flowType === "HOToBranch" ? "HO Origination" : "Source Branch Entry"}
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
-                          {isWithdrawal(selected) ? (
+                          {/* Step 1 Dr/Cr labels by voucher type */}
+                          {isWithdrawal(selected) || isLoanAdv(selected) ? (
                             <>
                               <InfoRow label={selected.flowType === "HOToBranch" ? "Dr (Dest-Branch Ref at HO)" : "Dr (HO Ref)"} value={selected.step1DrAccName} />
                               <InfoRow label="Cr (Cash)" value={selected.step1CrAccName} />
+                            </>
+                          ) : isLoanExp(selected) ? (
+                            <>
+                              <InfoRow label={selected.flowType === "HOToBranch" ? "Dr (Dest-Branch Ref at HO)" : "Dr (HO Ref)"} value={selected.step1DrAccName} />
+                              <InfoRow label="Cr (Credit Account)" value={selected.step1CrAccName} />
+                            </>
+                          ) : isPreMature(selected) || isMature(selected) ? (
+                            <>
+                              <InfoRow label={`Dr (${(selected.voucherType === "IBPreMatureFD" || selected.voucherType === "IBMatureFD") ? "FD" : "RD"} Account)`} value={selected.step1DrAccName} />
+                              <InfoRow label="Cr (IB Ref at Source/HO)" value={selected.step1CrAccName} />
+                            </>
+                          ) : isRDKist(selected) ? (
+                            <>
+                              <InfoRow label="Dr (Cash)" value={selected.step1DrAccName} />
+                              <InfoRow
+                                label={selected.flowType === "HOToBranch" ? "Cr (Dest-Branch Ref at HO)" : "Cr (HO Ref)"}
+                                value={selected.step1CrAccName}
+                              />
                             </>
                           ) : (
                             <>
@@ -347,14 +467,15 @@ const IBIncomingVouchers: React.FC = () => {
                             }
                           </h3>
                           <div className="grid grid-cols-2 gap-4">
-                            {isWithdrawal(selected) ? (
+                            {/* Step 2 Dr/Cr labels by voucher type */}
+                            {isWithdrawal(selected) || isLoanAdv(selected) || isLoanExp(selected) ? (
                               <>
                                 <InfoRow label="Dr (Dest-Branch Ref at HO)" value={selected.step2DrAccName} />
                                 <InfoRow label="Cr (Source-Branch Ref at HO)" value={selected.step2CrAccName} />
                               </>
                             ) : (
                               <>
-                                <InfoRow label="Dr (Source-Branch Ref at HO)" value={selected.step2DrAccName} />
+                                <InfoRow label="Dr (Source/From-Branch Ref at HO)" value={selected.step2DrAccName} />
                                 <InfoRow label="Cr (Dest-Branch Ref at HO)" value={selected.step2CrAccName} />
                               </>
                             )}
@@ -369,26 +490,58 @@ const IBIncomingVouchers: React.FC = () => {
                           {selected.flowType === "HOToBranch" ? "Step 2" : "Step 3"} — Dest Branch Approval (This Action)
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
-                          {isWithdrawal(selected) ? (
+                          {isLoanExp(selected) || isLoanAdv(selected) ? (
                             <>
                               <div className="flex flex-col gap-0.5">
-                                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Dr (Customer Saving Account)</span>
-                                <span className="text-sm font-semibold text-gray-800">
-                                  {selected.destAccName ?? "—"}
-                                </span>
+                                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Dr (Loan Account — LA Entry)</span>
+                                <span className="text-sm font-semibold text-gray-800">{selected.destAccName ?? "—"}</span>
                               </div>
                               <div className="flex flex-col gap-0.5">
                                 <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Cr (HO Ref at Dest Branch)</span>
-                                <span className="text-sm font-semibold text-gray-800">
-                                  {selected.step3DrAccName ?? "—"}
-                                </span>
+                                <span className="text-sm font-semibold text-gray-800">{selected.step3DrAccName ?? "—"}</span>
                               </div>
                             </>
-                          ) : (
+                          ) : isWithdrawal(selected) ? (
+                            <>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Dr (Customer Saving Account)</span>
+                                <span className="text-sm font-semibold text-gray-800">{selected.destAccName ?? "—"}</span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Cr (HO Ref at Dest Branch)</span>
+                                <span className="text-sm font-semibold text-gray-800">{selected.step3DrAccName ?? "—"}</span>
+                              </div>
+                            </>
+                          ) : isRDKist(selected) ? (
                             <>
                               <InfoRow label="Dr (HO Ref at Dest Branch)" value={selected.step3DrAccName} />
                               <div className="flex flex-col gap-0.5">
-                                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Cr (Customer Saving Account)</span>
+                                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Cr (RD Account — kist posting)</span>
+                                <span className="text-sm font-semibold text-gray-800">
+                                  {selected.step3CrAccName ?? selected.destAccName ?? <em className="text-gray-400 font-normal">Will be resolved on approve</em>}
+                                </span>
+                              </div>
+                              {(selected.penaltyAmount ?? 0) > 0 && (
+                                <div className="col-span-2 mt-2 bg-amber-50 border border-amber-200 rounded p-2 flex gap-4">
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Kist Amount</span>
+                                    <span className="text-sm font-semibold text-gray-800">₹{((selected.amount ?? 0) - (selected.penaltyAmount ?? 0)).toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Penalty</span>
+                                    <span className="text-sm font-semibold text-amber-700">₹{(selected.penaltyAmount ?? 0).toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            /* Deposit and Pre-Mature: Dr=HO-Ref, Cr=Customer Saving */
+                            <>
+                              <InfoRow label="Dr (HO Ref at Dest Branch)" value={selected.step3DrAccName} />
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                                  {(isPreMature(selected) || isMature(selected)) ? "Cr (Customer Saving Account — FD/RD Payout)" : "Cr (Customer Saving Account)"}
+                                </span>
                                 <span className="text-sm font-semibold text-gray-800">
                                   {selected.step3CrAccName ?? selected.destAccName ?? <em className="text-gray-400 font-normal">Will be resolved on approve</em>}
                                 </span>
@@ -396,6 +549,22 @@ const IBIncomingVouchers: React.FC = () => {
                             </>
                           )}
                         </div>
+                        {isLoanExp(selected) && selected.expenseCategoryName && (
+                          <div className="mt-3 grid grid-cols-3 gap-3 pt-3 border-t border-violet-100">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Category</span>
+                              <span className="text-sm font-semibold text-gray-800">{selected.expenseCategoryName}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Expense Amt</span>
+                              <span className="text-sm font-semibold text-gray-800">₹{selected.expenseAmount?.toFixed(2) ?? "—"}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Loan Product</span>
+                              <span className="text-sm font-semibold text-gray-800">{selected.expenseLoanProductName ?? "—"}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Narration & date */}

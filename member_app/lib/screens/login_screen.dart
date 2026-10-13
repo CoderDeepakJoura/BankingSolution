@@ -71,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString('member_name', data['memberName'] as String);
         await prefs.setInt('member_id', data['memberId'] as int);
         await prefs.setInt('branch_id', data['branchId'] as int);
-        if (mounted) Navigator.pushReplacementNamed(context, '/dashboard');
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
       } else {
         setState(() => _error = res['message'] as String? ?? 'Login failed.');
       }

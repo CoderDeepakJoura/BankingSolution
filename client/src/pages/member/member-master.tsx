@@ -369,6 +369,7 @@ const MemberMaster = () => {
               id: Number(memberId ?? 0),
               email1: data.member?.email1 || "",
               email2: data.member?.email2 || "",
+              telegramChatId: data.member?.telegramChatId || "",
             });
 
             // Set dropdown states
@@ -591,6 +592,7 @@ const MemberMaster = () => {
     id: 0,
     email1: "",
     email2: "",
+    telegramChatId: "",
   });
 
   const firstSessionFromDateStr = user.firstSessionFromDate
@@ -1058,6 +1060,7 @@ const isOpeningEntry = !!(
       id: Number(memberId),
       email1: memberData.email1,
       email2: memberData.email2,
+      telegramChatId: memberData.telegramChatId,
     };
 
     const documentDetailsDTO: MemberDocDetailsDTO = {
@@ -1404,6 +1407,7 @@ const isOpeningEntry = !!(
       id: Number(memberId ?? 0),
       email1: "",
       email2: "",
+      telegramChatId: "",
     });
 
     // Reset voucher data
@@ -2936,15 +2940,38 @@ const isOpeningEntry = !!(
             errors={errorsByField.email2 || []}
           >
             <input
-              type="email" // Changed type to email
+              type="email"
               value={memberData.email2}
               onChange={(e) => handleInputChange("email2", e.target.value)}
               onBlur={() => handleFieldBlur("email2")}
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-              placeholder="example@domain.com" // Updated placeholder
-              // Removed readOnly
-              // Removed maxLength (emails can be long)
-              autoComplete="email" // Added for better browser autofill
+              placeholder="example@domain.com"
+              autoComplete="email"
+            />
+          </FormField>
+        </div>
+      </div>
+
+      {/* Telegram Notifications */}
+      <div className="bg-sky-50 p-6 rounded-lg border border-sky-200">
+        <h3 className="text-lg font-semibold text-sky-800 mb-1 flex items-center gap-2">
+          Telegram Notifications (Optional)
+        </h3>
+        <p className="text-xs text-sky-600 mb-4">Member will receive auto-debit transaction alerts on Telegram when their Chat ID is saved here.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            name="telegramChatId"
+            label="Telegram Chat ID"
+            errors={errorsByField.telegramChatId || []}
+          >
+            <input
+              type="text"
+              value={memberData.telegramChatId}
+              onChange={(e) => handleInputChange("telegramChatId", e.target.value)}
+              onBlur={() => handleFieldBlur("telegramChatId")}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-sky-500 outline-none"
+              placeholder="e.g. 1228438041"
+              maxLength={50}
             />
           </FormField>
         </div>

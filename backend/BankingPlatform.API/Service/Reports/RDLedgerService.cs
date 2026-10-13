@@ -192,7 +192,10 @@ namespace BankingPlatform.API.Service.Reports
             var contraAccountIds = contraEntries.Select(e => e.AccountId).Distinct().ToList();
             var accountNameMap = await _context.accountmaster.AsNoTracking()
                 .Where(x => contraAccountIds.Contains(x.ID))
-                .ToDictionaryAsync(x => x.ID, x => x.AccountName ?? "");
+                .ToDictionaryAsync(x => x.ID,
+                    x => !string.IsNullOrEmpty(x.AccPrefix)
+                        ? $"{x.AccPrefix}-{x.AccSuffix} {x.AccountName}"
+                        : x.AccountName ?? "");
 
             var contraByVoucher = contraEntries
                 .GroupBy(e => e.VoucherID)

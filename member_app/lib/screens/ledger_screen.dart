@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -38,10 +37,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   void initState() {
     super.initState();
     final now = DateTime.now();
-    // Default: current financial year (April 1)
-    _fromDate = now.month >= 4
-        ? DateTime(now.year, 4, 1)
-        : DateTime(now.year - 1, 4, 1);
+    _fromDate = now.month >= 4 ? DateTime(now.year, 4, 1) : DateTime(now.year - 1, 4, 1);
     _toDate = now;
     _fetchLedger();
   }
@@ -81,294 +77,62 @@ class _LedgerScreenState extends State<LedgerScreen> {
       ),
     );
     if (picked != null) {
-      setState(() {
-        if (isFrom) _fromDate = picked;
-        else _toDate = picked;
-      });
-      _fetchLedger();
+      setState(() { isFrom ? _fromDate = picked : _toDate = picked; });
     }
   }
 
-  String _fmt(double amount) =>
-      NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2).format(amount.abs());
+  String _fmt(double v) =>
+      NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2).format(v.abs());
 
-  String _fmtDate(DateTime d) => DateFormat('dd MMM yy').format(d);
+  String _fmtShort(double v) =>
+      NumberFormat.currency(locale: 'en_IN', symbol: '₹ ', decimalDigits: 0).format(v.abs());
 
-  Future<void> _downloadPdf() async {
-    if (_ledger == null) return;
-    final pdfBytes = await _buildPdf();
-    await Printing.layoutPdf(onLayout: (_) => pdfBytes);
-  }
+  String _fmtDate(DateTime d) => DateFormat('dd-MM-yyyy').format(d);
+  String _fmtDateShort(DateTime d) => DateFormat('dd-MM-yy').format(d);
 
-  Future<Uint8List> _buildPdf() async {
-    // Load Noto Sans — full Unicode support including ₹ and em-dash
-    final font = await PdfGoogleFonts.notoSansRegular();
-    final fontBold = await PdfGoogleFonts.notoSansBold();
+  bool get _isLoan => widget.account.accountType == 'Loan';
 
-    final doc = pw.Document(
-      theme: pw.ThemeData.withFont(base: font, bold: fontBold),
-    );
-    final ledger = _ledger!;
-    final dateRange =
-        '${DateFormat('dd MMM yyyy').format(_fromDate)} to ${DateFormat('dd MMM yyyy').format(_toDate)}';
-
-    doc.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        header: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              ledger.accountName,
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  '${widget.account.accountType} — ${ledger.accountIdentifier}',
-                  style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey600),
-                ),
-                pw.Text(
-                  dateRange,
-                  style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
-                ),
-              ],
-            ),
-            pw.Divider(height: 12),
-          ],
-        ),
-        build: (ctx) => [
-          // Opening balance row
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-            color: PdfColors.grey100,
-            child: pw.Row(
-              children: [
-                pw.Expanded(flex: 2, child: pw.Text('Opening Balance',
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
-                pw.Expanded(child: pw.SizedBox()),
-                pw.Expanded(child: pw.SizedBox()),
-                pw.Expanded(
-                  child: pw.Text(
-                    _fmt(ledger.openingBalance),
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
-                    textAlign: pw.TextAlign.right,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Table header
-          pw.Container(
-            color: const PdfColor.fromInt(0xFF1A56DB),
-            padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 8),
-            child: pw.Row(
-              children: [
-                pw.Expanded(flex: 1, child: _hdr('Date')),
-                pw.Expanded(flex: 3, child: _hdr('Particulars')),
-                pw.Expanded(flex: 2, child: _hdr('Debit', right: true)),
-                pw.Expanded(flex: 2, child: _hdr('Credit', right: true)),
-                pw.Expanded(flex: 2, child: _hdr('Balance', right: true)),
-              ],
-            ),
-          ),
-
-          // Entries
-          ...ledger.entries.asMap().entries.map((e) {
-            final entry = e.value;
-            final bg = e.key.isEven ? PdfColors.white : PdfColors.grey50;
-            return pw.Container(
-              color: bg,
-              padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
-              child: pw.Row(
-                children: [
-                  pw.Expanded(flex: 1, child: pw.Text(_fmtDate(entry.voucherDate),
-                      style: const pw.TextStyle(fontSize: 9))),
-                  pw.Expanded(flex: 3, child: pw.Text(entry.particulars,
-                      style: const pw.TextStyle(fontSize: 9))),
-                  pw.Expanded(flex: 2, child: pw.Text(
-                      entry.dr != null ? _fmt(entry.dr!) : '',
-                      style: const pw.TextStyle(fontSize: 9, color: PdfColors.red700),
-                      textAlign: pw.TextAlign.right)),
-                  pw.Expanded(flex: 2, child: pw.Text(
-                      entry.cr != null ? _fmt(entry.cr!) : '',
-                      style: const pw.TextStyle(fontSize: 9, color: PdfColors.green700),
-                      textAlign: pw.TextAlign.right)),
-                  pw.Expanded(flex: 2, child: pw.Text(
-                      _fmt(entry.balance),
-                      style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
-                      textAlign: pw.TextAlign.right)),
-                ],
-              ),
-            );
-          }),
-
-          pw.SizedBox(height: 4),
-          pw.Divider(),
-
-          // Totals
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 8),
-            color: PdfColors.grey100,
-            child: pw.Row(
-              children: [
-                pw.Expanded(flex: 1, child: pw.SizedBox()),
-                pw.Expanded(flex: 3, child: pw.Text('Closing Balance',
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
-                pw.Expanded(flex: 2, child: pw.Text(_fmt(ledger.totalDr),
-                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.red700),
-                    textAlign: pw.TextAlign.right)),
-                pw.Expanded(flex: 2, child: pw.Text(_fmt(ledger.totalCr),
-                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.green700),
-                    textAlign: pw.TextAlign.right)),
-                pw.Expanded(flex: 2, child: pw.Text(_fmt(ledger.closingBalance),
-                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-                    textAlign: pw.TextAlign.right)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return doc.save();
-  }
-
-  pw.Widget _hdr(String text, {bool right = false}) => pw.Text(
-    text,
-    style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 9),
-    textAlign: right ? pw.TextAlign.right : pw.TextAlign.left,
-  );
-
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      body: NestedScrollView(
-        headerSliverBuilder: (ctx, _) => [
-          SliverAppBar(
-            expandedHeight: 160,
-            pinned: true,
-            backgroundColor: widget.color,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+      appBar: AppBar(
+        backgroundColor: widget.color,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          widget.account.accountType == 'Saving' ? 'Saving Account'
+              : widget.account.accountType == 'FD' ? 'Fixed Deposit'
+              : widget.account.accountType == 'RD' ? 'Recurring Deposit'
+              : widget.account.accountType == 'Loan' ? 'My Loan Account'
+              : widget.account.accountType,
+          style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+        ),
+        actions: [
+          if (_ledger != null)
+            IconButton(
+              icon: const Icon(Icons.download_outlined, color: Colors.white),
+              tooltip: 'Download PDF',
+              onPressed: _downloadPdf,
             ),
-            title: Text(
-              widget.account.accountName,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
-              overflow: TextOverflow.ellipsis,
-            ),
-            actions: [
-              if (_ledger != null)
-                IconButton(
-                  icon: const Icon(Icons.download_outlined, color: Colors.white),
-                  tooltip: 'Download PDF',
-                  onPressed: _downloadPdf,
-                ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Builder(
-                builder: (ctx) {
-                  final topPad = MediaQuery.of(ctx).padding.top + kToolbarHeight;
-                  return Container(
-                    clipBehavior: Clip.hardEdge,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [widget.color, widget.color.withOpacity(0.75)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    padding: EdgeInsets.fromLTRB(24, topPad + 8, 24, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(widget.icon, color: Colors.white, size: 18),
-                            const SizedBox(width: 7),
-                            Text(
-                              widget.account.accountType,
-                              style: GoogleFonts.inter(color: Colors.white.withOpacity(0.8), fontSize: 12),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.account.accountName,
-                          style: GoogleFonts.inter(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.account.accountIdentifier,
-                          style: GoogleFonts.inter(color: Colors.white.withOpacity(0.6), fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
         ],
-        body: Column(
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
           children: [
-            // Date range selector
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(child: _DateChip(
-                    label: 'From',
-                    date: _fromDate,
-                    onTap: () => _pickDate(true),
-                    color: widget.color,
-                  )),
-                  const SizedBox(width: 10),
-                  Expanded(child: _DateChip(
-                    label: 'To',
-                    date: _toDate,
-                    onTap: () => _pickDate(false),
-                    color: widget.color,
-                  )),
-                  const SizedBox(width: 10),
-                  InkWell(
-                    onTap: _fetchLedger,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: widget.color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.search, color: widget.color, size: 22),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // ── Top info card ──────────────────────────────────────────────
+            _buildInfoCard(),
 
-            // Content
+            // ── Date pickers + search ──────────────────────────────────────
+            _buildDateRow(),
+
+            // ── Ledger table ───────────────────────────────────────────────
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
@@ -376,21 +140,290 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       ? _buildError()
                       : _buildLedger(),
             ),
+
+            // ── Download button ────────────────────────────────────────────
+            if (_ledger != null && _ledger!.entries.isNotEmpty)
+              _buildDownloadBtn(),
           ],
         ),
       ),
     );
   }
 
+  // ── Info card ─────────────────────────────────────────────────────────────
+  Widget _buildInfoCard() {
+    final ledger = _ledger;
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: Column(
+        children: [
+          // Account number
+          Text(
+            'Account No.: ${widget.account.accountIdentifier}',
+            style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 4),
+          Text('Available Balance',
+            style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
+          const SizedBox(height: 4),
+          Text(
+            _fmt(widget.account.balance),
+            style: GoogleFonts.inter(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: _isLoan && widget.account.balance > 0
+                  ? AppColors.error
+                  : const Color(0xFF0D8A4E),
+            ),
+          ),
+
+          // Summary stats (only once ledger is loaded)
+          if (ledger != null) ...[
+            const SizedBox(height: 14),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _statBox('Opening Bal.', _fmtShort(ledger.openingBalance), Colors.grey.shade700),
+                _vDivider(),
+                _statBox(
+                  _isLoan ? 'Total Payment' : 'Total Deposit',
+                  _fmtShort(ledger.totalCr),
+                  const Color(0xFF0D8A4E),
+                ),
+                _vDivider(),
+                _statBox(
+                  _isLoan ? 'Total Disbursed' : 'Total Withdrawal',
+                  _fmtShort(ledger.totalDr),
+                  AppColors.error,
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _statBox(String label, String value, Color color) => Expanded(
+    child: Column(
+      children: [
+        Text(label,
+          style: GoogleFonts.inter(fontSize: 10, color: Colors.grey.shade500),
+          textAlign: TextAlign.center),
+        const SizedBox(height: 3),
+        Text(value,
+          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis),
+      ],
+    ),
+  );
+
+  Widget _vDivider() => Container(width: 1, height: 32, color: Colors.grey.shade200);
+
+  // ── Date row ──────────────────────────────────────────────────────────────
+  Widget _buildDateRow() => Container(
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border(top: BorderSide(color: Colors.grey.shade100)),
+      boxShadow: [
+        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2)),
+      ],
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _DatePicker(
+              label: 'From Date',
+              date: _fromDate,
+              color: widget.color,
+              onTap: () => _pickDate(true),
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _DatePicker(
+              label: 'To Date',
+              date: _toDate,
+              color: widget.color,
+              onTap: () => _pickDate(false),
+            )),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: ElevatedButton(
+            onPressed: _fetchLedger,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: widget.color,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+            child: const Text('Search'),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  // ── Ledger table ──────────────────────────────────────────────────────────
+  Widget _buildLedger() {
+    final ledger = _ledger;
+    if (ledger == null || ledger.entries.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.receipt_long_outlined, size: 56, color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+            Text('No transactions in this period',
+              style: GoogleFonts.inter(color: Colors.grey.shade400, fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Table header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          color: widget.color,
+          child: Row(
+            children: [
+              _hdr('Date', flex: 2),
+              _hdr('Particulars', flex: 3),
+              _hdr(_isLoan ? 'Payment' : 'Deposit', flex: 2, right: true),
+              _hdr(_isLoan ? 'Disbursed' : 'Withdraw', flex: 2, right: true),
+              _hdr('Balance', flex: 2, right: true),
+            ],
+          ),
+        ),
+
+        // Rows
+        Expanded(
+          child: ListView.builder(
+            itemCount: ledger.entries.length,
+            itemBuilder: (ctx, i) {
+              final e = ledger.entries[i];
+              final isEven = i.isEven;
+              return Container(
+                color: isEven ? Colors.white : const Color(0xFFF8FAFC),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        _fmtDateShort(e.voucherDate),
+                        style: GoogleFonts.inter(fontSize: 10, color: Colors.grey.shade600),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        e.particulars,
+                        style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF1A202C)),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        e.cr != null ? _fmtShort(e.cr!) : '-',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          color: e.cr != null ? const Color(0xFF0D8A4E) : Colors.grey.shade400,
+                          fontWeight: e.cr != null ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        e.dr != null ? _fmtShort(e.dr!) : '-',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          color: e.dr != null ? AppColors.error : Colors.grey.shade400,
+                          fontWeight: e.dr != null ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        _fmtShort(e.balance),
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1A202C),
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _hdr(String text, {int flex = 1, bool right = false}) => Expanded(
+    flex: flex,
+    child: Text(
+      text,
+      style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10),
+      textAlign: right ? TextAlign.right : TextAlign.left,
+    ),
+  );
+
+  // ── Download button ───────────────────────────────────────────────────────
+  Widget _buildDownloadBtn() => Container(
+    padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + MediaQuery.of(context).padding.bottom),
+    color: Colors.white,
+    child: SizedBox(
+      width: double.infinity,
+      height: 46,
+      child: ElevatedButton.icon(
+        onPressed: _downloadPdf,
+        icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+        label: const Text('Download Statement (PDF)'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF0D8A4E),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+      ),
+    ),
+  );
+
+  // ── Error ─────────────────────────────────────────────────────────────────
   Widget _buildError() => Center(
     child: Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 48, color: AppColors.error.withOpacity(0.7)),
+          Icon(Icons.error_outline, size: 48, color: AppColors.error.withOpacity(0.6)),
           const SizedBox(height: 12),
-          Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14)),
+          Text(_error!, textAlign: TextAlign.center,
+            style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade600)),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _fetchLedger,
@@ -402,130 +435,140 @@ class _LedgerScreenState extends State<LedgerScreen> {
     ),
   );
 
-  Widget _buildLedger() {
-    final ledger = _ledger;
-    if (ledger == null || ledger.entries.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.receipt_long_outlined, size: 56, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            Text('No transactions in this period', style: TextStyle(color: Colors.grey.shade500)),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // Summary row
-        _SummaryBar(ledger: ledger, color: widget.color, fmt: _fmt),
-
-        // Table header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: widget.color.withOpacity(0.1),
-          child: Row(
-            children: [
-              Expanded(flex: 2, child: Text('Date', style: _headerStyle())),
-              Expanded(flex: 3, child: Text('Particulars', style: _headerStyle())),
-              Expanded(flex: 2, child: Text('Debit', style: _headerStyle(), textAlign: TextAlign.right)),
-              Expanded(flex: 2, child: Text('Credit', style: _headerStyle(), textAlign: TextAlign.right)),
-              Expanded(flex: 2, child: Text('Balance', style: _headerStyle(), textAlign: TextAlign.right)),
-            ],
-          ),
-        ),
-
-        // Entries
-        Expanded(
-          child: ListView.builder(
-            itemCount: ledger.entries.length,
-            itemBuilder: (ctx, i) {
-              final e = ledger.entries[i];
-              final bg = i.isEven ? Colors.white : const Color(0xFFF8FAFC);
-
-              return Container(
-                color: bg,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        DateFormat('dd/MM/yy').format(e.voucherDate),
-                        style: GoogleFonts.inter(fontSize: 11, color: Colors.grey.shade600),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        e.particulars,
-                        style: GoogleFonts.inter(fontSize: 11),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        e.dr != null ? _fmt(e.dr!) : '',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: e.dr != null ? AppColors.error : null,
-                          fontWeight: e.dr != null ? FontWeight.w500 : FontWeight.normal,
-                        ),
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        e.cr != null ? _fmt(e.cr!) : '',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: e.cr != null ? AppColors.success : null,
-                          fontWeight: e.cr != null ? FontWeight.w500 : FontWeight.normal,
-                        ),
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        _fmt(e.balance),
-                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(delay: Duration(milliseconds: 20 * i));
-            },
-          ),
-        ),
-      ],
-    );
+  // ── PDF ───────────────────────────────────────────────────────────────────
+  Future<void> _downloadPdf() async {
+    if (_ledger == null) return;
+    final bytes = await _buildPdf();
+    await Printing.layoutPdf(onLayout: (_) => bytes);
   }
 
-  TextStyle _headerStyle() => GoogleFonts.inter(
-    fontSize: 11,
-    fontWeight: FontWeight.w700,
-    color: widget.color,
+  Future<Uint8List> _buildPdf() async {
+    final font = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
+    final doc = pw.Document(theme: pw.ThemeData.withFont(base: font, bold: fontBold));
+    final ledger = _ledger!;
+    final dateRange =
+        '${DateFormat('dd MMM yyyy').format(_fromDate)} to ${DateFormat('dd MMM yyyy').format(_toDate)}';
+    final crLabel = _isLoan ? 'Payment' : 'Deposit';
+    final drLabel = _isLoan ? 'Disbursed' : 'Withdraw';
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (ctx) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(widget.account.accountName,
+              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 4),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('${widget.account.accountType} — ${ledger.accountIdentifier}',
+                  style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey600)),
+                pw.Text(dateRange,
+                  style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+              ],
+            ),
+            pw.Divider(height: 12),
+          ],
+        ),
+        build: (ctx) => [
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+            color: PdfColors.grey100,
+            child: pw.Row(children: [
+              pw.Expanded(flex: 2, child: pw.Text('Opening Balance',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+              pw.Expanded(child: pw.SizedBox()),
+              pw.Expanded(child: pw.SizedBox()),
+              pw.Expanded(child: pw.Text(_fmt(ledger.openingBalance),
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+                textAlign: pw.TextAlign.right)),
+            ]),
+          ),
+          pw.Container(
+            color: const PdfColor.fromInt(0xFF1A56DB),
+            padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+            child: pw.Row(children: [
+              pw.Expanded(flex: 1, child: _ph('Date')),
+              pw.Expanded(flex: 3, child: _ph('Particulars')),
+              pw.Expanded(flex: 2, child: _ph(crLabel, right: true)),
+              pw.Expanded(flex: 2, child: _ph(drLabel, right: true)),
+              pw.Expanded(flex: 2, child: _ph('Balance', right: true)),
+            ]),
+          ),
+          ...ledger.entries.asMap().entries.map((e) {
+            final entry = e.value;
+            final bg = e.key.isEven ? PdfColors.white : PdfColors.grey50;
+            return pw.Container(
+              color: bg,
+              padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+              child: pw.Row(children: [
+                pw.Expanded(flex: 1, child: pw.Text(_fmtDateShort(entry.voucherDate),
+                  style: const pw.TextStyle(fontSize: 9))),
+                pw.Expanded(flex: 3, child: pw.Text(entry.particulars,
+                  style: const pw.TextStyle(fontSize: 9))),
+                pw.Expanded(flex: 2, child: pw.Text(
+                  entry.cr != null ? _fmt(entry.cr!) : '',
+                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.green700),
+                  textAlign: pw.TextAlign.right)),
+                pw.Expanded(flex: 2, child: pw.Text(
+                  entry.dr != null ? _fmt(entry.dr!) : '',
+                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.red700),
+                  textAlign: pw.TextAlign.right)),
+                pw.Expanded(flex: 2, child: pw.Text(_fmt(entry.balance),
+                  style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                  textAlign: pw.TextAlign.right)),
+              ]),
+            );
+          }),
+          pw.SizedBox(height: 4),
+          pw.Divider(),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+            color: PdfColors.grey100,
+            child: pw.Row(children: [
+              pw.Expanded(flex: 1, child: pw.SizedBox()),
+              pw.Expanded(flex: 3, child: pw.Text('Closing Balance',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+              pw.Expanded(flex: 2, child: pw.Text(_fmt(ledger.totalCr),
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.green700),
+                textAlign: pw.TextAlign.right)),
+              pw.Expanded(flex: 2, child: pw.Text(_fmt(ledger.totalDr),
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.red700),
+                textAlign: pw.TextAlign.right)),
+              pw.Expanded(flex: 2, child: pw.Text(_fmt(ledger.closingBalance),
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                textAlign: pw.TextAlign.right)),
+            ]),
+          ),
+        ],
+      ),
+    );
+    return doc.save();
+  }
+
+  pw.Widget _ph(String text, {bool right = false}) => pw.Text(
+    text,
+    style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 9),
+    textAlign: right ? pw.TextAlign.right : pw.TextAlign.left,
   );
 }
 
-class _DateChip extends StatelessWidget {
+// ── Date picker widget ─────────────────────────────────────────────────────
+class _DatePicker extends StatelessWidget {
   final String label;
   final DateTime date;
-  final VoidCallback onTap;
   final Color color;
+  final VoidCallback onTap;
 
-  const _DateChip({
+  const _DatePicker({
     required this.label,
     required this.date,
-    required this.onTap,
     required this.color,
+    required this.onTap,
   });
 
   @override
@@ -534,23 +577,25 @@ class _DateChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFFF8FAFC),
         ),
         child: Row(
           children: [
             Icon(Icons.calendar_today_outlined, size: 14, color: color),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: GoogleFonts.inter(fontSize: 9, color: Colors.grey.shade500)),
+                Text(label,
+                  style: GoogleFonts.inter(fontSize: 9, color: Colors.grey.shade500)),
                 Text(
-                  DateFormat('dd MMM yyyy').format(date),
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                  DateFormat('dd-MM-yyyy').format(date),
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1A202C)),
                 ),
               ],
             ),
@@ -559,58 +604,4 @@ class _DateChip extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SummaryBar extends StatelessWidget {
-  final LedgerData ledger;
-  final Color color;
-  final String Function(double) fmt;
-
-  const _SummaryBar({required this.ledger, required this.color, required this.fmt});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: color.withOpacity(0.06),
-      child: Row(
-        children: [
-          _stat('Opening', fmt(ledger.openingBalance), Colors.grey),
-          _divider(),
-          _stat('Total Dr', fmt(ledger.totalDr), AppColors.error),
-          _divider(),
-          _stat('Total Cr', fmt(ledger.totalCr), AppColors.success),
-          _divider(),
-          _stat('Closing', fmt(ledger.closingBalance), color, bold: true),
-        ],
-      ),
-    );
-  }
-
-  Widget _stat(String label, String value, Color vColor, {bool bold = false}) => Expanded(
-    child: Column(
-      children: [
-        Text(label,
-          style: GoogleFonts.inter(fontSize: 9, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 2),
-        Text(value,
-          style: GoogleFonts.inter(
-            fontSize: 11,
-            fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
-            color: vColor,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    ),
-  );
-
-  Widget _divider() => Container(
-    height: 30,
-    width: 1,
-    color: Colors.grey.withOpacity(0.2),
-    margin: const EdgeInsets.symmetric(horizontal: 4),
-  );
 }
