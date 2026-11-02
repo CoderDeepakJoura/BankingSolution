@@ -37,7 +37,7 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                 if (result != "Success")
                     return BadRequest(new ResponseDto { Success = false, Message = result });
 
-                return Ok(new ResponseDto { Success = true, Message = $"Loan account created successfully. Account ID: {accountId}" });
+                return Ok(new { success = true, message = "Loan account created successfully.", data = new { accId = accountId } });
             }
             catch (Exception ex)
             {

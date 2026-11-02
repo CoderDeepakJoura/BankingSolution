@@ -145,6 +145,10 @@ namespace BankingPlatform.API.Service.ProductMasters.Savings
                         existingRule.MinBalanceAmt = dto.SavingsProductRulesDTO.MinBalanceAmt;
                         existingRule.ModifiedDate = DateTime.UtcNow;
                     }
+                    else
+                    {
+                        _context.savingproductrules.Add(MapToEntity(dto.SavingsProductRulesDTO, product.Id));
+                    }
                 }
 
                 // Update Posting Heads
@@ -159,6 +163,10 @@ namespace BankingPlatform.API.Service.ProductMasters.Savings
                         existingPosting.PrincipalBalHeadCode = dto.SavingsProductPostingHeadsDTO.PrincipalBalHeadCode;
                         existingPosting.SuspendedBalHeadCode = dto.SavingsProductPostingHeadsDTO.SuspendedBalHeadCode;
                         existingPosting.IntPayableHeadCode = dto.SavingsProductPostingHeadsDTO.IntPayableHeadCode;
+                    }
+                    else
+                    {
+                        _context.savingproductpostingheads.Add(MapToEntity(dto.SavingsProductPostingHeadsDTO, product.Id));
                     }
                 }
 
@@ -186,6 +194,10 @@ namespace BankingPlatform.API.Service.ProductMasters.Savings
                         existingInterest.CompoundInterval = dto.SavingsProductInterestRulesDTO.CompoundInterval;
                         existingInterest.IntCompoundDate = dto.SavingsProductInterestRulesDTO.IntCompoundDate;
                         existingInterest.ActionOnIntPosting = dto.SavingsProductInterestRulesDTO.ActionOnIntPosting;
+                    }
+                    else
+                    {
+                        _context.savingproductinterestrules.Add(MapToEntity(dto.SavingsProductInterestRulesDTO, product.Id));
                     }
                 }
 

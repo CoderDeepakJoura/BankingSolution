@@ -227,6 +227,10 @@ import AgentLevelData from "../pages/Agent/agent-level-data";
 import AgentMasterOperations from "../pages/Agent/agent-master-operations";
 import AgentMasterData from "../pages/Agent/agent-master-data";
 import UpdateAgentAccounts from "../pages/Agent/update-agent-accounts";
+import AgentLoginManagement from "../pages/Agent/agent-login-management";
+import ReceiptPostingRD from "../pages/Agent/receipt-posting-rd";
+import ReceiptPostingSaving from "../pages/Agent/receipt-posting-saving";
+import ReceiptPostingLoan from "../pages/Agent/receipt-posting-loan";
 
 export interface RouteEntry {
   path: string;
@@ -577,6 +581,10 @@ export const ROUTES: RouteEntry[] = [
   { path: "/agent-master",                   element: <AgentMasterOperations />,       label: "Agent Master",             category: "Agent" },
   { path: "/agent-master-data",              element: <AgentMasterData /> },
   { path: "/update-agent-accounts",          element: <UpdateAgentAccounts />,         label: "Update Agent of Accounts", category: "Agent" },
+  { path: "/agent-login-management",         element: <AgentLoginManagement />,        label: "Agent Login Management",   category: "Agent" },
+  { path: "/receipt-posting-rd",             element: <ReceiptPostingRD />,            label: "Receipt Posting — RD",     category: "Agent" },
+  { path: "/receipt-posting-saving",         element: <ReceiptPostingSaving />,        label: "Receipt Posting — Saving", category: "Agent" },
+  { path: "/receipt-posting-loan",           element: <ReceiptPostingLoan />,          label: "Receipt Posting — Loan",   category: "Agent" },
 
   // ── Super User ────────────────────────────────────────────────────────────
   { path: "/su-settings",                     element: <SuperUserSettings />,           label: "Super User Settings",      category: "Super User",    suOnly: true },

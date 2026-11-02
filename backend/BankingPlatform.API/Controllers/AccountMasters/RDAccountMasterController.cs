@@ -24,15 +24,9 @@ namespace BankingPlatform.API.Controllers.AccountMasters
         {
             try
             {
-                var result = await _service.CreateNewRDAccAsync(
-                    dto!
-                );
-                if (result != "Success") return BadRequest(new ResponseDto { Success = false, Message = result });
-                return Ok(new ResponseDto
-                {
-                    Success = true,
-                    Message = "RD Account saved successfully."
-                });
+                var (error, newAccId) = await _service.CreateNewRDAccAsync(dto!);
+                if (!string.IsNullOrEmpty(error)) return BadRequest(new ResponseDto { Success = false, Message = error });
+                return Ok(new { success = true, message = "RD Account saved successfully.", data = new { accId = newAccId } });
             }
             catch (Exception ex)
             {

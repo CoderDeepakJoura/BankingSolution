@@ -157,6 +157,91 @@ namespace BankingPlatform.API.Service.Vouchers.RD
             return ("Success", nextVrNo);
         }
 
+        public async Task<(string result, int voucherNo, int voucherId)> AddBatchRDKistVoucherAsync(
+            int branchId, DateTime voucherDate, int cashAccountId,
+            List<(int rdAccountId, decimal amount)> kists, string narration)
+        {
+            int nextVrNo = 0;
+            int newVoucherId = 0;
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                decimal total = kists.Sum(k => k.amount);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, voucherDate);
+                nextVrNo = _vrLease.VoucherNo;
+                bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
+                int userId = int.Parse(_commonfunctions.GetCurrentUserId()!);
+                string status = isAutoVerification ? "V" : "A";
+                DateTime vDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Unspecified);
+                DateTime valueDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
+                string batchNarration = kists.Count == 1 ? narration : $"Agent batch RD kist — {kists.Count} accounts";
+
+                var voucherEntity = new VoucherDTO
+                {
+                    ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                    VoucherDate = vDate,
+                    AddedBy = userId,
+                    BrID = branchId,
+                    ModifiedBy = 0,
+                    VerifiedBy = isAutoVerification ? userId : 0,
+                    VoucherNarration = batchNarration,
+                    OtherBrID = 0,
+                    VoucherNo = nextVrNo,
+                    VoucherStatus = status,
+                    VoucherType = (int)Enums.VoucherType.RD,
+                    VoucherSubType = (int)Enums.VoucherSubType.Kist,
+                };
+                var voucherInfo = _memberService.MapToEntity(voucherEntity);
+                await _context.voucher.AddAsync(voucherInfo);
+                await _context.SaveChangesAsync();
+                newVoucherId = voucherInfo.Id;
+
+                int row = 1;
+                foreach (var (rdAccountId, amount) in kists)
+                {
+                    var rdAccDet = await _context.rdaccountdetail
+                        .Where(x => x.BrId == branchId && x.AccId == rdAccountId)
+                        .OrderByDescending(x => x.Id)
+                        .FirstOrDefaultAsync();
+                    int rdAccDetId = rdAccDet?.Id ?? 0;
+
+                    var rdAccName = await _context.accountmaster
+                        .Where(x => x.ID == rdAccountId && x.BranchId == branchId)
+                        .Select(x => x.AccountName).FirstOrDefaultAsync() ?? rdAccountId.ToString();
+
+                    var crRdAcc = await _commonfunctions.GetAccountHeadCodeFromAccId(rdAccountId, branchId);
+                    var voucherCrRD = _memberService.voucherCreditDebitDetails(
+                        crRdAcc, rdAccountId, branchId, Enums.VoucherStatus.Cr.ToString(),
+                        $"RD Kist Cr - {rdAccName}, Amt: {amount}", amount,
+                        status, valueDate, "Cr", newVoucherId, row++);
+                    await _context.vouchercreditdebitdetails.AddAsync(voucherCrRD);
+                    await _context.SaveChangesAsync();
+
+                    var rdDetail = _voucherMapper.voucherRDDetails(
+                        branchId, rdAccountId, rdAccDetId, voucherCrRD.Id, newVoucherId,
+                        (double)amount, 0, "RC", status, vDate, valueDate);
+                    await _context.voucherrddetail.AddAsync(rdDetail);
+                }
+
+                var drCashAcc = await _commonfunctions.GetAccountHeadCodeFromAccId(cashAccountId, branchId);
+                var voucherDrCash = _memberService.voucherCreditDebitDetails(
+                    drCashAcc, cashAccountId, branchId, Enums.VoucherStatus.Dr.ToString(),
+                    batchNarration, total, status, valueDate, "Dr", newVoucherId, row);
+                await _context.vouchercreditdebitdetails.AddAsync(voucherDrCash);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return (ex.Message ?? "Error creating batch RD kist voucher.", 0, 0);
+            }
+
+            return ("Success", nextVrNo, newVoucherId);
+        }
+
         public async Task<(string result, int voucherNo)> UpdateRDKistVoucher(int voucherId, RDKistVoucherDTO dto)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();

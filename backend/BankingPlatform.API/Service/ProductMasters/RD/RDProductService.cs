@@ -134,6 +134,10 @@ namespace BankingPlatform.API.Service.ProductMasters.RD
                         existingDefinition.MinPeriodLimitMonths = dto.RdProductRulesDTO.PeriodLimitMin;
                         existingDefinition.MaxPeriodLimitMonths = dto.RdProductRulesDTO.PeriodLimitMax;
                     }
+                    else
+                    {
+                        _context.rdproductdefinition.Add(MapToEntity(dto.RdProductRulesDTO, product.Id));
+                    }
                 }
 
                 // Update posting heads
@@ -146,6 +150,10 @@ namespace BankingPlatform.API.Service.ProductMasters.RD
                     {
                         existingPosting.PrincipalBalHeadCode = dto.RdProductPostingHeadsDTO.PrincipalBalHeadCode;
                         existingPosting.IntPayableHeadCode = dto.RdProductPostingHeadsDTO.IntPayableHeadCode;
+                    }
+                    else
+                    {
+                        _context.rdproductposting.Add(MapToEntity(dto.RdProductPostingHeadsDTO, product.Id));
                     }
                 }
 

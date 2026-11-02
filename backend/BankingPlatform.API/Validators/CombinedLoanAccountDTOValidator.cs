@@ -28,9 +28,8 @@ public class AccountMasterDTOValidator : AbstractValidator<AccountMasterDTO>
             .GreaterThan(0).WithMessage("Account type is required.");
 
         RuleFor(x => x.AccountNumber)
-            .NotEmpty().WithMessage("Account number is required.")
             .MaximumLength(20).WithMessage("Account number cannot exceed 20 characters.")
-            .Matches(@"^\d+$").WithMessage("Account number must contain digits only.");
+            .When(x => !string.IsNullOrEmpty(x.AccountNumber));
 
         RuleFor(x => x.AccountName)
             .NotEmpty().WithMessage("Account name is required.")

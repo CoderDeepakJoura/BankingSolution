@@ -43,7 +43,7 @@ namespace BankingPlatform.API.Service.AccountMasters
             _voucherMapper = voucherMapper;
         }
 
-        public async Task<string> CreateNewSavingAccAsync(CommonAccMasterDTO dto, IFormFile? picture = null , IFormFile? signature = null)
+        public async Task<(string Error, int AccId)> CreateNewSavingAccAsync(CommonAccMasterDTO dto, IFormFile? picture = null , IFormFile? signature = null)
         {
             // Validate duplicate account number
             var duplicateFields = await _context.accountmaster
@@ -55,7 +55,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 .ToListAsync();
 
             if (duplicateFields.Any())
-                return "Account Suffix already exists";
+                return ("Account Suffix already exists", 0);
             var claimsPrincipal = _httpContextAccessor.HttpContext?.User;
             using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -67,7 +67,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 // 1. Create Account Master
                 (int headId, long headCode) = await _commonfunctions.GetSavingProductPrincipalHead(dto.AccountMasterDTO!.BranchId, (int)dto.AccountMasterDTO.GeneralProductId!);
                 if (headId == 0 || headCode == 0)
-                    return "Principal Balance Head Code not configured properly. Kindly configure it in Saving Product Master.";
+                    return ("Principal Balance Head Code not configured properly. Kindly configure it in Saving Product Master.", 0);
                 dto.AccountMasterDTO!.HeadId = headId;
                 dto.AccountMasterDTO!.HeadCode = headCode;
                 dto.AccountMasterDTO!.addedUsing = dto.AccountMasterDTO.addedUsing;
@@ -209,12 +209,12 @@ namespace BankingPlatform.API.Service.AccountMasters
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                return "Success";
+                return ("", accountId);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return $"Error: {ex.Message}";
+                return ($"Error: {ex.Message}", 0);
             }
         }
 

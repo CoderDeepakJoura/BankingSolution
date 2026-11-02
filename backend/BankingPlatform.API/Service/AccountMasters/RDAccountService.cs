@@ -38,7 +38,7 @@ namespace BankingPlatform.API.Service.AccountMasters
         // ───────────────────────────────────────────────
         // CREATE
         // ───────────────────────────────────────────────
-        public async Task<string> CreateNewRDAccAsync(CommonAccMasterDTO dto)
+        public async Task<(string Error, int AccId)> CreateNewRDAccAsync(CommonAccMasterDTO dto)
         {
             var duplicateFields = await _context.accountmaster
                 .Where(x => x.BranchId == dto.AccountMasterDTO!.BranchId
@@ -49,7 +49,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                 .ToListAsync();
 
             if (duplicateFields.Any())
-                return "Account Suffix already exists";
+                return ("Account Suffix already exists", 0);
 
             var claimsPrincipal = _httpContextAccessor.HttpContext?.User;
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -65,7 +65,7 @@ namespace BankingPlatform.API.Service.AccountMasters
                     dto.AccountMasterDTO!.BranchId, (int)dto.AccountMasterDTO.GeneralProductId!);
 
                 if (headId == 0 || headCode == 0)
-                    return "Principal Balance Head Code not configured properly. Kindly configure it in RD Product Master.";
+                    return ("Principal Balance Head Code not configured properly. Kindly configure it in RD Product Master.", 0);
 
                 dto.AccountMasterDTO!.HeadId = headId;
                 dto.AccountMasterDTO!.HeadCode = headCode;
@@ -282,12 +282,12 @@ namespace BankingPlatform.API.Service.AccountMasters
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
-                return "Success";
+                return ("", accountId);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return $"Error: {ex.Message}";
+                return ($"Error: {ex.Message}", 0);
             }
         }
 

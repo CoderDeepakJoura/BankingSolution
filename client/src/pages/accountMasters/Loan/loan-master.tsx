@@ -30,6 +30,7 @@ import {
 } from "../../../utils/session";
 import DatePicker from "../../../components/DatePicker";
 import autoDebitApi from "../../../services/autoDebit/autoDebitApi";
+import agentApi from "../../../services/agent/agentApi";
 
 // ─── Loan type constants ──────────────────────────────────────────────────────
 const LOAN_TYPE_INSTALLMENT = [1, 2, 3]; // Installment, Overdraft, Demand Loan
@@ -184,6 +185,11 @@ const LoanAccountMaster: React.FC = () => {
   const [autoDebitSavingAccId, setAutoDebitSavingAccId] = useState(0);
   const [memberSavingAccounts, setMemberSavingAccounts] = useState<{ accId: number; accountName: string; accountNo: string }[]>([]);
 
+  // ── Agent
+  const showAgent = useSelector((s: RootState) => s.user.showAgentModule);
+  const [agentOptions, setAgentOptions] = useState<{ value: number; label: string }[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState(0);
+
   // ── Derived flags ────────────────────────────────────────────────────────────
   const isInstallment  = productInfo ? LOAN_TYPE_INSTALLMENT.includes(productInfo.typeId) : true;
   const isLimitWise    = productInfo?.typeId === LOAN_TYPE_LIMITWISE;
@@ -281,14 +287,16 @@ const LoanAccountMaster: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        const [prodRes, relRes, membersRes] = await Promise.all([
+        const [prodRes, relRes, membersRes, agentRes] = await Promise.all([
           commonservice.fetch_loan_products(user.branchid),
           commonservice.relation_info(),
           commonservice.fetch_active_members(user.branchid),
+          agentApi.getAgentDropdown(user.branchid).catch(() => ({ items: [] })),
         ]);
         setLoanProducts(prodRes.data ?? []);
         setRelations(relRes.data ?? []);
         setActiveMembers((membersRes as any).data ?? []);
+        setAgentOptions(((agentRes as any).items ?? []).map((a: any) => ({ value: a.id, label: `${a.code} — ${a.name}` })));
       } catch {
         Swal.fire("Error", "Failed to load required data", "error");
       }
@@ -508,6 +516,14 @@ const LoanAccountMaster: React.FC = () => {
               overDueDate: ob.overDueDate ? commonservice.splitDate(ob.overDueDate) : "",
             });
           }
+        }
+        // Load current agent assignment
+        if (showAgent) {
+          try {
+            const agentHistory = await agentApi.getAccountAgentHistory(user.branchid, Number(accountId));
+            const current = (agentHistory as any).items?.find((x: any) => !x.toDate);
+            if (current) setSelectedAgentId(current.agentId);
+          } catch { /* non-critical */ }
         }
         Swal.close();
       } catch (error: any) {
@@ -1042,6 +1058,14 @@ const LoanAccountMaster: React.FC = () => {
                 savingAccountId: autoDebitSavingAccId,
                 notes: "Set from Loan Account Master",
               });
+            } catch { /* non-critical */ }
+          }
+        }
+        if (showAgent && selectedAgentId > 0) {
+          const savedAccId = isEditMode ? Number(accountId!) : (res as any).data?.accId;
+          if (savedAccId) {
+            try {
+              await agentApi.assignAgent(user.branchid, savedAccId, 1, selectedAgentId, formData.openingDate);
             } catch { /* non-critical */ }
           }
         }
@@ -2008,6 +2032,21 @@ const LoanAccountMaster: React.FC = () => {
               )}
 
             </div>
+
+            {/* Agent Assignment */}
+            {showAgent && activeTab === "loan-detail" && memberDetails?.memberId && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 mx-5 mb-4">
+                <label className="block text-sm font-semibold text-emerald-800 mb-2">Assign Agent (optional)</label>
+                <Select
+                  options={agentOptions}
+                  value={agentOptions.find(o => o.value === selectedAgentId) || null}
+                  onChange={(opt: any) => setSelectedAgentId(opt?.value ?? 0)}
+                  isClearable
+                  placeholder="— Select Agent —"
+                  styles={{ control: (base: any) => ({ ...base, cursor: "pointer" }) }}
+                />
+              </div>
+            )}
 
             {/* Auto-Debit Mandate */}
             {memberDetails?.memberId && (

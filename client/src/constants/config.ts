@@ -4,4 +4,4 @@ export const API_CONFIG = {
 };
 
 export const APP_VERSION = "1.1.17";
-export const APP_VERSION_DATE = "13-October-2026";
+export const APP_VERSION_DATE = "02-November-2026";

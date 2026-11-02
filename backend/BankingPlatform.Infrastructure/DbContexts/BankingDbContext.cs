@@ -194,6 +194,8 @@ public partial class BankingDbContext : DbContext
     public virtual DbSet<AgentLevel> agentlevel { get; set; }
     public virtual DbSet<AgentMaster> agentmaster { get; set; }
     public virtual DbSet<AccountAgent> accountagent { get; set; }
+    public virtual DbSet<AgentLogin> agentlogin { get; set; }
+    public virtual DbSet<AgentCollection> agentcollection { get; set; }
 
     // ── Audit logging ────────────────────────────────────────────────────────────
 

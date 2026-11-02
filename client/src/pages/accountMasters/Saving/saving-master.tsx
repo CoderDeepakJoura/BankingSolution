@@ -35,6 +35,7 @@ import { ValidationSummary } from "../../../components/Validations/ValidationSum
 import { FormField } from "../../../components/Validations/FormField";
 import { canEnterOpeningBalance } from "../../../utils/session";
 import DatePicker from "../../../components/DatePicker";
+import agentApi from "../../../services/agent/agentApi";
 
 export interface SavingProduct {
   id: number;
@@ -165,6 +166,11 @@ const SavingAccountMaster = () => {
   const [signatureFile, setSignatureFile] = useState<any>(null);
   const [requirePicSign, setRequirePicSign] = useState(true);
 
+  // ─── Agent ─────────────────────────────────────────────────
+  const showAgent = useSelector((state: RootState) => state.user.showAgentModule);
+  const [agentOptions, setAgentOptions] = useState<{ value: number; label: string }[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState(0);
+
   // Refs
   const memberAccountNoRef = useRef<HTMLInputElement>(null);
   const debitAccountRef = useRef<any>(null);
@@ -173,17 +179,19 @@ const SavingAccountMaster = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productsRes, relationsRes, debitAccountsRes] = await Promise.all(
+        const [productsRes, relationsRes, debitAccountsRes, agentRes] = await Promise.all(
           [
             commonservice.fetch_saving_products(user.branchid),
             commonservice.relation_info(),
             commonservice.general_accmasters_info(user.branchid),
+            agentApi.getAgentDropdown(user.branchid).catch(() => ({ items: [] })),
           ]
         );
 
         setSavingProducts(productsRes.data || []);
         setRelations(relationsRes.data || []);
         setDebitAccounts(debitAccountsRes.data || []);
+        setAgentOptions(((agentRes as any).items ?? []).map((a: any) => ({ value: a.id, label: `${a.code} — ${a.name}` })));
       } catch (error) {
         console.error("Error loading data:", error);
         Swal.fire("Error", "Failed to load required data", "error");
@@ -756,6 +764,14 @@ const SavingAccountMaster = () => {
             } else {
               setRequirePicSign(false);
             }
+            // Load current agent assignment
+            if (showAgent) {
+              try {
+                const agentHistory = await agentApi.getAccountAgentHistory(user.branchid, Number(accountId));
+                const current = (agentHistory as any).items?.find((x: any) => !x.toDate);
+                if (current) setSelectedAgentId(current.agentId);
+              } catch { /* non-critical */ }
+            }
             Swal.close();
           } else {
             throw new Error("Account not found");
@@ -958,6 +974,14 @@ const SavingAccountMaster = () => {
       if (response.success) {
         clearErrors();
         setShowValidationSummary(false);
+        if (showAgent && selectedAgentId > 0) {
+          const savedAccId = isEditMode ? Number(accountId!) : (response as any).data?.accId;
+          if (savedAccId) {
+            try {
+              await agentApi.assignAgent(user.branchid, savedAccId, 2, selectedAgentId, formData.accountMasterDTO.accountOpeningDate || sessionDate);
+            } catch { /* non-critical */ }
+          }
+        }
         await Swal.fire({
           icon: "success",
           title: "Success!",
@@ -2637,6 +2661,21 @@ const SavingAccountMaster = () => {
                 {activeTab === "nominee" && renderNominee()}
                 {activeTab === "images" && renderImages()}
               </div>
+
+              {/* Agent Assignment */}
+              {showAgent && activeTab === "basic" && formData.memberDetails?.memberId && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 mx-6 mb-4">
+                  <label className="block text-sm font-semibold text-emerald-800 mb-2">Assign Agent (optional)</label>
+                  <Select
+                    options={agentOptions}
+                    value={agentOptions.find(o => o.value === selectedAgentId) || null}
+                    onChange={(opt: any) => setSelectedAgentId(opt?.value ?? 0)}
+                    isClearable
+                    placeholder="— Select Agent —"
+                    styles={{ control: (base: any) => ({ ...base, cursor: "pointer" }) }}
+                  />
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">

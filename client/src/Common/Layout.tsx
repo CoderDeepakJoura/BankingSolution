@@ -436,6 +436,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: "",
           subItems: [
             { label: "Update Agent of Accounts", path: "/update-agent-accounts" },
+            { label: "Agent Login Management",   path: "/agent-login-management" },
+          ],
+        },
+        {
+          label: "Receipt Posting",
+          path: "",
+          subItems: [
+            { label: "RD Kist",          path: "/receipt-posting-rd" },
+            { label: "Saving Deposit",   path: "/receipt-posting-saving" },
+            { label: "Loan Recovery",    path: "/receipt-posting-loan" },
           ],
         },
       ],

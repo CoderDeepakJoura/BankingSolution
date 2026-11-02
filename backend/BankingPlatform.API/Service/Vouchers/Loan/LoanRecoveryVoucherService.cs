@@ -1074,6 +1074,142 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             }
         }
 
+        public async Task<(string result, int voucherNo, int voucherId)> AddBatchLoanRecoveryVoucherAsync(
+            int branchId, DateTime voucherDate, int cashAccountId,
+            List<(int loanAccountId, decimal amount)> recoveries, string narration)
+        {
+            int nextVrNo = 0;
+            int newVoucherId = 0;
+
+            // Pre-validate all accounts before starting the transaction
+            var balances = new Dictionary<int, LoanRecoveryBalanceDTO>();
+            foreach (var (loanAccountId, amount) in recoveries)
+            {
+                var bal = await GetLoanBalanceAsync(loanAccountId, branchId);
+                if (bal == null) return ($"Loan account {loanAccountId} not found.", 0, 0);
+                if (bal.TotalOutstanding <= 0) return ($"Account {loanAccountId}: no outstanding balance.", 0, 0);
+                if (amount > bal.TotalOutstanding + 0.01m)
+                    return ($"Account {loanAccountId}: recovery exceeds outstanding balance.", 0, 0);
+                balances[loanAccountId] = bal;
+            }
+
+            using var tx = await _db.Database.BeginTransactionAsync();
+            try
+            {
+                decimal grandTotal = recoveries.Sum(r => r.amount);
+                using var _vrLease = await _cf.ReserveVoucherNoAsync(branchId, voucherDate);
+                nextVrNo = _vrLease.VoucherNo;
+                bool autoVerify = await _cf.IsAutoVerification(branchId);
+                string vrStatus = autoVerify ? "V" : "A";
+                int userId = int.Parse(_cf.GetCurrentUserId()!);
+                DateTime vrDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Unspecified);
+                DateTime valDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
+                string narr = string.IsNullOrWhiteSpace(narration)
+                    ? $"Agent batch loan recovery — {recoveries.Count} accounts"
+                    : narration;
+
+                var voucher = new Voucher
+                {
+                    BrID = branchId, VoucherNo = nextVrNo,
+                    VoucherType = (int)Enums.VoucherType.Loan,
+                    VoucherSubType = (int)Enums.VoucherSubType.LoanRecovery,
+                    VoucherDate = vrDate,
+                    ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                    VoucherNarration = narr, VoucherStatus = vrStatus,
+                    AddedBy = userId, ModifiedBy = 0,
+                    VerifiedBy = autoVerify ? userId : 0, OtherBrID = 0,
+                };
+                await _db.voucher.AddAsync(voucher);
+                await _db.SaveChangesAsync();
+                newVoucherId = voucher.Id;
+
+                int row = 1;
+                foreach (var (loanAccountId, amount) in recoveries)
+                {
+                    var bal = balances[loanAccountId];
+                    bool isAddInBalance = bal.ActOnIntPosting == 1;
+                    var (principalRec, intRec) = Allocate(amount, bal);
+                    decimal intTotal = intRec.Values.Sum();
+
+                    int currentRecoverableAccId = 0;
+                    if (!isAddInBalance)
+                    {
+                        var productId = await _db.accountmaster.AsNoTracking()
+                            .Where(x => x.ID == loanAccountId && x.BranchId == branchId)
+                            .Select(x => (int?)x.GeneralProductId).FirstOrDefaultAsync();
+                        if (productId.HasValue)
+                        {
+                            var bwr = await _db.loanproductbranchwiserule.AsNoTracking()
+                                .FirstOrDefaultAsync(x => x.LoanProductId == productId.Value && x.BranchId == branchId);
+                            currentRecoverableAccId = bwr?.CurrentRecoverableIntAcc ?? 0;
+                        }
+                    }
+
+                    long loanHead = await _cf.GetAccountHeadCodeFromAccId(loanAccountId, branchId);
+                    var crEntry = new VoucherCreditDebitDetails
+                    {
+                        BrId = branchId, VoucherID = newVoucherId, AccountId = loanAccountId,
+                        AccHeadCode = loanHead, VoucherAmount = principalRec,
+                        VoucherEntryType = "Cr", EntryStatus = Enums.VoucherStatus.LR.ToString(),
+                        Narration = narr, VoucherStatus = vrStatus, ValueDate = valDate,
+                        VoucherSeqNo = row++, IntCr = intTotal > 0 ? intTotal : null,
+                        HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                    };
+                    await _db.vouchercreditdebitdetails.AddAsync(crEntry);
+                    await _db.SaveChangesAsync();
+                    int crId = crEntry.Id;
+
+                    long drHead = await _cf.GetAccountHeadCodeFromAccId(cashAccountId, branchId);
+                    await _db.vouchercreditdebitdetails.AddAsync(new VoucherCreditDebitDetails
+                    {
+                        BrId = branchId, VoucherID = newVoucherId, AccountId = cashAccountId,
+                        AccHeadCode = drHead, VoucherAmount = amount,
+                        VoucherEntryType = "Dr", EntryStatus = Enums.VoucherStatus.Dr.ToString(),
+                        Narration = narr, VoucherStatus = vrStatus, ValueDate = valDate,
+                        VoucherSeqNo = row++, HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                    });
+
+                    if (!isAddInBalance && intTotal > 0 && currentRecoverableAccId > 0)
+                    {
+                        long intHead = await _cf.GetAccountHeadCodeFromAccId(currentRecoverableAccId, branchId);
+                        await _db.vouchercreditdebitdetails.AddAsync(new VoucherCreditDebitDetails
+                        {
+                            BrId = branchId, VoucherID = newVoucherId, AccountId = currentRecoverableAccId,
+                            AccHeadCode = intHead, VoucherAmount = intTotal,
+                            VoucherEntryType = "Cr", EntryStatus = "IR",
+                            Narration = narr, VoucherStatus = vrStatus, ValueDate = valDate,
+                            VoucherSeqNo = row++, HCL1 = 0, HCL2 = 0, HCL3 = 0,
+                        });
+                    }
+
+                    foreach (var (catId, catAmt) in intRec)
+                    {
+                        if (catAmt <= 0) continue;
+                        bool isUnposted = catId == CAT_STD || catId == CAT_PENAL;
+                        await _db.voucherrecintdetail.AddAsync(new VoucherRecIntDetail
+                        {
+                            BrId = branchId, VAccCrDrId = crId, VoucherId = newVoucherId,
+                            VoucherNo = nextVrNo, EntryDate = vrDate, ValueDate = valDate,
+                            IntCatId = catId, Pamt = (double)principalRec, AccId = loanAccountId,
+                            IntDr = isUnposted ? (double)catAmt : 0,
+                            IntCr = (double)catAmt,
+                            VoucherMainStatus = vrStatus,
+                        });
+                    }
+                }
+
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                return (ex.Message ?? "Error creating batch loan recovery voucher.", 0, 0);
+            }
+
+            return ("Success", nextVrNo, newVoucherId);
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────────
 
         // Public entry point used by IBLoanRecoveryService for the same allocation logic.

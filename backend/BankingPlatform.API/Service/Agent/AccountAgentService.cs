@@ -11,10 +11,17 @@ namespace BankingPlatform.API.Service.Agent
 
         private static string AccTypeName(int t) => t switch
         {
-            2 => "Saving", 3 => "General", 4 => "Share Money", 5 => "RD", 6 => "FD", _ => t.ToString()
+            1 => "Loan", 2 => "Saving", 3 => "General", 4 => "Share Money", 5 => "RD", 6 => "FD", _ => t.ToString()
         };
 
-        private record AccInfo(string AccountNumber, string AccountName);
+        private record AccInfo(string AccountNumber, string AccountName, string? AccPrefix, int? AccSuffix)
+        {
+            public string DisplayNo => !string.IsNullOrWhiteSpace(AccountNumber)
+                ? AccountNumber
+                : (!string.IsNullOrWhiteSpace(AccPrefix) && AccSuffix.HasValue
+                    ? $"{AccPrefix}-{AccSuffix}"
+                    : AccSuffix?.ToString() ?? AccountNumber);
+        }
 
         public async Task<List<AccountAgentDTO>> GetAccountsByAgentAsync(int branchId, int agentId)
         {
@@ -28,9 +35,9 @@ namespace BankingPlatform.API.Service.Agent
             {
                 var rawAccs = await _db.accountmaster.AsNoTracking()
                     .Where(x => x.BranchId == branchId && accIds.Contains(x.ID))
-                    .Select(x => new { x.ID, x.AccountNumber, x.AccountName })
+                    .Select(x => new { x.ID, x.AccountNumber, x.AccountName, x.AccPrefix, x.AccSuffix })
                     .ToListAsync();
-                accounts = rawAccs.ToDictionary(x => x.ID, x => new AccInfo(x.AccountNumber, x.AccountName ?? ""));
+                accounts = rawAccs.ToDictionary(x => x.ID, x => new AccInfo(x.AccountNumber, x.AccountName ?? "", x.AccPrefix, x.AccSuffix));
             }
             else accounts = new Dictionary<int, AccInfo>();
 
@@ -46,7 +53,7 @@ namespace BankingPlatform.API.Service.Agent
                 return new AccountAgentDTO
                 {
                     Id = x.id, BranchId = x.branchid, AccountId = x.accountid,
-                    AccountNo = acc?.AccountNumber ?? x.accountid.ToString(),
+                    AccountNo = acc?.DisplayNo ?? x.accountid.ToString(),
                     AccountName = acc?.AccountName ?? "",
                     AccType = x.acctype, AccTypeName = AccTypeName(x.acctype),
                     AgentId = x.agentid, AgentName = agentName ?? "",
@@ -71,8 +78,9 @@ namespace BankingPlatform.API.Service.Agent
 
             var rawAcc = await _db.accountmaster.AsNoTracking()
                 .Where(x => x.BranchId == branchId && x.ID == accountId)
-                .Select(x => new { x.AccountNumber, x.AccountName })
+                .Select(x => new { x.AccountNumber, x.AccountName, x.AccPrefix, x.AccSuffix })
                 .FirstOrDefaultAsync();
+            var accInfo = rawAcc != null ? new AccInfo(rawAcc.AccountNumber, rawAcc.AccountName ?? "", rawAcc.AccPrefix, rawAcc.AccSuffix) : null;
 
             return rows.Select(x =>
             {
@@ -80,7 +88,7 @@ namespace BankingPlatform.API.Service.Agent
                 return new AccountAgentDTO
                 {
                     Id = x.id, BranchId = x.branchid, AccountId = x.accountid,
-                    AccountNo = rawAcc?.AccountNumber ?? x.accountid.ToString(),
+                    AccountNo = accInfo?.DisplayNo ?? x.accountid.ToString(),
                     AccountName = rawAcc?.AccountName ?? "",
                     AccType = x.acctype, AccTypeName = AccTypeName(x.acctype),
                     AgentId = x.agentid, AgentName = agentName ?? "",

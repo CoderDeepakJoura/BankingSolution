@@ -101,6 +101,10 @@ namespace BankingPlatform.API.Service.ProductMasters.Loan
                         def.IntFormulae = dto.LoanProductDefinitionDTO.IntFormulae;
                         def.ActOnIntPosting = dto.LoanProductDefinitionDTO.ActOnIntPosting;
                     }
+                    else
+                    {
+                        _context.loanproductdefinition.Add(MapToEntity(dto.LoanProductDefinitionDTO, product.Id));
+                    }
                 }
 
                 if (dto.LoanProductAdvancementDTO != null)
@@ -128,7 +132,20 @@ namespace BankingPlatform.API.Service.ProductMasters.Loan
                                 mmr.MarginProportion = dto.LoanProductMarginMoneyRuleDTO.MarginProportion;
                                 mmr.MMPercentage = dto.LoanProductMarginMoneyRuleDTO.MMPercentage;
                             }
+                            else
+                            {
+                                _context.loanproductmarginmoneyrule.Add(MapToEntity(dto.LoanProductMarginMoneyRuleDTO, adv.Id));
+                            }
                         }
+                    }
+                    else
+                    {
+                        var newAdv = MapToEntity(dto.LoanProductAdvancementDTO, product.Id);
+                        _context.loanproductadvancement.Add(newAdv);
+                        await _context.SaveChangesAsync();
+
+                        if (dto.LoanProductMarginMoneyRuleDTO != null)
+                            _context.loanproductmarginmoneyrule.Add(MapToEntity(dto.LoanProductMarginMoneyRuleDTO, newAdv.Id));
                     }
                 }
 
@@ -143,6 +160,10 @@ namespace BankingPlatform.API.Service.ProductMasters.Loan
                         posting.MinBalGivenLimitHeadCode = dto.LoanProductPostingDTO.MinBalGivenLimitHeadCode;
                         posting.ExpHeadCode = dto.LoanProductPostingDTO.ExpHeadCode;
                         posting.RecoverableIntHeadCode = dto.LoanProductPostingDTO.RecoverableIntHeadCode;
+                    }
+                    else
+                    {
+                        _context.loanproductposting.Add(MapToEntity(dto.LoanProductPostingDTO, product.Id));
                     }
                 }
 
@@ -160,6 +181,10 @@ namespace BankingPlatform.API.Service.ProductMasters.Loan
                         recovery.IntPostingInterval = dto.LoanProductRecoveryDTO.IntPostingInterval;
                         recovery.StdOverdueOnKistDate = dto.LoanProductRecoveryDTO.StdOverdueOnKistDate;
                         recovery.RecoveryAdjustmentSeq = dto.LoanProductRecoveryDTO.RecoveryAdjustmentSeq;
+                    }
+                    else
+                    {
+                        _context.loanproductrecovery.Add(MapToEntity(dto.LoanProductRecoveryDTO, product.Id));
                     }
                 }
 

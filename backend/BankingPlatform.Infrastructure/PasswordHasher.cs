@@ -23,19 +23,24 @@ public static class PasswordHasher
 
     public static bool VerifyPassword(string password, string storedHash)
     {
-        byte[] hashBytes = Convert.FromBase64String(storedHash);
+        try
+        {
+            byte[] hashBytes = Convert.FromBase64String(storedHash);
+            if (hashBytes.Length != 48) return false;
 
-        // Extract salt
-        byte[] salt = new byte[16];
-        Buffer.BlockCopy(hashBytes, 0, salt, 0, 16);
+            byte[] salt = new byte[16];
+            Buffer.BlockCopy(hashBytes, 0, salt, 0, 16);
 
-        // Derive the hash from the input password
-        var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100_000, HashAlgorithmName.SHA256);
-        byte[] hash = pbkdf2.GetBytes(32);
+            var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100_000, HashAlgorithmName.SHA256);
+            byte[] hash = pbkdf2.GetBytes(32);
 
-        // Constant-time comparison to prevent timing side-channel attacks
-        var expected = new byte[32];
-        Buffer.BlockCopy(hashBytes, 16, expected, 0, 32);
-        return CryptographicOperations.FixedTimeEquals(hash, expected);
+            var expected = new byte[32];
+            Buffer.BlockCopy(hashBytes, 16, expected, 0, 32);
+            return CryptographicOperations.FixedTimeEquals(hash, expected);
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

@@ -66,6 +66,7 @@ import { canEnterOpeningBalance } from "../../../utils/session";
 
 import DatePicker from "../../../components/DatePicker";
 import autoDebitApi from "../../../services/autoDebit/autoDebitApi";
+import agentApi from "../../../services/agent/agentApi";
 
 
 
@@ -452,6 +453,11 @@ const RDAccountMaster = () => {
   const [autoDebitSavingAccId, setAutoDebitSavingAccId] = useState(0);
   const [memberSavingAccounts, setMemberSavingAccounts] = useState<{ accId: number; accountName: string; accountNo: string }[]>([]);
 
+  // ─── Agent ─────────────────────────────────────────────────
+  const showAgent = useSelector((s: RootState) => s.user.showAgentModule);
+  const [agentOptions, setAgentOptions] = useState<{ value: number; label: string }[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState(0);
+
 
 
   const memberAccountNoRef = useRef<HTMLInputElement>(null);
@@ -558,7 +564,7 @@ const RDAccountMaster = () => {
 
       try {
 
-        const [relationsRes, debitAccountsRes, rdProductsRes, savingAccountsRes, defaultCashRes] = await Promise.all([
+        const [relationsRes, debitAccountsRes, rdProductsRes, savingAccountsRes, defaultCashRes, agentRes] = await Promise.all([
 
           commonservice.relation_info(),
 
@@ -570,7 +576,11 @@ const RDAccountMaster = () => {
 
           commonservice.default_cash_in_hand_account(user.branchid),
 
+          agentApi.getAgentDropdown(user.branchid).catch(() => ({ items: [] })),
+
         ]);
+
+        setAgentOptions(((agentRes as any).items ?? []).map((a: any) => ({ value: a.id, label: `${a.code} — ${a.name}` })));
 
         setRelations(relationsRes.data || []);
 
@@ -938,7 +948,14 @@ useEffect(() => {
 
         }
 
-
+        // Load current agent assignment
+        if (showAgent) {
+          try {
+            const agentHistory = await agentApi.getAccountAgentHistory(user.branchid, Number(accountId));
+            const current = (agentHistory as any).items?.find((x: any) => !x.toDate);
+            if (current) setSelectedAgentId(current.agentId);
+          } catch { /* non-critical */ }
+        }
 
         Swal.close();
 
@@ -2826,6 +2843,15 @@ useEffect(() => {
         }
       }
 
+      if (showAgent && selectedAgentId > 0) {
+        const savedAccId = isEditMode ? Number(accountId!) : (response as any).data?.accId;
+        if (savedAccId) {
+          try {
+            await agentApi.assignAgent(user.branchid, savedAccId, 5, selectedAgentId, formData.accountMasterDTO.accountOpeningDate || sessionDate);
+          } catch { /* non-critical */ }
+        }
+      }
+
       Swal.fire({
 
         icon: "success",
@@ -4536,6 +4562,21 @@ useEffect(() => {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Agent Assignment */}
+          {showAgent && activeTab === "rdDetail" && formData.memberDetails?.memberId && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 mx-4 mb-6">
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">Assign Agent (optional)</label>
+              <Select
+                options={agentOptions}
+                value={agentOptions.find(o => o.value === selectedAgentId) || null}
+                onChange={(opt: any) => setSelectedAgentId(opt?.value ?? 0)}
+                isClearable
+                placeholder="— Select Agent —"
+                styles={{ control: (base: any) => ({ ...base, cursor: "pointer" }) }}
+              />
             </div>
           )}
 

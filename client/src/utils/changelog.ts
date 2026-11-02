@@ -16,9 +16,14 @@ export interface VersionEntry {
 export const changelog: VersionEntry[] = [
   {
     version: "1.1.17",
-    date: "2026-10-13",
+    date: "2026-11-02",
     changes: [
-      { type: "improvement", text: "Minor updates and bug fixes" },
+      { type: "new",         text: "Agent Mobile App: Flutter app for agents — login, RD kist, Saving deposit, and Loan recovery collection with offline-safe secure session storage" },
+      { type: "new",         text: "Agent Login Management: Super User can create/reset/toggle agent login credentials from the web portal" },
+      { type: "new",         text: "Receipt Posting — Saving/RD/Loan: single combined voucher for all selected collections in a batch (one voucher number for all accounts posted together)" },
+      { type: "fix",         text: "Receipt posting results now show the display voucher number instead of the internal DB id" },
+      { type: "fix",         text: "Mobile app: fixed OperationError on web (HTTP) by using SharedPreferences instead of FlutterSecureStorage on web builds" },
+      { type: "fix",         text: "Mobile app: fixed 0 accounts showing on dashboard due to accountNo field name mismatch between backend and Flutter DTOs" },
     ],
   },
   {

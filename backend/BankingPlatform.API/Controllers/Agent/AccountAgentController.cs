@@ -17,24 +17,45 @@ namespace BankingPlatform.API.Controllers.Agent
         [HttpGet("by-agent/{branchId}/{agentId}")]
         public async Task<IActionResult> GetByAgent(int branchId, int agentId)
         {
-            var items = await _service.GetAccountsByAgentAsync(branchId, agentId);
-            return Ok(new { Success = true, Items = items });
+            try
+            {
+                var items = await _service.GetAccountsByAgentAsync(branchId, agentId);
+                return Ok(new { Success = true, Items = items });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new ResponseDto { Success = false, Message = ex.Message });
+            }
         }
 
         [HttpGet("history/{branchId}/{accountId}")]
         public async Task<IActionResult> GetHistory(int branchId, int accountId)
         {
-            var items = await _service.GetHistoryByAccountAsync(branchId, accountId);
-            return Ok(new { Success = true, Items = items });
+            try
+            {
+                var items = await _service.GetHistoryByAccountAsync(branchId, accountId);
+                return Ok(new { Success = true, Items = items });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new ResponseDto { Success = false, Message = ex.Message });
+            }
         }
 
         [HttpPost("transfer")]
         public async Task<IActionResult> Transfer([FromBody] TransferAgentDTO dto)
         {
             if (!ModelState.IsValid) return BadRequest(new ResponseDto { Success = false, Message = "Invalid data." });
-            var result = await _service.TransferAccountsAsync(dto);
-            if (result != "Success") return BadRequest(new ResponseDto { Success = false, Message = result });
-            return Ok(new ResponseDto { Success = true, Message = "Accounts transferred successfully." });
+            try
+            {
+                var result = await _service.TransferAccountsAsync(dto);
+                if (result != "Success") return BadRequest(new ResponseDto { Success = false, Message = result });
+                return Ok(new ResponseDto { Success = true, Message = "Accounts transferred successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new ResponseDto { Success = false, Message = ex.Message });
+            }
         }
 
         [HttpPost("assign")]
@@ -42,9 +63,16 @@ namespace BankingPlatform.API.Controllers.Agent
         {
             if (!DateTime.TryParse(dto.FromDate, out var fromDate))
                 return BadRequest(new ResponseDto { Success = false, Message = "Invalid date." });
-            var result = await _service.AssignAgentAsync(dto.BranchId, dto.AccountId, dto.AccType, dto.AgentId, fromDate);
-            if (result != "Success") return BadRequest(new ResponseDto { Success = false, Message = result });
-            return Ok(new ResponseDto { Success = true, Message = "Agent assigned successfully." });
+            try
+            {
+                var result = await _service.AssignAgentAsync(dto.BranchId, dto.AccountId, dto.AccType, dto.AgentId, fromDate);
+                if (result != "Success") return BadRequest(new ResponseDto { Success = false, Message = result });
+                return Ok(new ResponseDto { Success = true, Message = "Agent assigned successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new ResponseDto { Success = false, Message = ex.Message });
+            }
         }
     }
 

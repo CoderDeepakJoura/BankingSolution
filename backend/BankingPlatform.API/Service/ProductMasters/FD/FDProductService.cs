@@ -113,6 +113,10 @@ namespace BankingPlatform.API.Service.ProductMasters.FD
                         existingRule.FdMaturityReminderInMonths = dto.fdProductRulesDTO.FdMaturityReminderInMonths;
                         existingRule.FdMaturityReminderInDays = dto.fdProductRulesDTO.FdMaturityReminderInDays;
                     }
+                    else
+                    {
+                        _context.fdproductrules.Add(MapToEntity(dto.fdProductRulesDTO, product.Id));
+                    }
                 }
 
                 if (dto.fdProductPostingHeadsDTO != null)
@@ -125,6 +129,10 @@ namespace BankingPlatform.API.Service.ProductMasters.FD
                         existingPosting.PrincipalBalHeadCode = dto.fdProductPostingHeadsDTO.PrincipalBalHeadCode;
                         existingPosting.SuspendedBalHeadCode = dto.fdProductPostingHeadsDTO.SuspendedBalHeadCode;
                         existingPosting.IntPayableHeadCode = dto.fdProductPostingHeadsDTO.IntPayableHeadCode;
+                    }
+                    else
+                    {
+                        _context.fdproductpostingheads.Add(MapToEntity(dto.fdProductPostingHeadsDTO, product.Id));
                     }
                 }
 
@@ -147,6 +155,10 @@ namespace BankingPlatform.API.Service.ProductMasters.FD
                         existingInterest.MaturityDueNoticeInDays = dto.fdProductInterestRulesDTO.MaturityDueNoticeInDays;
                         existingInterest.IntPostingInterval = dto.fdProductInterestRulesDTO.IntPostingInterval;
                         existingInterest.IntPostingDate = dto.fdProductInterestRulesDTO.IntPostingDate;
+                    }
+                    else
+                    {
+                        _context.fdproductinterestrules.Add(MapToEntity(dto.fdProductInterestRulesDTO, product.Id));
                     }
                 }
 

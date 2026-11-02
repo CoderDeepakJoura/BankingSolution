@@ -2463,6 +2463,36 @@ CREATE TABLE IF NOT EXISTS accountagent (
     CONSTRAINT pk_accountagent PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS agentlogin (
+    id                  SERIAL,
+    branchid            INTEGER       NOT NULL DEFAULT 0,
+    agentmasterid       INTEGER       NOT NULL DEFAULT 0,
+    username            VARCHAR(100)  NOT NULL DEFAULT '',
+    passwordhash        VARCHAR(300)  NOT NULL DEFAULT '',
+    issuperagent        BOOLEAN       NOT NULL DEFAULT FALSE,
+    isactive            BOOLEAN       NOT NULL DEFAULT TRUE,
+    refreshtoken        VARCHAR(500)  NULL,
+    refreshtokenexpiry  TIMESTAMP     NULL,
+    createdat           TIMESTAMP     NOT NULL DEFAULT NOW(),
+    CONSTRAINT pk_agentlogin PRIMARY KEY (id),
+    CONSTRAINT uq_agentlogin_username UNIQUE (username)
+);
+
+CREATE TABLE IF NOT EXISTS agentcollection (
+    id              SERIAL,
+    branchid        INTEGER       NOT NULL DEFAULT 0,
+    agentid         INTEGER       NOT NULL DEFAULT 0,
+    accountid       INTEGER       NOT NULL DEFAULT 0,
+    acctype         VARCHAR(20)   NOT NULL DEFAULT '',
+    amount          NUMERIC(18,2) NOT NULL DEFAULT 0,
+    collectiondate  DATE          NOT NULL DEFAULT CURRENT_DATE,
+    isposted        BOOLEAN       NOT NULL DEFAULT FALSE,
+    voucherid       INTEGER       NULL,
+    notes           VARCHAR(300)  NULL,
+    createdat       TIMESTAMP     NOT NULL DEFAULT NOW(),
+    CONSTRAINT pk_agentcollection PRIMARY KEY (id)
+);
+
 -- agentlevel incremental columns
 ALTER TABLE agentlevel ADD COLUMN IF NOT EXISTS branchid        INTEGER      NOT NULL DEFAULT 0;
 ALTER TABLE agentlevel ADD COLUMN IF NOT EXISTS code            VARCHAR(20)  NOT NULL DEFAULT '';
@@ -2485,6 +2515,34 @@ ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS acctype       INTEGER      NOT
 ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS agentid       INTEGER      NOT NULL DEFAULT 0;
 ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS fromdate      DATE         NOT NULL DEFAULT CURRENT_DATE;
 ALTER TABLE accountagent ADD COLUMN IF NOT EXISTS todate        DATE         NULL;
+
+-- agentlogin incremental columns
+ALTER TABLE agentlogin ADD COLUMN IF NOT EXISTS branchid           INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE agentlogin ADD COLUMN IF NOT EXISTS agentmasterid      INTEGER      NOT NULL DEFAULT 0;
+ALTER TABLE agentlogin ADD COLUMN IF NOT EXISTS username           VARCHAR(100) NOT NULL DEFAULT '';
+ALTER TABLE agentlogin ADD COLUMN IF NOT EXISTS passwordhash       VARCHAR(300) NOT NULL DEFAULT '';
+ALTER TABLE agentlogin ADD COLUMN IF NOT EXISTS issuperagent       BOOLEAN      NOT NULL DEFAULT FALSE;
+ALTER TABLE agentlogin ADD COLUMN IF NOT EXISTS isactive           BOOLEAN      NOT NULL DEFAULT TRUE;
+ALTER TABLE agentlogin ADD COLUMN IF NOT EXISTS refreshtoken       VARCHAR(500) NULL;
+ALTER TABLE agentlogin ADD COLUMN IF NOT EXISTS refreshtokenexpiry TIMESTAMP    NULL;
+ALTER TABLE agentlogin ADD COLUMN IF NOT EXISTS createdat          TIMESTAMP    NOT NULL DEFAULT NOW();
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_agentlogin_username') THEN
+        ALTER TABLE agentlogin ADD CONSTRAINT uq_agentlogin_username UNIQUE (username);
+    END IF;
+END $$;
+
+-- agentcollection incremental columns
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS branchid       INTEGER       NOT NULL DEFAULT 0;
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS agentid        INTEGER       NOT NULL DEFAULT 0;
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS accountid      INTEGER       NOT NULL DEFAULT 0;
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS acctype        VARCHAR(20)   NOT NULL DEFAULT '';
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS amount         NUMERIC(18,2) NOT NULL DEFAULT 0;
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS collectiondate DATE          NOT NULL DEFAULT CURRENT_DATE;
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS isposted       BOOLEAN       NOT NULL DEFAULT FALSE;
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS voucherid      INTEGER       NULL;
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS notes          VARCHAR(300)  NULL;
+ALTER TABLE agentcollection ADD COLUMN IF NOT EXISTS createdat      TIMESTAMP     NOT NULL DEFAULT NOW();
 
 -- ibvoucherexpensedetail incremental columns (added for IB Loan Expense feature)
 ALTER TABLE ibvoucherexpensedetail ADD COLUMN IF NOT EXISTS ibvoucherid       INTEGER      NOT NULL DEFAULT 0;

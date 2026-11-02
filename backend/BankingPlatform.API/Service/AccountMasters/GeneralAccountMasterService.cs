@@ -108,10 +108,12 @@ namespace BankingPlatform.API.Service.AccountMasters
             if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
             {
                 var term = filter.SearchTerm;
+                // HeadCode is bigint — parse client-side to avoid lower(bigint) SQL error
+                long? headCodeTerm = long.TryParse(term, out var tl) ? tl : null;
                 query = query.Where(m =>
                     m.AccountName!.ToLower().Contains(term.ToLower()) ||
                     m.AccountNumber.ToLower().Contains(term.ToLower()) ||
-                    m.HeadCode.ToString().ToLower().Contains(term.ToLower()));
+                    (headCodeTerm != null && m.HeadCode == headCodeTerm.Value));
             }
 
             var totalCount = await query.CountAsync();

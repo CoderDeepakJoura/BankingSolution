@@ -37,17 +37,13 @@ namespace BankingPlatform.API.Controllers.AccountMasters
                     WriteIndented = true
                 };
                 var dto = JsonSerializer.Deserialize<CommonAccMasterDTO>(request.AccountData, options);
-                var result = await _service.CreateNewSavingAccAsync(
+                var (error, newAccId) = await _service.CreateNewSavingAccAsync(
                     dto!,
                     request.Picture,
                     request.Signature
                 );
-                if (result != "Success") return BadRequest(new ResponseDto { Success = false, Message = result });
-                return Ok(new ResponseDto
-                {
-                    Success = true,
-                    Message = "Saving Account saved successfully."
-                });
+                if (!string.IsNullOrEmpty(error)) return BadRequest(new ResponseDto { Success = false, Message = error });
+                return Ok(new { success = true, message = "Saving Account saved successfully.", data = new { accId = newAccId } });
             }
             catch (Exception ex)
             {

@@ -96,6 +96,82 @@ namespace BankingPlatform.API.Service.Vouchers.Saving
             return ("Success", nextVrNo);
         }
 
+        public async Task<(string result, int voucherNo, int voucherId)> AddBatchSavingDepositVoucherAsync(
+            int branchId, DateTime voucherDate, int cashAccountId,
+            List<(int accountId, decimal amount, string narration)> deposits)
+        {
+            int nextVrNo = 0;
+            int newVoucherId = 0;
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                decimal total = deposits.Sum(d => d.amount);
+                using var _vrLease = await _commonfunctions.ReserveVoucherNoAsync(branchId, voucherDate);
+                nextVrNo = _vrLease.VoucherNo;
+                bool isAutoVerification = await _commonfunctions.IsAutoVerification(branchId);
+                int userId = int.Parse(_commonfunctions.GetCurrentUserId()!);
+                string status = isAutoVerification ? "V" : "A";
+                DateTime vDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Unspecified);
+                DateTime valueDate = DateTime.SpecifyKind(voucherDate, DateTimeKind.Utc);
+
+                string batchNarration = deposits.Count == 1
+                    ? deposits[0].narration
+                    : $"Agent batch saving deposit — {deposits.Count} accounts";
+
+                var voucherEntity = _memberService.MapToEntity(new VoucherDTO
+                {
+                    ActualTime = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                    VoucherDate = vDate,
+                    AddedBy = userId,
+                    BrID = branchId,
+                    ModifiedBy = 0,
+                    VerifiedBy = isAutoVerification ? userId : 0,
+                    VoucherNarration = batchNarration,
+                    OtherBrID = 0,
+                    VoucherNo = nextVrNo,
+                    VoucherStatus = status,
+                    VoucherType = (int)Enums.VoucherType.Saving,
+                    VoucherSubType = (int)Enums.VoucherSubType.Deposit,
+                });
+                await _context.voucher.AddAsync(voucherEntity);
+                await _context.SaveChangesAsync();
+                newVoucherId = voucherEntity.Id;
+
+                int row = 1;
+                foreach (var (accountId, amount, narration) in deposits)
+                {
+                    var crEntry = _memberService.voucherCreditDebitDetails(
+                        await _commonfunctions.GetAccountHeadCodeFromAccId(accountId, branchId),
+                        accountId, branchId, Enums.VoucherStatus.Cr.ToString(),
+                        narration, amount, status, valueDate, "Cr", newVoucherId, row++);
+                    await _context.vouchercreditdebitdetails.AddAsync(crEntry);
+                    await _context.SaveChangesAsync();
+
+                    var savingDetail = _voucherMapper.voucherSavingDetails(
+                        branchId, accountId, 0, crEntry.Id, newVoucherId,
+                        narration, amount, status, vDate, valueDate, "SD", 0);
+                    await _context.vouchersavingdetail.AddAsync(savingDetail);
+                }
+
+                var drEntry = _memberService.voucherCreditDebitDetails(
+                    await _commonfunctions.GetAccountHeadCodeFromAccId(cashAccountId, branchId),
+                    cashAccountId, branchId, Enums.VoucherStatus.Dr.ToString(),
+                    batchNarration, total, status, valueDate, "Dr", newVoucherId, row);
+                await _context.vouchercreditdebitdetails.AddAsync(drEntry);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return (ex.Message ?? "Error creating batch saving voucher.", 0, 0);
+            }
+
+            return ("Success", nextVrNo, newVoucherId);
+        }
+
         public async Task<(string result, int voucherNo)> UpdateSavingVoucher(int voucherId, SavingVoucherDTO dto)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();

@@ -142,6 +142,11 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Reports.MemberAccountsSer
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.FDOpeningService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.RDMaturityService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Reports.RDFinancialReportService>();
+// Agent module services
+builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AgentAuthService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AgentLoginManagementService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AgentMobileService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AgentReceiptPostingService>();
 // Configure DbContext with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("BankingDatabase")
     ?? throw new InvalidOperationException("Connection string 'BankingDatabase' is missing.");
@@ -161,6 +166,9 @@ if (string.IsNullOrEmpty(jwtSettings.SecretKey) || string.IsNullOrEmpty(jwtSetti
     throw new InvalidOperationException("JWT settings (SecretKey, Issuer, or Audience) are missing or invalid.");
 }
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+// Agent JWT settings (separate scheme for mobile app)
+builder.Services.Configure<BankingPlatform.Infrastructure.Settings.AgentJwtSettings>(
+    builder.Configuration.GetSection("AgentJwtSettings"));
 builder.Services.Configure<DocPaths>(builder.Configuration.GetSection("DocPaths"));
 builder.Services.Configure<ScriptPath>(builder.Configuration.GetSection("ScriptPath"));
 builder.Services.AddHttpContextAccessor();
@@ -356,6 +364,30 @@ builder.Services.AddAuthentication(options =>
         }
     };
 });
+
+// Add AgentBearer scheme — separate JWT for mobile agent app
+var agentJwtSettings = builder.Configuration.GetSection("AgentJwtSettings").Get<BankingPlatform.Infrastructure.Settings.AgentJwtSettings>();
+if (agentJwtSettings != null && !string.IsNullOrEmpty(agentJwtSettings.SecretKey))
+{
+    builder.Services.AddAuthentication()
+        .AddJwtBearer("AgentBearer", options =>
+        {
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            options.SaveToken = true;
+            var agentKeyBytes = Convert.FromBase64String(agentJwtSettings.SecretKey);
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = agentJwtSettings.Issuer,
+                ValidAudience = agentJwtSettings.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(agentKeyBytes),
+                ClockSkew = TimeSpan.Zero
+            };
+        });
+}
 
 builder.Services.AddAuthorization();
 
