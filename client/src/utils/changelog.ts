@@ -15,6 +15,13 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.18",
+    date: "2026-11-10",
+    changes: [
+      { type: "fix", text: "Cash Book: session date range now reflects current login session instead of the first DB session from 2018" },
+    ],
+  },
+  {
     version: "1.1.17",
     date: "2026-11-02",
     changes: [
