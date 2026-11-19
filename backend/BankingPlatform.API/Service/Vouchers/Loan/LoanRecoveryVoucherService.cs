@@ -77,6 +77,45 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     effectiveOvdRate = slabDetail!.PenalIntRate!.Value;
             }
 
+            // Effective standard rate: use account's stored rate; fall back to slab StdIntRate
+            // (mirrors the existing penal rate slab fallback above) for legacy accounts where
+            // kist detail was never saved.
+            double effectiveStdRate = kist?.StandardInterestRate ?? limitDetail?.StandardInterestRate ?? 0;
+            DateTime? effectiveLoanDate = kist?.LoanDate ?? limitDetail?.LoanDate;
+            if (effectiveStdRate == 0 && acc.GeneralProductId.HasValue)
+            {
+                // Look up the product's default slab and use its StdIntRate.
+                decimal loanAmt    = (decimal)(kist?.LoanAmountPassed ?? 0);
+                int     loanPeriod = kist?.LoanPeriod ?? 0;
+                var productSlab = await _db.loanslab.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.LoanProductId == acc.GeneralProductId.Value && x.BrId == branchId);
+                if (productSlab != null)
+                {
+                    var slabDetail = await _db.loanslabdetail.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.SlabId == productSlab.Id
+                            && x.FromAmount <= loanAmt && x.ToAmount >= loanAmt
+                            && (x.PeriodFrom == null || x.PeriodFrom <= loanPeriod)
+                            && (x.PeriodTo   == null || x.PeriodTo   >= loanPeriod));
+                    if ((slabDetail?.StdIntRate ?? 0) > 0)
+                        effectiveStdRate = slabDetail!.StdIntRate!.Value;
+                    // Also fill overdue rate from slab if still missing
+                    if (effectiveOvdRate == 0 && (slabDetail?.PenalIntRate ?? 0) > 0)
+                        effectiveOvdRate = slabDetail!.PenalIntRate!.Value;
+                }
+            }
+
+            // Loan date fallback: derive from first LA entry when kist detail is absent.
+            if (effectiveLoanDate == null)
+            {
+                var firstLaDate = await _db.vouchercreditdebitdetails.AsNoTracking()
+                    .Where(x => x.AccountId == loanAccId && x.BrId == branchId && x.EntryStatus == "LA"
+                             && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
+                    .OrderBy(x => x.ValueDate).ThenBy(x => x.Id)
+                    .Select(x => (DateTime?)x.ValueDate)
+                    .FirstOrDefaultAsync();
+                effectiveLoanDate = firstLaDate?.Date;
+            }
+
             // Product definition — drives both interest calc method and loan interest type
             string intCalcMethod = "Schedule";
             int? actOnIntPosting = null;  // 1=AddInBalance, 2=Stand
@@ -107,9 +146,10 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
                 .SumAsync(x => x.VoucherAmount);
 
+            // "Cr" is the legacy entry status written by older loan recovery vouchers; "LR" is current.
             decimal recoveredTotal = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(x => x.AccountId == loanAccId && x.BrId == branchId
-                         && x.EntryStatus == Enums.VoucherStatus.LR.ToString()
+                         && (x.EntryStatus == Enums.VoucherStatus.LR.ToString() || x.EntryStatus == "Cr")
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
                 .SumAsync(x => x.VoucherAmount);
 
@@ -175,9 +215,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     PhoneNo                      = member?.PhoneNo1,
                     MembershipNo                 = member?.PermanentMembershipNo ?? member?.NominalMembershipNo,
                     LoanNo                       = kist?.LoanNo,
-                    LoanDate                     = kist?.LoanDate,
-                    StandardInterestRate         = kist?.StandardInterestRate,
-                    OverdueInterestRate          = kist?.OverdueInterestRate,
+                    LoanDate                     = effectiveLoanDate,
+                    StandardInterestRate         = effectiveStdRate > 0 ? effectiveStdRate : (double?)null,
+                    OverdueInterestRate          = effectiveOvdRate > 0 ? effectiveOvdRate : (double?)null,
                     KistAmount                   = kist?.KistAmount.HasValue == true ? (decimal)kist.KistAmount!.Value : null,
                     PrincipalBalance             = principalBal,
                     StdInterestOutstanding       = 0,
@@ -266,7 +306,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     .Max(x => (DateTime?)x.EntryDate)
                 : null;
 
-            DateTime calcFromDate = lastPostDate?.Date ?? kist?.LoanDate ?? limitDetail?.LoanDate ?? ob?.OverDueDate ?? today;
+            DateTime calcFromDate = lastPostDate?.Date ?? effectiveLoanDate ?? ob?.OverDueDate ?? today;
             DateTime calcToDate   = today;
 
             // ── Dynamic unposted interest (not yet formally posted) ───────────────
@@ -289,11 +329,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
 
                 // WO (without-interest) schedule: InterestAmt is 0 on every installment but rate
                 // is still set — fall back to day-weighted Balance method.
-                if (dynStdInt == 0 && kist != null && (kist.StandardInterestRate ?? 0) > 0 && principalBal > 0)
+                if (dynStdInt == 0 && effectiveStdRate > 0 && principalBal > 0)
                 {
                     var (wInt, wSegs) = await CalculateDayWeightedInterestAsync(
                         loanAccId, branchId, obNetForDayWeighted,
-                        calcFromDate, calcToDate, kist.StandardInterestRate!.Value);
+                        calcFromDate, calcToDate, effectiveStdRate);
                     dynStdInt = Math.Max(0, wInt);
                     calcSegments = wSegs;
                 }
@@ -352,12 +392,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     dynPenalInt = Math.Max(0, rawPenal - postedPenalInt);
                 }
             }
-            else if ((kist != null && (kist.StandardInterestRate ?? 0) > 0)
-                  || (limitDetail != null && limitDetail.StandardInterestRate > 0))
+            else if (effectiveStdRate > 0)
             {
-                double effectiveStdRate = kist != null
-                    ? (kist.StandardInterestRate ?? 0)
-                    : limitDetail!.StandardInterestRate;
 
                 if (intCalcMethod == "MinBalance")
                 {
@@ -487,9 +523,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 PhoneNo                      = member?.PhoneNo1,
                 MembershipNo                 = member?.PermanentMembershipNo ?? member?.NominalMembershipNo,
                 LoanNo                       = kist?.LoanNo ?? limitDetail?.LoanNo,
-                LoanDate                     = kist?.LoanDate ?? limitDetail?.LoanDate,
-                StandardInterestRate         = kist?.StandardInterestRate ?? limitDetail?.StandardInterestRate,
-                OverdueInterestRate          = kist?.OverdueInterestRate ?? limitDetail?.OverdueInterestRate,
+                LoanDate                     = effectiveLoanDate,
+                StandardInterestRate         = effectiveStdRate > 0 ? effectiveStdRate : (double?)null,
+                OverdueInterestRate          = effectiveOvdRate > 0 ? effectiveOvdRate : (double?)null,
                 KistAmount                   = kist?.KistAmount.HasValue == true ? (decimal)kist.KistAmount!.Value : null,
                 PrincipalBalance             = principalBal,
                 StdInterestOutstanding       = dynStdInt,       // Cat 1: unposted standard interest
@@ -527,7 +563,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             var events = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(x => x.AccountId == loanAccId && x.BrId == branchId
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
-                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "LInterest"))
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "Cr" || x.EntryStatus == "LInterest"))
                 .OrderBy(x => x.ValueDate).ThenBy(x => x.VoucherID)
                 .Select(x => new VcddEvent(x.EntryStatus, x.VoucherAmount, x.IntDr, x.IntCr, x.ValueDate))
                 .ToListAsync();
@@ -551,9 +587,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             decimal balance = obNet;
             foreach (var e in events.Where(x => x.ValueDate.Date <= calcFromDate.Date))
             {
-                if (e.EntryStatus == "LA")             balance += e.VoucherAmount;
-                else if (e.EntryStatus == "LR")        balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
-                else if (e.EntryStatus == "LInterest") balance += e.VoucherAmount;
+                if (e.EntryStatus == "LA")                              balance += e.VoucherAmount;
+                else if (e.EntryStatus == "LR" || e.EntryStatus == "Cr") balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
+                else if (e.EntryStatus == "LInterest")                  balance += e.VoucherAmount;
             }
             balance = Math.Max(0, balance);
 
@@ -578,9 +614,9 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     });
                 foreach (var e in group)
                 {
-                    if (e.EntryStatus == "LA")             balance += e.VoucherAmount;
-                    else if (e.EntryStatus == "LR")        balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
-                    else if (e.EntryStatus == "LInterest") balance += e.VoucherAmount;
+                    if (e.EntryStatus == "LA")                              balance += e.VoucherAmount;
+                    else if (e.EntryStatus == "LR" || e.EntryStatus == "Cr") balance -= (e.VoucherAmount + (e.IntCr ?? 0m));
+                    else if (e.EntryStatus == "LInterest")                  balance += e.VoucherAmount;
                 }
                 balance = Math.Max(0, balance);
                 segStart = evDate.AddDays(1);
@@ -661,7 +697,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             var vouchers = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(x => x.AccountId == loanAccId && x.BrId == branchId
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A")
-                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "LInterest"))
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "Cr" || x.EntryStatus == "LInterest"))
                 .OrderBy(x => x.ValueDate)
                 .ThenBy(x => x.VoucherID)
                 .Select(x => new
@@ -680,11 +716,12 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             foreach (var v in vouchers)
             {
                 bool isIP = v.EntryStatus == "LInterest";
-                bool isLR = v.EntryStatus == "LR";
+                bool isLR = v.EntryStatus == "LR" || v.EntryStatus == "Cr"; // "Cr" is legacy entry status for loan recovery
                 string desc = v.EntryStatus switch
                 {
                     "LA"        => "Loan Advancement",
                     "LR"        => "Loan Recovery",
+                    "Cr"        => "Loan Recovery",
                     "LInterest" => "Interest Posting",
                     _           => v.EntryStatus ?? "",
                 };

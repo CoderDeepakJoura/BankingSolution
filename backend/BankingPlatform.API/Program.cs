@@ -68,6 +68,10 @@ builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AgentLevelService>(
 builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AgentMasterService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Agent.AccountAgentService>();
 builder.Services.AddScoped<MasterUsageCheckerService>();
+builder.Services.AddSingleton<BankingPlatform.API.Service.Migration.MigrationJobStore>();
+builder.Services.AddSingleton<BankingPlatform.API.Service.Migration.BackupUploadStore>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Migration.MigrationService>();
+builder.Services.AddScoped<BankingPlatform.API.Service.Migration.BackupMigrationService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.VoucherPrint.VoucherPrintService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.FDBond.FDBondService>();
 builder.Services.AddScoped<BankingPlatform.API.Service.Receipt.ReceiptService>();

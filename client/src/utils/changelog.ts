@@ -15,6 +15,24 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.21",
+    date: "2026-11-19",
+    changes: [
+      { type: "new", text: "Data Migration screen (Super User): upload a SQL Server .bak backup, run a security scan, restore to SQL Server, then migrate selected tables to PostgreSQL — with configurable source and target connection strings" },
+      { type: "improvement", text: "Migration connection settings panel sits above both tabs so SQL Server and PostgreSQL connections are always editable regardless of active tab" },
+    ],
+  },
+  {
+    version: "1.1.20",
+    date: "2026-11-19",
+    changes: [
+      { type: "fix", text: "Loan Ledger: opening balance for Stand loans now correctly excludes legacy interest postings (LInterest) from the principal balance — previously showed 0 instead of the correct outstanding/credit balance" },
+      { type: "fix", text: "Loan Interest Posting: principal balance now correctly accounts for older loan recovery entries with legacy 'Cr' status — previously these were missed, causing the displayed principal to be higher than actual" },
+      { type: "fix", text: "Loan Ledger: loan ledger rows now correctly show older recovery entries (legacy 'Cr' status) with proper Loan Recovery description and credit column routing" },
+      { type: "fix", text: "Loan Interest Posting: interest rate now correctly displays for legacy loan accounts where kist detail was never saved — rate is now fetched from the loan product slab configuration" },
+    ],
+  },
+  {
     version: "1.1.19",
     date: "2026-11-19",
     changes: [

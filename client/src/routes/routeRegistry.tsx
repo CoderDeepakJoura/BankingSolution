@@ -199,6 +199,7 @@ import SeleniumAutomation from "../pages/seleniumautomation/automation";
 import SuperUserSettings from "../pages/superuser/SuperUserSettings";
 import AutoDebitMandates from "../pages/autoDebit/AutoDebitMandates";
 import AutoDebitHistory from "../pages/autoDebit/AutoDebitHistory";
+import Migration from "../pages/Migration";
 import EmployeeDesignationData from "../pages/Salary/employee-designation-data";
 import EmployeeMasterOperations from "../pages/Salary/employee-master-operations";
 import EmployeeMasterForm from "../pages/Salary/employee-master";
@@ -592,6 +593,9 @@ export const ROUTES: RouteEntry[] = [
   // ── Auto-Debit ────────────────────────────────────────────────────────────
   { path: "/auto-debit-mandates",             element: <AutoDebitMandates />,           label: "Auto-Debit Mandates",      category: "Auto-Debit" },
   { path: "/auto-debit-history",              element: <AutoDebitHistory />,            label: "Auto-Debit History",       category: "Auto-Debit" },
+
+  // ── Migration ─────────────────────────────────────────────────────────────
+  { path: "/migration",                       element: <Migration />,                   label: "Data Migration",           category: "Super User",    suOnly: true },
 ];
 
 /** All searchable screens for the header search bar. Imported from screenList to avoid circular deps. */

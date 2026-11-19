@@ -563,6 +563,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: "/auto-debit-history",
           suOnly: true,
         },
+        {
+          label: "Data Migration",
+          path: "/migration",
+          suOnly: true,
+        },
       ],
     },
   ];

@@ -349,10 +349,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 .Where(x => accountIds.Contains(x.AccountId) && x.BrId == brId)
                 .ToListAsync();
 
-            // All VCDD (LA / LR / LInterest) — principal calc + day-weighted interest
+            // All VCDD (LA / LR / LInterest) — principal calc + day-weighted interest.
+            // "Cr" is the legacy entry status for loan recoveries written by older vouchers; include it alongside "LR".
             var vcddRaw = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(x => accountIds.Contains(x.AccountId) && x.BrId == brId
-                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "LInterest")
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "Cr" || x.EntryStatus == "LInterest")
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
                 .OrderBy(x => x.ValueDate).ThenBy(x => x.VoucherID)
                 .Select(x => new { x.AccountId, x.EntryStatus, x.VoucherAmount, x.IntDr, x.IntCr, x.ValueDate })
@@ -380,6 +381,20 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     .Where(x => slabIds.Contains(x.SlabId) && x.PenalIntRate > 0)
                     .ToListAsync()
                 : new List<BankingPlatform.Infrastructure.Models.InterestSlabs.Loan.LoanSlabDetail>();
+
+            // Product default slab — used as std rate fallback when kist detail is missing (legacy accounts).
+            var productSlab = await _db.loanslab.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.LoanProductId == productId && x.BrId == brId);
+            BankingPlatform.Infrastructure.Models.InterestSlabs.Loan.LoanSlabDetail? productSlabDetail = null;
+            if (productSlab != null)
+            {
+                productSlabDetail = await _db.loanslabdetail.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.SlabId == productSlab.Id
+                        && x.FromAmount <= 0 && x.ToAmount >= 0);
+                // Fallback: if no row matches amount=0, take the first row of this slab.
+                productSlabDetail ??= await _db.loanslabdetail.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.SlabId == productSlab.Id);
+            }
 
             // First session start date for this branch — interest never starts before this date because
             // the user has already entered opening balance + opening interest up to (firstSessionFrom - 1).
@@ -418,9 +433,31 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 var intEntries   = intEntrMap.GetValueOrDefault(acc.ID) ?? new List<BankingPlatform.Infrastructure.Models.voucher.VoucherRecIntDetail>();
                 var kistSchedule = schedMap.GetValueOrDefault(acc.ID) ?? new List<BankingPlatform.Infrastructure.Models.AccMasters.Loan.AccountKistSchedule>();
 
+                // Per-account effective rates and loan date (may be overridden below for LimitWise / fallback)
+                double accStdRate   = kist?.StandardInterestRate ?? 0;
+                double accPenalRate = kist?.OverdueInterestRate  ?? 0;
+                DateTime? accLoanDate = kist?.LoanDate;
+                if (isLimitWise && limitDetail != null)
+                {
+                    if (accStdRate   == 0) accStdRate   = limitDetail.StandardInterestRate;
+                    if (accPenalRate == 0) accPenalRate = limitDetail.OverdueInterestRate;
+                    if (accLoanDate == null) accLoanDate = limitDetail.LoanDate;
+                }
+                // Fallback: no kist detail (legacy accounts) — use the product slab's StdIntRate.
+                if (accStdRate == 0 && productSlabDetail != null)
+                {
+                    if ((productSlabDetail.StdIntRate ?? 0) > 0)
+                        accStdRate = productSlabDetail.StdIntRate!.Value;
+                    if (accPenalRate == 0 && (productSlabDetail.PenalIntRate ?? 0) > 0)
+                        accPenalRate = productSlabDetail.PenalIntRate!.Value;
+                }
+                // Loan date fallback: derive from first LA entry when kist detail is absent.
+                if (accLoanDate == null)
+                    accLoanDate = vcdd.Where(x => x.EntryStatus == "LA").OrderBy(x => x.ValueDate).FirstOrDefault()?.ValueDate.Date;
+
                 // Principal balance (mirrors GetLoanBalanceAsync logic exactly)
                 decimal advancedTotal   = vcdd.Where(x => x.EntryStatus == "LA").Sum(x => x.VoucherAmount);
-                decimal recoveredTotal  = vcdd.Where(x => x.EntryStatus == "LR").Sum(x => x.VoucherAmount);
+                decimal recoveredTotal  = vcdd.Where(x => x.EntryStatus == "LR" || x.EntryStatus == "Cr").Sum(x => x.VoucherAmount);
                 decimal lInterestPosted = isAddInBalance ? vcdd.Where(x => x.EntryStatus == "LInterest").Sum(x => x.VoucherAmount) : 0m;
 
                 decimal openingPrincipal = ob?.TotalBalance ?? 0m;
@@ -447,13 +484,13 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 {
                     DateTime? lastIpDate = intEntries.Any() ? intEntries.Max(x => (DateTime?)x.EntryDate) : null;
                     DateTime aibTo   = today;
-                    DateTime aibFrom = (lastIpDate?.Date ?? kist?.LoanDate) ?? aibTo;
+                    DateTime aibFrom = (lastIpDate?.Date ?? accLoanDate) ?? aibTo;
                     int days = Math.Max(0, (aibTo - aibFrom.Date).Days);
 
                     decimal aibStdInt = 0m;
-                    if (days > 0 && principalBal > 0 && (kist?.StandardInterestRate ?? 0) > 0)
+                    if (days > 0 && principalBal > 0 && accStdRate > 0)
                     {
-                        decimal rate = (decimal)kist!.StandardInterestRate!.Value;
+                        decimal rate = (decimal)accStdRate;
                         if (intCalcMethod == "Schedule")
                         {
                             var schedKists = kistSchedule
@@ -482,8 +519,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         TotalPostable       = Math.Round(aibStdInt, 0, MidpointRounding.AwayFromZero),
                         CalcFromDate        = aibFrom,
                         CalcToDate          = (DateTime?)aibTo,
-                        StdInterestRate     = kist?.StandardInterestRate,
-                        OverdueInterestRate = kist?.OverdueInterestRate,
+                        StdInterestRate     = accStdRate > 0 ? accStdRate : kist?.StandardInterestRate,
+                        OverdueInterestRate = accPenalRate > 0 ? accPenalRate : kist?.OverdueInterestRate,
                         IntCalcMethod       = intCalcMethod,
                         ActOnIntPosting     = actOnIntPosting,
                         NoInterestReason    = aibStdInt == 0 ? "No interest accrued yet" : null,
@@ -492,16 +529,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 }
 
                 // ── Stand loan path ───────────────────────────────────────────────
-                // LimitWise: std and overdue rates come from accountlimitdetail, not accountkistdetail.
-                double effectiveStdRate = kist?.StandardInterestRate ?? 0;
-                double effectiveOvdRate = kist?.OverdueInterestRate ?? 0;
-                DateTime? limitLoanDate = null;
-                if (isLimitWise && limitDetail != null)
-                {
-                    if (effectiveStdRate == 0) effectiveStdRate = limitDetail.StandardInterestRate;
-                    if (effectiveOvdRate == 0) effectiveOvdRate = limitDetail.OverdueInterestRate;
-                    limitLoanDate = limitDetail.LoanDate;
-                }
+                double effectiveStdRate = accStdRate;
+                double effectiveOvdRate = accPenalRate;
                 // Slab fallback: if account's own rate is 0 but a slab is configured, use it.
                 if (effectiveOvdRate == 0 && (kist?.SlabId ?? 0) > 0)
                 {
@@ -555,7 +584,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                         .Max(x => (DateTime?)x.EntryDate)
                     : null;
 
-                DateTime calcFromDate = lastPostDate?.Date ?? kist?.LoanDate ?? limitLoanDate ?? ob?.OverDueDate ?? today;
+                DateTime calcFromDate = lastPostDate?.Date ?? accLoanDate ?? ob?.OverDueDate ?? today;
                 // If the account predates the first session, clamp to the session start.
                 // Opening balance + opening interest already cover everything before that date.
                 if (firstSession.HasValue && calcFromDate.Date < firstSession.Value.Date)
@@ -772,8 +801,8 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                     TotalPostable       = rndTotal,
                     CalcFromDate        = calcFromDate == today ? null : (DateTime?)calcFromDate,
                     CalcToDate          = (DateTime?)calcToDate,
-                    StdInterestRate     = effectiveStdRate > 0 ? effectiveStdRate : kist?.StandardInterestRate,
-                    OverdueInterestRate = effectiveOvdRate > 0 ? effectiveOvdRate : kist?.OverdueInterestRate,
+                    StdInterestRate     = effectiveStdRate > 0 ? effectiveStdRate : (double?)null,
+                    OverdueInterestRate = effectiveOvdRate > 0 ? effectiveOvdRate : (double?)null,
                     IntCalcMethod       = intCalcMethod,
                     ActOnIntPosting     = actOnIntPosting,
                     NoInterestReason    = noReason,
@@ -845,6 +874,39 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                 }
             }
 
+            // Fallback: if no kist detail (legacy accounts), use the product slab's StdIntRate —
+            // mirrors the existing penal rate slab fallback in GetLoanBalanceAsync.
+            if (stdRate == 0 && acc.GeneralProductId.HasValue)
+            {
+                var productSlab = await _db.loanslab.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.LoanProductId == acc.GeneralProductId.Value && x.BrId == branchId);
+                if (productSlab != null)
+                {
+                    decimal loanAmt    = (decimal)(kistInfo?.LoanAmountPassed ?? 0);
+                    int     loanPeriod = kistInfo?.LoanPeriod ?? 0;
+                    var slabDetail = await _db.loanslabdetail.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.SlabId == productSlab.Id
+                            && x.FromAmount <= loanAmt && x.ToAmount >= loanAmt
+                            && (x.PeriodFrom == null || x.PeriodFrom <= loanPeriod)
+                            && (x.PeriodTo   == null || x.PeriodTo   >= loanPeriod));
+                    if ((slabDetail?.StdIntRate ?? 0) > 0)
+                        stdRate = slabDetail!.StdIntRate!.Value;
+                    if (penalRate == 0 && (slabDetail?.PenalIntRate ?? 0) > 0)
+                        penalRate = slabDetail!.PenalIntRate!.Value;
+                }
+            }
+            // Loan date fallback: derive from first LA entry when kist detail is absent.
+            if (loanDate == null)
+            {
+                loanDate = await _db.vouchercreditdebitdetails.AsNoTracking()
+                    .Where(x => x.AccountId == loanAccId && x.BrId == branchId && x.EntryStatus == "LA"
+                             && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
+                    .OrderBy(x => x.ValueDate).ThenBy(x => x.Id)
+                    .Select(x => (DateTime?)x.ValueDate)
+                    .FirstOrDefaultAsync();
+                loanDate = loanDate?.Date;
+            }
+
             // First session start date — penal interest never starts before this date.
             var firstSessionDate = await _db.branchsession.AsNoTracking()
                 .Where(s => s.branchid == branchId && s.isfirst)
@@ -875,10 +937,11 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
             decimal openingIntBal = (ob?.OpenInt > 0 && ob?.OpenIntType == "Dr")
                 ? (decimal)ob!.OpenInt!.Value : 0m;
 
-            // Voucher events: LA, LR, LInterest (ValueDate is DateTime — not nullable)
+            // Voucher events: LA, LR, LInterest (ValueDate is DateTime — not nullable).
+            // "Cr" is the legacy entry status for loan recoveries written by older vouchers; include it alongside "LR".
             var rawEventsDb = await _db.vouchercreditdebitdetails.AsNoTracking()
                 .Where(x => x.AccountId == loanAccId && x.BrId == branchId
-                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "LInterest")
+                         && (x.EntryStatus == "LA" || x.EntryStatus == "LR" || x.EntryStatus == "Cr" || x.EntryStatus == "LInterest")
                          && (x.VoucherStatus == "V" || x.VoucherStatus == "A"))
                 .OrderBy(x => x.ValueDate)
                 .ThenBy(x => x.Id)
@@ -1067,6 +1130,7 @@ namespace BankingPlatform.API.Service.Vouchers.Loan
                                 hasLa = true;
                                 break;
                             case "LR":
+                            case "Cr":  // legacy entry status used by older loan recovery vouchers
                                 crOnDate       += ev.VoucherAmount;
                                 runningBalance -= ev.VoucherAmount;
                                 intRecoveredOnDate += ev.IntCr;

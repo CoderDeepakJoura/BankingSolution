@@ -227,4 +227,5 @@ export const SEARCHABLE_SCREENS: ScreenEntry[] = [
 
   // ── Super User ────────────────────────────────────────────────────────────
   { path: "/su-settings",                     label: "Super User Settings",             category: "Super User",       suOnly: true },
+  { path: "/migration",                       label: "Data Migration",                  category: "Super User",       suOnly: true },
 ];

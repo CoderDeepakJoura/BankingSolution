@@ -184,7 +184,7 @@ namespace BankingPlatform.API.Service.Reports
                     .Select(x => x.AccountNumber ?? "").FirstOrDefaultAsync() ?? "";
             }
 
-            decimal openingBalance = await CalculateOpeningBalanceAsync(branchId, accountId, fromDate.Date);
+            decimal openingBalance = await CalculateOpeningBalanceAsync(branchId, accountId, fromDate.Date, isStand);
 
             // For Stand loans: read opening interest balance (OpenInt) separately — it is not baked into
             // the principal balance, so it must be shown in the INT DR column of the opening balance row.
@@ -461,7 +461,7 @@ namespace BankingPlatform.API.Service.Reports
 
         private record LLVoucherInfo(int VoucherNo, DateTime VoucherDate);
 
-        private async Task<decimal> CalculateOpeningBalanceAsync(int branchId, int accountId, DateTime fromDate)
+        private async Task<decimal> CalculateOpeningBalanceAsync(int branchId, int accountId, DateTime fromDate, bool isStand = false)
         {
             var ob = await _context.loanaccopeningbalance.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.BranchId == branchId && x.AccId == accountId);
@@ -483,7 +483,11 @@ namespace BankingPlatform.API.Service.Reports
             foreach (var e in entries)
             {
                 if (e.EntryStatus == "LInterest")
-                    drSum += e.VoucherAmount;       // interest posting increases outstanding (AddInBalance only; Stand same net effect for OB)
+                {
+                    // Stand loans: interest doesn't affect principal balance (shown in IntDr column separately)
+                    if (!isStand)
+                        drSum += e.VoucherAmount;
+                }
                 else if (e.VoucherEntryType == "Dr")
                     drSum += e.VoucherAmount;
                 else
