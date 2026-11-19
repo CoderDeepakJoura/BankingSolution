@@ -15,6 +15,15 @@ export interface VersionEntry {
 
 export const changelog: VersionEntry[] = [
   {
+    version: "1.1.19",
+    date: "2026-11-19",
+    changes: [
+      { type: "fix", text: "FD Product Master: modify mode no longer falsely reports 'product name already exists' when the name is unchanged" },
+      { type: "fix", text: "All ledgers now default From Date to the first (oldest) session start date instead of the current session" },
+      { type: "fix", text: "Cash Book session date range now reflects the current login session" },
+    ],
+  },
+  {
     version: "1.1.18",
     date: "2026-11-10",
     changes: [

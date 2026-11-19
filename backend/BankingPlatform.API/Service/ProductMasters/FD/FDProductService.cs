@@ -87,12 +87,12 @@ namespace BankingPlatform.API.Service.ProductMasters.FD
 
                 if (dto.fdProductDTO!.ProductName.Trim() != "")
                 {
-                    if (await _context.fdproduct.Where(x => x.BranchId == dto.fdProductDTO!.BranchId && x.ProductName.ToLower() == dto.fdProductDTO!.ProductName.ToLower() && x.Id != dto.fdProductRulesDTO!.Id).AnyAsync())
+                    if (await _context.fdproduct.Where(x => x.BranchId == dto.fdProductDTO!.BranchId && x.ProductName.ToLower() == dto.fdProductDTO!.ProductName.ToLower() && x.Id != dto.fdProductDTO!.Id).AnyAsync())
                         throw new Exception("FD Product Name already Exists.");
                 }
                 if (dto.fdProductDTO!.ProductCode.Trim() != "")
                 {
-                    if (await _context.fdproduct.Where(x => x.BranchId == dto.fdProductDTO!.BranchId && x.ProductCode.ToLower() == dto.fdProductDTO!.ProductCode.ToLower() && x.Id != dto.fdProductRulesDTO!.Id).AnyAsync())
+                    if (await _context.fdproduct.Where(x => x.BranchId == dto.fdProductDTO!.BranchId && x.ProductCode.ToLower() == dto.fdProductDTO!.ProductCode.ToLower() && x.Id != dto.fdProductDTO!.Id).AnyAsync())
                         throw new Exception("FD Product Code already Exists.");
                 }
 

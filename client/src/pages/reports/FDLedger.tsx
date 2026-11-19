@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -356,7 +356,7 @@ const FDLedgerPage: React.FC = () => {
     ? commonservice.parseWorkingDate(user.workingdate)
     : new Date().toISOString().split("T")[0];
 
-  const sessionMinDate = getSessionFromDate(user.sessionInfo, workingDate);
+  const [sessionMinDate, setSessionMinDate] = useState(getSessionFromDate(user.sessionInfo, workingDate));
   const sessionMaxDate = getSessionToDate(user.sessionInfo, workingDate);
   const [products, setProducts] = useState<FDProductItem[]>([]);
   const [accounts, setAccounts] = useState<FDAccountItem[]>([]);
@@ -366,6 +366,16 @@ const FDLedgerPage: React.FC = () => {
   const [selectedDetail, setSelectedDetail] = useState<number | "">("");
   const [tillDateOnly, setTillDateOnly] = useState(false);
   const [fromDate, setFromDate] = useState(getSessionFromDate(user.sessionInfo, workingDate));
+  useEffect(() => {
+    if (!user.branchid) return;
+    dayBookApi.getSessionDates(user.branchid).then((res) => {
+      if (res.success && res.data?.fromDate) {
+        const d = res.data.fromDate.split("T")[0];
+        setFromDate(d);
+        setSessionMinDate(d);
+      }
+    }).catch(() => {});
+  }, [user.branchid]);
   const [toDate, setToDate] = useState(workingDate);
   const [withLongNarration, setWithLongNarration] = useState(false);
   const [loading, setLoading] = useState(false);

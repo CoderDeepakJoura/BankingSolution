@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -10,6 +10,7 @@ import headLedgerApi, { AccountHeadItem, HeadLedger } from "../../services/repor
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
 import { getSessionFromDate } from "../../utils/sessionUtils";
+import dayBookApi from "../../services/reports/dayBookApi";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,14 @@ const HeadLedgerPage: React.FC = () => {
   const [heads, setHeads]           = useState<AccountHeadItem[]>([]);
   const [selectedHead, setSelectedHead] = useState<{ value: number; label: string } | null>(null);
   const [fromDate, setFromDate]     = useState(getSessionFromDate(user.sessionInfo, workingDate));
+  useEffect(() => {
+    if (!user.branchid) return;
+    dayBookApi.getSessionDates(user.branchid).then((res) => {
+      if (res.success && res.data?.fromDate) {
+        setFromDate(res.data.fromDate.split("T")[0]);
+      }
+    }).catch(() => {});
+  }, [user.branchid]);
   const [toDate, setToDate]         = useState(workingDate);
   const [loading, setLoading]       = useState(false);
   const [report, setReport]         = useState<HeadLedger | null>(null);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -10,7 +10,8 @@ import generalLedgerApi, { GeneralLedgerAccountItem, GeneralLedger } from "../..
 import headLedgerApi, { AccountHeadItem, HeadLedger, HeadInDetail } from "../../services/reports/headLedgerApi";
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
-import { getSessionFromDate } from "../../utils/sessionUtils";
+import { getSessionFromDate } from "../../utils/sessionUtils";
+import dayBookApi from "../../services/reports/dayBookApi";
 
 type LedgerMode = "ac" | "head-detail" | "head-consolidate" | "head-accounts";
 
@@ -216,7 +217,15 @@ const GeneralLedgerPage: React.FC = () => {
   const [selectedHead, setSelectedHead]         = useState<{ value: number; label: string } | null>(null);
   const [generalAccounts, setGeneralAccounts]   = useState<GeneralLedgerAccountItem[]>([]);
   const [selectedAccount, setSelectedAccount]   = useState<{ value: number; label: string } | null>(null);
-  const [fromDate, setFromDate]                 = useState(getSessionFromDate(user.sessionInfo, workingDate));
+  const [fromDate, setFromDate]                 = useState(getSessionFromDate(user.sessionInfo, workingDate));
+  useEffect(() => {
+    if (!user.branchid) return;
+    dayBookApi.getSessionDates(user.branchid).then((res) => {
+      if (res.success && res.data?.fromDate) {
+        setFromDate(res.data.fromDate.split("T")[0]);
+      }
+    }).catch(() => {});
+  }, [user.branchid]);
   const [toDate, setToDate]                     = useState(workingDate);
   const [consolidate, setConsolidate]           = useState(false);
   const [nonZero, setNonZero]                   = useState(false);

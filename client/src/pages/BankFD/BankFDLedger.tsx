@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Common/Layout";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +16,7 @@ import bankFDLedgerApi, {
 import commonservice from "../../services/common/commonservice";
 import { exportToPdf, exportToExcel, ExportConfig, ExportRow } from "../../utils/reportExport";
 import { getSessionFromDate } from "../../utils/sessionUtils";
+import dayBookApi from "../../services/reports/dayBookApi";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -225,6 +226,14 @@ const BankFDLedgerPage: React.FC = () => {
 
   // Filter state
   const [fromDate, setFromDate] = useState(sessionFrom);
+  useEffect(() => {
+    if (!branchId) return;
+    dayBookApi.getSessionDates(branchId).then((res) => {
+      if (res.success && res.data?.fromDate) {
+        setFromDate(res.data.fromDate.split("T")[0]);
+      }
+    }).catch(() => {});
+  }, [branchId]);
   const [toDate, setToDate] = useState(workingDate);
 
   // Accounts
